@@ -68,8 +68,9 @@ export async function POST(req: Request) {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: process.env.GROQ_LLM_MODEL || "openai/gpt-oss-120b", // llama-3.3-70b-versatile fue retirado por Groq
       temperature: 0,
+      reasoning_effort: "low",
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM },
@@ -77,7 +78,10 @@ export async function POST(req: Request) {
       ],
     }),
   });
-  if (!llmRes.ok) return NextResponse.json({ error: "Fallo al interpretar" }, { status: 502 });
+  if (!llmRes.ok) {
+    console.error("groq llm", llmRes.status, (await llmRes.text()).slice(0, 300));
+    return NextResponse.json({ error: "Fallo al interpretar" }, { status: 502 });
+  }
 
   try {
     const json = await llmRes.json();
