@@ -1,0 +1,81 @@
+{
+  "ublVersion": "2.1",
+  "tipoOperacion": "0101",
+  "tipoDoc": "01",
+  "serie": "F001",
+  "correlativo": "__NUM__",
+  "fechaEmision": "__NOW__",
+  "formaPago": {
+    "tipo": "Contado"
+  },
+  "tipoMoneda": "PEN",
+  "company": {
+    "ruc": "20000000001",
+    "razonSocial": "EMPRESA PRUEBA SAC",
+    "nombreComercial": "EMPRESA PRUEBA SAC",
+    "address": {
+      "ubigueo": "150101",
+      "codigoPais": "PE",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "LIMA",
+      "urbanizacion": "-",
+      "direccion": "AV. EJEMPLO 123"
+    }
+  },
+  "client": {
+    "tipoDoc": "6",
+    "numDoc": "20480072872",
+    "rznSocial": "CLIENTE SAC",
+    "address": {
+      "ubigueo": "-",
+      "codigoPais": "PE",
+      "departamento": "-",
+      "provincia": "-",
+      "distrito": "-",
+      "direccion": "AV. LIMA 1"
+    }
+  },
+  "mtoOperGravadas": 251,
+  "mtoIGV": 45.18,
+  "totalImpuestos": 45.18,
+  "valorVenta": 251,
+  "subTotal": 296.18,
+  "mtoImpVenta": 296.18,
+  "details": [
+    {
+      "unidad": "NIU",
+      "cantidad": 2,
+      "codProducto": "001",
+      "descripcion": "Instalación eléctrica",
+      "mtoValorUnitario": 100.5,
+      "mtoValorVenta": 201,
+      "mtoBaseIgv": 201,
+      "porcentajeIgv": 18,
+      "igv": 36.18,
+      "tipAfeIgv": "10",
+      "totalImpuestos": 36.18,
+      "mtoPrecioUnitario": 118.59
+    },
+    {
+      "unidad": "NIU",
+      "cantidad": 1.5,
+      "codProducto": "002",
+      "descripcion": "Material",
+      "mtoValorUnitario": 33.33,
+      "mtoValorVenta": 50,
+      "mtoBaseIgv": 50,
+      "porcentajeIgv": 18,
+      "igv": 9,
+      "tipAfeIgv": "10",
+      "totalImpuestos": 9,
+      "mtoPrecioUnitario": 39.333333
+    }
+  ],
+  "legends": [
+    {
+      "code": "1000",
+      "value": "SON DOSCIENTOS NOVENTA Y SEIS CON 18/100 SOLES"
+    }
+  ]
+}

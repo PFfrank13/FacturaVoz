@@ -1,0 +1,52 @@
+# Lycet (API REST sobre Greenter) detrás de Caddy con HTTPS automático.
+# Lycet NO se publica: solo Caddy escucha en 80/443 y exige credenciales.
+services:
+  lycet:
+    build:
+      # Versión fijada (no «master»): cámbiala solo tras probar en beta.
+      context: https://github.com/giansalex/lycet.git#872b048a21ec7f09fdc2fb2850442742531032fd
+    restart: unless-stopped
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${LYCET_APP_SECRET:?falta LYCET_APP_SECRET}
+      CLIENT_TOKEN: ${LYCET_TOKEN:?falta LYCET_TOKEN}
+      CORS_ALLOW_ORIGIN: '^$'
+      TRUSTED_PROXIES: "172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"
+      # Credenciales por defecto de la imagen = SOLO pruebas SUNAT; cada empresa real se registra desde la app.
+    volumes:
+      - lycet_data:/var/www/html/data   # empresas.json + certificados (SECRETOS: respáldalos cifrados)
+    networks: [internal]
+    expose: ["8000"]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits: { memory: 768m }
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\",8000)?0:1);'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [lycet]
+    ports: ["${HTTP_PORT:-80}:80", "${HTTPS_PORT:-443}:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?falta DOMAIN}
+      LYCET_TOKEN: ${LYCET_TOKEN}
+      LYCET_BASIC_HASH: ${LYCET_BASIC_HASH:?falta LYCET_BASIC_HASH}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [internal]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  internal:
+
+volumes:
+  lycet_data:
+  caddy_data:
+  caddy_config:

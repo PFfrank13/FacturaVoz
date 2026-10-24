@@ -1,0 +1,39 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	request_body {
+		max_size 400KB
+	}
+
+	# Salud (sin datos)
+	handle /health {
+		respond "ok" 200
+	}
+
+	# Solo lo que usa FacturaVoz. Todo lo demás (Swagger, home, otras rutas) = 404.
+	@api path /api/v1/invoice/send /api/v1/note/send /api/v1/invoice/status /api/v1/configuration/company/*
+	handle @api {
+		# Usuario "lycet" + clave larga (LYCET_API_KEY en Vercel). Comparación bcrypt.
+		basic_auth {
+			lycet {$LYCET_BASIC_HASH}
+		}
+		# El token interno de Lycet nunca sale del servidor: lo añade Caddy (reemplaza cualquiera enviado).
+		uri query token {$LYCET_TOKEN}
+		request_header -Authorization
+		reverse_proxy lycet:8000 {
+			transport http {
+				read_timeout 70s
+			}
+		}
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}
