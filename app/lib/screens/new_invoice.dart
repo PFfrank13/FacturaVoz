@@ -56,7 +56,9 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   int _seconds = 0;
   Timer? _timer;
   StreamSubscription<Amplitude>? _ampSub;
-  final List<double> _levels = List<double>.filled(28, 0.08);
+  
+  // Aquí está la corrección: growable: true
+  final List<double> _levels = List<double>.filled(28, 0.08, growable: true);
 
   final _client = TextEditingController();
   final _clientFocus = FocusNode();
