@@ -334,3 +334,81 @@ class FiscalCompany {
   final String ruc;
   final String env;
 }
+
+enum RiskLevel { low, medium, high }
+
+class RiskReport {
+  const RiskReport(this.level, this.reasons);
+  final RiskLevel level;
+  final List<String> reasons;
+}
+
+/// Revisión automática previa al guardado (reglas fijas, sin red ni IA: instantánea y gratis).
+/// Avisa de datos que suelen causar rechazos de SUNAT o errores de tipeo; nunca bloquea.
+RiskReport assessRisk({
+  required String clientName,
+  required String clientTaxId,
+  required List<LineItem> items,
+  required double taxRate,
+}) {
+  final reasons = <String>[];
+  var level = RiskLevel.low;
+  void raise(RiskLevel l, String why) {
+    reasons.add(why);
+    if (l.index > level.index) level = l;
+  }
+
+  final total = computeTotals(items, taxRate).total;
+  final doc = clientTaxId.trim();
+  final digits = RegExp(r'^\d+$').hasMatch(doc);
+
+  if (total > 5000) raise(RiskLevel.high, 'Monto alto (${total.toStringAsFixed(2)}): confirma que no hay un cero de más.');
+  for (final i in items) {
+    if (i.description.trim().isNotEmpty && i.unitPrice <= 0) {
+      raise(RiskLevel.high, '“${i.description.trim()}” tiene precio 0.');
+      break;
+    }
+  }
+  if (doc.isEmpty && total >= 700) {
+    raise(RiskLevel.medium, 'Desde S/ 700 SUNAT pide identificar al cliente (DNI o RUC).');
+  } else if (doc.isEmpty) {
+    raise(RiskLevel.medium, 'Sin DNI/RUC del cliente: solo servirá como boleta a consumidor.');
+  }
+  if (doc.isNotEmpty && digits && doc.length != 8 && doc.length != 11) {
+    raise(RiskLevel.medium, 'El documento no parece DNI (8) ni RUC (11).');
+  }
+  const generic = {'servicio', 'servicios', 'varios', 'trabajo', 'producto', 'productos', 'item', 'ítem', 'otros', 'cosa'};
+  for (final i in items) {
+    final d = i.description.trim().toLowerCase();
+    if (d.isNotEmpty && (d.length < 4 || generic.contains(d))) {
+      raise(RiskLevel.medium, 'Descripción muy genérica (“${i.description.trim()}”): sé más específico.');
+      break;
+    }
+  }
+  if (items.any((i) => i.quantity > 1000)) raise(RiskLevel.medium, 'Cantidad inusualmente alta.');
+  if (clientName.trim().length < 3) raise(RiskLevel.medium, 'Nombre de cliente muy corto.');
+  return RiskReport(level, reasons);
+}
+
+/// Empresa (organización) a la que pertenece el usuario.
+class Org {
+  const Org({required this.id, required this.name, required this.taxId, required this.role});
+  final String id;
+  final String name;
+  final String taxId;
+  final String role; // owner | admin | member
+
+  bool get isAdmin => role == 'owner' || role == 'admin';
+  String get roleLabel => switch (role) {
+        'owner' => 'Propietario',
+        'admin' => 'Administrador',
+        _ => 'Miembro',
+      };
+}
+
+class OrgMember {
+  const OrgMember({required this.userId, required this.email, required this.role});
+  final String userId;
+  final String email;
+  final String role;
+}

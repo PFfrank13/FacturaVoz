@@ -421,3 +421,41 @@ class SoftCard extends StatelessWidget {
     );
   }
 }
+
+/// Botón principal con degradado, sombra suave y rebote al pulsar.
+class GradientButton extends StatelessWidget {
+  const GradientButton({super.key, required this.label, required this.icon, required this.onPressed, this.busy = false});
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onPressed,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: onPressed == null ? 0.7 : 1,
+        child: Container(
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: Brand.heroGradient,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: Brand.softShadow(false, a: 0.35),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (busy)
+              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+            else
+              Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(width: 8),
+            Text(label, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+

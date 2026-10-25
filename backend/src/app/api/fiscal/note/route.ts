@@ -28,12 +28,13 @@ export async function POST(req: Request) {
   // Lectura con RLS del usuario: solo ve sus propios comprobantes
   const { data: doc } = await supabase
     .from("fiscal_documents")
-    .select("doc_type, series, correlative, status, env, payload")
+    .select("org_id, doc_type, series, correlative, status, env, payload")
     .eq("invoice_id", invoiceId)
     .maybeSingle();
   if (!doc) return json({ error: "Este comprobante no se emitió a SUNAT" }, 404);
   if (doc.status !== "accepted") return json({ error: "Solo se puede anular un comprobante aceptado por SUNAT" }, 409);
-  const { data: company } = await supabase.from("fiscal_companies").select("ruc, env").maybeSingle();
+  const orgId = doc.org_id as string;
+  const { data: company } = await supabase.from("fiscal_companies").select("ruc, env").eq("org_id", orgId).maybeSingle();
   if (!company) return json({ error: "Configura primero la facturación electrónica en Ajustes" }, 412);
 
   let built;
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   const { data: reserved, error: resErr } = await admin.rpc("fiscal_reserve_note", {
+    p_org: orgId,
     p_user: userId,
     p_invoice: invoiceId,
     p_series: noteSeriesFor(doc.series as string),
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
   }
 
   const { error: recErr } = await admin.rpc("fiscal_record_note", {
-    p_user: userId,
+    p_org: orgId,
     p_invoice: invoiceId,
     p_status: outcome.status,
     p_code: outcome.code,

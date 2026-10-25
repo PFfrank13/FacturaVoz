@@ -98,9 +98,13 @@ export async function POST(req: Request) {
   if (declared > MAX_BYTES + 100_000) return json({ error: "Audio demasiado grande" }, 413);
 
   let audio: File | null = null;
+  let orgId: string | null = null;
   try {
-    const f = (await req.formData()).get("audio");
+    const form = await req.formData();
+    const f = form.get("audio");
     audio = f instanceof File ? f : null;
+    const o = form.get("org_id");
+    orgId = typeof o === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o) ? o : null;
   } catch {
     return json({ error: "Audio no válido" }, 400);
   }
@@ -114,6 +118,7 @@ export async function POST(req: Request) {
     p_per_minute: MAX_PER_MINUTE,
     p_per_day: MAX_PER_DAY,
   });
+  if (quotaErr) console.error("parse: quota rpc failed", quotaErr.code);
   if (quotaErr) return json({ error: "Falta ejecutar la migración de cuotas en Supabase", code: "quota_rpc" }, 500);
   if (allowed !== true) return json({ error: "Demasiadas solicitudes, espera un momento" }, 429, { "Retry-After": "60" });
 
@@ -133,6 +138,7 @@ export async function POST(req: Request) {
       method: "POST", headers, body: stt, signal: AbortSignal.timeout(20_000),
     });
     if (sttRes.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto" }, 503, { "Retry-After": "60" });
+    if (!sttRes.ok) console.error("parse: stt failed", sttRes.status);
     if (!sttRes.ok) return json({ error: "No se pudo transcribir el audio", code: `stt_${sttRes.status}` }, 502);
     const text = String(((await sttRes.json()) as { text?: string }).text ?? "")
       .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
@@ -156,6 +162,7 @@ export async function POST(req: Request) {
       }),
     });
     if (llmRes.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto" }, 503, { "Retry-After": "60" });
+    if (!llmRes.ok) console.error("parse: llm failed", llmRes.status);
     if (!llmRes.ok) return json({ error: "No se pudo interpretar el dictado", code: `llm_${llmRes.status}`, transcript: text }, 502);
 
     const raw = JSON.parse((await llmRes.json()).choices[0].message.content) as Record<string, unknown>;
@@ -163,7 +170,9 @@ export async function POST(req: Request) {
     // Impuesto: lo dictado; si no se dijo, el configurado por el usuario (21 solo para cuentas web antiguas sin ajustes)
     let taxRate = toNum(raw.tax_rate);
     if (raw.tax_rate === null || raw.tax_rate === undefined || Number.isNaN(taxRate)) {
-      const { data: prof } = await supabase.from("profiles").select("default_tax_rate").eq("id", userId).maybeSingle();
+      const { data: prof } = orgId
+        ? await supabase.from("organizations").select("default_tax_rate").eq("id", orgId).maybeSingle()
+        : await supabase.from("profiles").select("default_tax_rate").eq("id", userId).maybeSingle();
       taxRate = prof?.default_tax_rate != null ? Number(prof.default_tax_rate) : 21;
     }
     // Saneo manual y tolerante: nunca perdemos lo que se dictó; el usuario revisa y completa en pantalla.
@@ -187,7 +196,8 @@ export async function POST(req: Request) {
     return json({
       invoice: { client_name: clientName, tax_rate: Math.min(100, Math.max(0, round2(taxRate))), notes, items, transcript: text },
     });
-  } catch {
+  } catch (e) {
+    console.error("parse: unexpected", e instanceof Error ? e.name : "unknown");
     return json({ error: "Respuesta no válida del servicio de voz", code: "parse" }, 502);
   }
 }

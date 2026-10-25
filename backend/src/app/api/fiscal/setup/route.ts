@@ -31,8 +31,18 @@ export async function POST(req: Request) {
   if (!solUser || !/^[A-Za-z0-9ñÑ_.-]+$/.test(solUser)) return json({ error: "Usuario SOL no válido" }, 400);
   if (!solPass || !certB64 || !format || !env) return json({ error: "Faltan datos" }, 400);
 
-  const { data: profile } = await auth.supabase.from("profiles").select("tax_id").eq("id", auth.userId).maybeSingle();
-  const ruc = (profile?.tax_id ?? "").trim();
+  // Empresa: la indicada (UUID) o la primera del usuario; solo propietario/administrador conecta SUNAT
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let orgId = typeof body.org_id === "string" && UUID.test(body.org_id) ? body.org_id : null;
+  if (!orgId) {
+    const { data: first } = await auth.supabase.from("organization_members").select("org_id").eq("user_id", auth.userId).order("created_at").limit(1).maybeSingle();
+    orgId = (first?.org_id as string | undefined) ?? null;
+  }
+  if (!orgId) return json({ error: "No tienes una empresa. Ejecuta la migración multi-empresa." }, 412);
+  const { data: role } = await auth.supabase.rpc("my_org_role", { p_org: orgId });
+  if (role !== "owner" && role !== "admin") return json({ error: "Solo el propietario o un administrador puede conectar SUNAT" }, 403);
+  const { data: org } = await auth.supabase.from("organizations").select("tax_id").eq("id", orgId).maybeSingle();
+  const ruc = (org?.tax_id ?? "").trim();
   if (!isValidRuc(ruc)) return json({ error: "Primero escribe un RUC válido en «Datos del negocio»" }, 400);
 
   // 1) Certificado válido (antes de reclamar el RUC)
@@ -48,10 +58,10 @@ export async function POST(req: Request) {
 
   // 2) Un RUC pertenece a UN solo usuario
   const admin = createAdminClient();
-  const { data: claim, error: claimErr } = await admin.rpc("fiscal_claim_company", { p_user: auth.userId, p_ruc: ruc, p_env: env });
+  const { data: claim, error: claimErr } = await admin.rpc("fiscal_claim_company", { p_org: orgId, p_user: auth.userId, p_ruc: ruc, p_env: env });
   if (claimErr) return json({ error: "Error inesperado" }, 500);
-  if (claim === "ruc_taken") return json({ error: "Ese RUC ya está registrado por otra cuenta. Contacta a soporte." }, 409);
-  if (claim === "other_ruc") return json({ error: "Tu cuenta ya usa otro RUC. Contacta a soporte para cambiarlo." }, 409);
+  if (claim === "ruc_taken") return json({ error: "Ese RUC ya está registrado por otra empresa. Contacta a soporte." }, 409);
+  if (claim === "other_ruc") return json({ error: "Esta empresa ya usa otro RUC. Contacta a soporte para cambiarlo." }, 409);
 
   // 3) Registro en Lycet (el SOL_USER es RUC + usuario)
   try {

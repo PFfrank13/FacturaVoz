@@ -4,8 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_state.dart';
 import '../config.dart';
 import '../services/repo.dart';
+import '../ui/theme.dart';
+import '../ui/widgets.dart';
 import 'fiscal_setup.dart';
 import 'legal.dart';
+import 'orgs.dart';
+import 'reports.dart';
 import 'profile_form.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -58,34 +62,114 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  Widget _tile(BuildContext context, {required IconData icon, required String title, String? subtitle, required VoidCallback onTap, Color? color}) {
+    final t = Theme.of(context);
+    final c = color ?? t.colorScheme.primary;
+    return Pressable(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: c, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: t.textTheme.titleSmall?.copyWith(color: color)),
+              if (subtitle != null) Text(subtitle, style: t.textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: t.colorScheme.onSurfaceVariant),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+    final org = AppState.instance.activeOrg;
+    void go(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
     return Scaffold(
       appBar: AppBar(title: const Text('Ajustes')),
       body: SafeArea(
-        child: ListView(children: [
-          ListTile(leading: const Icon(Icons.person_outline), title: Text(email), subtitle: const Text('Sesión iniciada')),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.business_outlined),
-            title: const Text('Datos del negocio'),
-            subtitle: const Text('Nombre, documento, moneda e impuesto'),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileFormScreen())),
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
+          Reveal(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28), boxShadow: Brand.softShadow(false, a: 0.3)),
+              child: Row(children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+                  child: Text(email.isEmpty ? '?' : email.characters.first.toUpperCase(),
+                      style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(org?.name ?? 'Mi cuenta',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                    Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                  ]),
+                ),
+              ]),
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.verified_outlined),
-            title: const Text('Facturación electrónica (SUNAT)'),
-            subtitle: const Text('RUC, usuario SOL y certificado digital'),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FiscalSetupScreen())),
+          const SizedBox(height: 18),
+          Reveal(
+            index: 1,
+            child: SoftCard(
+              padding: EdgeInsets.zero,
+              child: Column(children: [
+                _tile(context,
+                    icon: Icons.apartment_rounded,
+                    title: 'Empresas y equipo',
+                    subtitle: org?.name ?? 'Cambia de empresa o agrega a tu equipo',
+                    onTap: () => go(const OrgsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.insights_rounded,
+                    title: 'Reportes',
+                    subtitle: 'Ventas por mes y exportar a Excel',
+                    onTap: () => go(const ReportsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.business_outlined,
+                    title: 'Datos del negocio',
+                    subtitle: 'Nombre, documento, moneda e impuesto',
+                    onTap: () => go(const ProfileFormScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.verified_outlined,
+                    title: 'Facturación electrónica (SUNAT)',
+                    subtitle: 'RUC, usuario SOL y certificado digital',
+                    onTap: () => go(const FiscalSetupScreen())),
+              ]),
+            ),
           ),
-          if (Config.privacyUrl.isNotEmpty)
-            ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: const Text('Política de privacidad'), onTap: openPrivacyPolicy),
-          ListTile(leading: const Icon(Icons.logout), title: const Text('Cerrar sesión'), onTap: () => _signOut(context)),
-          ListTile(
-            leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
-            title: Text('Eliminar mi cuenta', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            onTap: () => _deleteAccount(context),
+          const SizedBox(height: 14),
+          Reveal(
+            index: 2,
+            child: SoftCard(
+              padding: EdgeInsets.zero,
+              child: Column(children: [
+                if (Config.privacyUrl.isNotEmpty) ...[
+                  _tile(context, icon: Icons.privacy_tip_outlined, title: 'Política de privacidad', onTap: openPrivacyPolicy),
+                  Divider(indent: 72, color: t.colorScheme.outline),
+                ],
+                _tile(context, icon: Icons.logout_rounded, title: 'Cerrar sesión', onTap: () => _signOut(context)),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context, icon: Icons.delete_forever_outlined, title: 'Eliminar mi cuenta', color: Brand.bad, onTap: () => _deleteAccount(context)),
+              ]),
+            ),
           ),
         ]),
       ),

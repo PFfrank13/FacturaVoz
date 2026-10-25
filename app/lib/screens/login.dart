@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart' show LaunchMode;
 
 import '../config.dart';
 import '../ui/theme.dart';
@@ -117,6 +119,26 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _msg = '';
+    });
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? null : Config.authRedirect,
+        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      );
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _msg = 'No se pudo abrir Google: ${e.message}');
+    } catch (_) {
+      if (mounted) setState(() => _msg = 'No se pudo abrir el inicio de sesión con Google.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// Solo para cuentas con contraseña creada a mano en Supabase (p. ej. revisores de las tiendas).
   Future<void> _signInPassword() async {
     final email = _email.text.trim().toLowerCase();
@@ -211,6 +233,26 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
                             ),
                             const SizedBox(height: 24),
+                            if (Config.googleLogin && !_sent) ...[
+                              OutlinedButton.icon(
+                                onPressed: _busy ? null : _google,
+                                icon: Container(
+                                  width: 24,
+                                  height: 24,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(color: t.colorScheme.primaryContainer, shape: BoxShape.circle),
+                                  child: Text('G', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w800, color: t.colorScheme.primary)),
+                                ),
+                                label: const Text('Continuar con Google'),
+                              ),
+                              const SizedBox(height: 14),
+                              Row(children: [
+                                Expanded(child: Divider(color: t.colorScheme.outline)),
+                                Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('o con tu correo', style: t.textTheme.bodySmall)),
+                                Expanded(child: Divider(color: t.colorScheme.outline)),
+                              ]),
+                              const SizedBox(height: 14),
+                            ],
                   TextField(
                     controller: _email,
                     enabled: !_sent,

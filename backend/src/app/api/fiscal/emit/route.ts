@@ -35,24 +35,26 @@ export async function POST(req: Request) {
   if (!doc.ok) return json({ error: doc.error }, 400);
   const clientAddress = typeof body.client_address === "string" ? body.client_address.trim().slice(0, 200) : "";
 
-  // Empresa habilitada (el RUC sale de la tabla del servidor, NO del perfil editable)
-  const { data: company } = await supabase.from("fiscal_companies").select("ruc, env").maybeSingle();
-  if (!company) return json({ error: "Configura primero la facturación electrónica en Ajustes" }, 412);
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("business_name, trade_name, address, ubigeo, department, province, district, series_factura, series_boleta")
-    .eq("id", userId)
-    .maybeSingle();
-  if (!profile) return json({ error: "Completa los datos del negocio" }, 412);
-
+  // La factura (RLS: solo si eres miembro de su empresa) define la empresa emisora
   const { data: inv } = await supabase
     .from("invoices")
-    .select("id, status, currency, tax_rate, client_id, clients(id, name), invoice_items(description, quantity, unit_price, position)")
+    .select("id, org_id, status, currency, tax_rate, client_id, clients(id, name), invoice_items(description, quantity, unit_price, position)")
     .eq("id", invoiceId)
     .order("position", { referencedTable: "invoice_items", ascending: true })
     .maybeSingle();
   if (!inv) return json({ error: "Factura no encontrada" }, 404);
+  const orgId = inv.org_id as string;
+
+  // Empresa habilitada (el RUC sale de la tabla del servidor, NO de datos editables)
+  const { data: company } = await supabase.from("fiscal_companies").select("ruc, env").eq("org_id", orgId).maybeSingle();
+  if (!company) return json({ error: "Configura primero la facturación electrónica de esta empresa en Ajustes" }, 412);
+
+  const { data: profile } = await supabase
+    .from("organizations")
+    .select("name, trade_name, address, ubigeo, department, province, district, series_factura, series_boleta")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (!profile) return json({ error: "Completa los datos del negocio" }, 412);
   if (inv.currency !== "PEN" && inv.currency !== "USD") return json({ error: "SUNAT solo admite soles (PEN) o dólares (USD)" }, 422);
 
   const client = (Array.isArray(inv.clients) ? inv.clients[0] : inv.clients) as { id: string; name: string } | null;
@@ -74,7 +76,7 @@ export async function POST(req: Request) {
     unit,
     issuer: {
       ruc: company.ruc as string,
-      razonSocial: profile.business_name ?? "",
+      razonSocial: profile.name ?? "",
       nombreComercial: profile.trade_name,
       ubigeo: profile.ubigeo ?? "",
       departamento: profile.department ?? "",
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   const { data: reserved, error: resErr } = await admin.rpc("fiscal_reserve", {
+    p_org: orgId,
     p_user: userId,
     p_invoice: invoiceId,
     p_doc_type: docType,
@@ -130,7 +133,7 @@ export async function POST(req: Request) {
   }
 
   const { error: recErr } = await admin.rpc("fiscal_record", {
-    p_user: userId,
+    p_org: orgId,
     p_invoice: invoiceId,
     p_status: outcome.status,
     p_code: outcome.code,

@@ -149,4 +149,22 @@ void main() {
     expect(n.typeName, 'NOTA DE CRÉDITO ELECTRÓNICA');
     expect(n.legend, 'SON UNO CON 00/100 SOLES');
   });
+
+  test('assessRisk: monto alto, sin documento y descripción genérica', () {
+    final ok = assessRisk(
+      clientName: 'Ferretería Díaz',
+      clientTaxId: '20123456789',
+      items: [LineItem(description: 'Instalación eléctrica', quantity: 1, unitPrice: 450)],
+      taxRate: 18,
+    );
+    expect(ok.level, RiskLevel.low);
+    final high = assessRisk(
+      clientName: 'Ana',
+      clientTaxId: '',
+      items: [LineItem(description: 'Servicio', quantity: 1, unitPrice: 6000)],
+      taxRate: 18,
+    );
+    expect(high.level, RiskLevel.high);
+    expect(high.reasons.length, greaterThanOrEqualTo(3));
+  });
 }

@@ -21,10 +21,49 @@ class _HomeScreenState extends State<HomeScreen> {
   List<InvoiceRecord>? _items;
   String? _error;
 
+  String? _orgSeen;
+  String _filter = 'all';
+  String _query = '';
+
   @override
   void initState() {
     super.initState();
+    _orgSeen = Repo.activeOrgId;
+    AppState.instance.addListener(_onApp);
     _load();
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onApp);
+    super.dispose();
+  }
+
+  List<InvoiceRecord> _visible() {
+    final q = _query.trim().toLowerCase();
+    return (_items ?? const <InvoiceRecord>[]).where((i) {
+      final f = i.fiscalStatus;
+      final okFilter = switch (_filter) {
+        'draft' => f == null && i.status == 'draft',
+        'issued' => f == 'accepted',
+        'review' => f == 'rejected' || f == 'error' || f == 'pending',
+        _ => true,
+      };
+      if (!okFilter) return false;
+      return q.isEmpty || i.clientName.toLowerCase().contains(q) || (i.fiscalNumber ?? i.number).toLowerCase().contains(q);
+    }).toList();
+  }
+
+  /// Al cambiar de empresa se vuelve a cargar la lista.
+  void _onApp() {
+    if (!mounted) return;
+    if (_orgSeen != Repo.activeOrgId) {
+      _orgSeen = Repo.activeOrgId;
+      setState(() => _items = null);
+      _load();
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _load() async {
@@ -46,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     await _load();
     if (id != null && mounted) {
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id)));
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true)));
       if (mounted) _load();
     }
   }
@@ -86,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: _Header(name: profile?.businessName ?? '', currency: currency, total: m.total, count: m.count, loaded: _items != null),
+              child: _Header(name: AppState.instance.activeOrg?.name ?? profile?.businessName ?? '', currency: currency, total: m.total, count: m.count, loaded: _items != null),
             ),
             if (_error != null && _items == null)
               SliverToBoxAdapter(child: _ErrorBox(message: _error!, onRetry: _load))
@@ -109,23 +148,63 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               )
             else ...[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 26, 24, 12),
-                sliver: SliverToBoxAdapter(
-                  child: Reveal(index: 2, child: Text('Recientes', style: t.textTheme.titleMedium)),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 160),
-                sliver: SliverList.separated(
-                  itemCount: _items!.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, i) => Reveal(
-                    index: 3 + i,
-                    child: _Row(inv: _items![i], onTap: () => _open(_items![i])),
+              SliverToBoxAdapter(
+                child: Reveal(
+                  index: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 6),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      TextField(
+                        onChanged: (v) => setState(() => _query = v),
+                        textInputAction: TextInputAction.search,
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar por cliente o número',
+                          prefixIcon: Icon(Icons.search_rounded),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(children: [
+                          for (final (k, label) in const [('all', 'Todas'), ('draft', 'Borradores'), ('issued', 'Emitidas'), ('review', 'Por revisar')])
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(label),
+                                selected: _filter == k,
+                                onSelected: (_) => setState(() => _filter = k),
+                              ),
+                            ),
+                        ]),
+                      ),
+                    ]),
                   ),
                 ),
               ),
+              Builder(builder: (context) {
+                final list = _visible();
+                if (list.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
+                      child: Text('Nada coincide con tu búsqueda.', textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 160),
+                  sliver: SliverList.separated(
+                    itemCount: list.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) => Reveal(
+                      key: ValueKey(list[i].id),
+                      index: 3 + (i < 8 ? i : 8),
+                      child: _Row(inv: list[i], onTap: () => _open(list[i])),
+                    ),
+                  ),
+                );
+              }),
             ],
           ],
         ),

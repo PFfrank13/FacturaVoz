@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
+import '../ui/widgets.dart';
 
 /// Datos del emisor y ajustes de facturación. En el primer uso es obligatorio:
 /// moneda e impuesto los elige el usuario (no se asumen).
@@ -93,6 +94,21 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
     }
   }
 
+  Widget _card(String title, IconData icon, List<Widget> children) {
+    final t = Theme.of(context);
+    return SoftCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 20, color: t.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(title, style: t.textTheme.titleSmall),
+        ]),
+        const SizedBox(height: 14),
+        ...children,
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,10 +135,12 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               if (widget.onboarding)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: Text('Estos datos aparecerán en tus facturas. Puedes cambiarlos cuando quieras.'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text('Estos datos aparecerán en tus facturas. Puedes cambiarlos cuando quieras.',
+                      style: Theme.of(context).textTheme.bodyMedium),
                 ),
+              _card('Tu negocio', Icons.storefront_outlined, [
               TextFormField(
                 controller: _name,
                 maxLength: 120,
@@ -141,7 +159,9 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                 maxLength: 300,
                 decoration: const InputDecoration(labelText: 'Dirección'),
               ),
-              const SizedBox(height: 8),
+              ]),
+              const SizedBox(height: 14),
+              _card('Moneda e impuesto', Icons.payments_outlined, [
               DropdownButtonFormField<String>(
                 initialValue: _currency,
                 decoration: const InputDecoration(labelText: 'Moneda *'),
@@ -178,10 +198,10 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                   ),
                 ],
               ),
+              ]),
               if (!widget.onboarding) ...[
-                const Divider(height: 32),
-                Text('Facturación electrónica (SUNAT)', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
+                _card('Facturación electrónica (SUNAT)', Icons.verified_outlined, [
                 const Text('Solo si vas a emitir facturas y boletas válidas. El RUC va en «Documento fiscal».'),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -225,10 +245,12 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                     ),
                   ),
                 ]),
+                ]),
               ],
-              if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Guardando…' : 'Guardar')),
+              if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+              const SizedBox(height: 18),
+              GradientButton(label: _busy ? 'Guardando…' : 'Guardar', icon: Icons.check_rounded, busy: _busy, onPressed: _busy ? null : _save),
+              const SizedBox(height: 24),
             ],
           ),
         ),

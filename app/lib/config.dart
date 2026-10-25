@@ -9,6 +9,12 @@ class Config {
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const privacyUrl = String.fromEnvironment('PRIVACY_URL');
 
+  /// Muestra "Continuar con Google" (requiere activar el proveedor en Supabase). --dart-define=GOOGLE_LOGIN=true
+  static const googleLogin = bool.fromEnvironment('GOOGLE_LOGIN');
+
+  /// Esquema de retorno del inicio de sesión con navegador (debe coincidir con el manifest y con Supabase).
+  static const authRedirect = 'com.facturavoz.app://login-callback';
+
   static bool _secure(String u) =>
       u.startsWith('https://') ||
       (kDebugMode && (u.startsWith('http://localhost') || u.startsWith('http://10.0.2.2')));

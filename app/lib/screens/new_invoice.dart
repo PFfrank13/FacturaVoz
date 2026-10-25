@@ -238,6 +238,13 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     return (label: 'Doc.', ok: !digits || d.length >= 3);
   }
 
+  RiskReport _risk() => assessRisk(
+        clientName: _client.text,
+        clientTaxId: _clientTax.text,
+        items: _currentItems().where((i) => i.description.trim().isNotEmpty || i.unitPrice > 0).toList(),
+        taxRate: parseDecimal(_taxRate.text) ?? 0,
+      );
+
   String? _clientError() => _client.text.trim().isEmpty ? 'Escribe el nombre del cliente' : null;
   String? _taxError() {
     final k = _docKind();
@@ -285,6 +292,24 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       HapticFeedback.heavyImpact();
       setState(() => _error = err);
       return;
+    }
+    final risk = _risk();
+    if (risk.level == RiskLevel.high) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, color: Brand.bad, size: 32),
+          title: const Text('Revisa antes de guardar'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final r in risk.reasons) Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('• $r')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Corregir')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Guardar igual')),
+          ],
+        ),
+      );
+      if (go != true) return;
     }
     setState(() {
       _saving = true;
@@ -462,6 +487,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           Reveal(index: 3, child: _taxSection(totals, cur)),
           const SizedBox(height: 14),
           Reveal(index: 4, child: _notesSection()),
+          const SizedBox(height: 14),
+          _RiskCard(report: _risk()),
           AnimatedSize(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
@@ -495,7 +522,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
                 ]),
                 const SizedBox(width: 18),
                 Expanded(
-                  child: _GradientButton(
+                  child: GradientButton(
                     label: _saving ? 'Guardando…' : 'Guardar factura',
                     icon: Icons.check_rounded,
                     busy: _saving,
@@ -908,42 +935,6 @@ class _Banner extends StatelessWidget {
   }
 }
 
-class _GradientButton extends StatelessWidget {
-  const _GradientButton({required this.label, required this.icon, required this.onPressed, this.busy = false});
-  final String label;
-  final IconData icon;
-  final VoidCallback? onPressed;
-  final bool busy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onPressed,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: onPressed == null ? 0.7 : 1,
-        child: Container(
-          height: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: Brand.heroGradient,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: Brand.softShadow(false, a: 0.35),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (busy)
-              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-            else
-              Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
 /// Barras de onda alimentadas por el nivel real del micrófono.
 class _Wave extends StatelessWidget {
   const _Wave({required this.levels, required this.color});
@@ -965,4 +956,39 @@ class _Wave extends StatelessWidget {
             ),
         ],
       );
+}
+
+/// Semáforo de riesgo: verde / amarillo / rojo con los motivos.
+class _RiskCard extends StatelessWidget {
+  const _RiskCard({required this.report});
+  final RiskReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final (c, icon, title) = switch (report.level) {
+      RiskLevel.low => (Brand.ok, Icons.verified_rounded, 'Todo se ve bien'),
+      RiskLevel.medium => (Brand.warn, Icons.error_outline_rounded, 'Revisa estos detalles'),
+      RiskLevel.high => (Brand.bad, Icons.warning_amber_rounded, 'Atención antes de guardar'),
+    };
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: Container(
+        key: ValueKey('${report.level.name}${report.reasons.length}'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(18)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, color: c, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontFamily: 'Inter', color: c, fontWeight: FontWeight.w700)),
+              for (final r in report.reasons)
+                Padding(padding: const EdgeInsets.only(top: 4), child: Text(r, style: Theme.of(context).textTheme.bodySmall)),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
 }

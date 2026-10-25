@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config.dart';
 import '../errors.dart';
 import '../models.dart';
+import 'repo.dart';
 
 Future<String> _accessToken() async {
   final auth = Supabase.instance.client.auth;
@@ -73,6 +74,7 @@ class FiscalApi {
       'certificate_format': certificateFormat,
       'certificate_password': certificatePassword,
       'env': env,
+      if (Repo.activeOrgId != null) 'org_id': Repo.activeOrgId,
     });
   }
 
@@ -118,6 +120,33 @@ class FiscalApi {
   }
 }
 
+/// Envío del comprobante por correo (Resend, desde el servidor).
+class EmailApi {
+  /// [to] vacío = solo se envía la copia al correo con el que inició sesión.
+  static Future<void> send({required String invoiceId, String to = '', required Uint8List pdf}) async {
+    final token = await _accessToken();
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            Uri.parse('${Config.apiBase}/api/email/send'),
+            headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+            body: jsonEncode({'invoice_id': invoiceId, 'to': to.trim(), 'copy_to_self': true, 'pdf_b64': base64Encode(pdf)}),
+          )
+          .timeout(const Duration(seconds: 40));
+    } catch (_) {
+      throw AppException('No hay conexión con el servidor. Inténtalo de nuevo.', code: 'net');
+    }
+    if (res.statusCode == 200) return;
+    Map<String, dynamic> data = {};
+    try {
+      data = Map<String, dynamic>.from(jsonDecode(utf8.decode(res.bodyBytes)) as Map);
+    } catch (_) {}
+    if (res.statusCode == 401) throw AppException('Sesión caducada. Vuelve a entrar.');
+    throw AppException((data['error'] as String?) ?? 'No se pudo enviar el correo.', code: (data['code'] as String?) ?? 'http_${res.statusCode}');
+  }
+}
+
 /// Llama al backend (/api/parse). La clave de Groq vive SOLO en el servidor;
 /// la app envía únicamente el token de sesión del usuario.
 class ApiService {
@@ -141,6 +170,7 @@ class ApiService {
 
     final req = http.MultipartRequest('POST', Uri.parse('${Config.apiBase}/api/parse'))
       ..headers['Authorization'] = 'Bearer ${session.accessToken}'
+      ..fields.addAll({if (Repo.activeOrgId != null) 'org_id': Repo.activeOrgId!})
       ..files.add(http.MultipartFile.fromBytes(
         'audio',
         bytes,

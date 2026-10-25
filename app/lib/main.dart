@@ -6,6 +6,7 @@ import 'app_state.dart';
 import 'config.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
+import 'screens/onboarding.dart';
 import 'screens/profile_form.dart';
 import 'ui/theme.dart';
 import 'ui/widgets.dart';
@@ -67,6 +68,16 @@ class ProfileGate extends StatefulWidget {
 }
 
 class _ProfileGateState extends State<ProfileGate> {
+  late bool _intro = Supabase.instance.client.auth.currentUser?.userMetadata?['onboarded'] != true;
+
+  Future<void> _finishIntro() async {
+    setState(() => _intro = false);
+    // Best-effort: si falla, simplemente se verá de nuevo en el próximo inicio.
+    try {
+      await Supabase.instance.client.auth.updateUser(UserAttributes(data: {'onboarded': true}));
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +91,7 @@ class _ProfileGateState extends State<ProfileGate> {
       builder: (context, _) {
         final s = AppState.instance;
         if (s.loading || (s.profile == null && s.error == null)) {
-          return const Scaffold(body: Center(child: BrandMark(size: 64)));
+          return const Scaffold(body: Center(child: _Splash()));
         }
         if (s.error != null) {
           return Scaffold(
@@ -103,7 +114,9 @@ class _ProfileGateState extends State<ProfileGate> {
             ),
           );
         }
-        if (!s.profile!.isComplete) return const ProfileFormScreen(onboarding: true);
+        if (!s.profile!.isComplete) {
+          return _intro ? OnboardingScreen(onDone: _finishIntro) : const ProfileFormScreen(onboarding: true);
+        }
         return const HomeScreen();
       },
     );
@@ -129,4 +142,28 @@ class _ConfigError extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Pantalla de carga: la marca "respira" suavemente.
+class _Splash extends StatefulWidget {
+  const _Splash();
+
+  @override
+  State<_Splash> createState() => _SplashState();
+}
+
+class _SplashState extends State<_Splash> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ScaleTransition(
+        scale: Tween<double>(begin: 0.92, end: 1.06).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+        child: const BrandMark(size: 72),
+      );
 }

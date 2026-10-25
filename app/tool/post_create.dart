@@ -37,6 +37,15 @@ void android() {
         m = m.replaceFirst('</manifest>', '<queries>$q</queries>\n</manifest>');
       }
     }
+    if (!m.contains('com.facturavoz.app')) {
+      const f = '<intent-filter>\n'
+          '                <action android:name="android.intent.action.VIEW"/>\n'
+          '                <category android:name="android.intent.category.DEFAULT"/>\n'
+          '                <category android:name="android.intent.category.BROWSABLE"/>\n'
+          '                <data android:scheme="com.facturavoz.app" android:host="login-callback"/>\n'
+          '            </intent-filter>';
+      m = m.replaceFirst('</activity>', '            $f\n        </activity>');
+    }
     write(manifestPath, m);
     stdout.writeln('OK  AndroidManifest.xml');
   }
@@ -66,6 +75,13 @@ void ios() {
       RegExp(r'</dict>\s*</plist>'),
       '\t<key>NSMicrophoneUsageDescription</key>\n'
       '\t<string>FacturaVoz usa el micrófono solo para dictar tus facturas.</string>\n</dict>\n</plist>',
+    );
+  }
+  if (!s.contains('com.facturavoz.app')) {
+    s = s.replaceFirst(
+      RegExp(r'</dict>\s*</plist>'),
+      '\t<key>CFBundleURLTypes</key>\n\t<array><dict><key>CFBundleURLSchemes</key>\n'
+      '\t<array><string>com.facturavoz.app</string></array></dict></array>\n</dict>\n</plist>',
     );
   }
   s = s.replaceFirstMapped(

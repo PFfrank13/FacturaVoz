@@ -10,11 +10,15 @@ import 'emit_sunat.dart';
 import 'fiscal_setup.dart';
 import '../services/api.dart';
 import '../services/repo.dart';
+import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
 class InvoiceDetailScreen extends StatefulWidget {
-  const InvoiceDetailScreen({super.key, required this.invoiceId});
+  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false});
   final String invoiceId;
+
+  /// true al venir de crear la factura: envía una copia al correo de la cuenta.
+  final bool sendCopy;
 
   @override
   State<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
@@ -26,6 +30,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   FiscalDoc? _note;
   FiscalCompany? _company;
   String? _error;
+  bool _copySent = false;
   bool _busy = false;
 
   @override
@@ -47,6 +52,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           _note = n;
           _company = c;
         });
+        if (widget.sendCopy && !_copySent) {
+          _copySent = true;
+          _sendOwnCopy();
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));
@@ -98,7 +107,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
     final changed = await Navigator.of(context)
         .push<bool>(MaterialPageRoute(builder: (_) => EmitSunatScreen(invoice: inv, company: company!)));
-    if (changed == true) await _load();
+    if (changed == true) {
+      await _load();
+      if (_fiscal?.status == 'accepted') _sendOwnCopy();
+    }
   }
 
   Future<void> _anular() async {
@@ -200,6 +212,62 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
+  /// Copia silenciosa al correo con el que el usuario inició sesión (si el servidor tiene correo configurado).
+  Future<void> _sendOwnCopy() async {
+    final inv = _inv;
+    if (inv == null) return;
+    try {
+      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
+      await EmailApi.send(invoiceId: inv.id, pdf: bytes);
+      if (mounted) _snack('Te enviamos una copia a tu correo.');
+    } catch (_) {
+      // Best-effort: si el correo no está configurado no molestamos al usuario.
+    }
+  }
+
+  Future<void> _email() async {
+    final inv = _inv!;
+    final ctrl = TextEditingController();
+    final to = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (c) => Padding(
+        padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.of(c).viewInsets.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Enviar por correo', style: Theme.of(c).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text('Se adjunta el PDF de ${_fiscal?.number ?? inv.number}.', style: Theme.of(c).textTheme.bodySmall),
+          const SizedBox(height: 16),
+          TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Correo del cliente', prefixIcon: Icon(Icons.alternate_email_rounded)),
+            onSubmitted: (v) => Navigator.pop(c, v),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(onPressed: () => Navigator.pop(c, ctrl.text), icon: const Icon(Icons.send_rounded), label: const Text('Enviar')),
+        ]),
+      ),
+    );
+    ctrl.dispose();
+    if (to == null || to.trim().isEmpty) return;
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(to.trim())) {
+      _snack('Ese correo no parece válido.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
+      await EmailApi.send(invoiceId: inv.id, to: to, pdf: bytes);
+      _snack('Correo enviado a ${to.trim()}');
+    } catch (e) {
+      _snack(friendly(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _preview() async {
     final inv = _inv!;
     setState(() => _busy = true);
@@ -232,29 +300,56 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       appBar: AppBar(title: Text(_fiscal?.number ?? inv?.number ?? 'Factura')),
       body: SafeArea(
         child: inv == null
-            ? Center(child: _error == null ? const CircularProgressIndicator() : Text(_error!))
+            ? Center(
+                child: _error == null
+                    ? const CircularProgressIndicator()
+                    : Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: SoftCard(
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.cloud_off_rounded, color: Brand.bad, size: 34),
+                            const SizedBox(height: 12),
+                            Text('No pudimos abrir el comprobante', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            Text(_error!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: () {
+                                setState(() => _error = null);
+                                _load();
+                              },
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Reintentar'),
+                            ),
+                          ]),
+                        ),
+                      ),
+              )
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _ticket(inv),
+                  Reveal(child: _ticket(inv)),
                   const SizedBox(height: 20),
                   // La vista previa embebida usa pdf.js en web (CDN de terceros); en web solo se descarga.
-                  if (!kIsWeb) ...[
-                    FilledButton.icon(onPressed: _busy ? null : _preview, icon: const Icon(Icons.picture_as_pdf), label: const Text('Ver PDF')),
-                    const SizedBox(height: 8),
-                  ],
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _share,
-                    icon: Icon(kIsWeb ? Icons.download : Icons.ios_share),
-                    label: Text(kIsWeb ? 'Descargar PDF' : 'Compartir PDF'),
+                  Reveal(
+                    index: 2,
+                    child: Row(children: [
+                      if (!kIsWeb) Expanded(child: _quick(Icons.picture_as_pdf_rounded, 'Ver PDF', _preview)),
+                      if (!kIsWeb) const SizedBox(width: 10),
+                      Expanded(child: _quick(kIsWeb ? Icons.download_rounded : Icons.ios_share_rounded, kIsWeb ? 'Descargar' : 'Compartir', _share)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _quick(Icons.mail_outline_rounded, 'Correo', _email)),
+                    ]),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 14),
                   if (_fiscal == null || _fiscal!.status != 'accepted')
-                    FilledButton.tonalIcon(
+                    GradientButton(
                       onPressed: _busy ? null : _emitSunat,
-                      icon: const Icon(Icons.verified_outlined),
-                      label: Text(_fiscal == null ? 'Emitir factura / boleta a SUNAT' : 'Reintentar envío a SUNAT'),
+                      icon: Icons.verified_rounded,
+                      busy: _busy,
+                      label: _fiscal == null ? 'Emitir a SUNAT' : 'Reintentar envío a SUNAT',
                     ),
+                  const SizedBox(height: 8),
                   if (_fiscal != null && _fiscal!.status == 'accepted' && (_note == null || _note!.status != 'accepted'))
                     OutlinedButton.icon(
                       onPressed: _busy ? null : (_note == null ? _anular : () => _retryNote()),
@@ -286,6 +381,25 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     ),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _quick(IconData icon, String label, VoidCallback onTap) {
+    final t = Theme.of(context);
+    return Pressable(
+      onTap: _busy ? null : onTap,
+      child: Opacity(
+        opacity: _busy ? 0.5 : 1,
+        child: SoftCard(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          radius: 20,
+          child: Column(children: [
+            Icon(icon, color: t.colorScheme.primary),
+            const SizedBox(height: 6),
+            Text(label, style: t.textTheme.labelMedium),
+          ]),
+        ),
       ),
     );
   }
