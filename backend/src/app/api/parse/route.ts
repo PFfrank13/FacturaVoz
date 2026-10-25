@@ -152,7 +152,7 @@ export async function POST(req: Request) {
       headers: { ...headers, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(20_000),
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.1-8b-instant",
         temperature: 0,
         response_format: { type: "json_object" },
         messages: [
