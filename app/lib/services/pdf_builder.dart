@@ -313,7 +313,7 @@ _View _fiscalView(FiscalDoc f) {
       if (gravadas > 0) ('Op. Gravada', gravadas, false),
       if (exoneradas > 0) ('Op. Exonerada', exoneradas, false),
       if (inafectas > 0) ('Op. Inafecta', inafectas, false),
-      ('IGV (${qtyText(rate.toDouble())}%)', igv, false),
+      ('IGV (${qtyText(rate)}%)', igv, false),
       ('IMPORTE TOTAL', total, true),
     ],
     legend: f.legend,

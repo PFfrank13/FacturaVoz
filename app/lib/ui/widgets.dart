@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'theme.dart';
 
@@ -78,7 +81,7 @@ class StatusPill extends StatelessWidget {
   }
 }
 
-/// Marca: micrófono dorado dentro de un sello índigo.
+/// Marca: micrófono blanco sobre degradado lavanda.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 44});
   final double size;
@@ -88,10 +91,11 @@ class BrandMark extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Brand.indigo, Brand.indigoDeep]),
-          borderRadius: BorderRadius.circular(size * 0.32),
+          gradient: Brand.heroGradient,
+          borderRadius: BorderRadius.circular(size * 0.34),
+          boxShadow: Brand.softShadow(false, a: 0.25),
         ),
-        child: Icon(Icons.mic_rounded, color: Brand.gold, size: size * 0.52),
+        child: Icon(Icons.mic_rounded, color: Colors.white, size: size * 0.52),
       );
 }
 
@@ -150,29 +154,36 @@ class _DictateButtonState extends State<DictateButton> with SingleTickerProvider
               builder: (context, _) => CustomPaint(size: Size(s * 1.9, s * 1.9), painter: _RingPainter(_c.value, s)),
             ),
           GestureDetector(
-            onTap: widget.busy ? null : widget.onPressed,
+            onTap: widget.busy
+                ? null
+                : () {
+                    HapticFeedback.mediumImpact();
+                    widget.onPressed?.call();
+                  },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 250),
               width: s,
               height: s,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: widget.recording ? Brand.bad : Brand.gold,
+                color: widget.recording ? Brand.bad : null,
+                gradient: widget.recording ? null : Brand.coralGradient,
                 boxShadow: [
                   BoxShadow(
-                    color: (widget.recording ? Brand.bad : Brand.gold).withValues(alpha: 0.35),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
+                    color: (widget.recording ? Brand.bad : Brand.goldDeep).withValues(alpha: 0.38),
+                    blurRadius: 30,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
               child: widget.busy
                   ? const Padding(
                       padding: EdgeInsets.all(26),
-                      child: CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF2A1D00)),
+                      child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
                     )
                   : Icon(widget.recording ? Icons.stop_rounded : Icons.mic_rounded,
-                      size: s * 0.46, color: widget.recording ? Colors.white : const Color(0xFF2A1D00)),
+                      size: s * 0.46, color: Colors.white),
             ),
           ),
         ]),
@@ -282,6 +293,131 @@ class EmptyState extends StatelessWidget {
         const SizedBox(height: 8),
         Text(body, textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
       ]),
+    );
+  }
+}
+
+
+/// Entrada escalonada: aparece desde abajo con fundido. `index` define el retraso en cascada.
+class Reveal extends StatefulWidget {
+  const Reveal({super.key, required this.child, this.index = 0, this.dy = 18});
+  final Widget child;
+  final int index;
+  final double dy;
+
+  @override
+  State<Reveal> createState() => _RevealState();
+}
+
+class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 550));
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    final delay = Duration(milliseconds: 60 * widget.index.clamp(0, 12));
+    _t = Timer(delay, () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return widget.child;
+    final a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    return AnimatedBuilder(
+      animation: a,
+      child: widget.child,
+      builder: (context, child) => Opacity(
+        opacity: a.value,
+        child: Transform.translate(offset: Offset(0, (1 - a.value) * widget.dy), child: child),
+      ),
+    );
+  }
+}
+
+/// Cifra que "cuenta" hasta su valor (se anima al cambiar).
+class CountUp extends StatelessWidget {
+  const CountUp({super.key, required this.value, required this.builder});
+  final double value;
+  final Widget Function(BuildContext, double) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return builder(context, value);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (c, v, _) => builder(c, v),
+    );
+  }
+}
+
+/// Retroalimentación táctil: se encoge ligeramente al pulsar.
+class Pressable extends StatefulWidget {
+  const Pressable({super.key, required this.child, required this.onTap, this.onLongPress, this.scale = 0.97});
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final double scale;
+
+  @override
+  State<Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<Pressable> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _down = true),
+        onTapUp: (_) => setState(() => _down = false),
+        onTapCancel: () => setState(() => _down = false),
+        onTap: widget.onTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                widget.onTap!();
+              },
+        onLongPress: widget.onLongPress,
+        child: AnimatedScale(
+          scale: _down ? widget.scale : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: widget.child,
+        ),
+      );
+}
+
+/// Tarjeta blanda con sombra difusa (reemplaza al borde duro).
+class SoftCard extends StatelessWidget {
+  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(18), this.radius = 24, this.color});
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: color ?? Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: Brand.softShadow(dark, a: 0.07),
+      ),
+      child: child,
     );
   }
 }

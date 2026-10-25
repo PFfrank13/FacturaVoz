@@ -3,26 +3,49 @@ import 'package:flutter/material.dart';
 /// Sistema de diseño de FacturaVoz.
 /// Índigo "tinta" como color de marca, oro "sol" solo para la acción de dictar y el dato clave.
 class Brand {
-  static const indigo = Color(0xFF2B2F8F);
-  static const indigoDeep = Color(0xFF1C2068);
-  static const indigoSoft = Color(0xFF9EA3FF);
-  static const gold = Color(0xFFD9A21B);
-  static const goldDeep = Color(0xFF8A6200);
+  // Violeta-lavanda sereno (confianza y calma) + coral durazno cálido (invita a actuar).
+  static const indigo = Color(0xFF6A62E2);
+  static const indigoDeep = Color(0xFF5048C8);
+  static const indigoSoft = Color(0xFFB9B4FF);
+  static const lilac = Color(0xFF9B8CF5);
+  static const gold = Color(0xFFFF9376); // coral durazno (acción de dictar)
+  static const goldDeep = Color(0xFFFF6F8E);
+  static const onGold = Color(0xFF3B1D2E);
 
-  static const ok = Color(0xFF16805C);
-  static const warn = Color(0xFFB26A00);
-  static const bad = Color(0xFFB42318);
+  static const ok = Color(0xFF23956F);
+  static const warn = Color(0xFFC57A12);
+  static const bad = Color(0xFFD94A5E);
 
-  static const lightBg = Color(0xFFF3F4F8);
-  static const lightInk = Color(0xFF171A2E);
-  static const lightMuted = Color(0xFF626883);
-  static const lightLine = Color(0xFFE1E3EC);
+  static const lightBg = Color(0xFFF8F6FD);
+  static const lightInk = Color(0xFF26254B);
+  static const lightMuted = Color(0xFF77799B);
+  static const lightLine = Color(0xFFECE9F7);
 
-  static const darkBg = Color(0xFF0F1226);
-  static const darkCard = Color(0xFF181C3A);
-  static const darkInk = Color(0xFFEDEEF7);
-  static const darkMuted = Color(0xFF9CA1BF);
-  static const darkLine = Color(0xFF2A2F55);
+  static const darkBg = Color(0xFF14132B);
+  static const darkCard = Color(0xFF1E1D3F);
+  static const darkInk = Color(0xFFEFEEFB);
+  static const darkMuted = Color(0xFFA2A3C6);
+  static const darkLine = Color(0xFF2F2E57);
+
+  static const heroGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF6A62E2), Color(0xFF8E7CF2), Color(0xFFB58BF5)],
+  );
+  static const coralGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFA77F), Color(0xFFFF7E9A)],
+  );
+
+  /// Sombra suave y difusa (nunca dura): da sensación de flotar.
+  static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => [
+        BoxShadow(
+          color: (dark ? Colors.black : const Color(0xFF6A62E2)).withValues(alpha: dark ? 0.35 : a),
+          blurRadius: 28,
+          offset: const Offset(0, 10),
+        ),
+      ];
 }
 
 const _font = 'Inter';
@@ -60,7 +83,7 @@ ThemeData buildTheme(Brightness b) {
     primary: primary,
     onPrimary: dark ? Brand.darkBg : Colors.white,
     secondary: Brand.gold,
-    onSecondary: const Color(0xFF2A1D00),
+    onSecondary: Brand.onGold,
     error: dark ? const Color(0xFFFF8A7A) : Brand.bad,
     onError: dark ? Brand.darkBg : Colors.white,
     surface: card,
@@ -68,21 +91,36 @@ ThemeData buildTheme(Brightness b) {
     onSurfaceVariant: muted,
     outline: line,
     outlineVariant: line,
-    surfaceContainerHighest: dark ? const Color(0xFF222750) : const Color(0xFFE9EBF4),
-    surfaceContainerHigh: dark ? const Color(0xFF1E2346) : const Color(0xFFEEF0F7),
+    surfaceContainerHighest: dark ? const Color(0xFF2A2954) : const Color(0xFFEFEDFA),
+    surfaceContainerHigh: dark ? const Color(0xFF25244A) : const Color(0xFFF3F1FC),
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF2B2F6E) : const Color(0xFFE3E5FF),
+    primaryContainer: dark ? const Color(0xFF34336F) : const Color(0xFFEBE9FF),
     onPrimaryContainer: dark ? Brand.indigoSoft : Brand.indigoDeep,
   );
 
-  final radius = BorderRadius.circular(14);
+  final radius = BorderRadius.circular(16);
   OutlineInputBorder border(Color c, [double w = 1]) =>
       OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: c, width: w));
 
   return ThemeData(
     useMaterial3: true,
+    splashFactory: InkSparkle.splashFactory,
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.android: SoftPageTransitions(),
+      TargetPlatform.iOS: SoftPageTransitions(),
+      TargetPlatform.windows: SoftPageTransitions(),
+      TargetPlatform.macOS: SoftPageTransitions(),
+      TargetPlatform.linux: SoftPageTransitions(),
+      TargetPlatform.fuchsia: SoftPageTransitions(),
+    }),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: card,
+      surfaceTintColor: Colors.transparent,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+    ),
     brightness: b,
     colorScheme: scheme,
     scaffoldBackgroundColor: bg,
@@ -101,7 +139,7 @@ ThemeData buildTheme(Brightness b) {
       color: card,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: line)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: line)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -139,16 +177,40 @@ ThemeData buildTheme(Brightness b) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: dark ? const Color(0xFF2A2F55) : Brand.lightInk,
+      backgroundColor: dark ? const Color(0xFF34336F) : Brand.lightInk,
       contentTextStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       titleTextStyle: TextStyle(fontFamily: _font, fontSize: 19, fontWeight: FontWeight.w600, color: ink),
     ),
     listTileTheme: ListTileThemeData(iconColor: muted, textColor: ink),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
   );
+}
+
+/// Transición de página suave: la nueva pantalla entra deslizándose y apareciendo,
+/// la anterior retrocede un poco. Respeta "reducir animaciones" del sistema.
+class SoftPageTransitions extends PageTransitionsBuilder {
+  const SoftPageTransitions();
+
+  @override
+  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    if (MediaQuery.of(context).disableAnimations) return child;
+    final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    final back = CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    return SlideTransition(
+      position: Tween<Offset>(begin: Offset.zero, end: const Offset(-0.06, 0)).animate(back),
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 1, end: 0.92).animate(back),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0.0, 0.06), end: Offset.zero).animate(curve),
+          child: FadeTransition(opacity: curve, child: child),
+        ),
+      ),
+    );
+  }
 }

@@ -153,7 +153,7 @@ class ApiService {
       final streamed = await req.send().timeout(const Duration(seconds: 60));
       res = await http.Response.fromStream(streamed);
     } catch (_) {
-      throw AppException('No hay conexión con el servidor. Inténtalo de nuevo.');
+      throw AppException('No hay conexión con el servidor. Inténtalo de nuevo.', code: 'net');
     }
 
     Map<String, dynamic> body = {};
@@ -164,17 +164,22 @@ class ApiService {
     if (res.statusCode == 200 && body['invoice'] is Map) {
       return InvoiceDraft.fromParse(Map<String, dynamic>.from(body['invoice'] as Map), profile);
     }
+    final code = (body['code'] as String?) ?? 'http_${res.statusCode}';
     switch (res.statusCode) {
       case 401:
         throw AppException('Sesión caducada. Vuelve a entrar.');
+      case 403:
+        throw AppException('El servidor rechazó la solicitud.', code: 'http_403');
+      case 404:
+        throw AppException('No se encontró el servicio de voz. Revisa API_BASE_URL y el despliegue.', code: 'http_404');
       case 429:
         throw AppException('Demasiados dictados seguidos. Espera un minuto.');
       case 413:
         throw AppException('El audio es demasiado largo. Dicta algo más corto.');
       case 422:
-        throw AppException((body['error'] as String?) ?? 'No se entendió el dictado. Inténtalo de nuevo.');
+        throw AppException((body['error'] as String?) ?? 'No se entendió el dictado. Inténtalo de nuevo.', code: code);
       default:
-        throw AppException((body['error'] as String?) ?? 'Error del servidor. Inténtalo de nuevo.');
+        throw AppException((body['error'] as String?) ?? 'Error del servidor. Inténtalo de nuevo.', code: code);
     }
   }
 }

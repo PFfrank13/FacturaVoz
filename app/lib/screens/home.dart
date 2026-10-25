@@ -78,57 +78,131 @@ class _HomeScreenState extends State<HomeScreen> {
     final t = Theme.of(context);
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: DictateButton(size: 66, onPressed: _newInvoice),
+      floatingActionButton: Reveal(index: 4, dy: 30, child: DictateButton(size: 66, onPressed: _newInvoice)),
       body: RefreshIndicator(
         onRefresh: _load,
-        edgeOffset: 120,
+        edgeOffset: 140,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(child: _Header(name: profile?.businessName ?? '', currency: currency, total: m.total, count: m.count, loaded: _items != null)),
+            SliverToBoxAdapter(
+              child: _Header(name: profile?.businessName ?? '', currency: currency, total: m.total, count: m.count, loaded: _items != null),
+            ),
             if (_error != null && _items == null)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(children: [
-                    Text(_error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 14),
-                    FilledButton(onPressed: _load, child: const Text('Reintentar')),
-                  ]),
+              SliverToBoxAdapter(child: _ErrorBox(message: _error!, onRetry: _load))
+            else if (_items == null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                sliver: SliverList.separated(
+                  itemCount: 4,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (_, _) => const _Skeleton(),
                 ),
               )
-            else if (_items == null)
-              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator())))
             else if (_items!.isEmpty)
               const SliverToBoxAdapter(
-                child: EmptyState(
-                  title: 'Tu primera factura está a una frase',
-                  body: 'Toca el micrófono y di el cliente, el servicio y el importe. La revisas antes de guardarla.',
+                child: Reveal(
+                  child: EmptyState(
+                    title: 'Tu primera factura está a una frase',
+                    body: 'Toca el micrófono y di el cliente, el servicio y el importe. La revisas antes de guardarla.',
+                  ),
                 ),
               )
             else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
-                sliver: SliverToBoxAdapter(child: Text('Comprobantes', style: t.textTheme.titleMedium)),
+                padding: const EdgeInsets.fromLTRB(24, 26, 24, 12),
+                sliver: SliverToBoxAdapter(
+                  child: Reveal(index: 2, child: Text('Recientes', style: t.textTheme.titleMedium)),
+                ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
-                sliver: DecoratedSliver(
-                  decoration: BoxDecoration(
-                    color: t.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: t.colorScheme.outline),
-                  ),
-                  sliver: SliverList.separated(
-                    itemCount: _items!.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1, indent: 18, endIndent: 18),
-                    itemBuilder: (context, i) => _Row(inv: _items![i], onTap: () => _open(_items![i])),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 160),
+                sliver: SliverList.separated(
+                  itemCount: _items!.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) => Reveal(
+                    index: 3 + i,
+                    child: _Row(inv: _items![i], onTap: () => _open(_items![i])),
                   ),
                 ),
               ),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+String _greeting() {
+  final h = DateTime.now().hour;
+  if (h < 12) return 'Buenos días';
+  if (h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+class _ErrorBox extends StatelessWidget {
+  const _ErrorBox({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+      child: SoftCard(
+        child: Column(children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(color: Brand.bad.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: const Icon(Icons.cloud_off_rounded, color: Brand.bad),
+          ),
+          const SizedBox(height: 14),
+          Text('No pudimos cargar tus comprobantes', textAlign: TextAlign.center, style: t.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center, style: t.textTheme.bodySmall),
+          const SizedBox(height: 16),
+          FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Reintentar')),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Marcador de posición pulsante mientras carga.
+class _Skeleton extends StatefulWidget {
+  const _Skeleton();
+
+  @override
+  State<_Skeleton> createState() => _SkeletonState();
+}
+
+class _SkeletonState extends State<_Skeleton> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final base = t.colorScheme.surfaceContainerHighest;
+    Widget bar(double w, double h) => Container(width: w, height: h, decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(8)));
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+      child: SoftCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: base, shape: BoxShape.circle)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [bar(140, 14), const SizedBox(height: 8), bar(90, 11)])),
+          bar(64, 16),
+        ]),
       ),
     );
   }
@@ -146,63 +220,113 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
     final sym = currencySymbols[currency] ?? currency;
-    final amount = total.toStringAsFixed(2);
-    final parts = amount.split('.');
-    final whole = parts[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+    String fmt(double v) {
+      final parts = v.toStringAsFixed(2).split('.');
+      return '${parts[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',')}.${parts[1]}';
+    }
+
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(24, top + 12, 24, 30),
+      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.fromLTRB(24, top + 12, 24, 34),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Brand.indigo, Brand.indigoDeep]),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+        gradient: Brand.heroGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(40)),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-            child: Text(
-              name.isEmpty ? 'FacturaVoz' : name,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+      child: Stack(children: [
+        Positioned(right: -70, top: -50, child: _Orb(size: 190, alpha: 0.10)),
+        Positioned(right: 40, bottom: -90, child: _Orb(size: 150, alpha: 0.08)),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Reveal(
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_greeting(), style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.8), fontSize: 13.5)),
+                  const SizedBox(height: 2),
+                  Text(
+                    name.isEmpty ? 'FacturaVoz' : name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
+                  ),
+                ]),
+              ),
+              Pressable(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
+                  child: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 26),
+          Reveal(
+            index: 1,
+            child: Text('Facturado este mes',
+                style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500)),
+          ),
+          const SizedBox(height: 6),
+          if (!loaded)
+            const SizedBox(height: 62)
+          else
+            Reveal(
+              index: 2,
+              child: CountUp(
+                value: total,
+                builder: (context, v) {
+                  final f = fmt(v).split('.');
+                  return Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                    Text(sym, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 26, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: f[0], style: const TextStyle(fontSize: 54, fontWeight: FontWeight.w700, letterSpacing: -1.8)),
+                            TextSpan(text: '.${f[1]}', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.75))),
+                          ]),
+                          style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontFeatures: [FontFeature.tabularFigures()]),
+                        ),
+                      ),
+                    ),
+                  ]);
+                },
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Ajustes',
-            icon: const Icon(Icons.tune_rounded, color: Colors.white),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
-          ),
-        ]),
-        const SizedBox(height: 18),
-        Text('Facturado este mes',
-            style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.72), fontSize: 14, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 6),
-        if (!loaded)
-          const SizedBox(height: 56)
-        else
-          Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-            Text(sym, style: const TextStyle(fontFamily: 'Inter', color: Brand.gold, fontSize: 26, fontWeight: FontWeight.w600)),
-            const SizedBox(width: 8),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text.rich(
-                  TextSpan(children: [
-                    TextSpan(text: whole, style: const TextStyle(fontSize: 52, fontWeight: FontWeight.w700, letterSpacing: -1.6)),
-                    TextSpan(text: '.${parts[1]}', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.7))),
-                  ]),
-                  style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontFeatures: [FontFeature.tabularFigures()]),
+          const SizedBox(height: 12),
+          if (loaded)
+            Reveal(
+              index: 3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+                child: Text(
+                  count == 0 ? 'Aún sin comprobantes este mes' : (count == 1 ? '1 comprobante' : '$count comprobantes'),
+                  style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
-          ]),
-        const SizedBox(height: 4),
-        Text(
-          !loaded ? '' : (count == 0 ? 'Aún sin comprobantes este mes' : (count == 1 ? '1 comprobante' : '$count comprobantes')),
-          style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.72), fontSize: 13.5),
-        ),
+        ]),
       ]),
     );
   }
+}
+
+class _Orb extends StatelessWidget {
+  const _Orb({required this.size, required this.alpha});
+  final double size;
+  final double alpha;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: alpha)),
+      );
 }
 
 class _Row extends StatelessWidget {
@@ -216,22 +340,30 @@ class _Row extends StatelessWidget {
     final fiscal = inv.fiscalStatus;
     final label = fiscal == null ? statusLabel(inv.status) : fiscalStatusLabel(fiscal);
     final tone = fiscal == null ? (inv.status == 'paid' ? PillTone.ok : PillTone.neutral) : StatusPill.toneForFiscal(fiscal);
-    return InkWell(
+    final initial = inv.clientName.trim().isEmpty || inv.clientName == '—' ? '·' : inv.clientName.trim().characters.first.toUpperCase();
+    return Pressable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      child: SoftCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: t.colorScheme.primaryContainer, shape: BoxShape.circle),
+            child: Text(initial, style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18, color: t.colorScheme.primary)),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(inv.clientName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.titleSmall),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text('${inv.fiscalNumber ?? inv.number}  ·  ${displayDate(inv.issueDate)}', style: t.textTheme.bodySmall),
               const SizedBox(height: 8),
               StatusPill(label, tone: tone),
             ]),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Money(money(inv.totals.total, inv.currency), size: 16, weight: FontWeight.w700),
         ]),
       ),
