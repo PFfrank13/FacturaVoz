@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     });
     try {
       await Supabase.instance.client.auth
-          .verifyOtp(email: _email.text.trim().toLowerCase(), token: token, type: OtpType.email);
+          .verifyOTP(email: _email.text.trim().toLowerCase(), token: token, type: OtpType.email);
       // AuthGate reacciona al cambio de sesión.
     } catch (_) {
       if (mounted) setState(() => _msg = 'Código incorrecto o caducado');
