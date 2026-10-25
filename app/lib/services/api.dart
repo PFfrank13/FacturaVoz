@@ -209,7 +209,11 @@ class ApiService {
       case 422:
         throw AppException((body['error'] as String?) ?? 'No se entendió el dictado. Inténtalo de nuevo.', code: code);
       default:
-        throw AppException((body['error'] as String?) ?? 'Error del servidor. Inténtalo de nuevo.', code: code);
+        throw AppException(
+          (body['error'] as String?) ?? 'Error del servidor. Inténtalo de nuevo.',
+          code: code,
+          transcript: (body['transcript'] is String && (body['transcript'] as String).trim().isNotEmpty) ? (body['transcript'] as String).trim() : null,
+        );
     }
   }
 }

@@ -125,17 +125,17 @@ class Repo {
   }
 
   static const _invoiceSelect =
-      'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id, doc_type), fiscal_documents(status, series, correlative, doc_type), invoice_items(description, quantity, unit_price, position)';
+      'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id, doc_type, email), fiscal_documents(status, series, correlative, doc_type), invoice_items(description, quantity, unit_price, position)';
 
   // Versión mínima: sirve aunque aún no existan las tablas/columnas fiscales (migración 2).
   static const _invoiceSelectBasic =
       'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id), invoice_items(description, quantity, unit_price, position)';
 
-  static Future<List<InvoiceRecord>> listInvoices() async {
+  static Future<List<InvoiceRecord>> listInvoices({int limit = 100}) async {
     Future<dynamic> q(String sel) => (activeOrgId == null ? _db.from('invoices').select(sel) : _db.from('invoices').select(sel).eq('org_id', activeOrgId!))
         .order('created_at', ascending: false)
         .order('position', referencedTable: 'invoice_items', ascending: true)
-        .limit(100);
+        .limit(limit);
     dynamic rows;
     try {
       rows = await q(_invoiceSelect);
@@ -143,6 +143,15 @@ class Repo {
       rows = await q(_invoiceSelectBasic);
     }
     return (rows as List).map((r) => InvoiceRecord.fromJson(Map<String, dynamic>.from(r as Map))).toList();
+  }
+
+  /// Guarda el correo del cliente de una factura (para no volver a escribirlo). Best-effort.
+  static Future<void> setClientEmail(String invoiceId, String email) async {
+    try {
+      final row = await _db.from('invoices').select('client_id').eq('id', invoiceId).maybeSingle();
+      final cid = row?['client_id'] as String?;
+      if (cid != null) await _db.from('clients').update({'email': email.trim().toLowerCase()}).eq('id', cid);
+    } catch (_) {}
   }
 
   /// Facturas con fecha en [from, toExclusive) ('yyyy-MM-dd') de la empresa activa, para reportes.
@@ -199,6 +208,76 @@ class Repo {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// Clientes de la empresa activa, sin duplicados (cada factura puede haber creado una fila: se agrupan por documento o nombre).
+  static Future<List<ClientCard>> listClients() async {
+    final base = _db.from('clients').select('id, name, tax_id, email, address, doc_type');
+    final rows = await (activeOrgId == null ? base : base.eq('org_id', activeOrgId!)).order('created_at', ascending: false).limit(2000);
+    final groups = <String, ClientCard>{};
+    for (final r in rows as List) {
+      final m = Map<String, dynamic>.from(r as Map);
+      final name = ((m['name'] ?? '') as String).trim();
+      if (name.isEmpty) continue;
+      final tax = ((m['tax_id'] ?? '') as String).trim();
+      final key = tax.isNotEmpty ? 'd:$tax' : 'n:${name.toLowerCase()}';
+      final g = groups[key];
+      if (g == null) {
+        groups[key] = ClientCard(
+          ids: [m['id'] as String],
+          name: name,
+          taxId: tax,
+          email: ((m['email'] ?? '') as String).trim(),
+          address: ((m['address'] ?? '') as String).trim(),
+        );
+      } else {
+        g.ids.add(m['id'] as String);
+        if (g.email.isEmpty) g.email = ((m['email'] ?? '') as String).trim();
+        if (g.address.isEmpty) g.address = ((m['address'] ?? '') as String).trim();
+      }
+    }
+    final out = groups.values.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return out;
+  }
+
+  /// Actualiza todas las filas de un mismo cliente (datos de contacto; no cambia facturas ya emitidas).
+  static Future<void> updateClient(ClientCard c, {required String name, required String taxId, required String email, required String address}) async {
+    await _db.from('clients').update({
+      'name': name.trim(),
+      'tax_id': taxId.trim().isEmpty ? null : taxId.trim(),
+      'email': email.trim().isEmpty ? null : email.trim().toLowerCase(),
+      'address': address.trim().isEmpty ? null : address.trim(),
+    }).inFilter('id', c.ids);
+  }
+
+  // ---------------- Catálogo ----------------
+  static Future<List<Product>> listProducts({bool activeOnly = false}) async {
+    var q = _db.from('products').select('id, name, unit_price, unit, active');
+    if (activeOrgId != null) q = q.eq('org_id', activeOrgId!);
+    if (activeOnly) q = q.eq('active', true);
+    final rows = await q.order('name', ascending: true).limit(1000);
+    return (rows as List).map((r) => Product.fromJson(Map<String, dynamic>.from(r as Map))).toList();
+  }
+
+  static Future<void> saveProduct({String? id, required String name, required double unitPrice, required String unit}) async {
+    final data = {'name': name.trim(), 'unit_price': round2(unitPrice), 'unit': unit};
+    if (id != null) {
+      await _db.from('products').update(data).eq('id', id);
+      return;
+    }
+    final org = activeOrgId;
+    if (org == null) throw AppException('Elige una empresa primero.');
+    await _db.from('products').insert({...data, 'org_id': org, 'user_id': _uid});
+  }
+
+  static Future<void> setProductActive(String id, bool active) async {
+    await _db.from('products').update({'active': active}).eq('id', id);
+  }
+
+  /// Solo propietarios/administradores (lo exige la base de datos).
+  static Future<void> deleteProduct(String id) async {
+    final rows = await _db.from('products').delete().eq('id', id).select('id');
+    if ((rows as List).isEmpty) throw AppException('Solo un administrador de la empresa puede borrar productos. Puedes archivarlo.');
   }
 
   static Future<InvoiceRecord> getInvoice(String id) async {

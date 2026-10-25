@@ -23,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String? _orgSeen;
   String _filter = 'all';
+  int _limit = 100;
+  bool _more = false;
   String _query = '';
 
   @override
@@ -59,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     if (_orgSeen != Repo.activeOrgId) {
       _orgSeen = Repo.activeOrgId;
+      _limit = 100;
       setState(() => _items = null);
       _load();
     } else {
@@ -68,10 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     try {
-      final r = await Repo.listInvoices();
+      final r = await Repo.listInvoices(limit: _limit);
       if (mounted) {
         setState(() {
           _items = r;
+          _more = r.length >= _limit;
           _error = null;
         });
       }
@@ -195,9 +199,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 160),
                   sliver: SliverList.separated(
-                    itemCount: list.length,
+                    itemCount: list.length + (_more ? 1 : 0),
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, i) => Reveal(
+                    itemBuilder: (context, i) => i == list.length
+                        ? Center(
+                            child: TextButton.icon(
+                              onPressed: () {
+                                _limit += 100;
+                                _load();
+                              },
+                              icon: const Icon(Icons.expand_more_rounded),
+                              label: const Text('Cargar más'),
+                            ),
+                          )
+                        : Reveal(
                       key: ValueKey(list[i].id),
                       index: 3 + (i < 8 ? i : 8),
                       child: _Row(inv: list[i], onTap: () => _open(list[i])),

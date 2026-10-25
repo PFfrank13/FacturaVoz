@@ -200,6 +200,7 @@ class InvoiceRecord {
     required this.clientName,
     required this.clientTaxId,
     required this.clientDocType,
+    this.clientEmail = '',
     required this.items,
     this.fiscalStatus,
     this.fiscalNumber,
@@ -215,6 +216,7 @@ class InvoiceRecord {
   final String clientName;
   final String clientTaxId;
   final String clientDocType;
+  final String clientEmail;
   final List<LineItem> items;
   final String? fiscalStatus; // pending | accepted | rejected | error (null = sin comprobante electrónico)
   final String? fiscalNumber; // F001-00000007
@@ -236,6 +238,7 @@ class InvoiceRecord {
       clientName: (client['name'] ?? '—') as String,
       clientTaxId: (client['tax_id'] ?? '') as String,
       clientDocType: (client['doc_type'] ?? '') as String,
+      clientEmail: (client['email'] ?? '') as String,
       fiscalStatus: fiscal?['status'] as String?,
       fiscalNumber: fiscal == null ? null : fiscalNumberOf(fiscal['series'] as String, (fiscal['correlative'] as num).toInt()),
       items: ((j['invoice_items'] ?? []) as List)
@@ -411,4 +414,36 @@ class OrgMember {
   final String userId;
   final String email;
   final String role;
+}
+
+
+/// Cliente tal como lo ve la pantalla "Clientes" (varias filas de la base pueden ser el mismo cliente).
+class ClientCard {
+  ClientCard({required this.ids, required this.name, required this.taxId, required this.email, required this.address});
+  final List<String> ids;
+  final String name;
+  final String taxId;
+  String email;
+  String address;
+}
+
+
+/// Producto o servicio del catálogo de la empresa.
+class Product {
+  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active});
+  final String id;
+  final String name;
+  final double unitPrice;
+  final String unit; // NIU producto | ZZ servicio
+  final bool active;
+
+  bool get isService => unit == 'ZZ';
+
+  factory Product.fromJson(Map<String, dynamic> j) => Product(
+        id: j['id'] as String,
+        name: (j['name'] ?? '') as String,
+        unitPrice: _num(j['unit_price']),
+        unit: (j['unit'] ?? 'NIU') as String,
+        active: j['active'] != false,
+      );
 }

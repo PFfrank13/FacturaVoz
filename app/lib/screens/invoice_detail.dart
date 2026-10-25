@@ -227,7 +227,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   Future<void> _email() async {
     final inv = _inv!;
-    final ctrl = TextEditingController();
+    final ctrl = TextEditingController(text: inv.clientEmail);
     final to = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -236,7 +236,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Enviar por correo', style: Theme.of(c).textTheme.titleLarge),
           const SizedBox(height: 6),
-          Text('Se adjunta el PDF de ${_fiscal?.number ?? inv.number}.', style: Theme.of(c).textTheme.bodySmall),
+          Text('Se adjunta el PDF de ${_fiscal?.number ?? inv.number}. Tú también recibes una copia en el correo con el que entraste.', style: Theme.of(c).textTheme.bodySmall),
           const SizedBox(height: 16),
           TextField(
             controller: ctrl,
@@ -260,10 +260,33 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     try {
       final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
       await EmailApi.send(invoiceId: inv.id, to: to, pdf: bytes);
-      _snack('Correo enviado a ${to.trim()}');
+      _snack('Correo enviado a ${to.trim()} (y copia para ti)');
+      if (to.trim().toLowerCase() != inv.clientEmail.toLowerCase()) Repo.setClientEmail(inv.id, to);
     } catch (e) {
       _snack(friendly(e));
     } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Crea una nota de venta nueva (borrador) con los mismos datos, para cobrar de nuevo al mismo cliente.
+  Future<void> _duplicate() async {
+    final inv = _inv!;
+    setState(() => _busy = true);
+    try {
+      final id = await Repo.createInvoice(InvoiceDraft(
+        clientName: inv.clientName,
+        clientTaxId: inv.clientTaxId,
+        taxRate: inv.taxRate,
+        currency: inv.currency,
+        notes: inv.notes,
+        items: inv.items.map((i) => LineItem(description: i.description, quantity: i.quantity, unitPrice: i.unitPrice)).toList(),
+      ));
+      if (inv.clientEmail.isNotEmpty) await Repo.setClientEmail(id, inv.clientEmail);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id)));
+    } catch (e) {
+      _snack('No se pudo duplicar. ${friendly(e)}');
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -339,6 +362,8 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       Expanded(child: _quick(kIsWeb ? Icons.download_rounded : Icons.ios_share_rounded, kIsWeb ? 'Descargar' : 'Compartir', _share)),
                       const SizedBox(width: 10),
                       Expanded(child: _quick(Icons.mail_outline_rounded, 'Correo', _email)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _quick(Icons.copy_all_rounded, 'Duplicar', _duplicate)),
                     ]),
                   ),
                   const SizedBox(height: 14),

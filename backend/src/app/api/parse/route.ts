@@ -5,6 +5,10 @@ import { createClient as createCookieClient } from "@/lib/supabase/server";
 export const maxDuration = 30;
 
 const GROQ = "https://api.groq.com/openai/v1";
+// Modelo de texto: LLM_MODEL (opcional, en Vercel) y luego los recomendados por Groq tras retirar llama-3.3-70b-versatile.
+const LLM_MODELS = [process.env.LLM_MODEL, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"].filter(
+  (m, i, a): m is string => !!m && a.indexOf(m) === i,
+);
 const MAX_BYTES = 4_000_000; // Vercel limita el cuerpo a 4,5 MB
 const MAX_PER_MINUTE = 5;
 const MAX_PER_DAY = 100;
@@ -147,25 +151,35 @@ export async function POST(req: Request) {
     if (!text) return json({ error: "No se oyó nada. Habla más cerca del micrófono.", code: "empty" }, 422);
 
     // 2) Texto a datos de factura
-    const llmRes = await fetch(`${GROQ}/chat/completions`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(20_000),
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: `<dictado>\n${text}\n</dictado>` },
-        ],
-      }),
-    });
+    // Groq retira modelos con frecuencia: se prueba el siguiente si el actual ya no existe (404) o no admite algún parámetro (400).
+    let llmRes: Response | null = null;
+    for (const model of LLM_MODELS) {
+      llmRes = await fetch(`${GROQ}/chat/completions`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          max_completion_tokens: 2000,
+          // Los modelos gpt-oss "razonan": con esfuerzo bajo responden rápido y sin gastar el límite en pensar.
+          ...(model.startsWith("openai/") ? { reasoning_effort: "low" } : {}),
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: `<dictado>\n${text}\n</dictado>` },
+          ],
+        }),
+      });
+      if (llmRes.status !== 404 && llmRes.status !== 400) break;
+      console.error("parse: llm model unavailable", model, llmRes.status);
+    }
+    if (!llmRes) return json({ error: "No se pudo interpretar el dictado", code: "llm_none", transcript: text }, 502);
     if (llmRes.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto" }, 503, { "Retry-After": "60" });
     if (!llmRes.ok) console.error("parse: llm failed", llmRes.status);
     if (!llmRes.ok) return json({ error: "No se pudo interpretar el dictado", code: `llm_${llmRes.status}`, transcript: text }, 502);
 
-    const raw = JSON.parse((await llmRes.json()).choices[0].message.content) as Record<string, unknown>;
+    const raw = JSON.parse((await llmRes.json()).choices[0].message.content ?? "{}") as Record<string, unknown>;
 
     // Impuesto: lo dictado; si no se dijo, el configurado por el usuario (21 solo para cuentas web antiguas sin ajustes)
     let taxRate = toNum(raw.tax_rate);

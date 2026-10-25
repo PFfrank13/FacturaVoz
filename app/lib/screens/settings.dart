@@ -6,9 +6,11 @@ import '../config.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'clients.dart';
 import 'fiscal_setup.dart';
 import 'legal.dart';
 import 'orgs.dart';
+import 'products.dart';
 import 'reports.dart';
 import 'profile_form.dart';
 
@@ -134,6 +136,18 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Empresas y equipo',
                     subtitle: org?.name ?? 'Cambia de empresa o agrega a tu equipo',
                     onTap: () => go(const OrgsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.inventory_2_rounded,
+                    title: 'Productos y servicios',
+                    subtitle: 'Tu catálogo con precios',
+                    onTap: () => go(const ProductsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.groups_rounded,
+                    title: 'Clientes',
+                    subtitle: 'Contactos, documentos y correos',
+                    onTap: () => go(const ClientsScreen())),
                 Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.insights_rounded,

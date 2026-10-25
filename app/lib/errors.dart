@@ -1,8 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppException implements Exception {
-  AppException(this.message, {this.code});
+  AppException(this.message, {this.code, this.transcript});
   final String message;
+
+  /// Lo que se alcanzó a oír, si la transcripción funcionó pero la interpretación falló.
+  final String? transcript;
 
   /// Código corto y SEGURO para soporte (nunca contiene secretos).
   final String? code;
@@ -22,6 +25,8 @@ String friendly(Object e) {
     if (c == '42703' || c == 'PGRST204') {
       return 'La base de datos está desactualizada: ejecuta las migraciones SQL en Supabase. ($c)';
     }
+    if (c == '23505') return 'Ya existe un elemento con ese nombre. ($c)';
+    if (c == '23514') return 'Hay un dato fuera de rango (por ejemplo, un precio negativo). ($c)';
     if (c == '42501') return 'Sin permiso para esta operación. Vuelve a iniciar sesión. ($c)';
     if (c == 'PGRST301' || c == 'PGRST303') return 'Sesión caducada. Vuelve a entrar. ($c)';
     return 'La base de datos respondió con un error. (${c.isEmpty ? 'db' : c})';

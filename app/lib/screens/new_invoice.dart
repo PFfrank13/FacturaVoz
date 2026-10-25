@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:math' as math;
+import 'dart:typed_data' show Uint8List;
 import 'dart:ui' show ImageFilter;
 
 import 'package:cross_file/cross_file.dart';
@@ -17,6 +18,7 @@ import '../services/api.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'products.dart';
 
 enum _Phase { idle, recording, processing, review }
 
@@ -49,6 +51,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   final _recorder = AudioRecorder();
   _Phase _phase = _Phase.idle;
   String _error = '';
+  Uint8List? _lastAudio; // solo en memoria, para reintentar sin volver a grabar
+  String? _heardOnFail;
   int _seconds = 0;
   Timer? _timer;
   StreamSubscription<Amplitude>? _ampSub;
@@ -57,6 +61,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   final _client = TextEditingController();
   final _clientFocus = FocusNode();
   final _clientTax = TextEditingController();
+  final _clientEmail = TextEditingController();
   final _taxRate = TextEditingController();
   final _notes = TextEditingController();
   final List<_Row> _rows = [];
@@ -83,7 +88,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     _ampSub?.cancel();
     _recorder.dispose();
     _clientFocus.dispose();
-    for (final c in [_client, _clientTax, _taxRate, _notes]) {
+    for (final c in [_client, _clientTax, _clientEmail, _taxRate, _notes]) {
       c.dispose();
     }
     for (final r in _rows) {
@@ -143,10 +148,24 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     }
   }
 
+  Future<void> _addFromCatalog() async {
+    final p = await pickProduct(context, _profile.currency);
+    if (p == null || !mounted) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      // Reemplaza la línea vacía si es la única; si no, agrega una nueva.
+      final empty = _rows.length == 1 && _rows.first.desc.text.trim().isEmpty && _rows.first.price.text.trim().isEmpty;
+      if (empty) _rows.removeAt(0).dispose();
+      _rows.add(_Row(LineItem(description: p.name, quantity: 1, unitPrice: p.unitPrice)));
+      _dirty = true;
+    });
+  }
+
   Future<void> _stop() async {
     if (_phase != _Phase.recording) return;
     _timer?.cancel();
     _ampSub?.cancel();
+    _lastAudio = null;
     setState(() => _phase = _Phase.processing);
     String? path;
     try {
@@ -163,13 +182,41 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     }
     try {
       if (_seconds < 1) throw AppException('Dictado demasiado corto. Mantén la grabación unos segundos.');
-      final bytes = await XFile(path).readAsBytes();
+      _lastAudio = await XFile(path).readAsBytes();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.idle;
+          _error = friendly(e);
+        });
+      }
+    } finally {
+      // El audio no se conserva en el dispositivo (solo en memoria mientras reintentas).
+      if (!kIsWeb) {
+        try {
+          await File(path).delete();
+        } catch (_) {}
+      }
+    }
+    if (_lastAudio != null) await _process();
+  }
+
+  Future<void> _process() async {
+    final bytes = _lastAudio;
+    if (bytes == null) return;
+    setState(() {
+      _phase = _Phase.processing;
+      _error = '';
+      _heardOnFail = null;
+    });
+    try {
       final draft = await ApiService.parseAudio(
         bytes: bytes,
         filename: kIsWeb ? 'dictado.webm' : 'dictado.m4a',
         mimeType: kIsWeb ? 'audio/webm' : 'audio/mp4',
         profile: _profile,
       );
+      _lastAudio = null;
       if (!mounted) return;
       _loadDraft(draft);
       HapticFeedback.lightImpact();
@@ -179,15 +226,21 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         setState(() {
           _phase = _Phase.idle;
           _error = friendly(e);
+          _heardOnFail = e is AppException ? e.transcript : null;
         });
       }
-    } finally {
-      // El audio no se conserva en el dispositivo.
-      if (!kIsWeb) {
-        try {
-          await File(path).delete();
-        } catch (_) {}
-      }
+    }
+  }
+
+  /// Si la IA falló pero se oyó el dictado: abre el formulario con el texto en notas para no perderlo.
+  void _useHeard() {
+    final text = _heardOnFail ?? '';
+    _lastAudio = null;
+    _manual();
+    if (text.isNotEmpty) {
+      _notes.text = text.length > 500 ? text.substring(0, 500) : text;
+      _showNotes = true;
+      _transcript = text;
     }
   }
 
@@ -326,6 +379,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         items: _currentItems(),
       ));
       _dirty = false;
+      final mail = _clientEmail.text.trim();
+      if (mail.isNotEmpty) await Repo.setClientEmail(id, mail); // best-effort: no bloquea el guardado
       HapticFeedback.lightImpact();
       if (mounted) Navigator.of(context).pop(id);
     } catch (e) {
@@ -445,7 +500,20 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
                   ? const SizedBox(width: double.infinity)
                   : Padding(
                       padding: const EdgeInsets.only(top: 18),
-                      child: _Banner(text: _error, tone: PillTone.bad),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        _Banner(text: _error, tone: PillTone.bad),
+                        if (_lastAudio != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Row(children: [
+                              Expanded(child: FilledButton.icon(onPressed: _process, icon: const Icon(Icons.refresh_rounded), label: const Text('Reintentar'))),
+                              if (_heardOnFail != null) ...[
+                                const SizedBox(width: 10),
+                                Expanded(child: OutlinedButton(onPressed: _useHeard, child: const Text('Usar lo que se oyó'))),
+                              ],
+                            ]),
+                          ),
+                      ]),
                     ),
             ),
             const SizedBox(height: 22),
@@ -640,6 +708,21 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         ),
         onChanged: (_) => _touch(),
       ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: _clientEmail,
+        maxLength: 120,
+        keyboardType: TextInputType.emailAddress,
+        decoration: InputDecoration(
+          labelText: 'Correo del cliente (opcional)',
+          counterText: '',
+          prefixIcon: const Icon(Icons.alternate_email_rounded),
+          errorText: _clientEmail.text.trim().isEmpty || RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(_clientEmail.text.trim())
+              ? null
+              : 'Ese correo no parece válido',
+        ),
+        onChanged: (_) => _touch(),
+      ),
     ]);
   }
 
@@ -679,6 +762,13 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
                   },
             icon: const Icon(Icons.add_circle_outline_rounded),
             label: const Text('Agregar línea'),
+          ),
+        ),
+        Center(
+          child: TextButton.icon(
+            onPressed: _rows.length >= 50 ? null : _addFromCatalog,
+            icon: const Icon(Icons.inventory_2_outlined),
+            label: const Text('Agregar del catálogo'),
           ),
         ),
       ]),

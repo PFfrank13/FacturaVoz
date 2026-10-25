@@ -1,5 +1,5 @@
 # Voice-to-Invoice (Micro-SaaS, coste cero)
-Stack: Next.js 15 App Router, TypeScript estricto, Tailwind v4, Supabase (@supabase/ssr), Zod 3 + next-safe-action 7, @react-pdf/renderer, Groq (whisper-large-v3-turbo + llama-3.3-70b-versatile).
+Stack: Next.js 15 App Router, TypeScript estricto, Tailwind v4, Supabase (@supabase/ssr), Zod 3 + next-safe-action 7, @react-pdf/renderer, Groq (whisper-large-v3-turbo + openai/gpt-oss-120b (antes llama-3.3-70b, retirado por Groq)).
 
 ## Reglas inviolables
 1. Coste cero: no sugerir servicios sin free tier funcional.
