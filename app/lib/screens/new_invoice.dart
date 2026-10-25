@@ -130,6 +130,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           final v = ((a.current + 55) / 55).clamp(0.05, 1.0).toDouble();
           if (!mounted) return;
           setState(() {
+            // Convierte la lista a dinámica para evitar la excepción de lista de tamaño fijo
+            _levels = _levels.toList(growable: true);
             _levels.removeAt(0);
             _levels.add(v);
           });
