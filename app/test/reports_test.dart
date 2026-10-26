@@ -2,11 +2,15 @@ import 'package:facturavoz/models.dart';
 import 'package:facturavoz/reports.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-InvoiceRecord inv(String date, String client, double price, {String cur = 'PEN', String? fiscal, double tax = 18}) => InvoiceRecord(
+InvoiceRecord inv(String date, String client, double price,
+        {String cur = 'PEN', String? fiscal, double tax = 18, String status = 'sent', double paid = 0, String? due}) =>
+    InvoiceRecord(
       id: '$date$client$price',
       number: 'N-1',
       issueDate: date,
-      status: 'sent',
+      status: status,
+      paid: paid,
+      dueDate: due,
       currency: cur,
       taxRate: tax,
       notes: '',
@@ -19,6 +23,7 @@ InvoiceRecord inv(String date, String client, double price, {String cur = 'PEN',
 
 void main() {
   paymentTests();
+  receivableTests();
   test('rango de mes, incluido diciembre', () {
     expect(monthRange(2026, 10).toExclusive, '2026-11-01');
     expect(monthRange(2026, 12).toExclusive, '2027-01-01');
@@ -49,6 +54,23 @@ void main() {
     expect(csv.startsWith('﻿Fecha,'), isTrue);
     expect(csv.contains("'+51 Ana"), isTrue);
     expect(csv.contains('118.00'), isTrue);
+  });
+}
+
+void receivableTests() {
+  test('por cobrar y vencido en el reporte, y columnas del CSV', () {
+    final list = [
+      inv('2026-10-01', 'Ana', 100, paid: 18, due: '2026-10-10'), // saldo 100, vencida
+      inv('2026-10-02', 'Luis', 100, due: '2026-12-01'), // saldo 118, vigente
+      inv('2026-10-03', 'Zoe', 100, status: 'paid', paid: 118), // saldada
+      inv('2026-10-04', 'Rey', 100, status: 'draft'), // borrador: no se cobra
+    ];
+    final r = buildReport(list, today: '2026-10-25')['PEN']!;
+    expect(r.receivable, 218);
+    expect(r.overdue, 100);
+    final csv = invoicesToCsv(list);
+    expect(csv.contains('Total,Cobrado,Saldo,Vence,Estado'), isTrue);
+    expect(csv.contains('118.00,18.00,100.00,2026-10-10'), isTrue);
   });
 }
 

@@ -34,6 +34,8 @@ class CurrencyReport {
     required this.total,
     required this.topClients,
     required this.byDay,
+    this.receivable = 0,
+    this.overdue = 0,
   });
 
   final String currency;
@@ -43,19 +45,22 @@ class CurrencyReport {
   final double total;
   final List<ClientTotal> topClients;
   final Map<int, double> byDay; // día del mes -> total
+  final double receivable; // saldo por cobrar de lo facturado en el mes
+  final double overdue; // parte del saldo ya vencida
 
   double get average => count == 0 ? 0 : round2(total / count);
 }
 
 /// Un reporte por moneda (nunca se suman monedas distintas).
-Map<String, CurrencyReport> buildReport(List<InvoiceRecord> invoices, {int topN = 5}) {
+Map<String, CurrencyReport> buildReport(List<InvoiceRecord> invoices, {int topN = 5, String? today}) {
+  final now = today ?? todayIso();
   final groups = <String, List<InvoiceRecord>>{};
   for (final i in invoices.where(countsAsSale)) {
     groups.putIfAbsent(i.currency, () => []).add(i);
   }
   final out = <String, CurrencyReport>{};
   groups.forEach((cur, list) {
-    var sub = 0.0, tax = 0.0, total = 0.0;
+    var sub = 0.0, tax = 0.0, total = 0.0, recv = 0.0, over = 0.0;
     final clients = <String, (double, int)>{};
     final days = <int, double>{};
     for (final i in list) {
@@ -63,6 +68,10 @@ Map<String, CurrencyReport> buildReport(List<InvoiceRecord> invoices, {int topN 
       sub += t.subtotal;
       tax += t.tax;
       total += t.total;
+      if (i.receivable) {
+        recv += i.balance;
+        if (i.isOverdue(now)) over += i.balance;
+      }
       final key = i.clientName.trim().isEmpty ? '—' : i.clientName.trim();
       final prev = clients[key] ?? (0.0, 0);
       clients[key] = (prev.$1 + t.total, prev.$2 + 1);
@@ -79,6 +88,8 @@ Map<String, CurrencyReport> buildReport(List<InvoiceRecord> invoices, {int topN 
       total: round2(total),
       topClients: top.take(topN).toList(),
       byDay: days,
+      receivable: round2(recv),
+      overdue: round2(over),
     );
   });
   return out;
@@ -95,7 +106,7 @@ String csvCell(String v) {
 /// CSV (UTF-8 con BOM para que Excel lea bien las tildes). Una fila por comprobante.
 String invoicesToCsv(List<InvoiceRecord> invoices) {
   final b = StringBuffer('﻿');
-  b.writeln('Fecha,Número,Comprobante electrónico,Cliente,Documento,Moneda,Subtotal,Impuesto,Total,Estado,SUNAT');
+  b.writeln('Fecha,Número,Comprobante electrónico,Cliente,Documento,Moneda,Subtotal,Impuesto,Total,Cobrado,Saldo,Vence,Estado,SUNAT');
   for (final i in invoices) {
     final t = i.totals;
     b.writeln([
@@ -108,6 +119,9 @@ String invoicesToCsv(List<InvoiceRecord> invoices) {
       t.subtotal.toStringAsFixed(2),
       t.tax.toStringAsFixed(2),
       t.total.toStringAsFixed(2),
+      i.paid.toStringAsFixed(2),
+      i.balance.toStringAsFixed(2),
+      i.dueDate ?? '',
       statusLabel(i.status),
       i.fiscalStatus == null ? '' : fiscalStatusLabel(i.fiscalStatus!),
     ].map(csvCell).join(','));

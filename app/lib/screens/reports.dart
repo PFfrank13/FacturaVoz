@@ -209,17 +209,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ]),
       );
 
-  Widget _split(ThemeData t, CurrencyReport r) => Row(children: [
-        Expanded(child: _stat(t, 'Subtotal', money(r.subtotal, r.currency))),
-        const SizedBox(width: 12),
-        Expanded(child: _stat(t, 'Impuesto', money(r.tax, r.currency))),
+  Widget _split(ThemeData t, CurrencyReport r) => Column(children: [
+        Row(children: [
+          Expanded(child: _stat(t, 'Subtotal', money(r.subtotal, r.currency))),
+          const SizedBox(width: 12),
+          Expanded(child: _stat(t, 'Impuesto', money(r.tax, r.currency))),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _stat(t, 'Por cobrar', money(r.receivable, r.currency))),
+          const SizedBox(width: 12),
+          Expanded(child: _stat(t, 'Vencido', money(r.overdue, r.currency), color: r.overdue > 0 ? Brand.bad : null)),
+        ]),
       ]);
 
-  Widget _stat(ThemeData t, String label, String value) => SoftCard(
+  Widget _stat(ThemeData t, String label, String value, {Color? color}) => SoftCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: t.textTheme.bodySmall),
           const SizedBox(height: 6),
-          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Money(value, size: 18, weight: FontWeight.w700)),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Money(value, size: 18, weight: FontWeight.w700, color: color)),
         ]),
       );
 

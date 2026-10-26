@@ -174,9 +174,13 @@ class Repo {
 
     dynamic rows;
     try {
-      rows = await q(_invoiceSelect);
+      rows = await q(_invoiceSelectPay);
     } on PostgrestException {
-      rows = await q(_invoiceSelectBasic);
+      try {
+        rows = await q(_invoiceSelect);
+      } on PostgrestException {
+        rows = await q(_invoiceSelectBasic);
+      }
     }
     return (rows as List).map((r) => InvoiceRecord.fromJson(Map<String, dynamic>.from(r as Map))).toList();
   }
