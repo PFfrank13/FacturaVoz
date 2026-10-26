@@ -8,6 +8,7 @@ import '../models.dart';
 import '../services/pdf_builder.dart';
 import 'emit_sunat.dart';
 import 'fiscal_setup.dart';
+import 'payments_card.dart';
 import '../services/api.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
@@ -367,6 +368,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     ]),
                   ),
                   const SizedBox(height: 14),
+                  if (inv.status != 'draft' && _fiscal?.status != 'rejected') ...[
+                    Reveal(index: 3, child: PaymentsCard(key: ValueKey('${inv.id}-${inv.status}'), invoice: inv, onChanged: _load)),
+                    const SizedBox(height: 14),
+                  ],
                   if (_fiscal == null || _fiscal!.status != 'accepted')
                     GradientButton(
                       onPressed: _busy ? null : _emitSunat,

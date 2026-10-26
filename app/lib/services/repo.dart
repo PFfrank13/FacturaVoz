@@ -127,6 +127,9 @@ class Repo {
   static const _invoiceSelect =
       'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id, doc_type, email), fiscal_documents(status, series, correlative, doc_type), invoice_items(description, quantity, unit_price, position)';
 
+  // Con cobros (migración 20261030); si aún no existe, se usa la versión anterior.
+  static const _invoiceSelectPay = '$_invoiceSelect, due_date, payments(amount)';
+
   // Versión mínima: sirve aunque aún no existan las tablas/columnas fiscales (migración 2).
   static const _invoiceSelectBasic =
       'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id), invoice_items(description, quantity, unit_price, position)';
@@ -138,9 +141,13 @@ class Repo {
         .limit(limit);
     dynamic rows;
     try {
-      rows = await q(_invoiceSelect);
+      rows = await q(_invoiceSelectPay);
     } on PostgrestException {
-      rows = await q(_invoiceSelectBasic);
+      try {
+        rows = await q(_invoiceSelect);
+      } on PostgrestException {
+        rows = await q(_invoiceSelectBasic);
+      }
     }
     return (rows as List).map((r) => InvoiceRecord.fromJson(Map<String, dynamic>.from(r as Map))).toList();
   }
@@ -293,11 +300,56 @@ class Repo {
 
     Map<String, dynamic> row;
     try {
-      row = await q(_invoiceSelect);
+      row = await q(_invoiceSelectPay);
     } on PostgrestException {
-      row = await q(_invoiceSelectBasic);
+      try {
+        row = await q(_invoiceSelect);
+      } on PostgrestException {
+        row = await q(_invoiceSelectBasic);
+      }
     }
     return InvoiceRecord.fromJson(row);
+  }
+
+  // ---------------- Cobros ----------------
+  static Future<List<Payment>> listPayments(String invoiceId) async {
+    final rows = await _db
+        .from('payments')
+        .select('id, amount, paid_on, method, note')
+        .eq('invoice_id', invoiceId)
+        .order('paid_on', ascending: true)
+        .order('created_at', ascending: true);
+    return (rows as List).map((r) => Payment.fromJson(Map<String, dynamic>.from(r as Map))).toList();
+  }
+
+  static Future<void> addPayment({
+    required String invoiceId,
+    required double amount,
+    required String method,
+    String note = '',
+    String? paidOn,
+  }) async {
+    final org = activeOrgId;
+    final inv = await _db.from('invoices').select('org_id').eq('id', invoiceId).single();
+    await _db.from('payments').insert({
+      'org_id': (inv['org_id'] as String?) ?? org,
+      'invoice_id': invoiceId,
+      'user_id': _uid,
+      'amount': round2(amount),
+      'method': method,
+      if (note.trim().isNotEmpty) 'note': note.trim(),
+      if (paidOn != null) 'paid_on': paidOn,
+    });
+  }
+
+  /// Solo administradores y solo mientras la factura no esté marcada como pagada (lo exige la base de datos).
+  static Future<void> deletePayment(String id) async {
+    final rows = await _db.from('payments').delete().eq('id', id).select('id');
+    if ((rows as List).isEmpty) throw AppException('No se pudo anular el cobro. Solo un administrador puede hacerlo y solo mientras la factura no esté pagada.');
+  }
+
+  static Future<void> setDueDate(String invoiceId, String? isoDate) async {
+    await _db.from('invoices').update({'due_date': isoDate}).eq('id', invoiceId);
   }
 
   static Future<void> setStatus(String id, String status) async {

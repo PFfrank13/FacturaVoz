@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,6 +14,22 @@ import 'ui/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kReleaseMode) {
+    // En producción nunca se muestra un error técnico crudo al usuario.
+    ErrorWidget.builder = (details) => const Material(
+          color: Color(0xFF14132B),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(28),
+              child: Text(
+                'Algo salió mal en esta pantalla.\nVuelve atrás e inténtalo de nuevo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4),
+              ),
+            ),
+          ),
+        );
+  }
   if (!Config.isValid) {
     runApp(const _ConfigError());
     return;

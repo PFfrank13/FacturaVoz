@@ -34,6 +34,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(seconds: 9))..repeat();
   bool _started = false;
 
+  static const _offlineMsg = 'No hay conexión a internet. Revisa tus datos móviles o el Wi‑Fi e inténtalo de nuevo.';
+
+  static bool _isOffline(String lowerMsg) =>
+      lowerMsg.contains('socketexception') || lowerMsg.contains('failed host lookup') || lowerMsg.contains('clientexception') || lowerMsg.contains('timed out');
+
   static final _emailRe = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
@@ -95,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       });
       _startCooldown();
     } on AuthException catch (e) {
-      if (mounted) setState(() => _msg = _explainSendError(e));
+      if (mounted) setState(() => _msg = _isOffline(e.message.toLowerCase()) ? _offlineMsg : _explainSendError(e));
     } catch (_) {
       if (mounted) setState(() => _msg = 'No hay conexión. Revisa tu internet e inténtalo de nuevo.');
     } finally {
@@ -179,7 +184,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       await Supabase.instance.client.auth.signInWithPassword(email: email, password: _password.text);
     } on AuthException catch (e) {
       final m = e.message.toLowerCase();
-      final text = m.contains('invalid login') || m.contains('invalid credentials')
+      final text = _isOffline(m)
+          ? _offlineMsg
+          : m.contains('invalid login') || m.contains('invalid credentials')
           ? 'Correo o contraseña incorrectos'
           : m.contains('not confirmed')
               ? 'El correo no está confirmado en Supabase (marca Auto Confirm User)'

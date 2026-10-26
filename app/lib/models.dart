@@ -201,6 +201,8 @@ class InvoiceRecord {
     required this.clientTaxId,
     required this.clientDocType,
     this.clientEmail = '',
+    this.dueDate,
+    this.paid = 0,
     required this.items,
     this.fiscalStatus,
     this.fiscalNumber,
@@ -217,11 +219,25 @@ class InvoiceRecord {
   final String clientTaxId;
   final String clientDocType;
   final String clientEmail;
+  final String? dueDate; // 'yyyy-MM-dd'
+  final double paid; // suma de cobros registrados
   final List<LineItem> items;
   final String? fiscalStatus; // pending | accepted | rejected | error (null = sin comprobante electrónico)
   final String? fiscalNumber; // F001-00000007
 
   Totals get totals => computeTotals(items, taxRate);
+
+  /// Saldo por cobrar (nunca negativo).
+  double get balance {
+    final b = round2(totals.total - paid);
+    return b < 0 ? 0 : b;
+  }
+
+  /// ¿Hay algo por cobrar? Solo facturas emitidas, no rechazadas ni ya pagadas.
+  bool get receivable => status != 'draft' && status != 'paid' && fiscalStatus != 'rejected' && balance > 0.004;
+
+  /// Vencida: por cobrar y con fecha de vencimiento anterior a [today] ('yyyy-MM-dd').
+  bool isOverdue(String today) => receivable && dueDate != null && dueDate!.compareTo(today) < 0;
 
   factory InvoiceRecord.fromJson(Map<String, dynamic> j) {
     final client = j['clients'] is Map ? Map<String, dynamic>.from(j['clients'] as Map) : <String, dynamic>{};
@@ -239,6 +255,8 @@ class InvoiceRecord {
       clientTaxId: (client['tax_id'] ?? '') as String,
       clientDocType: (client['doc_type'] ?? '') as String,
       clientEmail: (client['email'] ?? '') as String,
+      dueDate: j['due_date'] as String?,
+      paid: j['payments'] is List ? round2((j['payments'] as List).fold<double>(0, (a, e) => a + _num((e as Map)['amount']))) : 0,
       fiscalStatus: fiscal?['status'] as String?,
       fiscalNumber: fiscal == null ? null : fiscalNumberOf(fiscal['series'] as String, (fiscal['correlative'] as num).toInt()),
       items: ((j['invoice_items'] ?? []) as List)
@@ -445,5 +463,38 @@ class Product {
         unitPrice: _num(j['unit_price']),
         unit: (j['unit'] ?? 'NIU') as String,
         active: j['active'] != false,
+      );
+}
+
+
+String todayIso([DateTime? now]) {
+  final d = now ?? DateTime.now();
+  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+const paymentMethods = {
+  'efectivo': 'Efectivo',
+  'yape': 'Yape',
+  'plin': 'Plin',
+  'transferencia': 'Transferencia',
+  'tarjeta': 'Tarjeta',
+  'otro': 'Otro',
+};
+
+/// Cobro registrado sobre una factura.
+class Payment {
+  Payment({required this.id, required this.amount, required this.paidOn, required this.method, required this.note});
+  final String id;
+  final double amount;
+  final String paidOn; // yyyy-MM-dd
+  final String method;
+  final String note;
+
+  factory Payment.fromJson(Map<String, dynamic> j) => Payment(
+        id: j['id'] as String,
+        amount: _num(j['amount']),
+        paidOn: (j['paid_on'] ?? '') as String,
+        method: (j['method'] ?? 'otro') as String,
+        note: (j['note'] ?? '') as String,
       );
 }

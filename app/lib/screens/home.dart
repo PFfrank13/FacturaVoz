@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'draft' => f == null && i.status == 'draft',
         'issued' => f == 'accepted',
         'review' => f == 'rejected' || f == 'error' || f == 'pending',
+        'due' => i.receivable,
         _ => true,
       };
       if (!okFilter) return false;
@@ -171,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(children: [
-                          for (final (k, label) in const [('all', 'Todas'), ('draft', 'Borradores'), ('issued', 'Emitidas'), ('review', 'Por revisar')])
+                          for (final (k, label) in const [('all', 'Todas'), ('draft', 'Borradores'), ('issued', 'Emitidas'), ('due', 'Por cobrar'), ('review', 'Por revisar')])
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: ChoiceChip(
@@ -434,6 +435,8 @@ class _Row extends StatelessWidget {
     final fiscal = inv.fiscalStatus;
     final label = fiscal == null ? statusLabel(inv.status) : fiscalStatusLabel(fiscal);
     final tone = fiscal == null ? (inv.status == 'paid' ? PillTone.ok : PillTone.neutral) : StatusPill.toneForFiscal(fiscal);
+    final overdue = inv.isOverdue(todayIso());
+    final partial = inv.receivable && inv.paid > 0;
     final initial = inv.clientName.trim().isEmpty || inv.clientName == '—' ? '·' : inv.clientName.trim().characters.first.toUpperCase();
     return Pressable(
       onTap: onTap,
@@ -454,7 +457,10 @@ class _Row extends StatelessWidget {
               const SizedBox(height: 2),
               Text('${inv.fiscalNumber ?? inv.number}  ·  ${displayDate(inv.issueDate)}', style: t.textTheme.bodySmall),
               const SizedBox(height: 8),
-              StatusPill(label, tone: tone),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                StatusPill(label, tone: tone),
+                if (overdue) const StatusPill('Vencida', tone: PillTone.bad) else if (partial) StatusPill('Saldo ${money(inv.balance, inv.currency)}', tone: PillTone.warn),
+              ]),
             ]),
           ),
           const SizedBox(width: 10),

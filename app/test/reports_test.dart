@@ -18,6 +18,7 @@ InvoiceRecord inv(String date, String client, double price, {String cur = 'PEN',
     );
 
 void main() {
+  paymentTests();
   test('rango de mes, incluido diciembre', () {
     expect(monthRange(2026, 10).toExclusive, '2026-11-01');
     expect(monthRange(2026, 12).toExclusive, '2027-01-01');
@@ -48,5 +49,43 @@ void main() {
     expect(csv.startsWith('﻿Fecha,'), isTrue);
     expect(csv.contains("'+51 Ana"), isTrue);
     expect(csv.contains('118.00'), isTrue);
+  });
+}
+
+void paymentTests() {
+  InvoiceRecord mk({String status = 'sent', String? due, double paid = 0, String? fiscal}) => InvoiceRecord(
+        id: 'x',
+        number: 'N-1',
+        issueDate: '2026-10-01',
+        status: status,
+        currency: 'PEN',
+        taxRate: 18,
+        notes: '',
+        clientName: 'Ana',
+        clientTaxId: '',
+        clientDocType: '',
+        dueDate: due,
+        paid: paid,
+        fiscalStatus: fiscal,
+        items: [LineItem(description: 'x', quantity: 1, unitPrice: 100)],
+      );
+
+  test('saldo, por cobrar y vencida', () {
+    expect(mk().balance, 118);
+    expect(mk(paid: 40).balance, 78);
+    expect(mk(paid: 200).balance, 0); // nunca negativo
+    expect(mk().receivable, isTrue);
+    expect(mk(status: 'draft').receivable, isFalse);
+    expect(mk(status: 'paid', paid: 118).receivable, isFalse);
+    expect(mk(paid: 118).receivable, isFalse);
+    expect(mk(fiscal: 'rejected').receivable, isFalse);
+    expect(mk(due: '2026-10-10').isOverdue('2026-10-11'), isTrue);
+    expect(mk(due: '2026-10-10').isOverdue('2026-10-10'), isFalse); // vence hoy: aún no vencida
+    expect(mk(due: '2026-10-10', paid: 118).isOverdue('2026-12-01'), isFalse);
+    expect(mk().isOverdue('2030-01-01'), isFalse); // sin fecha no vence
+  });
+
+  test('todayIso con ceros a la izquierda', () {
+    expect(todayIso(DateTime(2026, 3, 5)), '2026-03-05');
   });
 }
