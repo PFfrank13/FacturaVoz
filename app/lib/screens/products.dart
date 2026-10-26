@@ -60,7 +60,7 @@ class _ProductPickerState extends State<_ProductPicker> {
             child: _error != null
                 ? Center(child: Text(_error!, textAlign: TextAlign.center))
                 : _all == null
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const SingleChildScrollView(child: SkeletonList(count: 4))
                     : _all!.isEmpty
                         ? const EmptyState(title: 'Tu catálogo está vacío', body: 'Agrega productos y servicios en Ajustes → Productos y servicios.')
                         : ListView.builder(
@@ -235,6 +235,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
@@ -252,7 +253,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 ]),
               )
             else if (all == null)
-              const Padding(padding: EdgeInsets.only(top: 80), child: Center(child: CircularProgressIndicator()))
+              const SkeletonList()
             else if (all.isEmpty)
               const EmptyState(title: 'Tu catálogo está vacío', body: 'Guarda tus productos y servicios con su precio y elígelos al facturar, sin dictar el precio cada vez.')
             else if (list.isEmpty)

@@ -17,6 +17,32 @@ import 'profile_form.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+  Future<void> _pickTheme(BuildContext context) async {
+    final m = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Apariencia', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment(value: ThemeMode.light, label: Text('Claro'), icon: Icon(Icons.light_mode_outlined)),
+                ButtonSegment(value: ThemeMode.system, label: Text('Auto'), icon: Icon(Icons.brightness_auto_outlined)),
+                ButtonSegment(value: ThemeMode.dark, label: Text('Oscuro'), icon: Icon(Icons.dark_mode_outlined)),
+              ],
+              selected: {AppState.instance.themeMode.value},
+              onSelectionChanged: (s) => Navigator.pop(ctx, s.first),
+            ),
+          ]),
+        ),
+      ),
+    );
+    if (m != null) await AppState.instance.setTheme(m);
+  }
+
   Future<void> _signOut(BuildContext context) async {
     final nav = Navigator.of(context);
     AppState.instance.clear();
@@ -142,6 +168,16 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Productos y servicios',
                     subtitle: 'Tu catálogo con precios',
                     onTap: () => go(const ProductsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.palette_outlined,
+                    title: 'Apariencia',
+                    subtitle: switch (AppState.instance.themeMode.value) {
+                      ThemeMode.light => 'Claro',
+                      ThemeMode.dark => 'Oscuro',
+                      _ => 'Igual que el sistema',
+                    },
+                    onTap: () => _pickTheme(context)),
                 Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.groups_rounded,

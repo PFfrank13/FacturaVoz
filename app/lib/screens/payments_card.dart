@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../whatsapp.dart';
 
 /// Cobros de una factura emitida: saldo, barra de avance, historial, registrar cobro y vencimiento.
 class PaymentsCard extends StatefulWidget {
@@ -157,6 +160,63 @@ class _PaymentsCardState extends State<PaymentsCard> {
     }
   }
 
+  Future<void> _remind() async {
+    final inv = widget.invoice;
+    final ctrl = TextEditingController();
+    var err = '';
+    final digits = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Recordar por WhatsApp', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text('Se abre WhatsApp con el mensaje listo; tú decides si lo envías.', style: Theme.of(ctx).textTheme.bodySmall),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s\-]'))],
+              decoration: const InputDecoration(labelText: 'Celular del cliente', hintText: '987 654 321', prefixIcon: Icon(Icons.phone_outlined)),
+            ),
+            if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(err, style: const TextStyle(color: Brand.bad))),
+            const SizedBox(height: 14),
+            GradientButton(
+              label: 'Abrir WhatsApp',
+              icon: Icons.send_rounded,
+              onPressed: () {
+                final d = normalizePhone(ctrl.text);
+                if (d == null) {
+                  setS(() => err = 'Escribe un celular válido (9 dígitos, o con código de país)');
+                } else {
+                  Navigator.pop(ctx, d);
+                }
+              },
+            ),
+          ]),
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (digits == null) return;
+    final msg = reminderText(
+      clientName: inv.clientName,
+      businessName: AppState.instance.profile?.businessName ?? '',
+      number: inv.fiscalNumber ?? inv.number,
+      currency: inv.currency,
+      total: _total,
+      balance: _balance,
+      dueDate: _due,
+      today: todayIso(),
+    );
+    final ok = await launchUrl(whatsappUri(digits, msg), mode: LaunchMode.externalApplication);
+    if (!ok) _snack('No se pudo abrir WhatsApp en este dispositivo.');
+  }
+
   Future<void> _pickDue() async {
     final inv = widget.invoice;
     final issue = DateTime.tryParse(inv.issueDate) ?? DateTime.now();
@@ -260,6 +320,11 @@ class _PaymentsCardState extends State<PaymentsCard> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(onPressed: _busy ? null : _add, icon: const Icon(Icons.add_card_rounded), label: const Text('Registrar cobro')),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(onPressed: _remind, icon: const Icon(Icons.chat_outlined), label: const Text('Recordar por WhatsApp')),
             ),
           ],
         ],

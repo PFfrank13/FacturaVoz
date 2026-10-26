@@ -43,19 +43,30 @@ class FacturaVozApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FacturaVoz',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
-      locale: const Locale('es'),
-      supportedLocales: const [Locale('es')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      home: const AuthGate(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppState.instance.themeMode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'FacturaVoz',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        themeMode: mode,
+        builder: (context, child) {
+          // Evita que una fuente del sistema muy grande rompa los diseños (sigue respetando la accesibilidad hasta 125 %).
+          final mq = MediaQuery.of(context);
+          return MediaQuery(data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)), child: child!);
+        },
+        themeAnimationDuration: const Duration(milliseconds: 350),
+        themeAnimationCurve: Curves.easeInOut,
+        locale: const Locale('es'),
+        supportedLocales: const [Locale('es')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: const AuthGate(),
+      ),
     );
   }
 }

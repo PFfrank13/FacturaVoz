@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Sistema de diseño de FacturaVoz.
 /// Índigo "tinta" como color de marca, oro "sol" solo para la acción de dictar y el dato clave.
@@ -133,6 +134,7 @@ ThemeData buildTheme(Brightness b) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
+      systemOverlayStyle: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(statusBarColor: Colors.transparent),
       titleTextStyle: TextStyle(fontFamily: _font, fontSize: 18, fontWeight: FontWeight.w600, color: ink, letterSpacing: -0.2),
     ),
     cardTheme: CardThemeData(

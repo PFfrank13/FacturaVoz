@@ -117,6 +117,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
           children: [
@@ -134,7 +135,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 ]),
               )
             else if (all == null)
-              const Padding(padding: EdgeInsets.only(top: 80), child: Center(child: CircularProgressIndicator()))
+              const SkeletonList()
             else if (all.isEmpty)
               const EmptyState(title: 'Aún no tienes clientes', body: 'Se guardan solos cuando creas tu primera factura.')
             else if (list.isEmpty)

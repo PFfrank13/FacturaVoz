@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'errors.dart';
@@ -15,11 +16,28 @@ class AppState extends ChangeNotifier {
   bool loading = false;
   String? error;
 
+  /// Apariencia elegida (se recuerda en la cuenta). Escucha este notifier para cambiar el tema al instante.
+  final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
+
+  static ThemeMode _parseTheme(Object? v) => switch (v) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+
+  Future<void> setTheme(ThemeMode m) async {
+    themeMode.value = m;
+    try {
+      await Supabase.instance.client.auth.updateUser(UserAttributes(data: {'theme': m.name}));
+    } catch (_) {}
+  }
+
   Future<void> load() async {
     loading = true;
     error = null;
     notifyListeners();
     try {
+      themeMode.value = _parseTheme(Supabase.instance.client.auth.currentUser?.userMetadata?['theme']);
       await _loadOrgs();
       profile = await Repo.loadProfile();
     } catch (e) {
@@ -62,6 +80,7 @@ class AppState extends ChangeNotifier {
     profile = null;
     orgs = const [];
     Repo.activeOrgId = null;
+    themeMode.value = ThemeMode.system;
     error = null;
     loading = false;
     notifyListeners();

@@ -459,3 +459,52 @@ class GradientButton extends StatelessWidget {
   }
 }
 
+
+
+/// Marcador de posición pulsante mientras carga una lista de tarjetas.
+class SkeletonCard extends StatefulWidget {
+  const SkeletonCard({super.key});
+
+  @override
+  State<SkeletonCard> createState() => _SkeletonCardState();
+}
+
+class _SkeletonCardState extends State<SkeletonCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final base = t.colorScheme.surfaceContainerHighest;
+    Widget bar(double w, double h) => Container(width: w, height: h, decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(8)));
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+      child: SoftCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: base, shape: BoxShape.circle)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [bar(140, 14), const SizedBox(height: 8), bar(90, 11)])),
+          bar(64, 16),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Varias tarjetas de carga seguidas (para pantallas de lista).
+class SkeletonList extends StatelessWidget {
+  const SkeletonList({super.key, this.count = 5});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        for (var i = 0; i < count; i++) const Padding(padding: EdgeInsets.only(bottom: 12), child: SkeletonCard()),
+      ]);
+}

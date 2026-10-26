@@ -120,7 +120,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ]),
               )
             else if (rows == null)
-              const Padding(padding: EdgeInsets.only(top: 80), child: Center(child: CircularProgressIndicator()))
+              const SkeletonList()
             else if (rows.isEmpty)
               const EmptyState(title: 'Sin ventas este mes', body: 'Cuando crees facturas de este mes, aquí verás tus totales.')
             else ...[
