@@ -177,14 +177,14 @@ class _PinEntryState extends State<PinEntry> with TickerProviderStateMixin {
       child: AnimatedScale(
         scale: _ok ? 1.14 : 1,
         duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutBack,
-        child: Row(
+        curve: Curves.easeOutCubic,
+        child: FittedBox(fit: BoxFit.scaleDown, child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(pinLength, (i) {
             final on = i < _pin.length;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutBack,
+              curve: Curves.easeOutCubic, // sin rebote: easeOutBack hacía blurRadius negativo
               margin: const EdgeInsets.symmetric(horizontal: 8),
               width: on ? 18 : 13,
               height: on ? 18 : 13,
@@ -196,7 +196,7 @@ class _PinEntryState extends State<PinEntry> with TickerProviderStateMixin {
               ),
             );
           }),
-        ),
+        )),
       ),
     );
   }
@@ -243,9 +243,12 @@ class _PinEntryState extends State<PinEntry> with TickerProviderStateMixin {
       final gap = c.maxHeight > 700 ? 28.0 : 14.0;
       Widget row(List<Widget> keys) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 7),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              for (var j = 0; j < keys.length; j++) Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: keys[j]),
-            ]),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+                for (var j = 0; j < keys.length; j++) Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: keys[j]),
+              ]),
+            ),
           );
       Widget d(String n, int i) => _key(size, digit: n, i: i, onTap: () => _tap(n));
       return SingleChildScrollView(
@@ -324,7 +327,7 @@ class _PulseBadgeState extends State<_PulseBadge> with SingleTickerProviderState
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {
-        final glow = 18 + 14 * _c.value;
+        final glow = (18 + 14 * _c.value).clamp(0.0, 64.0);
         final color = widget.ok ? _okGreen : Brand.lilac;
         return Container(
           width: 76,

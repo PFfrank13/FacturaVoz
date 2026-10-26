@@ -204,7 +204,7 @@ class _OrgsScreenState extends State<OrgsScreen> {
                   body: 'Ejecuta la migración 20261027_multitenant.sql en Supabase y vuelve a abrir la app.',
                 ),
               )
-            : ListView(
+            : ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
                 children: [
                   Text('Tus empresas', style: t.textTheme.titleMedium),

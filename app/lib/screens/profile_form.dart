@@ -131,7 +131,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
       body: SafeArea(
         child: Form(
           key: _form,
-          child: ListView(
+          child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             padding: const EdgeInsets.all(16),
             children: [
               if (widget.onboarding)

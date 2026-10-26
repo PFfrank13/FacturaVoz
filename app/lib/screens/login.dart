@@ -23,6 +23,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   final _email = TextEditingController();
   final _code = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _signup = false;
   bool _usePassword = true;
   bool _obscure = true;
   bool _sent = false;
@@ -68,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _email.dispose();
     _code.dispose();
     _password.dispose();
+    _confirm.dispose();
     super.dispose();
   }
 
@@ -169,7 +172,64 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
-  /// Solo para cuentas con contraseña creada a mano en Supabase (p. ej. revisores de las tiendas).
+  /// Registro con correo y contraseña (sin crear usuarios a mano en Supabase).
+  Future<void> _signUp() async {
+    final email = _email.text.trim().toLowerCase();
+    final pass = _password.text;
+    if (!_emailRe.hasMatch(email)) {
+      setState(() => _msg = 'Escribe un correo válido');
+      return;
+    }
+    if (pass.length < 8) {
+      setState(() => _msg = 'La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+    if (pass != _confirm.text) {
+      setState(() => _msg = 'Las contraseñas no coinciden');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _msg = '';
+    });
+    try {
+      final res = await Supabase.instance.client.auth.signUp(email: email, password: pass);
+      if (!mounted) return;
+      if (res.session != null) return; // sesión iniciada: AuthGate te lleva a la app
+      if (res.user != null && (res.user!.identities?.isEmpty ?? false)) {
+        setState(() {
+          _signup = false;
+          _msg = 'Ese correo ya está registrado. Inicia sesión con tu contraseña.';
+        });
+      } else {
+        setState(() {
+          _signup = false;
+          _confirm.clear();
+          _msg = 'Cuenta creada. Te enviamos un correo para confirmarla; ábrelo y luego inicia sesión.';
+        });
+      }
+    } on AuthException catch (e) {
+      final m = e.message.toLowerCase();
+      final text = _isOffline(m)
+          ? _offlineMsg
+          : m.contains('already') || m.contains('registered')
+              ? 'Ese correo ya está registrado. Inicia sesión.'
+              : m.contains('rate limit') || m.contains('too many') || e.statusCode == '429'
+                  ? 'Demasiados intentos o correos enviados. Espera un rato e inténtalo otra vez.'
+                  : m.contains('password')
+                      ? 'La contraseña es muy débil. Usa 8 o más caracteres con letras y números.'
+                      : m.contains('signups not allowed') || m.contains('disabled')
+                          ? 'El registro está desactivado en Supabase (Authentication → Sign In / Providers → Email).'
+                          : 'No se pudo crear la cuenta: ${e.message}';
+      if (mounted) setState(() => _msg = text);
+    } catch (_) {
+      if (mounted) setState(() => _msg = _offlineMsg);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Entrar con correo y contraseña. Solo para cuentas con contraseña creada a mano en Supabase (p. ej. revisores de las tiendas).
   Future<void> _signInPassword() async {
     final email = _email.text.trim().toLowerCase();
     if (!_emailRe.hasMatch(email) || _password.text.isEmpty) {
@@ -256,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
                           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .18), blurRadius: 30, offset: const Offset(0, -8))],
                         ),
-                        child: SingleChildScrollView(
+                        child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
                           padding: EdgeInsets.fromLTRB(24, 28, 24, 20 + MediaQuery.of(context).padding.bottom),
                           child: Center(
                             child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 400), child: _form(t)),
@@ -294,10 +354,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   Widget _form(ThemeData t) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(_sent ? 'Revisa tu correo' : (_usePassword ? 'Bienvenido de nuevo' : 'Crea tu cuenta'), style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+      Text(_sent ? 'Revisa tu correo' : (_usePassword ? (_signup ? 'Crea tu cuenta' : 'Bienvenido de nuevo') : 'Crea tu cuenta'), style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: 4),
       Text(
-        _usePassword ? 'Entra con tu correo y contraseña.' : 'Te enviamos un código y listo: sin contraseñas que recordar.',
+        _usePassword ? (_signup ? 'Regístrate con tu correo y una contraseña de 8 o más caracteres.' : 'Entra con tu correo y contraseña.') : 'Te enviamos un código y listo: sin contraseñas que recordar.',
         style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
       ),
       const SizedBox(height: 20),
@@ -325,10 +385,39 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
           ),
-          onSubmitted: (_) => _signInPassword(),
+          onChanged: _signup ? (_) => setState(() {}) : null,
+          textInputAction: _signup ? TextInputAction.next : TextInputAction.done,
+          onSubmitted: (_) => _signup ? null : _signInPassword(),
         ),
+        if (_signup) ...[
+          _StrengthBar(password: _password.text),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _confirm,
+            obscureText: _obscure,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(labelText: 'Repite la contraseña', prefixIcon: Icon(Icons.lock_reset_rounded)),
+            onSubmitted: (_) => _signUp(),
+          ),
+        ],
         const SizedBox(height: 16),
-        GradientButton(label: _busy ? 'Entrando…' : 'Entrar', icon: Icons.arrow_forward_rounded, busy: _busy, onPressed: _busy ? null : _signInPassword),
+        GradientButton(
+          label: _busy ? (_signup ? 'Creando…' : 'Entrando…') : (_signup ? 'Crear cuenta' : 'Entrar'),
+          icon: _signup ? Icons.person_add_alt_1_rounded : Icons.arrow_forward_rounded,
+          busy: _busy,
+          onPressed: _busy ? null : (_signup ? _signUp : _signInPassword),
+        ),
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () => setState(() {
+                    _signup = !_signup;
+                    _msg = '';
+                    _confirm.clear();
+                  }),
+          child: Text(_signup ? 'Ya tengo cuenta · Iniciar sesión' : '¿No tienes cuenta? Regístrate'),
+        ),
       ] else if (!_sent)
         GradientButton(label: _busy ? 'Enviando…' : 'Enviar código', icon: Icons.send_rounded, busy: _busy, onPressed: _busy ? null : _send)
       else ...[
@@ -356,11 +445,21 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           child: const Text('Cambiar correo'),
         ),
       ],
-      if (_msg.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Text(_msg, textAlign: TextAlign.center, style: t.textTheme.bodyMedium),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _msg.isEmpty
+              ? const SizedBox(width: double.infinity, key: ValueKey('nomsg'))
+              : Padding(
+                  key: ValueKey(_msg),
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(_msg, textAlign: TextAlign.center, style: t.textTheme.bodyMedium),
+                ),
         ),
+      ),
       if (!_sent) ...[
         const SizedBox(height: 18),
         Row(children: [
@@ -512,6 +611,54 @@ class _MiniTicket extends StatelessWidget {
         line(56),
         const SizedBox(height: 4),
         Align(alignment: Alignment.centerRight, child: line(34, a: .8)),
+      ]),
+    );
+  }
+}
+
+
+/// Medidor de seguridad de la contraseña con barra animada.
+class _StrengthBar extends StatelessWidget {
+  const _StrengthBar({required this.password});
+  final String password;
+
+  int get _score {
+    if (password.isEmpty) return 0;
+    var n = 0;
+    if (password.length >= 8) n++;
+    if (password.length >= 12) n++;
+    if (RegExp(r'[a-z]').hasMatch(password) && RegExp(r'[A-Z]').hasMatch(password)) n++;
+    if (RegExp(r'\d').hasMatch(password)) n++;
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) n++;
+    return n.clamp(1, 4);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sc = _score;
+    const labels = ['', 'Débil', 'Regular', 'Buena', 'Excelente'];
+    final colors = [Colors.transparent, Brand.bad, Brand.warn, Brand.ok, Brand.ok];
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(end: sc / 4),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => LinearProgressIndicator(
+                value: v,
+                minHeight: 5,
+                backgroundColor: Theme.of(context).colorScheme.outline,
+                valueColor: AlwaysStoppedAnimation<Color>(colors[sc] == Colors.transparent ? Brand.bad : colors[sc]),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(width: 70, child: Text(labels[sc], style: Theme.of(context).textTheme.bodySmall)),
       ]),
     );
   }

@@ -114,7 +114,7 @@ class _EmitSunatScreenState extends State<EmitSunatScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Emitir a SUNAT')),
       body: SafeArea(
-        child: ListView(
+        child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
           padding: const EdgeInsets.all(16),
           children: [
             if (widget.company.env == 'beta')

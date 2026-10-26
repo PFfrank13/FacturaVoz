@@ -447,7 +447,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     final scheme = t.colorScheme;
     final remaining = _maxSeconds - _seconds;
     return Center(
-      child: SingleChildScrollView(
+      child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -662,7 +662,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
               borderRadius: BorderRadius.circular(18),
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 64, maxHeight: 260),
-                child: ListView(
+                child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   shrinkWrap: true,
                   children: [

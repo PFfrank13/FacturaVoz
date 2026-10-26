@@ -50,7 +50,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
-          child: SingleChildScrollView(
+          child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Editar cliente', style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 6),

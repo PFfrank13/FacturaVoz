@@ -70,7 +70,7 @@ class _PaymentsCardState extends State<PaymentsCard> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
-          child: SingleChildScrollView(
+          child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Registrar cobro', style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 4),

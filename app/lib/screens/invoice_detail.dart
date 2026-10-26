@@ -341,7 +341,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                         ),
                       ),
               )
-            : ListView(
+            : ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
                 padding: const EdgeInsets.all(16),
                 children: [
                   Reveal(child: _ticket(inv)),

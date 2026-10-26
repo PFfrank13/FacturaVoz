@@ -58,7 +58,7 @@ class FacturaVozApp extends StatelessWidget {
         builder: (context, child) {
           // Evita que una fuente del sistema muy grande rompa los diseños (sigue respetando la accesibilidad hasta 125 %).
           final mq = MediaQuery.of(context);
-          return MediaQuery(data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)), child: LockOverlay(child: child!));
+          return MediaQuery(data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)), child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: () => FocusManager.instance.primaryFocus?.unfocus(), child: LockOverlay(child: child!)));
         },
         themeAnimationDuration: const Duration(milliseconds: 350),
         themeAnimationCurve: Curves.easeInOut,

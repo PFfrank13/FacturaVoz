@@ -32,6 +32,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // /api/parse se autentica a sí mismo (Bearer o cookie); si pasara por aquí, las apps móviles serían redirigidas a /login
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/parse|api/fiscal).*)"],
+  // /api/parse, /api/fiscal y /api/email se autentican a sí mismo (Bearer o cookie); si pasara por aquí, las apps móviles serían redirigidas a /login
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/parse|api/fiscal|api/email).*)"],
 };

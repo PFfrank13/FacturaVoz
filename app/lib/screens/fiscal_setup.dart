@@ -93,7 +93,7 @@ class _FiscalSetupScreenState extends State<FiscalSetupScreen> {
       body: SafeArea(
         child: Form(
           key: _form,
-          child: ListView(
+          child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             padding: const EdgeInsets.all(16),
             children: [
               ListTile(

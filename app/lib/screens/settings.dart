@@ -128,7 +128,7 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Ajustes')),
       body: SafeArea(
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
+        child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
           Reveal(
             child: Container(
               padding: const EdgeInsets.all(20),

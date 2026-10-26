@@ -60,7 +60,7 @@ class _ProductPickerState extends State<_ProductPicker> {
             child: _error != null
                 ? Center(child: Text(_error!, textAlign: TextAlign.center))
                 : _all == null
-                    ? const SingleChildScrollView(child: SkeletonList(count: 4))
+                    ? const SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, child: SkeletonList(count: 4))
                     : _all!.isEmpty
                         ? const EmptyState(title: 'Tu catálogo está vacío', body: 'Agrega productos y servicios en Ajustes → Productos y servicios.')
                         : ListView.builder(
@@ -131,7 +131,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
-          child: SingleChildScrollView(
+          child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(p == null ? 'Nuevo producto o servicio' : 'Editar', style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 16),

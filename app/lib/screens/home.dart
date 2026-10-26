@@ -27,18 +27,23 @@ class _HomeScreenState extends State<HomeScreen> {
   int _limit = 100;
   bool _more = false;
   String _query = '';
+  final _searchFocus = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _orgSeen = Repo.activeOrgId;
     AppState.instance.addListener(_onApp);
+    _searchFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
     _load();
   }
 
   @override
   void dispose() {
     AppState.instance.removeListener(_onApp);
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -152,11 +157,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final t = Theme.of(context);
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Reveal(index: 4, dy: 30, child: RepaintBoundary(child: DictateButton(size: 66, onPressed: _newInvoice))),
+      // El micrófono se esconde mientras se busca (teclado abierto o buscador enfocado).
+      floatingActionButton: Builder(builder: (context) {
+        final hide = _searchFocus.hasFocus || MediaQuery.viewInsetsOf(context).bottom > 0;
+        return IgnorePointer(
+          ignoring: hide,
+          child: AnimatedScale(
+            scale: hide ? 0 : 1,
+            duration: const Duration(milliseconds: 220),
+            curve: hide ? Curves.easeInCubic : Curves.easeOutBack,
+            child: AnimatedOpacity(
+              opacity: hide ? 0 : 1,
+              duration: const Duration(milliseconds: 180),
+              child: Reveal(index: 4, dy: 30, child: RepaintBoundary(child: DictateButton(size: 66, onPressed: _newInvoice))),
+            ),
+          ),
+        );
+      }),
       body: RefreshIndicator(
         onRefresh: _load,
         edgeOffset: 140,
         child: CustomScrollView(
+          cacheExtent: 600,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
@@ -190,7 +212,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 22, 16, 6),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       TextField(
+                        focusNode: _searchFocus,
                         onChanged: (v) => setState(() => _query = v),
+                        onSubmitted: (_) => _searchFocus.unfocus(),
                         textInputAction: TextInputAction.search,
                         decoration: const InputDecoration(
                           hintText: 'Buscar por cliente o número',
@@ -199,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      SingleChildScrollView(
+                      SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
                         scrollDirection: Axis.horizontal,
                         child: Row(children: [
                           for (final (k, label) in const [('all', 'Todas'), ('draft', 'Borradores'), ('issued', 'Emitidas'), ('due', 'Por cobrar'), ('review', 'Por revisar')])
@@ -219,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 2),
                         Text('Un toque crea una copia de la última factura del cliente.', style: t.textTheme.bodySmall),
                         const SizedBox(height: 8),
-                        SingleChildScrollView(
+                        SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
                           scrollDirection: Axis.horizontal,
                           child: Row(children: [
                             for (final inv in _repeatable())
@@ -267,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : Reveal(
                       key: ValueKey(list[i].id),
                       index: 3 + (i < 8 ? i : 8),
-                      child: _Row(inv: list[i], onTap: () => _open(list[i])),
+                      child: RepaintBoundary(child: _Row(inv: list[i], onTap: () => _open(list[i]))),
                     ),
                   ),
                 );
