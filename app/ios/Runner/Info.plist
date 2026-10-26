@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Facturavoz</string>
+	<string>FacturaVoz</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -66,5 +66,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FacturaVoz usa el micrófono solo para dictar tus facturas.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>FacturaVoz usa Face ID para desbloquear la app.</string>
+	<key>CFBundleURLTypes</key>
+	<array><dict><key>CFBundleURLSchemes</key>
+	<array><string>com.facturavoz.app</string></array></dict></array>
 </dict>
 </plist>
