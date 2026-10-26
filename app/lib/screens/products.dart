@@ -174,8 +174,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
     );
     final values = (name.text, price.text.trim().isEmpty ? 0.0 : (parseDecimal(price.text) ?? 0.0), unit);
-    name.dispose();
-    price.dispose();
+    disposeAfterClose([name, price]);
     if (ok != true) return;
     try {
       await Repo.saveProduct(id: p?.id, name: values.$1, unitPrice: values.$2, unit: values.$3);

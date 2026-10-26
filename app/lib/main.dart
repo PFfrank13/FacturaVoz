@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_state.dart';
 import 'config.dart';
+import 'screens/lock_screen.dart';
+import 'services/app_lock.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
 import 'screens/onboarding.dart';
@@ -35,6 +37,7 @@ Future<void> main() async {
     return;
   }
   await Supabase.initialize(url: Config.supabaseUrl, anonKey: Config.supabaseAnonKey);
+  AppLock.instance.bind();
   runApp(const FacturaVozApp());
 }
 
@@ -47,6 +50,7 @@ class FacturaVozApp extends StatelessWidget {
       valueListenable: AppState.instance.themeMode,
       builder: (context, mode, _) => MaterialApp(
         title: 'FacturaVoz',
+        navigatorKey: appNavigatorKey,
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
@@ -54,7 +58,7 @@ class FacturaVozApp extends StatelessWidget {
         builder: (context, child) {
           // Evita que una fuente del sistema muy grande rompa los diseños (sigue respetando la accesibilidad hasta 125 %).
           final mq = MediaQuery.of(context);
-          return MediaQuery(data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)), child: child!);
+          return MediaQuery(data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)), child: LockOverlay(child: child!));
         },
         themeAnimationDuration: const Duration(milliseconds: 350),
         themeAnimationCurve: Curves.easeInOut,
@@ -145,6 +149,7 @@ class _ProfileGateState extends State<ProfileGate> {
         if (!s.profile!.isComplete) {
           return _intro ? OnboardingScreen(onDone: _finishIntro) : const ProfileFormScreen(onboarding: true);
         }
+        WidgetsBinding.instance.addPostFrameCallback((_) => AppLock.instance.allowSetup());
         return const HomeScreen();
       },
     );

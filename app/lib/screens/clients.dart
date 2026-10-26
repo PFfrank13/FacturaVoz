@@ -90,9 +90,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
       ),
     );
     final values = (name.text, tax.text, mail.text, addr.text);
-    for (final x in [name, tax, mail, addr]) {
-      x.dispose();
-    }
+    disposeAfterClose([name, tax, mail, addr]);
     if (saved != true) return;
     try {
       await Repo.updateClient(c, name: values.$1, taxId: values.$2, email: values.$3, address: values.$4);

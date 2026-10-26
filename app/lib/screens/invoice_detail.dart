@@ -251,7 +251,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         ]),
       ),
     );
-    ctrl.dispose();
+    disposeAfterClose([ctrl]);
     if (to == null || to.trim().isEmpty) return;
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(to.trim())) {
       _snack('Ese correo no parece válido.');
@@ -275,15 +275,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     final inv = _inv!;
     setState(() => _busy = true);
     try {
-      final id = await Repo.createInvoice(InvoiceDraft(
-        clientName: inv.clientName,
-        clientTaxId: inv.clientTaxId,
-        taxRate: inv.taxRate,
-        currency: inv.currency,
-        notes: inv.notes,
-        items: inv.items.map((i) => LineItem(description: i.description, quantity: i.quantity, unitPrice: i.unitPrice)).toList(),
-      ));
-      if (inv.clientEmail.isNotEmpty) await Repo.setClientEmail(id, inv.clientEmail);
+      final id = await Repo.duplicateInvoice(inv);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id)));
     } catch (e) {

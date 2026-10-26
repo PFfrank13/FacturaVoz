@@ -20,7 +20,7 @@ void android() {
   const manifestPath = 'android/app/src/main/AndroidManifest.xml';
   var m = read(manifestPath);
   if (m != null) {
-    for (final perm in ['android.permission.INTERNET', 'android.permission.RECORD_AUDIO']) {
+    for (final perm in ['android.permission.INTERNET', 'android.permission.RECORD_AUDIO', 'android.permission.USE_BIOMETRIC']) {
       if (!m!.contains('"$perm"')) {
         m = m.replaceFirst('<application', '<uses-permission android:name="$perm"/>\n    <application');
       }
@@ -50,6 +50,30 @@ void android() {
     stdout.writeln('OK  AndroidManifest.xml');
   }
 
+  // Huella (local_auth): la actividad debe ser FlutterFragmentActivity y el tema, AppCompat.
+  final mainDir = Directory('android/app/src/main');
+  if (mainDir.existsSync()) {
+    for (final f in mainDir.listSync(recursive: true).whereType<File>()) {
+      if (f.path.endsWith('MainActivity.kt') || f.path.endsWith('MainActivity.java')) {
+        var k = f.readAsStringSync();
+        if (!k.contains('FlutterFragmentActivity')) {
+          k = k.replaceAll('FlutterActivity', 'FlutterFragmentActivity');
+          f.writeAsStringSync(k);
+          stdout.writeln('OK  ${f.path} (FlutterFragmentActivity)');
+        }
+      }
+      if (f.path.replaceAll('\\', '/').contains('/res/values') && f.path.endsWith('styles.xml')) {
+        var x = f.readAsStringSync();
+        final re = RegExp(r'parent="@android:style/Theme\.(Light|Black)(\.NoTitleBar)?"');
+        if (re.hasMatch(x)) {
+          x = x.replaceAll(re, 'parent="Theme.AppCompat.DayNight.NoActionBar"');
+          f.writeAsStringSync(x);
+          stdout.writeln('OK  ${f.path} (tema AppCompat)');
+        }
+      }
+    }
+  }
+
   // record exige minSdk 23 o superior
   for (final p in ['android/app/build.gradle.kts', 'android/app/build.gradle']) {
     var g = read(p);
@@ -75,6 +99,13 @@ void ios() {
       RegExp(r'</dict>\s*</plist>'),
       '\t<key>NSMicrophoneUsageDescription</key>\n'
       '\t<string>FacturaVoz usa el micrófono solo para dictar tus facturas.</string>\n</dict>\n</plist>',
+    );
+  }
+  if (!s.contains('NSFaceIDUsageDescription')) {
+    s = s.replaceFirst(
+      RegExp(r'</dict>\s*</plist>'),
+      '\t<key>NSFaceIDUsageDescription</key>\n'
+      '\t<string>FacturaVoz usa Face ID para desbloquear la app.</string>\n</dict>\n</plist>',
     );
   }
   if (!s.contains('com.facturavoz.app')) {

@@ -57,3 +57,10 @@ la API con un Supabase simulado (401/403/400/429/CORS). El flujo de voz con Groq
   Supabase/Vercel/Groq. Si no necesitas guardar la transcripción, elimina la columna `transcript`.
 - **Limpieza**: `api_usage` crece; programa un borrado de filas > 7 días (pg_cron o manual).
 - Pendiente recomendado: MFA opcional, registro de auditoría, límite global de Groq por cola, clientes y numeración por serie/año si tu normativa lo exige.
+
+## Bloqueo de la app (PIN + huella)
+- Se pide en cada inicio y al volver tras más de 20 s en segundo plano. PIN de 6 dígitos obligatorio; huella/rostro se activa por defecto si el teléfono la tiene.
+- El PIN se guarda con PBKDF2-HMAC-SHA256 (20 000 iteraciones, sal aleatoria) en Keystore/Keychain (`flutter_secure_storage`); nunca en claro ni en el servidor.
+- Intentos: espera de 30 s al 5.º fallo, 1 min, 5 min, 15 min, 1 h; al 10.º se cierra la sesión.
+- Tras compilar con paquetes nuevos: `flutter pub get` y `dart run tool/post_create.dart` (activa FlutterFragmentActivity, USE_BIOMETRIC y Face ID).
+- En web no se aplica (no hay almacén seguro).

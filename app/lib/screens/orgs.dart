@@ -91,8 +91,7 @@ class _OrgsScreenState extends State<OrgsScreen> {
       ),
     );
     final n = name.text, t = tax.text;
-    name.dispose();
-    tax.dispose();
+    disposeAfterClose([name, tax]);
     if (ok != true || n.trim().isEmpty) return;
     setState(() => _busy = true);
     try {
@@ -148,7 +147,7 @@ class _OrgsScreenState extends State<OrgsScreen> {
       ),
     );
     final e = email.text;
-    email.dispose();
+    disposeAfterClose([email]);
     if (ok != true || e.trim().isEmpty) return;
     setState(() => _busy = true);
     try {

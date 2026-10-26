@@ -452,7 +452,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DictateButton(size: 112, recording: recording, busy: processing, onPressed: recording ? _stop : _start),
+            RepaintBoundary(child: DictateButton(size: 112, recording: recording, busy: processing, onPressed: recording ? _stop : _start)),
             const SizedBox(height: 8),
             SizedBox(
               height: 44,

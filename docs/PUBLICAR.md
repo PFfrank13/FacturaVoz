@@ -2,6 +2,9 @@
 
 Antes de publicar, resuelve esto **en orden**. Nada de esto se puede cambiar después sin costo.
 
+## 0. Requisito de Google para cuentas personales nuevas
+Según la ayuda oficial de Play Console, una cuenta de desarrollador **personal nueva** debe hacer una **prueba cerrada con al menos 12 testers que se mantengan inscritos 14 días seguidos** antes de pedir acceso a producción (si la creas como organización con verificación, revisa en Play Console si te aplica). Plan realista: consigue 12 correos de Gmail (amigos, clientes), súbelos a la prueba cerrada y espera 14 días. Fuente: https://support.google.com/googleplay/android-developer/answer/14151465
+
 ## 1. Identidad de la app (no se cambia luego)
 - **ID de la app** (`applicationId`): hoy es `pe.tuempresa.facturavoz`. Debe ser uno tuyo y definitivo (por ejemplo `pe.tunegocio.facturavoz`). Se fija al crear el proyecto con `flutter create --org`; si aún no publicaste, puedes regenerar `android/` con otro `--org`.
 - **Nombre visible**, **ícono** y **pantalla de inicio**: usa tu logo real (no el de ejemplo).

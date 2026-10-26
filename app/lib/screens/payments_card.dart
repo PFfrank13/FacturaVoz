@@ -113,8 +113,7 @@ class _PaymentsCardState extends State<PaymentsCard> {
     );
     final v = parseDecimal(amount.text);
     final text = note.text;
-    amount.dispose();
-    note.dispose();
+    disposeAfterClose([amount, note]);
     if (ok != true || v == null) return;
     setState(() => _busy = true);
     try {
@@ -201,7 +200,7 @@ class _PaymentsCardState extends State<PaymentsCard> {
         ),
       ),
     );
-    ctrl.dispose();
+    disposeAfterClose([ctrl]);
     if (digits == null) return;
     final msg = reminderText(
       clientName: inv.clientName,

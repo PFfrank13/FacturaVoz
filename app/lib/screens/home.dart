@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../app_state.dart';
 import '../errors.dart';
@@ -85,6 +86,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Último comprobante de cada cliente reciente (para repetir una factura con un toque).
+  List<InvoiceRecord> _repeatable() {
+    final seen = <String>{};
+    final out = <InvoiceRecord>[];
+    for (final i in _items ?? const <InvoiceRecord>[]) {
+      final name = i.clientName.trim();
+      if (name.isEmpty || name == '—' || i.fiscalStatus == 'rejected' || i.items.isEmpty) continue;
+      if (seen.add(name.toLowerCase())) out.add(i);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }
+
+  Future<void> _repeat(InvoiceRecord inv) async {
+    HapticFeedback.selectionClick();
+    try {
+      final id = await Repo.duplicateInvoice(inv);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Copia de la última factura de ${inv.clientName}. Revísala y emítela.')));
+      await _openId(id);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo crear la copia. ${friendly(e)}')));
+    }
+  }
+
   Future<void> _newInvoice() async {
     final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const NewInvoiceScreen()));
     if (!mounted) return;
@@ -95,8 +123,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _open(InvoiceRecord inv) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: inv.id)));
+  Future<void> _open(InvoiceRecord inv) => _openId(inv.id);
+
+  Future<void> _openId(String id) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id)));
     if (mounted) _load();
   }
 
@@ -122,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final t = Theme.of(context);
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Reveal(index: 4, dy: 30, child: DictateButton(size: 66, onPressed: _newInvoice)),
+      floatingActionButton: Reveal(index: 4, dy: 30, child: RepaintBoundary(child: DictateButton(size: 66, onPressed: _newInvoice))),
       body: RefreshIndicator(
         onRefresh: _load,
         edgeOffset: 140,
@@ -183,6 +213,27 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                         ]),
                       ),
+                      if (_query.isEmpty && _filter == 'all' && _repeatable().isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text('Repetir factura', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text('Un toque crea una copia de la última factura del cliente.', style: t.textTheme.bodySmall),
+                        const SizedBox(height: 8),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(children: [
+                            for (final inv in _repeatable())
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ActionChip(
+                                  avatar: const Icon(Icons.replay_rounded, size: 18),
+                                  label: Text(inv.clientName.length > 22 ? '${inv.clientName.substring(0, 22)}…' : inv.clientName),
+                                  onPressed: () => _repeat(inv),
+                                ),
+                              ),
+                          ]),
+                        ),
+                      ],
                     ]),
                   ),
                 ),

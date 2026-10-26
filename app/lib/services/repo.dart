@@ -315,6 +315,20 @@ class Repo {
     return InvoiceRecord.fromJson(row);
   }
 
+  /// Crea un borrador nuevo con los mismos datos que [inv] (cliente, líneas, impuesto, notas y correo del cliente).
+  static Future<String> duplicateInvoice(InvoiceRecord inv) async {
+    final id = await createInvoice(InvoiceDraft(
+      clientName: inv.clientName,
+      clientTaxId: inv.clientTaxId,
+      taxRate: inv.taxRate,
+      currency: inv.currency,
+      notes: inv.notes,
+      items: inv.items.map((i) => LineItem(description: i.description, quantity: i.quantity, unitPrice: i.unitPrice)).toList(),
+    ));
+    if (inv.clientEmail.isNotEmpty) await setClientEmail(id, inv.clientEmail);
+    return id;
+  }
+
   // ---------------- Cobros ----------------
   static Future<List<Payment>> listPayments(String invoiceId) async {
     final rows = await _db

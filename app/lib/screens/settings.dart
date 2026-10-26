@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,6 +13,7 @@ import 'legal.dart';
 import 'orgs.dart';
 import 'products.dart';
 import 'reports.dart';
+import 'security.dart';
 import 'profile_form.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -73,7 +75,7 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
-    ctrl.dispose();
+    disposeAfterClose([ctrl]);
     if (ok != true) return;
     try {
       await Repo.deleteAccount();
@@ -178,6 +180,14 @@ class SettingsScreen extends StatelessWidget {
                       _ => 'Igual que el sistema',
                     },
                     onTap: () => _pickTheme(context)),
+                if (!kIsWeb) ...[
+                  Divider(indent: 72, color: t.colorScheme.outline),
+                  _tile(context,
+                      icon: Icons.fingerprint_rounded,
+                      title: 'Seguridad',
+                      subtitle: 'PIN y huella para entrar',
+                      onTap: () => go(const SecurityScreen())),
+                ],
                 Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.groups_rounded,

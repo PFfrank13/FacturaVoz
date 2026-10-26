@@ -508,3 +508,16 @@ class SkeletonList extends StatelessWidget {
         for (var i = 0; i < count; i++) const Padding(padding: EdgeInsets.only(bottom: 12), child: SkeletonCard()),
       ]);
 }
+
+
+/// Libera los controladores de un diálogo u hoja inferior DESPUÉS de que termine su animación de cierre.
+/// (Liberarlos justo al volver del `await` deja un TextField vivo usando un controlador ya liberado y
+/// Flutter lanza `'_dependents.isEmpty': is not true`.)
+void disposeAfterClose(Iterable<ChangeNotifier> items) {
+  final list = items.toList();
+  Future<void>.delayed(const Duration(milliseconds: 700), () {
+    for (final c in list) {
+      c.dispose();
+    }
+  });
+}
