@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEmail, buildImportEmail, escapeHtml, isEmail, looksLikePdf, safeFilename } from "../src/lib/email";
+import { buildEmail, buildImportEmail, escapeHtml, isEmail, looksLikePdf, safeFilename, senderFor } from "../src/lib/email";
 
 describe("email utils", () => {
   it("valida correos y rechaza inyección de cabeceras", () => {
@@ -25,5 +25,15 @@ describe("email utils", () => {
     expect(ok.html).toContain("1005");
     expect(ok.html).not.toContain("<b>X</b>");
     expect(buildImportEmail({ business: "A", status: "failed", imported: 0, skipped: 0, error: "<x>" }).html).not.toContain("<x>");
+  });
+});
+
+describe("remitente", () => {
+  it("usa el nombre del negocio con la dirección verificada y bloquea inyección", () => {
+    const from = "FacturaVoz <facturas@facturavoz.solvexsoftware.dev>";
+    expect(senderFor("Ferretería Díaz", from)).toBe('"Ferretería Díaz vía FacturaVoz" <facturas@facturavoz.solvexsoftware.dev>');
+    expect(senderFor('X"\r\nBcc: a@b.com <y>', from)).not.toMatch(/[\r\n]|Bcc: a@b.com </);
+    expect(senderFor("", "facturas@facturavoz.solvexsoftware.dev")).toBe("FacturaVoz <facturas@facturavoz.solvexsoftware.dev>");
+    expect(senderFor("Lupe", undefined)).toBe('"Lupe vía FacturaVoz" <onboarding@resend.dev>');
   });
 });

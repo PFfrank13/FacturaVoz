@@ -1,5 +1,5 @@
 import { authenticateBearer, jsonWith, preflight, readJson } from "@/lib/api-auth";
-import { buildEmail, isEmail, looksLikePdf, MAX_PDF_BYTES, safeFilename } from "@/lib/email";
+import { buildEmail, isEmail, looksLikePdf, MAX_PDF_BYTES, safeFilename, senderFor } from "@/lib/email";
 
 export const maxDuration = 30;
 export const OPTIONS = preflight;
@@ -68,8 +68,10 @@ export async function POST(req: Request) {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(20_000),
       body: JSON.stringify({
-        from: process.env.RESEND_FROM || "FacturaVoz <onboarding@resend.dev>",
+        from: senderFor(String(prof?.name ?? "")),
         to: [to || owner],
+        // Si el cliente responde, le escribe al dueño del negocio (no a FacturaVoz).
+        ...(owner ? { reply_to: owner } : {}),
         ...(to && wantsCopy && owner && owner.toLowerCase() !== to.toLowerCase() ? { bcc: [owner] } : {}),
         subject: mail.subject,
         html: mail.html,

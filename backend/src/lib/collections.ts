@@ -1,4 +1,4 @@
-import { escapeHtml } from "./email";
+import { escapeHtml, senderFor } from "./email";
 import { fmtDate, fmtMoney } from "./publicbase";
 
 /** Cobranza automática: el tono sube poco a poco según los días respecto al vencimiento. */
@@ -89,7 +89,7 @@ ${o.accepted ? `<p style="margin:16px 0 0">Abre FacturaVoz → Cotizaciones y to
 }
 
 /** Envía un correo con Resend. Devuelve true si se aceptó. */
-export async function sendResend(to: string, subject: string, html: string, replyTo?: string): Promise<boolean> {
+export async function sendResend(to: string, subject: string, html: string, replyTo?: string, fromName?: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;
   try {
@@ -98,7 +98,7 @@ export async function sendResend(to: string, subject: string, html: string, repl
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({
-        from: process.env.RESEND_FROM || "FacturaVoz <onboarding@resend.dev>",
+        from: senderFor(fromName),
         to: [to],
         ...(replyTo ? { reply_to: replyTo } : {}),
         subject,

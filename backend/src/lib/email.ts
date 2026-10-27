@@ -55,3 +55,14 @@ export function buildImportEmail(opts: { business: string; status: "done" | "fai
 </table></td></tr></table></body></html>`;
   return { subject, html };
 }
+
+/**
+ * Remitente con el nombre del negocio: "Ferretería Díaz vía FacturaVoz <facturas@tu-dominio>".
+ * La dirección sale de RESEND_FROM (dominio verificado). Se quitan comillas, <>, y saltos de línea (evita inyección).
+ */
+export function senderFor(business: string | null | undefined, from = process.env.RESEND_FROM): string {
+  const raw = (from ?? "").trim();
+  const addr = /<([^<>\s]+@[^<>\s]+)>/.exec(raw)?.[1] ?? (isEmail(raw) ? raw : "onboarding@resend.dev");
+  const name = (business ?? "").replace(/["<>\r\n\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  return name ? `"${name} vía FacturaVoz" <${addr}>` : `FacturaVoz <${addr}>`;
+}

@@ -65,7 +65,7 @@ export async function GET(req: Request) {
       stage: c.stage,
       payUrl: token && base ? `${base}/pagar/${token}` : "",
     });
-    const ok = await sendResend(c.client_email, mail.subject, mail.html, await replyTo(c.org_id));
+    const ok = await sendResend(c.client_email, mail.subject, mail.html, await replyTo(c.org_id), c.business_name);
     if (ok) {
       sent++;
       await admin.from("reminder_log").insert({ org_id: c.org_id, invoice_id: c.invoice_id, stage: c.stage, channel: "email", sent_to: c.client_email });
