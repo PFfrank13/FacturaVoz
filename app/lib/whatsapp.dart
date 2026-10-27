@@ -30,5 +30,5 @@ String reminderText({
   return b.toString();
 }
 
-/// Enlace https://wa.me/<número>?text=<mensaje> (el mensaje se codifica).
+/// Enlace `https://wa.me/<número>?text=<mensaje>` (el mensaje se codifica).
 Uri whatsappUri(String phoneDigits, String message) => Uri.https('wa.me', '/$phoneDigits', {'text': message});

@@ -254,7 +254,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: _load,
         edgeOffset: 140,
         child: CustomScrollView(
-          cacheExtent: 600,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(

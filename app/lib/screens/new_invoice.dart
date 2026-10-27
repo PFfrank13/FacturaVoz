@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:math' as math;
-import 'dart:typed_data' show Uint8List;
 import 'dart:ui' show ImageFilter;
 
 import 'package:cross_file/cross_file.dart';
@@ -456,7 +455,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       canPop: !(review && _dirty) && _phase != _Phase.processing,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop || _phase == _Phase.processing) return;
-        if (await _confirmDiscard() && mounted) Navigator.of(context).pop();
+        if (!await _confirmDiscard() || !context.mounted) return;
+        Navigator.of(context).pop();
       },
       child: Scaffold(
         extendBody: true,

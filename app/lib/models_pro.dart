@@ -135,8 +135,6 @@ class Expense {
         currency: _s(j['currency']).isEmpty ? 'PEN' : _s(j['currency']),
         supplierName: _s(j['supplier_name']),
         supplierTaxId: _s(j['supplier_tax_id']),
-        clientName: _s(j['client_name']),
-        clientTaxId: _s(j['client_tax_id']),
         docNumber: _s(j['doc_number']),
         source: _s(j['source']).isEmpty ? 'manual' : _s(j['source']),
       );

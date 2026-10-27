@@ -5,7 +5,6 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
-import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
 /// Empresas del usuario y su equipo. Cambiar de empresa cambia los clientes y facturas que se ven.
@@ -217,7 +216,7 @@ class _OrgsScreenState extends State<OrgsScreen> {
                         child: Pressable(
                           onTap: () async {
                             await _s.switchOrg(_s.orgs[i]);
-                            if (!mounted) return;
+                            if (!mounted || !context.mounted) return;
                             if (!(_s.profile?.isComplete ?? true)) {
                               Navigator.of(context).popUntil((r) => r.isFirst);
                               return;

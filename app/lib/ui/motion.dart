@@ -42,9 +42,8 @@ bool reduceMotion(BuildContext context) => MediaQuery.of(context).disableAnimati
 /// Ruta "premium": la pantalla nueva crece levemente desde el 94 % con fundido (eje Z),
 /// la anterior se aleja. Mantiene las Hero animations.
 class PremiumRoute<T> extends PageRouteBuilder<T> {
-  PremiumRoute({required WidgetBuilder builder, bool fullscreenDialog = false})
+  PremiumRoute({required WidgetBuilder builder, super.fullscreenDialog})
       : super(
-          fullscreenDialog: fullscreenDialog,
           transitionDuration: const Duration(milliseconds: 420),
           reverseTransitionDuration: const Duration(milliseconds: 320),
           pageBuilder: (context, _, _) => builder(context),

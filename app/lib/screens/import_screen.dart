@@ -101,10 +101,12 @@ class _ImportScreenState extends State<ImportScreen> {
       if (picked.length > 24) problem = 'Elige hasta 24 archivos por vez.';
       if (bytesTotal > 120 * 1024 * 1024) problem = 'Los archivos pesan demasiado juntos (máximo 120 MB). Impórtalos en dos tandas.';
       if (problem != null) {
-        if (mounted) setState(() {
-          _reading = false;
-          _error = problem!;
-        });
+        if (mounted) {
+          setState(() {
+            _reading = false;
+            _error = problem!;
+          });
+        }
         return;
       }
       final results = <_FileResult>[];
@@ -132,10 +134,12 @@ class _ImportScreenState extends State<ImportScreen> {
         }
       });
     } catch (_) {
-      if (mounted) setState(() {
-        _reading = false;
-        _error = 'No se pudo leer los archivos. Guárdalos como CSV (UTF-8) e inténtalo de nuevo.';
-      });
+      if (mounted) {
+        setState(() {
+          _reading = false;
+          _error = 'No se pudo leer los archivos. Guárdalos como CSV (UTF-8) e inténtalo de nuevo.';
+        });
+      }
     }
   }
 
@@ -166,10 +170,12 @@ class _ImportScreenState extends State<ImportScreen> {
       });
       if (j != null && !j.finished) _watch(id);
     } catch (e) {
-      if (mounted) setState(() {
-        _phase = _Phase.failed;
-        _error = friendly(e);
-      });
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.failed;
+          _error = friendly(e);
+        });
+      }
     }
   }
 

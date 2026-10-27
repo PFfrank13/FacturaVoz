@@ -36,7 +36,7 @@ Future<void> main() async {
     runApp(const _ConfigError());
     return;
   }
-  await Supabase.initialize(url: Config.supabaseUrl, anonKey: Config.supabaseAnonKey);
+  await Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey);
   AppLock.instance.bind();
   runApp(const FacturaVozApp());
 }

@@ -28,7 +28,7 @@ void android() {
     if (!m!.contains('android:allowBackup')) {
       m = m.replaceFirst('<application', '<application android:allowBackup="false" android:usesCleartextTraffic="false"');
     }
-    m = m!.replaceFirstMapped(RegExp(r'android:label="[^"]*"'), (_) => 'android:label="FacturaVoz"');
+    m = m.replaceFirstMapped(RegExp(r'android:label="[^"]*"'), (_) => 'android:label="FacturaVoz"');
     if (!m.contains('android.intent.action.VIEW')) {
       const q = '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>';
       if (m.contains('</queries>')) {
