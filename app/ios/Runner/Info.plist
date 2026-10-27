@@ -73,5 +73,9 @@
 	<key>CFBundleURLTypes</key>
 	<array><dict><key>CFBundleURLSchemes</key>
 	<array><string>com.facturavoz.app</string></array></dict></array>
+	<key>NSCameraUsageDescription</key>
+	<string>FacturaVoz usa la cámara para leer tus comprobantes y constancias de pago.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FacturaVoz lee las fotos y capturas que elijas (comprobantes y pagos de Yape o Plin).</string>
 </dict>
 </plist>
