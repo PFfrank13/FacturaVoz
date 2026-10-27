@@ -275,22 +275,33 @@ class Repo {
 
   // ---------------- Catálogo ----------------
   static Future<List<Product>> listProducts({bool activeOnly = false}) async {
-    var q = _db.from('products').select('id, name, unit_price, unit, active');
-    if (activeOrgId != null) q = q.eq('org_id', activeOrgId!);
-    if (activeOnly) q = q.eq('active', true);
-    final rows = await q.order('name', ascending: true).limit(1000);
+    Future<dynamic> run(String cols) {
+      var q = _db.from('products').select(cols);
+      if (activeOrgId != null) q = q.eq('org_id', activeOrgId!);
+      if (activeOnly) q = q.eq('active', true);
+      return q.order('name', ascending: true).limit(1000);
+    }
+
+    dynamic rows;
+    try {
+      rows = await run('id, name, unit_price, unit, active, stock, reorder_point');
+    } on PostgrestException {
+      rows = await run('id, name, unit_price, unit, active'); // migración de stock aún no aplicada
+    }
     return (rows as List).map((r) => Product.fromJson(Map<String, dynamic>.from(r as Map))).toList();
   }
 
-  static Future<void> saveProduct({String? id, required String name, required double unitPrice, required String unit}) async {
+  /// Crea o actualiza; devuelve el id del producto.
+  static Future<String> saveProduct({String? id, required String name, required double unitPrice, required String unit}) async {
     final data = {'name': name.trim(), 'unit_price': round2(unitPrice), 'unit': unit};
     if (id != null) {
       await _db.from('products').update(data).eq('id', id);
-      return;
+      return id;
     }
     final org = activeOrgId;
     if (org == null) throw AppException('Elige una empresa primero.');
-    await _db.from('products').insert({...data, 'org_id': org, 'user_id': _uid});
+    final row = await _db.from('products').insert({...data, 'org_id': org, 'user_id': _uid}).select('id').single();
+    return row['id'] as String;
   }
 
   static Future<void> setProductActive(String id, bool active) async {

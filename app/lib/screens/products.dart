@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../errors.dart';
 import '../models.dart';
+import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../ui/motion.dart';
 import '../ui/widgets.dart';
 
 /// Elige un producto del catálogo (solo activos). Devuelve null si se cierra sin elegir.
@@ -123,6 +125,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final name = TextEditingController(text: p?.name ?? '');
     final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(p.unitPrice));
     var unit = p?.unit ?? 'ZZ';
+    var track = p?.tracksStock ?? false;
+    final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
+    final reorder = TextEditingController(text: p?.reorderPoint == null ? '' : qtyText(p!.reorderPoint!));
     var err = '';
     final ok = await showModalBottomSheet<bool>(
       context: context,
@@ -152,6 +157,36 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 selected: {unit},
                 onSelectionChanged: (s) => setS(() => unit = s.first),
               ),
+              if (unit == 'NIU') ...[
+                const SizedBox(height: 6),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: track,
+                  onChanged: (v) => setS(() => track = v),
+                  title: const Text('Controlar stock'),
+                  subtitle: const Text('Se descuenta al emitir cada venta y te aviso días antes de que se acabe.'),
+                ),
+                if (track)
+                  Row(children: [
+                    Expanded(
+                      child: TextField(
+                        controller: stock,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,-]'))],
+                        decoration: const InputDecoration(labelText: 'Stock actual'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: reorder,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                        decoration: const InputDecoration(labelText: 'Avisar al llegar a'),
+                      ),
+                    ),
+                  ]),
+              ],
               if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err, style: const TextStyle(color: Color(0xFFD94A5E)))),
               const SizedBox(height: 16),
               GradientButton(
@@ -174,10 +209,25 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
     );
     final values = (name.text, price.text.trim().isEmpty ? 0.0 : (parseDecimal(price.text) ?? 0.0), unit);
-    disposeAfterClose([name, price]);
+    final stockValue = track && unit == 'NIU' ? (parseDecimal(stock.text) ?? 0.0) : null;
+    final reorderValue = track && unit == 'NIU' ? parseDecimal(reorder.text) : null;
+    final stockChanged = stockValue != p?.stock || reorderValue != p?.reorderPoint;
+    disposeAfterClose([name, price, stock, reorder]);
     if (ok != true) return;
     try {
-      await Repo.saveProduct(id: p?.id, name: values.$1, unitPrice: values.$2, unit: values.$3);
+      final id = await Repo.saveProduct(id: p?.id, name: values.$1, unitPrice: values.$2, unit: values.$3);
+      if (stockChanged) {
+        try {
+          await ProRepo.setStockConfig(id, stock: stockValue, reorderPoint: reorderValue);
+        } catch (e) {
+          if (ProRepo.isMissingMigration(e) || e.toString().contains('stock')) {
+            _snack('Guardado. Para controlar stock ejecuta la migración 20261101_negocio_pro.sql.');
+            _load();
+            return;
+          }
+          rethrow;
+        }
+      }
       _snack('Guardado');
       _load();
     } catch (e) {
@@ -192,6 +242,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Editar'), onTap: () => Navigator.pop(ctx, 'edit')),
+          if (p.tracksStock)
+            ListTile(
+              leading: const Icon(Icons.move_down_rounded),
+              title: const Text('Registrar entrada o salida de stock'),
+              subtitle: Text('Stock actual: ${qtyText(p.stock ?? 0)}'),
+              onTap: () => Navigator.pop(ctx, 'stock'),
+            ),
           ListTile(
             leading: Icon(p.active ? Icons.archive_outlined : Icons.unarchive_outlined),
             title: Text(p.active ? 'Archivar (ocultar al facturar)' : 'Reactivar'),
@@ -209,6 +266,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       switch (action) {
         case 'edit':
           await _edit(p);
+        case 'stock':
+          await _adjust(p);
         case 'toggle':
           await Repo.setProductActive(p.id, !p.active);
           _load();
@@ -217,6 +276,56 @@ class _ProductsScreenState extends State<ProductsScreen> {
           _snack('Producto borrado');
           _load();
       }
+    } catch (e) {
+      _snack(friendly(e));
+    }
+  }
+
+  /// Entrada (compra) o salida (merma, uso interno) de stock. Atómico en la base de datos.
+  Future<void> _adjust(Product p) async {
+    final qty = TextEditingController();
+    var inbound = true;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(p.name, style: Theme.of(ctx).textTheme.titleLarge),
+            Text('Stock actual: ${qtyText(p.stock ?? 0)}', style: Theme.of(ctx).textTheme.bodySmall),
+            const SizedBox(height: 14),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Entrada'), icon: Icon(Icons.add_box_outlined)),
+                ButtonSegment(value: false, label: Text('Salida'), icon: Icon(Icons.indeterminate_check_box_outlined)),
+              ],
+              selected: {inbound},
+              onSelectionChanged: (s) => setS(() => inbound = s.first),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qty,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+              decoration: const InputDecoration(labelText: 'Cantidad'),
+            ),
+            const SizedBox(height: 14),
+            GradientButton(label: 'Registrar', icon: Icons.check_rounded, onPressed: () => Navigator.pop(ctx, true)),
+          ]),
+        ),
+      ),
+    );
+    final v = parseDecimal(qty.text);
+    disposeAfterClose([qty]);
+    if (ok != true || v == null || v <= 0) return;
+    try {
+      final now = await ProRepo.stockAdjust(p.id, inbound ? v : -v);
+      Haptics.success();
+      _snack('Stock actualizado: ${qtyText(now ?? 0)}');
+      _load();
     } catch (e) {
       _snack(friendly(e));
     }
@@ -280,6 +389,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
                                 Text(p.active ? (p.isService ? 'Servicio' : 'Producto') : 'Archivado', style: t.textTheme.bodySmall),
+                                if (p.tracksStock)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: StatusPill('Stock ${qtyText(p.stock ?? 0)}', tone: p.lowStock ? PillTone.warn : PillTone.ok),
+                                  ),
                               ]),
                             ),
                             const SizedBox(width: 8),

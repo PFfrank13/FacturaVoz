@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'motion.dart';
 import 'theme.dart';
 
 const _tabular = [FontFeature.tabularFigures()];
@@ -410,8 +411,8 @@ class _PressableState extends State<Pressable> {
         onLongPress: widget.onLongPress,
         child: AnimatedScale(
           scale: _down ? widget.scale : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
+          duration: Duration(milliseconds: _down ? 110 : 380),
+          curve: _down ? Curves.easeOut : Curves.elasticOut,
           child: widget.child,
         ),
       );
@@ -482,30 +483,16 @@ class GradientButton extends StatelessWidget {
 
 
 
-/// Marcador de posición pulsante mientras carga una lista de tarjetas.
-class SkeletonCard extends StatefulWidget {
+/// Marcador de posición con brillo que recorre la tarjeta mientras carga.
+class SkeletonCard extends StatelessWidget {
   const SkeletonCard({super.key});
-
-  @override
-  State<SkeletonCard> createState() => _SkeletonCardState();
-}
-
-class _SkeletonCardState extends State<SkeletonCard> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final base = t.colorScheme.surfaceContainerHighest;
     Widget bar(double w, double h) => Container(width: w, height: h, decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(8)));
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0.45, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+    return Shimmer(
       child: SoftCard(
         padding: const EdgeInsets.all(16),
         child: Row(children: [

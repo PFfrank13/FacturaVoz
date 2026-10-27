@@ -7,16 +7,28 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_state.dart';
 import '../errors.dart';
+import '../finance.dart';
 import '../models.dart';
+import '../models_pro.dart';
+import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'assistant.dart';
 import 'invoice_detail.dart';
 import 'new_invoice.dart';
+import 'products.dart';
 import 'settings.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.embedded = false, this.onNavigate});
+
+  /// true dentro de [MainShell]: el micrófono vive en el dock, no aquí.
+  final bool embedded;
+
+  /// Cambia de pestaña en el shell (1 Cotizar, 2 Cobrar, 3 Negocio).
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -34,12 +46,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchFocus = FocusNode();
   RealtimeChannel? _chan;
   Timer? _debounce;
+  List<ProductVelocity> _stock = const [];
+  int _claims = 0;
 
   @override
   void initState() {
     super.initState();
     _orgSeen = Repo.activeOrgId;
     AppState.instance.addListener(_onApp);
+    AppState.instance.dataVersion.addListener(_liveReload);
     _searchFocus.addListener(() {
       if (mounted) setState(() {});
     });
@@ -77,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _debounce?.cancel();
     _chan?.unsubscribe();
     AppState.instance.removeListener(_onApp);
+    AppState.instance.dataVersion.removeListener(_liveReload);
     _searchFocus.dispose();
     super.dispose();
   }
@@ -120,9 +136,34 @@ class _HomeScreenState extends State<HomeScreen> {
           _more = r.length >= _limit;
           _error = null;
         });
+        _loadExtras();
       }
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));
+    }
+  }
+
+  /// Datos para los avisos del día (stock y pagos reportados). Si falta la migración, simplemente no aparecen.
+  Future<void> _loadExtras() async {
+    try {
+      final v = await ProRepo.productVelocity();
+      if (mounted) setState(() => _stock = v);
+    } catch (_) {}
+    final c = await ProRepo.countPendingClaims();
+    if (mounted && c != _claims) setState(() => _claims = c);
+  }
+
+  void _openInsight(Insight i) {
+    Haptics.tap();
+    switch (i.kind) {
+      case 'stock':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProductsScreen()));
+      case 'pace':
+        widget.onNavigate?.call(3);
+      case 'due_soon':
+        setState(() => _filter = 'due');
+      default:
+        widget.onNavigate?.call(2);
     }
   }
 
@@ -193,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       // El micrófono se esconde mientras se busca (teclado abierto o buscador enfocado).
-      floatingActionButton: Builder(builder: (context) {
+      floatingActionButton: widget.embedded ? null : Builder(builder: (context) {
         final hide = _searchFocus.hasFocus || MediaQuery.viewInsetsOf(context).bottom > 0;
         return IgnorePointer(
           ignoring: hide,
@@ -219,6 +260,13 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: _Header(name: AppState.instance.activeOrg?.name ?? profile?.businessName ?? '', currency: currency, total: m.total, count: m.count, loaded: _items != null),
             ),
+            if (_items != null && _items!.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _InsightsStrip(
+                  insights: buildInsights(invoices: _items!, today: todayIso(), currency: currency, stock: _stock, pendingClaims: _claims),
+                  onTap: _openInsight,
+                ),
+              ),
             if (_error != null && _items == null)
               SliverToBoxAdapter(child: _ErrorBox(message: _error!, onRetry: _load))
             else if (_items == null)
@@ -419,6 +467,20 @@ class _Header extends StatelessWidget {
                 ]),
               ),
               Pressable(
+                onTap: () => openCopilot(context),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 19),
+                    SizedBox(width: 6),
+                    Text('Copiloto', style: TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                  ]),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Pressable(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 child: Container(
                   width: 44,
@@ -544,6 +606,83 @@ class _Row extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Money(money(inv.totals.total, inv.currency), size: 16, weight: FontWeight.w700),
+        ]),
+      ),
+    );
+  }
+}
+
+
+/// Avisos del día: lo que conviene hacer hoy (cobrar, confirmar pagos, reponer stock…).
+class _InsightsStrip extends StatelessWidget {
+  const _InsightsStrip({required this.insights, required this.onTap});
+  final List<Insight> insights;
+  final ValueChanged<Insight> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (insights.isEmpty) return const SizedBox.shrink();
+    return Reveal(
+      index: 2,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 18),
+        child: SizedBox(
+          height: 118,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: insights.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, i) => _InsightCard(insight: insights[i], onTap: () => onTap(insights[i])),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({required this.insight, required this.onTap});
+  final Insight insight;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final (Color c, IconData icon) = switch (insight.kind) {
+      'claims' => (Brand.indigo, Icons.notifications_active_rounded),
+      'overdue' => (Brand.bad, Icons.warning_amber_rounded),
+      'due_soon' => (Brand.warn, Icons.schedule_rounded),
+      'pace' => (insight.tone == 'ok' ? Brand.ok : Brand.warn, insight.tone == 'ok' ? Icons.trending_up_rounded : Icons.trending_down_rounded),
+      'stock' => (Brand.goldDeep, Icons.inventory_2_rounded),
+      _ => (Brand.indigo, Icons.lightbulb_rounded),
+    };
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        width: 250,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: t.colorScheme.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: c.withValues(alpha: 0.25)),
+          boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: 0.06),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, size: 20, color: c),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(insight.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(insight.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: t.textTheme.bodySmall),
+            ]),
+          ),
         ]),
       ),
     );

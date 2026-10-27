@@ -7,7 +7,10 @@ import '../config.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/motion.dart';
 import 'clients.dart';
+import 'expenses.dart';
+import 'pay_settings.dart';
 import 'fiscal_setup.dart';
 import 'import_screen.dart';
 import 'legal.dart';
@@ -171,8 +174,20 @@ class SettingsScreen extends StatelessWidget {
                 _tile(context,
                     icon: Icons.inventory_2_rounded,
                     title: 'Productos y servicios',
-                    subtitle: 'Tu catálogo con precios',
+                    subtitle: 'Catálogo, precios y control de stock',
                     onTap: () => go(const ProductsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.qr_code_2_rounded,
+                    title: 'Cobros y recordatorios',
+                    subtitle: 'Yape, Plin, banco, tarjeta y cobranza automática',
+                    onTap: () => pushPremium(context, const PaySettingsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.shopping_bag_rounded,
+                    title: 'Gastos',
+                    subtitle: 'Compras y pagos del negocio (o escanéalos)',
+                    onTap: () => go(const ExpensesScreen())),
                 Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.palette_outlined,

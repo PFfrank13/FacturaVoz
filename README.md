@@ -12,3 +12,6 @@ Flujo: la app graba (≤60 s) → `POST /api/parse` con el token de sesión → 
 JSON de factura → el usuario revisa → RPC `create_invoice` (atómica, RLS) → PDF generado en el teléfono.
 
 Lee primero `docs/DESPLIEGUE.md` y `docs/SEGURIDAD.md` (incluye lo que NO está resuelto y es decisión tuya).
+
+**Novedades v1.1 "Negocio Pro"** (cotizaciones, enlaces de cobro, cobranza automática, gastos y rentabilidad,
+escáner con IA, Copiloto de voz, conciliación por foto, score de crédito, radar de stock): `docs/NEGOCIO_PRO.md`.

@@ -37,6 +37,15 @@ void android() {
         m = m.replaceFirst('</manifest>', '<queries>$q</queries>\n</manifest>');
       }
     }
+    // Copiloto: Android 11+ exige declarar que la app consulta el motor de voz (texto a voz).
+    if (!m.contains('android.intent.action.TTS_SERVICE')) {
+      const q = '<intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>';
+      if (m.contains('</queries>')) {
+        m = m.replaceFirst('</queries>', '$q\n    </queries>');
+      } else {
+        m = m.replaceFirst('</manifest>', '<queries>$q</queries>\n</manifest>');
+      }
+    }
     if (!m.contains('com.facturavoz.app')) {
       const f = '<intent-filter>\n'
           '                <action android:name="android.intent.action.VIEW"/>\n'
@@ -106,6 +115,20 @@ void ios() {
       RegExp(r'</dict>\s*</plist>'),
       '\t<key>NSFaceIDUsageDescription</key>\n'
       '\t<string>FacturaVoz usa Face ID para desbloquear la app.</string>\n</dict>\n</plist>',
+    );
+  }
+  if (!s.contains('NSCameraUsageDescription')) {
+    s = s.replaceFirst(
+      RegExp(r'</dict>\s*</plist>'),
+      '\t<key>NSCameraUsageDescription</key>\n'
+      '\t<string>FacturaVoz usa la cámara para leer tus comprobantes y constancias de pago.</string>\n</dict>\n</plist>',
+    );
+  }
+  if (!s.contains('NSPhotoLibraryUsageDescription')) {
+    s = s.replaceFirst(
+      RegExp(r'</dict>\s*</plist>'),
+      '\t<key>NSPhotoLibraryUsageDescription</key>\n'
+      '\t<string>FacturaVoz lee las fotos y capturas que elijas (comprobantes y pagos de Yape o Plin).</string>\n</dict>\n</plist>',
     );
   }
   if (!s.contains('com.facturavoz.app')) {

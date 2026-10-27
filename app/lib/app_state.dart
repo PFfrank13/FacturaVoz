@@ -16,6 +16,10 @@ class AppState extends ChangeNotifier {
   bool loading = false;
   String? error;
 
+  /// Se incrementa cuando cambian datos que varias pantallas muestran (facturas, cobros, gastos…).
+  final ValueNotifier<int> dataVersion = ValueNotifier(0);
+  void bump() => dataVersion.value++;
+
   /// Apariencia elegida (se recuerda en la cuenta). Escucha este notifier para cambiar el tema al instante.
   final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
 

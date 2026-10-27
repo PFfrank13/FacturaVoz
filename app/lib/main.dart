@@ -7,7 +7,7 @@ import 'app_state.dart';
 import 'config.dart';
 import 'screens/lock_screen.dart';
 import 'services/app_lock.dart';
-import 'screens/home.dart';
+import 'screens/shell.dart';
 import 'screens/login.dart';
 import 'screens/onboarding.dart';
 import 'screens/profile_form.dart';
@@ -151,7 +151,7 @@ class _ProfileGateState extends State<ProfileGate> {
           return _intro ? OnboardingScreen(onDone: _finishIntro) : const ProfileFormScreen(onboarding: true);
         }
         WidgetsBinding.instance.addPostFrameCallback((_) => AppLock.instance.allowSetup());
-        return const HomeScreen();
+        return const MainShell();
       },
     );
   }

@@ -10,7 +10,10 @@ import 'emit_sunat.dart';
 import 'fiscal_setup.dart';
 import 'payments_card.dart';
 import '../services/api.dart';
+import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../ui/motion.dart';
+import 'share_sheet.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -281,6 +284,29 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
+  /// Enlace de cobro: el cliente ve el saldo y paga con Yape, Plin, transferencia o tarjeta; o avisa "ya pagué".
+  Future<void> _payLink() async {
+    final inv = _inv!;
+    setState(() => _busy = true);
+    try {
+      final url = await ProRepo.payLinkUrl(inv.id);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final business = AppState.instance.activeOrg?.name ?? AppState.instance.profile?.businessName ?? '';
+      final shared = await shareLinkSheet(
+        context,
+        title: 'Enlace de cobro',
+        subtitle: 'Tu cliente verá el saldo y cómo pagarte. Si paga con tarjeta el cobro se registra solo; si paga por Yape o Plin, te avisa y lo confirmas con un toque.',
+        url: url,
+        message: 'Hola ${inv.clientName == '—' ? '' : inv.clientName}, te comparto el comprobante ${_fiscal?.number ?? inv.number} de $business. Saldo: ${money(inv.balance, inv.currency)}. Puedes pagarlo aquí:',
+      );
+      if (shared) Haptics.success();
+    } catch (e) {
+      _snack(ProRepo.isMissingMigration(e) ? 'Falta ejecutar la migración 20261101_negocio_pro.sql en Supabase.' : friendly(e));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// Crea una nota de venta nueva (borrador) con los mismos datos, para cobrar de nuevo al mismo cliente.
   Future<void> _duplicate() async {
     final inv = _inv!;
@@ -373,7 +399,18 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   const SizedBox(height: 14),
                   if (inv.status != 'draft' && _fiscal?.status != 'rejected') ...[
                     Reveal(index: 3, child: PaymentsCard(key: ValueKey('${inv.id}-${inv.status}'), invoice: inv, onChanged: _load)),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
+                    if (inv.status == 'sent' && inv.balance > 0.004 && _note?.status != 'accepted') ...[
+                      Reveal(
+                        index: 4,
+                        child: OutlinedButton.icon(
+                          onPressed: _busy ? null : _payLink,
+                          icon: const Icon(Icons.link_rounded),
+                          label: const Text('Enviar enlace de cobro'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                   ],
                   if (_fiscal == null || _fiscal!.status != 'accepted')
                     GradientButton(

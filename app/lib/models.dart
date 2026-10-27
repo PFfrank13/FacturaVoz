@@ -452,12 +452,18 @@ class ClientCard {
 
 /// Producto o servicio del catálogo de la empresa.
 class Product {
-  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active});
+  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active, this.stock, this.reorderPoint});
   final String id;
   final String name;
   final double unitPrice;
   final String unit; // NIU producto | ZZ servicio
   final bool active;
+
+  /// Stock actual (null = no se controla). Se descuenta solo al emitir una venta con ese nombre.
+  final double? stock;
+  final double? reorderPoint;
+  bool get tracksStock => stock != null;
+  bool get lowStock => stock != null && stock! <= (reorderPoint ?? 0);
 
   bool get isService => unit == 'ZZ';
 
@@ -467,6 +473,8 @@ class Product {
         unitPrice: _num(j['unit_price']),
         unit: (j['unit'] ?? 'NIU') as String,
         active: j['active'] != false,
+        stock: j['stock'] == null ? null : _num(j['stock']),
+        reorderPoint: j['reorder_point'] == null ? null : _num(j['reorder_point']),
       );
 }
 
@@ -482,6 +490,7 @@ const paymentMethods = {
   'plin': 'Plin',
   'transferencia': 'Transferencia',
   'tarjeta': 'Tarjeta',
+  'mercadopago': 'Mercado Pago',
   'otro': 'Otro',
 };
 

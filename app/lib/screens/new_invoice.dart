@@ -13,9 +13,13 @@ import 'package:record/record.dart';
 
 import '../app_state.dart';
 import '../errors.dart';
+import '../finance.dart';
 import '../models.dart';
+import '../models_pro.dart';
 import '../services/api.dart';
+import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'products.dart';
@@ -38,8 +42,12 @@ class _Row {
 }
 
 /// Dictado -> transcripción + extracción (servidor) -> revisión editable -> guardado atómico.
+/// Con [quote] = true guarda una COTIZACIÓN (mismo flujo de voz). Con [initial] abre directo la revisión
+/// (borrador que viene del Copiloto o del escáner).
 class NewInvoiceScreen extends StatefulWidget {
-  const NewInvoiceScreen({super.key});
+  const NewInvoiceScreen({super.key, this.quote = false, this.initial});
+  final bool quote;
+  final InvoiceDraft? initial;
 
   @override
   State<NewInvoiceScreen> createState() => _NewInvoiceScreenState();
@@ -74,8 +82,11 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   bool _submitted = false;
   bool _dirty = false;
   bool _showNotes = false;
+  int? _validDays = 15; // vigencia de la cotización
+  Map<String, ClientPayStats> _stats = const {};
 
   Profile get _profile => AppState.instance.profile!;
+  String get _noun => widget.quote ? 'cotización' : 'factura';
 
   @override
   void initState() {
@@ -83,6 +94,16 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     Repo.recentClients().then((v) {
       if (mounted) setState(() => _known = v);
     });
+    // Historial de pago por cliente (score de crédito). Si falta la migración, no se muestra.
+    ProRepo.clientStats().then((v) {
+      if (mounted) setState(() => _stats = v);
+    }).catchError((Object _) {});
+    final init = widget.initial;
+    if (init != null) {
+      _loadDraft(init);
+      _phase = _Phase.review;
+      _dirty = true;
+    }
   }
 
   @override
@@ -377,7 +398,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       _error = '';
     });
     try {
-      final id = await Repo.createInvoice(InvoiceDraft(
+      final draft = InvoiceDraft(
         clientName: _client.text,
         clientTaxId: _clientTax.text,
         taxRate: parseDecimal(_taxRate.text)!,
@@ -386,10 +407,24 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         transcript: _transcript,
         dueDate: _credit ? todayIso(_due) : null,
         items: _currentItems(),
-      ));
+      );
+      final String id;
+      if (widget.quote) {
+        final days = _validDays;
+        id = await ProRepo.createQuote(draft, validUntil: days == null ? null : todayIso(DateTime.now().add(Duration(days: days))));
+      } else {
+        id = await Repo.createInvoice(draft);
+      }
       _dirty = false;
       final mail = _clientEmail.text.trim();
-      if (mail.isNotEmpty) await Repo.setClientEmail(id, mail); // best-effort: no bloquea el guardado
+      if (mail.isNotEmpty) {
+        // best-effort: no bloquea el guardado
+        if (widget.quote) {
+          await ProRepo.setQuoteClientEmail(id, mail);
+        } else {
+          await Repo.setClientEmail(id, mail);
+        }
+      }
       HapticFeedback.lightImpact();
       if (mounted) Navigator.of(context).pop(id);
     } catch (e) {
@@ -426,7 +461,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       child: Scaffold(
         extendBody: true,
         appBar: AppBar(
-          title: Text(review ? 'Revisa tu factura' : 'Nueva factura'),
+          title: Text(review ? 'Revisa tu $_noun' : (widget.quote ? 'Nueva cotización' : 'Nueva factura')),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Navigator.maybePop(context),
@@ -473,7 +508,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
             if (recording)
               Money('0:${_seconds.toString().padLeft(2, '0')}', size: 36, weight: FontWeight.w700)
             else
-              Text(processing ? 'Entendiendo tu dictado…' : 'Dicta tu factura', style: t.textTheme.headlineSmall),
+              Text(processing ? 'Entendiendo tu dictado…' : 'Dicta tu $_noun', style: t.textTheme.headlineSmall),
             const SizedBox(height: 10),
             Text(
               processing
@@ -563,7 +598,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           const SizedBox(height: 14),
           Reveal(index: 3, child: _taxSection(totals, cur)),
           const SizedBox(height: 14),
-          Reveal(index: 4, child: _paymentSection()),
+          Reveal(index: 4, child: widget.quote ? _validitySection() : _paymentSection()),
           const SizedBox(height: 14),
           Reveal(index: 4, child: _notesSection()),
           const SizedBox(height: 14),
@@ -602,7 +637,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
                 const SizedBox(width: 18),
                 Expanded(
                   child: GradientButton(
-                    label: _saving ? 'Guardando…' : 'Guardar factura',
+                    label: _saving ? 'Guardando…' : 'Guardar $_noun',
                     icon: Icons.check_rounded,
                     busy: _saving,
                     onPressed: _saving ? null : _save,
@@ -977,6 +1012,10 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
 
     Widget panel() => Column(key: const ValueKey('credit'), crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SizedBox(height: 16),
+          if (_client.text.trim().isNotEmpty) ...[
+            _CreditHint(score: scoreClient(_stats[clientKey(_client.text)]), stats: _stats[clientKey(_client.text)]),
+            const SizedBox(height: 14),
+          ],
           Text('Plazo rápido', style: th.textTheme.labelMedium?.copyWith(color: th.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -1090,6 +1129,46 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
             layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, if (current != null) current]),
             child: _credit ? panel() : const SizedBox(key: ValueKey('cash'), width: double.infinity),
           ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _validitySection() {
+    final th = Theme.of(context);
+    final days = _validDays;
+    return _section(
+      'Vigencia',
+      Icons.event_available_rounded,
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final n in const [7, 15, 30, 60])
+            ChoiceChip(
+              label: Text('$n días'),
+              selected: days == n,
+              onSelected: (_) {
+                Haptics.select();
+                setState(() {
+                  _validDays = n;
+                  _dirty = true;
+                });
+              },
+            ),
+          ChoiceChip(
+            label: const Text('Sin fecha'),
+            selected: days == null,
+            onSelected: (_) => setState(() {
+              _validDays = null;
+              _dirty = true;
+            }),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Text(
+          days == null
+              ? 'El cliente podrá aceptarla en cualquier momento.'
+              : 'Válida hasta el ${displayDate(todayIso(DateTime.now().add(Duration(days: days))))}. Después ya no se podrá aceptar desde el enlace.',
+          style: th.textTheme.bodySmall,
         ),
       ]),
     );
@@ -1291,6 +1370,56 @@ class _PayToggle extends StatelessWidget {
           _seg(context, Icons.schedule_rounded, 'Al crédito', credit, () => onChanged(true)),
         ]),
       ]),
+    );
+  }
+}
+
+
+/// Score de crédito del cliente al vender al crédito: cómo ha pagado antes y qué conviene hacer.
+class _CreditHint extends StatelessWidget {
+  const _CreditHint({required this.score, required this.stats});
+  final ClientScore score;
+  final ClientPayStats? stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final c = switch (score.grade) {
+      Grade.a => Brand.ok,
+      Grade.b => Brand.indigo,
+      Grade.c => Brand.warn,
+      Grade.d => Brand.bad,
+      Grade.unknown => t.colorScheme.onSurfaceVariant,
+    };
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      child: Container(
+        key: ValueKey(score.letter),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.25))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(12)),
+            child: Text(score.letter, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(score.label, style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, color: c)),
+              const SizedBox(height: 2),
+              Text(score.advice, style: t.textTheme.bodySmall),
+              if (stats != null && stats!.overdueBalance > 0.004)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Hoy te debe ${stats!.overdueBalance.toStringAsFixed(2)} vencidos.', style: t.textTheme.bodySmall?.copyWith(color: Brand.bad, fontWeight: FontWeight.w600)),
+                ),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 }
