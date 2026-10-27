@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sanitizeAssistant, buildSystemPrompt, enrichSnapshot } from "../src/lib/assistant";
 import { buildReminderEmail, buildQuoteAnswerEmail, reminderLine, toneFor } from "../src/lib/collections";
 import { seal, unseal } from "../src/lib/crypto";
+import { diagnoseRpcError } from "../src/lib/cron";
 import { extractJson, sniffImage, toNum } from "../src/lib/groq";
 import { paymentIdFrom } from "../src/lib/mercadopago";
 import { fmtDate, fmtMoney, isToken, totalsOf } from "../src/lib/publicbase";
@@ -171,5 +172,14 @@ describe("copiloto: meta y clientes en riesgo", () => {
     expect(out.clients_at_risk.map((c) => c.client)).toEqual(["Se va"]);
     expect(out.clients_at_risk[0].avg_ticket).toBe(1000);
     expect(out.best_clients[0].client).toBe("Fiel");
+  });
+});
+
+describe("diagnóstico del cron de cobranza", () => {
+  it("explica la causa probable", () => {
+    expect(diagnoseRpcError("PGRST202", "Could not find the function")).toContain("20261101_negocio_pro.sql");
+    expect(diagnoseRpcError("42501", "permission denied for schema private")).toContain("service_role");
+    expect(diagnoseRpcError("PGRST301", "JWT invalid")).toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(diagnoseRpcError("XX000", "boom")).toContain("logs de Vercel");
   });
 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildReminderEmail, sendResend } from "@/lib/collections";
-import { hasCronSecret } from "@/lib/cron";
+import { diagnoseRpcError, hasCronSecret } from "@/lib/cron";
 import { publicBase } from "@/lib/publicbase";
 import { limaToday, userEmail } from "@/lib/publicdata";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -29,12 +29,16 @@ type Candidate = {
  * envía una sola vez (reminder_log). Límite por corrida para respetar el plan gratuito de Resend (100/día).
  */
 export async function GET(req: Request) {
-  if (!hasCronSecret(req)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "RESEND_API_KEY no configurada" }, { status: 503 });
+  if (!hasCronSecret(req)) return NextResponse.json({ error: "No autorizado (revisa CRON_SECRET)" }, { status: 401 });
+  if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "RESEND_API_KEY no configurada en Vercel" }, { status: 503 });
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY no configurada en Vercel" }, { status: 503 });
   const admin = createAdminClient();
   const limit = Math.min(Number(process.env.COLLECTIONS_DAILY_LIMIT ?? "80") || 80, 500);
   const { data, error } = await admin.rpc("collections_candidates", { p_today: limaToday(), p_limit: limit });
-  if (error) return NextResponse.json({ error: "rpc", code: error.code }, { status: 500 });
+  if (error) {
+    console.error("collections: rpc failed", error.code, error.message);
+    return NextResponse.json({ error: diagnoseRpcError(error.code, error.message), code: error.code, detail: error.message?.slice(0, 200) }, { status: 500 });
+  }
 
   const base = publicBase(req);
   const owners = new Map<string, string | null>();
