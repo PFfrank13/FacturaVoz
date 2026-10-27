@@ -64,27 +64,8 @@ class _MainShellState extends State<MainShell> {
         body: Stack(children: [
           for (var i = 0; i < 4; i++)
             if (_built.contains(i))
-              KeyedSubtree(
-                // Clave estable: al construir otra pestaña no se pierde el estado de las demás.
-                key: ValueKey('tab-$i'),
-                child: IgnorePointer(
-                ignoring: i != _tab,
-                child: TickerMode(
-                  enabled: i == _tab,
-                  child: AnimatedOpacity(
-                    opacity: i == _tab ? 1 : 0,
-                    duration: Duration(milliseconds: reduceMotion(context) ? 0 : 260),
-                    curve: Curves.easeOutCubic,
-                    child: AnimatedScale(
-                      scale: i == _tab ? 1 : 0.985,
-                      duration: Duration(milliseconds: reduceMotion(context) ? 0 : 320),
-                      curve: Curves.easeOutCubic,
-                      child: _page(i),
-                    ),
-                  ),
-                ),
-                ),
-              ),
+              // Clave estable: al construir otra pestaña no se pierde el estado de las demás.
+              _TabSlot(key: ValueKey('tab-$i'), active: i == _tab, child: _page(i)),
         ]),
         bottomNavigationBar: AnimatedSlide(
           offset: keyboard ? const Offset(0, 1.4) : Offset.zero,
@@ -95,6 +76,64 @@ class _MainShellState extends State<MainShell> {
             onTap: _go,
             onMic: _newInvoice,
             onMicLong: () => openCopilot(context),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Contenedor de una pestaña del shell.
+///
+/// IMPORTANTE: el fundido (AnimatedOpacity/AnimatedScale) va FUERA de TickerMode. Si TickerMode(enabled: false)
+/// envuelve la animación de salida, su ticker queda silenciado y la pestaña que se oculta se queda pintada
+/// encima (opacidad 1) mientras los toques van a la de abajo: la app "se congela".
+/// Al terminar de ocultarse pasa a Offstage: no se pinta ni recibe toques, pero conserva su estado.
+class _TabSlot extends StatefulWidget {
+  const _TabSlot({super.key, required this.active, required this.child});
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_TabSlot> createState() => _TabSlotState();
+}
+
+class _TabSlotState extends State<_TabSlot> {
+  late bool _offstage = !widget.active;
+
+  @override
+  void didUpdateWidget(covariant _TabSlot old) {
+    super.didUpdateWidget(old);
+    if (widget.active) {
+      _offstage = false; // vuelve a pintarse y entra con el fundido
+    } else if (old.active && reduceMotion(context)) {
+      _offstage = true; // sin animaciones no hay onEnd que esperar
+    }
+  }
+
+  void _onFadeEnd() {
+    if (mounted && !widget.active && !_offstage) setState(() => _offstage = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduce = reduceMotion(context);
+    final active = widget.active;
+    return Offstage(
+      offstage: _offstage,
+      child: AnimatedOpacity(
+        opacity: active ? 1 : 0,
+        duration: Duration(milliseconds: reduce ? 0 : 220),
+        curve: Curves.easeOutCubic,
+        onEnd: _onFadeEnd,
+        child: AnimatedScale(
+          scale: active ? 1 : 0.985,
+          duration: Duration(milliseconds: reduce ? 0 : 280),
+          curve: Curves.easeOutCubic,
+          child: IgnorePointer(
+            ignoring: !active,
+            // Solo las animaciones internas de la pestaña oculta se pausan (ahorra batería y CPU).
+            child: TickerMode(enabled: active, child: widget.child),
           ),
         ),
       ),

@@ -10,7 +10,10 @@ import '../ui/widgets.dart';
 import '../ui/motion.dart';
 import 'clients.dart';
 import 'expenses.dart';
+import 'clients360.dart';
 import 'pay_settings.dart';
+import 'recurring.dart';
+import 'store.dart';
 import 'fiscal_setup.dart';
 import 'import_screen.dart';
 import 'legal.dart';
@@ -182,6 +185,24 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Cobros y recordatorios',
                     subtitle: 'Yape, Plin, banco, tarjeta y cobranza automática',
                     onTap: () => pushPremium(context, const PaySettingsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.storefront_rounded,
+                    title: 'Tienda en línea',
+                    subtitle: 'Tu catálogo como página web: recibe pedidos por WhatsApp',
+                    onTap: () => pushPremium(context, const StoreScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.event_repeat_rounded,
+                    title: 'Facturación recurrente',
+                    subtitle: 'Alquileres y mensualidades que se facturan solos',
+                    onTap: () => pushPremium(context, const RecurringScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.groups_rounded,
+                    title: 'Clientes 360',
+                    subtitle: 'Mejores clientes y los que se están yendo',
+                    onTap: () => pushPremium(context, const Clients360Screen())),
                 Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.shopping_bag_rounded,

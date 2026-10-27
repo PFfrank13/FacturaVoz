@@ -21,7 +21,8 @@ import 'expenses.dart';
 import 'new_invoice.dart';
 
 /// Abre el Copiloto: pregunta por tu negocio o da una orden, por voz o por texto.
-Future<void> openCopilot(BuildContext context) {
+/// Con [ask] la pregunta se envía sola al abrir (p. ej. "plan de rescate de caja").
+Future<void> openCopilot(BuildContext context, {String? ask}) {
   final nav = Navigator.of(context);
   Haptics.soft();
   return showModalBottomSheet<void>(
@@ -29,7 +30,7 @@ Future<void> openCopilot(BuildContext context) {
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (ctx) => SizedBox(height: MediaQuery.of(ctx).size.height * 0.9, child: _CopilotSheet(nav: nav)),
+    builder: (ctx) => SizedBox(height: MediaQuery.of(ctx).size.height * 0.9, child: _CopilotSheet(nav: nav, ask: ask)),
   );
 }
 
@@ -42,8 +43,9 @@ class _Turn {
 }
 
 class _CopilotSheet extends StatefulWidget {
-  const _CopilotSheet({required this.nav});
+  const _CopilotSheet({required this.nav, this.ask});
   final NavigatorState nav;
+  final String? ask;
 
   @override
   State<_CopilotSheet> createState() => _CopilotSheetState();
@@ -66,8 +68,10 @@ class _CopilotSheetState extends State<_CopilotSheet> {
   String _error = '';
 
   static const _starters = [
-    '¿Cuánto vendí este mes?',
+    '¿Llegaré a mi meta este mes?',
     '¿Quién me debe más?',
+    'Dame un plan de rescate para mi caja',
+    '¿Qué clientes están dejando de comprarme?',
     '¿Cuánto gané este mes?',
     '¿Qué producto se me está acabando?',
     'Gasté 50 soles en movilidad',
@@ -78,6 +82,12 @@ class _CopilotSheetState extends State<_CopilotSheet> {
   void initState() {
     super.initState();
     _initTts();
+    final q = widget.ask;
+    if (q != null && q.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _ask(text: q);
+      });
+    }
   }
 
   Future<void> _initTts() async {

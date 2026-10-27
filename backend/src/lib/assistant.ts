@@ -19,6 +19,49 @@ export type AssistantReply = {
   expense?: { description: string; amount: number; category: ExpenseCategory; supplier_name: string; date: string };
 };
 
+export type ClientActivity = {
+  client_name: string;
+  purchases: number;
+  total: number | string;
+  avg_gap: number | string | null;
+  days_since: number;
+  last_purchase: string;
+};
+
+/**
+ * Suma al resumen: meta del mes (con proyección de cierre) y clientes que se están yendo / mejores clientes.
+ * Pura y testeable. Solo nombres y montos agregados.
+ */
+export function enrichSnapshot(snapshot: Record<string, unknown>, activity: ClientActivity[], goal: number | null) {
+  const today = String(snapshot.today ?? "");
+  const day = Number(today.slice(8, 10)) || 1;
+  const y = Number(today.slice(0, 4)) || 2026;
+  const m = Number(today.slice(5, 7)) || 1;
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const sales = Number((snapshot.sales_this_month as { total?: number } | undefined)?.total ?? 0);
+  const projected = Math.round((sales / day) * daysInMonth * 100) / 100;
+  const rows = activity.map((a) => ({
+    client: a.client_name,
+    purchases: a.purchases,
+    total: Number(a.total),
+    usual_every_days: a.avg_gap == null ? null : Number(a.avg_gap),
+    days_since_last_purchase: a.days_since,
+  }));
+  const atRisk = rows
+    .filter((r) => r.purchases >= 2 && r.usual_every_days != null && r.days_since_last_purchase > Math.max(30, r.usual_every_days * 1.8))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8)
+    .map((r) => ({ ...r, avg_ticket: Math.round((r.total / r.purchases) * 100) / 100 }));
+  const best = [...rows].sort((a, b) => b.total - a.total).slice(0, 5);
+  return {
+    ...snapshot,
+    monthly_goal: goal,
+    goal_progress: goal && goal > 0 ? { goal, sales_so_far: sales, projected_month_close: projected, needed_per_day: Math.max(0, Math.round(((goal - sales) / Math.max(1, daysInMonth - day + 1)) * 100) / 100) } : null,
+    clients_at_risk: atRisk,
+    best_clients: best,
+  };
+}
+
 export function buildSystemPrompt(snapshot: unknown, businessName: string): string {
   return `Eres el copiloto financiero de "${businessName.replace(/["\n\r]/g, " ").slice(0, 80) || "el negocio"}", un pequeño negocio peruano.
 Hablas español de Perú, claro, cálido y directo, como un buen contador amigo. Moneda: soles (S/) salvo que el resumen diga otra.
@@ -38,6 +81,11 @@ Intenciones:
 - "invoice": quiere facturar/vender ("factura a…", "véndele…"). "quote": quiere cotizar/presupuestar ("cotiza…", "presupuesto para…"). Extrae cliente e ítems (cada producto distinto es un ítem; "2 sillas a 150" = quantity 2, unit_price 150; importes sin impuesto salvo que diga lo contrario). answer confirma qué entendiste.
 - "expense": registra un gasto/compra ("gasté…", "pagué el alquiler…", "compré mercadería…"). amount es el total pagado.
 - "collections": quiere cobrar/recordar a deudores ("manda recordatorios", "cobra a los morosos"). answer resume a quién y cuánto.
+Además sabes: meta del mes (goal_progress: cuánto lleva, proyección de cierre al ritmo actual y cuánto necesita vender por día),
+clientes que se están yendo (clients_at_risk: solían comprar cada usual_every_days días y ya pasaron days_since_last_purchase)
+y mejores clientes (best_clients). Si piden un "plan de rescate", "me falta plata" o "cómo vendo más", responde con un PLAN
+de 3 pasos concretos y con nombres y montos del resumen: 1) a quién cobrar primero, 2) a qué cliente en riesgo escribir hoy
+con una oferta, 3) qué gasto o compra postergar. Sé específico, nada genérico.
 - "unknown": no se entiende; pide que lo repita con un ejemplo.
 Nunca inventes cifras, clientes ni productos que no estén en el resumen o en el pedido.`;
 }

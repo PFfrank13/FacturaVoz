@@ -13,6 +13,7 @@ import '../services/api.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
+import 'recurring.dart';
 import 'share_sheet.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -411,6 +412,22 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       ),
                       const SizedBox(height: 14),
                     ],
+                  ],
+                  if (inv.items.isNotEmpty && _fiscal?.status != 'rejected') ...[
+                    Reveal(
+                      index: 5,
+                      child: TextButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                final ok = await showRecurringEditor(context, from: inv);
+                                if (ok && context.mounted) showSuccess(context, 'Se facturará cada mes');
+                              },
+                        icon: const Icon(Icons.event_repeat_rounded),
+                        label: const Text('Facturar esto cada mes'),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                   ],
                   if (_fiscal == null || _fiscal!.status != 'accepted')
                     GradientButton(

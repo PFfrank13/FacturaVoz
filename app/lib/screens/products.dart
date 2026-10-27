@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../errors.dart';
 import '../models.dart';
+import '../growth.dart';
+import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
@@ -128,6 +130,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     var track = p?.tracksStock ?? false;
     final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
     final reorder = TextEditingController(text: p?.reorderPoint == null ? '' : qtyText(p!.reorderPoint!));
+    final cost = TextEditingController(text: p?.unitCost == null ? '' : qtyText(p!.unitCost!));
+    var inStore = p?.inStore ?? true;
     var err = '';
     final ok = await showModalBottomSheet<bool>(
       context: context,
@@ -147,7 +151,41 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                 decoration: const InputDecoration(labelText: 'Precio unitario (sin impuesto)', prefixIcon: Icon(Icons.payments_outlined)),
+                onChanged: (_) => setS(() {}),
               ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: cost,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                onChanged: (_) => setS(() {}),
+                decoration: const InputDecoration(labelText: 'Costo unitario (opcional)', helperText: 'Lo que te cuesta a ti. Calculo tu margen real.', prefixIcon: Icon(Icons.price_change_outlined)),
+              ),
+              Builder(builder: (_) {
+                final c = parseDecimal(cost.text);
+                final pr = parseDecimal(price.text) ?? 0;
+                final m = marginOf(price: pr, cost: c);
+                if (c == null || c <= 0) return const SizedBox.shrink();
+                final color = m == null ? Colors.grey : (m < 0.15 ? const Color(0xFFD94A5E) : (m < 0.3 ? const Color(0xFFC57A12) : const Color(0xFF23956F)));
+                return Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (m != null)
+                      Text(
+                        m < 0 ? 'Estás vendiendo a pérdida (${(m * 100).round()} %).' : 'Margen: ${(m * 100).round()} % · ganas ${(pr - c).toStringAsFixed(2)} por unidad',
+                        style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, color: color),
+                      ),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 6, runSpacing: 6, children: [
+                      for (final target in const [0.3, 0.4, 0.5])
+                        ActionChip(
+                          label: Text('Precio para ${(target * 100).round()} %: ${priceForMargin(cost: c, margin: target).toStringAsFixed(2)}'),
+                          onPressed: () => setS(() => price.text = qtyText(priceForMargin(cost: c, margin: target))),
+                        ),
+                    ]),
+                  ]),
+                );
+              }),
               const SizedBox(height: 12),
               SegmentedButton<String>(
                 segments: const [
@@ -156,6 +194,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 ],
                 selected: {unit},
                 onSelectionChanged: (s) => setS(() => unit = s.first),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: inStore,
+                onChanged: (v) => setS(() => inStore = v),
+                title: const Text('Mostrar en mi tienda en línea'),
               ),
               if (unit == 'NIU') ...[
                 const SizedBox(height: 6),
@@ -212,7 +256,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final stockValue = track && unit == 'NIU' ? (parseDecimal(stock.text) ?? 0.0) : null;
     final reorderValue = track && unit == 'NIU' ? parseDecimal(reorder.text) : null;
     final stockChanged = stockValue != p?.stock || reorderValue != p?.reorderPoint;
-    disposeAfterClose([name, price, stock, reorder]);
+    final costValue = parseDecimal(cost.text);
+    final growthChanged = costValue != p?.unitCost || inStore != (p?.inStore ?? true);
+    disposeAfterClose([name, price, stock, reorder, cost]);
     if (ok != true) return;
     try {
       final id = await Repo.saveProduct(id: p?.id, name: values.$1, unitPrice: values.$2, unit: values.$3);
@@ -222,6 +268,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
         } catch (e) {
           if (ProRepo.isMissingMigration(e) || e.toString().contains('stock')) {
             _snack('Guardado. Para controlar stock ejecuta la migración 20261101_negocio_pro.sql.');
+            _load();
+            return;
+          }
+          rethrow;
+        }
+      }
+      if (growthChanged) {
+        try {
+          await GrowthRepo.setCostAndStore(id, unitCost: costValue, inStore: inStore);
+        } catch (e) {
+          if (ProRepo.isMissingMigration(e) || e.toString().contains('unit_cost') || e.toString().contains('in_store')) {
+            _snack('Guardado. Para costo y tienda ejecuta la migración 20261102_revolucion.sql.');
             _load();
             return;
           }
@@ -389,10 +447,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
                                 Text(p.active ? (p.isService ? 'Servicio' : 'Producto') : 'Archivado', style: t.textTheme.bodySmall),
-                                if (p.tracksStock)
+                                if (p.tracksStock || p.margin != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
-                                    child: StatusPill('Stock ${qtyText(p.stock ?? 0)}', tone: p.lowStock ? PillTone.warn : PillTone.ok),
+                                    child: Wrap(spacing: 6, runSpacing: 4, children: [
+                                      if (p.tracksStock) StatusPill('Stock ${qtyText(p.stock ?? 0)}', tone: p.lowStock ? PillTone.warn : PillTone.ok),
+                                      if (p.margin != null)
+                                        StatusPill('Margen ${(p.margin! * 100).round()} %', tone: p.margin! < 0.15 ? PillTone.bad : (p.margin! < 0.3 ? PillTone.warn : PillTone.ok)),
+                                    ]),
                                   ),
                               ]),
                             ),

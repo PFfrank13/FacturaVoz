@@ -452,7 +452,7 @@ class ClientCard {
 
 /// Producto o servicio del catálogo de la empresa.
 class Product {
-  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active, this.stock, this.reorderPoint});
+  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active, this.stock, this.reorderPoint, this.unitCost, this.inStore = true});
   final String id;
   final String name;
   final double unitPrice;
@@ -465,6 +465,15 @@ class Product {
   bool get tracksStock => stock != null;
   bool get lowStock => stock != null && stock! <= (reorderPoint ?? 0);
 
+  /// Costo unitario (sin IGV), para calcular margen y precio sugerido. null = no registrado.
+  final double? unitCost;
+
+  /// Visible en la tienda en línea.
+  final bool inStore;
+
+  /// Margen sobre el precio (0..1) o null si no hay costo.
+  double? get margin => unitCost == null || unitPrice <= 0 ? null : (unitPrice - unitCost!) / unitPrice;
+
   bool get isService => unit == 'ZZ';
 
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -475,6 +484,8 @@ class Product {
         active: j['active'] != false,
         stock: j['stock'] == null ? null : _num(j['stock']),
         reorderPoint: j['reorder_point'] == null ? null : _num(j['reorder_point']),
+        unitCost: j['unit_cost'] == null ? null : _num(j['unit_cost']),
+        inStore: j['in_store'] != false,
       );
 }
 

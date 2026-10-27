@@ -12,6 +12,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'assistant.dart';
+import 'clients360.dart';
 import 'expenses.dart';
 import 'products.dart';
 import 'reports.dart';
@@ -41,22 +42,29 @@ class _ProfitScreenState extends State<ProfitScreen> {
   Map<String, ClientPayStats> _stats = const {};
   List<ProductVelocity> _stock = const [];
   String? _orgSeen;
+  final _debounce = Debouncer(500);
 
   @override
   void initState() {
     super.initState();
     _orgSeen = Repo.activeOrgId;
     AppState.instance.addListener(_onApp);
-    AppState.instance.dataVersion.addListener(_load);
+    AppState.instance.dataVersion.addListener(_reloadSoon);
     _load();
   }
 
   @override
   void dispose() {
     AppState.instance.removeListener(_onApp);
-    AppState.instance.dataVersion.removeListener(_load);
+    AppState.instance.dataVersion.removeListener(_reloadSoon);
+    _debounce.dispose();
     super.dispose();
   }
+
+  /// Agrupa varios cambios seguidos en una sola recarga.
+  void _reloadSoon() => _debounce(() {
+        if (mounted) _load();
+      });
 
   void _onApp() {
     if (_orgSeen != Repo.activeOrgId) {
@@ -268,6 +276,34 @@ class _ProfitScreenState extends State<ProfitScreen> {
                 Reveal(index: 7, child: _categories(context, cats, cur)),
               ],
               const SizedBox(height: 20),
+              Reveal(
+                index: 8,
+                child: Pressable(
+                  onTap: () => pushPremium(context, const Clients360Screen()),
+                  child: SoftCard(
+                    child: Row(children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFF78FB3), Color(0xFFD94A8E)]),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: const Icon(Icons.groups_rounded, color: Colors.white),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Clientes 360', style: t.textTheme.titleSmall),
+                          Text('Tus mejores clientes, los que se están yendo y cuánto dinero está en riesgo.', style: t.textTheme.bodySmall),
+                        ]),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: t.colorScheme.onSurfaceVariant),
+                    ]),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               SectionTitle('Radar de stock', action: 'Productos', onAction: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProductsScreen()))),
               Reveal(index: 8, child: _stockCard(context, risky)),
               const SizedBox(height: 16),
@@ -404,10 +440,19 @@ class _ProfitScreenState extends State<ProfitScreen> {
             margin: const EdgeInsets.only(top: 4),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: Brand.bad.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
-            child: Row(children: [
-              const Icon(Icons.warning_amber_rounded, color: Brand.bad, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text(f.warning!, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad, fontWeight: FontWeight.w600))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.warning_amber_rounded, color: Brand.bad, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text(f.warning!, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad, fontWeight: FontWeight.w600))),
+              ]),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: Brand.bad, minimumSize: const Size(64, 44)),
+                onPressed: () => openCopilot(context, ask: 'Mi caja se va a poner negativa. Dame un plan de rescate de 3 pasos con nombres y montos.'),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Plan de rescate con IA'),
+              ),
             ]),
           ),
       ]),

@@ -8,18 +8,26 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../finance.dart';
+import '../growth.dart';
 import '../models.dart';
 import '../models_pro.dart';
+import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'assistant.dart';
+import 'clients360.dart';
+import 'expenses.dart';
+import 'goal_sheet.dart';
 import 'invoice_detail.dart';
 import 'new_invoice.dart';
 import 'products.dart';
+import 'recurring.dart';
+import 'scan.dart';
 import 'settings.dart';
+import 'store.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.embedded = false, this.onNavigate});
@@ -48,6 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _debounce;
   List<ProductVelocity> _stock = const [];
   int _claims = 0;
+  double? _goal;
+  int _storeOrders = 0;
+  int _recurringDrafts = 0;
 
   @override
   void initState() {
@@ -150,7 +161,44 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _stock = v);
     } catch (_) {}
     final c = await ProRepo.countPendingClaims();
-    if (mounted && c != _claims) setState(() => _claims = c);
+    final goal = await GrowthRepo.monthlyGoal();
+    final orders = await GrowthRepo.countNewStoreOrders();
+    final drafts = await GrowthRepo.countRecurringDrafts();
+    if (!mounted) return;
+    if (c != _claims || goal != _goal || orders != _storeOrders || drafts != _recurringDrafts) {
+      setState(() {
+        _claims = c;
+        _goal = goal;
+        _storeOrders = orders;
+        _recurringDrafts = drafts;
+      });
+    }
+  }
+
+  Future<void> _setGoal(double salesSoFar) async {
+    final v = await showGoalSheet(context, current: _goal, salesSoFar: salesSoFar);
+    if (v != null && mounted) {
+      setState(() => _goal = v <= 0 ? null : v);
+      showSuccess(context, v <= 0 ? 'Meta quitada' : '¡Meta fijada!', icon: Icons.flag_rounded);
+    }
+  }
+
+  Future<void> _push(Widget page) async {
+    await pushPremium(context, page);
+    if (mounted) _load();
+  }
+
+  Future<void> _quickQuote() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewInvoiceScreen(quote: true)));
+    AppState.instance.bump();
+    widget.onNavigate?.call(1);
+  }
+
+  Future<void> _quickExpense() async {
+    if (await showExpenseSheet(context) && mounted) {
+      showSuccess(context, 'Gasto registrado');
+      AppState.instance.bump();
+    }
   }
 
   void _openInsight(Insight i) {
@@ -162,6 +210,10 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.onNavigate?.call(3);
       case 'due_soon':
         setState(() => _filter = 'due');
+      case 'store_orders':
+        widget.onNavigate?.call(1);
+      case 'recurring':
+        setState(() => _filter = 'draft');
       default:
         widget.onNavigate?.call(2);
     }
@@ -257,12 +309,70 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: _Header(name: AppState.instance.activeOrg?.name ?? profile?.businessName ?? '', currency: currency, total: m.total, count: m.count, loaded: _items != null),
+              child: _Header(
+                name: AppState.instance.activeOrg?.name ?? profile?.businessName ?? '',
+                currency: currency,
+                total: m.total,
+                count: m.count,
+                loaded: _items != null,
+                goal: _goal,
+                series: dailySeries(_items ?? const <InvoiceRecord>[], currency: currency, today: todayIso()),
+                onGoal: () => _setGoal(m.total),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Reveal(
+                index: 1,
+                child: SizedBox(
+                  height: 104,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
+                    children: [
+                      QuickAction(icon: Icons.mic_rounded, label: 'Facturar', colors: const [Color(0xFFFFA77F), Color(0xFFFF7E9A)], onTap: _newInvoice),
+                      QuickAction(icon: Icons.request_quote_rounded, label: 'Cotizar', colors: const [Color(0xFF8E7CF2), Color(0xFF6A62E2)], onTap: _quickQuote),
+                      QuickAction(icon: Icons.document_scanner_rounded, label: 'Escanear', colors: const [Color(0xFF5BC0EB), Color(0xFF3A86FF)], onTap: () => _push(const ScanScreen())),
+                      QuickAction(icon: Icons.shopping_bag_rounded, label: 'Gasto', colors: const [Color(0xFFFFC56E), Color(0xFFFF9F43)], onTap: _quickExpense),
+                      QuickAction(
+                        icon: Icons.storefront_rounded,
+                        label: 'Tienda',
+                        badge: _storeOrders,
+                        colors: const [Color(0xFF4FD1A1), Color(0xFF23956F)],
+                        onTap: () {
+                          // Con pedidos nuevos, lleva directo a atenderlos; si no, a configurar la tienda.
+                          if (_storeOrders > 0 && widget.onNavigate != null) {
+                            widget.onNavigate!(1);
+                          } else {
+                            _push(const StoreScreen());
+                          }
+                        },
+                      ),
+                      QuickAction(icon: Icons.groups_rounded, label: 'Clientes', colors: const [Color(0xFFF78FB3), Color(0xFFD94A8E)], onTap: () => _push(const Clients360Screen())),
+                      QuickAction(
+                        icon: Icons.event_repeat_rounded,
+                        label: 'Mensuales',
+                        badge: _recurringDrafts,
+                        colors: const [Color(0xFFB58BF5), Color(0xFF8E5CF2)],
+                        onTap: () => _push(const RecurringScreen()),
+                      ),
+                      QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
+                    ],
+                  ),
+                ),
+              ),
             ),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
-                  insights: buildInsights(invoices: _items!, today: todayIso(), currency: currency, stock: _stock, pendingClaims: _claims),
+                  insights: buildInsights(
+                    invoices: _items!,
+                    today: todayIso(),
+                    currency: currency,
+                    stock: _stock,
+                    pendingClaims: _claims,
+                    storeOrders: _storeOrders,
+                    recurringDrafts: _recurringDrafts,
+                  ),
                   onTap: _openInsight,
                 ),
               ),
@@ -424,12 +534,24 @@ class _ErrorBox extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.name, required this.currency, required this.total, required this.count, required this.loaded});
+  const _Header({
+    required this.name,
+    required this.currency,
+    required this.total,
+    required this.count,
+    required this.loaded,
+    required this.goal,
+    required this.series,
+    required this.onGoal,
+  });
   final String name;
   final String currency;
   final double total;
   final int count;
   final bool loaded;
+  final double? goal;
+  final List<double> series;
+  final VoidCallback onGoal;
 
   @override
   Widget build(BuildContext context) {
@@ -440,23 +562,18 @@ class _Header extends StatelessWidget {
       return '${parts[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',')}.${parts[1]}';
     }
 
-    return Container(
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.fromLTRB(24, top + 12, 24, 34),
-      decoration: const BoxDecoration(
-        gradient: Brand.heroGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(40)),
-      ),
-      child: Stack(children: [
-        Positioned(right: -70, top: -50, child: _Orb(size: 190, alpha: 0.10)),
-        Positioned(right: 40, bottom: -90, child: _Orb(size: 150, alpha: 0.08)),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final g = goal == null || goal! <= 0 ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
+    final white85 = Colors.white.withValues(alpha: 0.85);
+    return Aurora(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(40)),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, top + 12, 24, 26),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Reveal(
             child: Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_greeting(), style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.8), fontSize: 13.5)),
+                  Text(_greeting(), style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 13.5)),
                   const SizedBox(height: 2),
                   Text(
                     name.isEmpty ? 'FacturaVoz' : name,
@@ -490,71 +607,111 @@ class _Header extends StatelessWidget {
               ),
             ]),
           ),
-          const SizedBox(height: 26),
-          Reveal(
-            index: 1,
-            child: Text('Facturado este mes',
-                style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500)),
-          ),
-          const SizedBox(height: 6),
-          if (!loaded)
-            const SizedBox(height: 62)
-          else
-            Reveal(
-              index: 2,
-              child: CountUp(
-                value: total,
-                builder: (context, v) {
-                  final f = fmt(v).split('.');
-                  return Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                    Text(sym, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 26, fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text.rich(
-                          TextSpan(children: [
-                            TextSpan(text: f[0], style: const TextStyle(fontSize: 54, fontWeight: FontWeight.w700, letterSpacing: -1.8)),
-                            TextSpan(text: '.${f[1]}', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.75))),
-                          ]),
-                          style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontFeatures: [FontFeature.tabularFigures()]),
-                        ),
-                      ),
+          const SizedBox(height: 22),
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Reveal(
+                  index: 1,
+                  child: Text('Facturado este mes', style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 14, fontWeight: FontWeight.w500)),
+                ),
+                const SizedBox(height: 4),
+                if (!loaded)
+                  const SizedBox(height: 56)
+                else
+                  Reveal(
+                    index: 2,
+                    child: CountUp(
+                      value: total,
+                      builder: (context, v) {
+                        final f = fmt(v).split('.');
+                        return FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text.rich(
+                            TextSpan(children: [
+                              TextSpan(text: '$sym ', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+                              TextSpan(text: f[0], style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w700, letterSpacing: -1.6)),
+                              TextSpan(text: '.${f[1]}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.75))),
+                            ]),
+                            style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontFeatures: [FontFeature.tabularFigures()]),
+                          ),
+                        );
+                      },
                     ),
-                  ]);
-                },
-              ),
+                  ),
+              ]),
             ),
-          const SizedBox(height: 12),
-          if (loaded)
+            const SizedBox(width: 12),
             Reveal(
               index: 3,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
-                child: Text(
-                  count == 0 ? 'Aún sin comprobantes este mes' : (count == 1 ? '1 comprobante' : '$count comprobantes'),
-                  style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+              child: Semantics(
+                button: true,
+                label: g == null ? 'Fijar meta del mes' : 'Meta del mes al ${(g.percent * 100).round()} por ciento',
+                child: Pressable(
+                  onTap: onGoal,
+                  child: g == null
+                      ? Container(
+                          width: 78,
+                          height: 78,
+                          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white54, width: 2)),
+                          child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.flag_rounded, color: Colors.white, size: 22),
+                            Text('Fijar meta', style: TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                          ]),
+                        )
+                      : ProgressRing(
+                          value: g.percent,
+                          size: 78,
+                          stroke: 8,
+                          color: Colors.white,
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Text(g.reached ? '🎉' : '${(g.percent * 100).round()}%',
+                                style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+                            Text('de la meta', style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 9.5)),
+                          ]),
+                        ),
                 ),
               ),
             ),
+          ]),
+          const SizedBox(height: 10),
+          if (loaded)
+            Reveal(
+              index: 3,
+              child: Wrap(spacing: 8, runSpacing: 6, children: [
+                _HeaderPill(count == 0 ? 'Aún sin comprobantes este mes' : (count == 1 ? '1 comprobante' : '$count comprobantes')),
+                if (g != null && !g.reached)
+                  _HeaderPill(g.onTrack ? 'Vas bien · cierras en ${money(g.projected, currency)}' : 'Te faltan ${money(g.neededPerDay, currency)}/día'),
+                if (g != null && g.reached) const _HeaderPill('¡Meta cumplida!'),
+              ]),
+            ),
+          if (loaded && series.any((v) => v > 0)) ...[
+            const SizedBox(height: 14),
+            Reveal(
+              index: 4,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Últimos 14 días', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.7), fontSize: 11.5)),
+                const SizedBox(height: 4),
+                Sparkline(values: series, height: 44),
+              ]),
+            ),
+          ],
         ]),
-      ]),
+      ),
     );
   }
 }
 
-class _Orb extends StatelessWidget {
-  const _Orb({required this.size, required this.alpha});
-  final double size;
-  final double alpha;
+class _HeaderPill extends StatelessWidget {
+  const _HeaderPill(this.text);
+  final String text;
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: alpha)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+        child: Text(text, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
       );
 }
 
@@ -654,6 +811,8 @@ class _InsightCard extends StatelessWidget {
       'due_soon' => (Brand.warn, Icons.schedule_rounded),
       'pace' => (insight.tone == 'ok' ? Brand.ok : Brand.warn, insight.tone == 'ok' ? Icons.trending_up_rounded : Icons.trending_down_rounded),
       'stock' => (Brand.goldDeep, Icons.inventory_2_rounded),
+      'store_orders' => (Brand.ok, Icons.storefront_rounded),
+      'recurring' => (Brand.lilac, Icons.event_repeat_rounded),
       _ => (Brand.indigo, Icons.lightbulb_rounded),
     };
     return Pressable(

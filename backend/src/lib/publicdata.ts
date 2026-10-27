@@ -198,3 +198,48 @@ export function sameOrigin(req: Request): boolean {
     return false;
   }
 }
+
+export type StoreProduct = { id: string; name: string; price: number; priceWithTax: number; service: boolean };
+export type PublicStore = {
+  slug: string;
+  business: string;
+  taxId: string;
+  headline: string;
+  whatsapp: string;
+  currency: string;
+  taxRate: number;
+  products: StoreProduct[];
+};
+
+/** Catálogo público /tienda/<slug> (solo productos activos y visibles en tienda). */
+export async function getPublicStore(slug: string): Promise<PublicStore | null> {
+  const s = (slug ?? "").toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(s)) return null;
+  const admin = createAdminClient();
+  const { data: st } = await admin.from("org_store").select("org_id, slug, headline, whatsapp, enabled").eq("slug", s).maybeSingle();
+  if (!st || st.enabled !== true) return null;
+  const { data: org } = await admin.from("organizations").select("name, trade_name, tax_id, currency, default_tax_rate").eq("id", st.org_id).maybeSingle();
+  if (!org) return null;
+  const rate = org.default_tax_rate == null ? 18 : Number(org.default_tax_rate);
+  const { data: prods } = await admin
+    .from("products")
+    .select("id, name, unit_price, unit")
+    .eq("org_id", st.org_id)
+    .eq("active", true)
+    .eq("in_store", true)
+    .order("name", { ascending: true })
+    .limit(300);
+  return {
+    slug: s,
+    business: (org.trade_name as string | null) || (org.name as string),
+    taxId: (org.tax_id as string | null) ?? "",
+    headline: (st.headline as string | null) ?? "",
+    whatsapp: (st.whatsapp as string | null) ?? "",
+    currency: (org.currency as string | null) ?? "PEN",
+    taxRate: rate,
+    products: ((prods ?? []) as { id: string; name: string; unit_price: number | string; unit: string }[]).map((p) => {
+      const price = Number(p.unit_price);
+      return { id: p.id, name: p.name, price, priceWithTax: Math.round(price * (1 + rate / 100) * 100) / 100, service: p.unit === "ZZ" };
+    }),
+  };
+}

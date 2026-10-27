@@ -33,6 +33,8 @@ class QuoteRecord {
     this.responderName = '',
     this.responseNote = '',
     this.respondedAt,
+    this.source = 'app',
+    this.contactPhone = '',
   });
 
   final String id;
@@ -51,6 +53,11 @@ class QuoteRecord {
   final String responderName;
   final String responseNote;
   final String? respondedAt;
+
+  /// 'store' = pedido hecho por el cliente desde la tienda en línea.
+  final String source;
+  final String contactPhone;
+  bool get fromStore => source == 'store';
 
   Totals get totals => computeTotals(items, taxRate);
 
@@ -75,6 +82,8 @@ class QuoteRecord {
       responderName: _s(j['responder_name']),
       responseNote: _s(j['response_note']),
       respondedAt: j['responded_at'] as String?,
+      source: _s(j['source']).isEmpty ? 'app' : _s(j['source']),
+      contactPhone: _s(j['contact_phone']),
       items: ((j['quote_items'] ?? []) as List).map((e) => LineItem.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
     );
   }

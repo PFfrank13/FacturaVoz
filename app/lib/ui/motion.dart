@@ -660,3 +660,249 @@ class Debouncer {
 
   void dispose() => _t?.cancel();
 }
+
+// ───────────────────────── Fase "Revolución": piezas visuales ─────────────────────────
+
+/// Fondo "aurora": tres manchas de luz que flotan muy despacio sobre un degradado.
+/// Barato (un solo CustomPainter, sin blur en tiempo real) y se detiene con "Reducir animaciones".
+class Aurora extends StatefulWidget {
+  const Aurora({super.key, required this.child, this.gradient = Brand.heroGradient, this.borderRadius});
+  final Widget child;
+  final Gradient gradient;
+  final BorderRadius? borderRadius;
+
+  @override
+  State<Aurora> createState() => _AuroraState();
+}
+
+class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final still = reduceMotion(context);
+    return ClipRRect(
+      borderRadius: widget.borderRadius ?? BorderRadius.zero,
+      child: DecoratedBox(
+        decoration: BoxDecoration(gradient: widget.gradient),
+        child: Stack(children: [
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _c,
+                builder: (context, _) => CustomPaint(painter: _AuroraPainter(still ? 0.15 : _c.value)),
+              ),
+            ),
+          ),
+          widget.child,
+        ]),
+      ),
+    );
+  }
+}
+
+class _AuroraPainter extends CustomPainter {
+  _AuroraPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final blobs = [
+      (const Color(0xFFFFB199), 0.75, 0.15, 0.55, 0.0),
+      (const Color(0xFF8FE3FF), 0.15, 0.85, 0.50, 0.33),
+      (const Color(0xFFE6B8FF), 0.95, 0.95, 0.45, 0.66),
+    ];
+    for (final (color, bx, by, r, phase) in blobs) {
+      final a = 2 * math.pi * (t + phase);
+      final c = Offset(size.width * (bx + 0.08 * math.cos(a)), size.height * (by + 0.10 * math.sin(a)));
+      final radius = size.longestSide * r;
+      canvas.drawCircle(
+        c,
+        radius,
+        Paint()..shader = RadialGradient(colors: [color.withValues(alpha: 0.38), color.withValues(alpha: 0)]).createShader(Rect.fromCircle(center: c, radius: radius)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AuroraPainter old) => old.t != t;
+}
+
+/// Línea de tendencia que se dibuja de izquierda a derecha, con relleno suave y punto final.
+class Sparkline extends StatelessWidget {
+  const Sparkline({super.key, required this.values, this.height = 44, this.color = Colors.white});
+  final List<double> values;
+  final double height;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (values.length < 2) return SizedBox(height: height);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 1300),
+      curve: Curves.easeOutCubic,
+      builder: (context, k, _) => SizedBox(height: height, width: double.infinity, child: CustomPaint(painter: _SparkPainter(values, k, color))),
+    );
+  }
+}
+
+class _SparkPainter extends CustomPainter {
+  _SparkPainter(this.v, this.k, this.color);
+  final List<double> v;
+  final double k;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final maxV = v.reduce(math.max);
+    final minV = v.reduce(math.min);
+    final span = (maxV - minV).abs() < 0.01 ? 1.0 : maxV - minV;
+    Offset pt(int i) => Offset(size.width * i / (v.length - 1), size.height - 4 - (size.height - 8) * ((v[i] - minV) / span));
+    final upto = ((v.length - 1) * k).clamp(0.0, (v.length - 1).toDouble());
+    final last = upto.floor();
+    final line = Path()..moveTo(pt(0).dx, pt(0).dy);
+    for (var i = 1; i <= last; i++) {
+      final p0 = pt(i - 1), p1 = pt(i);
+      final mid = (p0.dx + p1.dx) / 2;
+      line.cubicTo(mid, p0.dy, mid, p1.dy, p1.dx, p1.dy);
+    }
+    var end = pt(last);
+    if (last < v.length - 1) {
+      final f = upto - last;
+      final a = pt(last), b = pt(last + 1);
+      end = Offset(a.dx + (b.dx - a.dx) * f, a.dy + (b.dy - a.dy) * f);
+      line.lineTo(end.dx, end.dy);
+    }
+    final fill = Path.from(line)
+      ..lineTo(end.dx, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0)])
+            .createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      line,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round
+        ..color = color,
+    );
+    canvas.drawCircle(end, 4.5, Paint()..color = color);
+    canvas.drawCircle(end, 9, Paint()..color = color.withValues(alpha: 0.25));
+  }
+
+  @override
+  bool shouldRepaint(_SparkPainter old) => old.k != k || old.v != v || old.color != color;
+}
+
+/// Acceso rápido: icono en degradado + texto, con rebote al tocar y número opcional (badge).
+class QuickAction extends StatelessWidget {
+  const QuickAction({super.key, required this.icon, required this.label, required this.onTap, required this.colors, this.badge = 0});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final List<Color> colors;
+  final int badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: badge > 0 ? '$label, $badge pendientes' : label,
+      child: GestureDetector(
+        onTap: () {
+          Haptics.tap();
+          onTap();
+        },
+        child: _Springy(
+          child: SizedBox(
+            width: 76,
+            child: Column(children: [
+              Stack(clipBehavior: Clip.none, children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+                    boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8))],
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 27),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      constraints: const BoxConstraints(minWidth: 20),
+                      decoration: BoxDecoration(color: Brand.bad, borderRadius: BorderRadius.circular(99), border: Border.all(color: t.scaffoldBackgroundColor, width: 2)),
+                      child: Text('$badge', textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+              ]),
+              const SizedBox(height: 7),
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: t.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Encoge al presionar y rebota al soltar (sin depender de un onTap propio).
+class _Springy extends StatefulWidget {
+  const _Springy({required this.child});
+  final Widget child;
+
+  @override
+  State<_Springy> createState() => _SpringyState();
+}
+
+class _SpringyState extends State<_Springy> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) => Listener(
+        onPointerDown: (_) => setState(() => _down = true),
+        onPointerUp: (_) => setState(() => _down = false),
+        onPointerCancel: (_) => setState(() => _down = false),
+        child: AnimatedScale(
+          scale: _down ? 0.9 : 1,
+          duration: Duration(milliseconds: _down ? 90 : 450),
+          curve: _down ? Curves.easeOut : Curves.elasticOut,
+          child: widget.child,
+        ),
+      );
+}
+
+/// Insignia de segmento/estado con icono (Clientes 360, recurrentes…).
+class TagChip extends StatelessWidget {
+  const TagChip(this.label, {super.key, required this.color, this.icon});
+  final String label;
+  final Color color;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(99)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[Icon(icon, size: 13, color: color), const SizedBox(width: 4)],
+          Text(label, style: TextStyle(fontFamily: 'Inter', fontSize: 11.5, fontWeight: FontWeight.w700, color: color)),
+        ]),
+      );
+}

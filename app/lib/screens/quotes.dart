@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app_state.dart';
 import '../errors.dart';
@@ -85,6 +86,11 @@ class _QuotesScreenState extends State<QuotesScreen> {
               if (mounted && n['status'] == 'accepted' && before != null && before.status != 'accepted') {
                 showSuccess(context, '¡${before.clientName} aceptó ${before.number}!', icon: Icons.celebration_rounded);
               }
+              // Pedido nuevo desde la tienda en línea
+              if (mounted && p.eventType == PostgresChangeEvent.insert && n['source'] == 'store') {
+                showSuccess(context, '🛍️ Nuevo pedido web ${n['number'] ?? ''}', icon: Icons.storefront_rounded);
+                if (_filter != 'store') setState(() => _filter = 'store');
+              }
               _debounce(() {
                 if (mounted) _load();
               });
@@ -128,6 +134,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
     final today = todayIso();
     return (_items ?? const <QuoteRecord>[]).where((q) => switch (_filter) {
           'open' => (q.status == 'draft' || q.status == 'sent') && !q.isExpired(today),
+          'store' => q.fromStore && q.status != 'converted' && q.status != 'rejected',
           'accepted' => q.status == 'accepted',
           'converted' => q.status == 'converted',
           'closed' => q.status == 'rejected' || q.isExpired(today),
@@ -207,7 +214,14 @@ class _QuotesScreenState extends State<QuotesScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(children: [
-                    for (final (k, label) in const [('open', 'Pendientes'), ('accepted', 'Aceptadas'), ('converted', 'Facturadas'), ('closed', 'Rechazadas o vencidas'), ('all', 'Todas')])
+                    for (final (k, label) in const [
+                      ('open', 'Pendientes'),
+                      ('store', 'Pedidos web'),
+                      ('accepted', 'Aceptadas'),
+                      ('converted', 'Facturadas'),
+                      ('closed', 'Rechazadas o vencidas'),
+                      ('all', 'Todas'),
+                    ])
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
@@ -300,6 +314,7 @@ class _QuoteRow extends StatelessWidget {
               Wrap(spacing: 6, runSpacing: 4, children: [
                 expired ? const StatusPill('Vencida', tone: PillTone.bad) : StatusPill(quoteStatusLabel(q.status), tone: _toneFor(q.status)),
                 if (q.status == 'accepted') const StatusPill('Lista para facturar', tone: PillTone.info),
+                if (q.fromStore) const TagChip('Pedido web', color: Brand.ok, icon: Icons.storefront_rounded),
               ]),
             ]),
           ),
@@ -560,6 +575,30 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                if (q.fromStore && q.contactPhone.isNotEmpty) ...[
+                  Reveal(
+                    index: 1,
+                    child: SoftCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(children: [
+                        const Icon(Icons.storefront_rounded, color: Brand.ok),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text('Pedido desde tu tienda · cel. ${q.contactPhone}', style: t.textTheme.titleSmall)),
+                        FilledButton.tonalIcon(
+                          onPressed: () => launchUrl(
+                            Uri.https('wa.me', '/51${q.contactPhone}', {
+                              'text': 'Hola ${q.clientName}, recibimos tu pedido ${q.number} por ${money(q.totals.total, q.currency)}. ¡Ya lo estamos preparando!',
+                            }),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(Icons.chat_rounded),
+                          label: const Text('Confirmar'),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (q.status == 'converted' && q.invoiceId != null)
                   GradientButton(
                     label: 'Ver factura',

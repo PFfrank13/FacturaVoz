@@ -1,5 +1,5 @@
 import { authenticateBearer, jsonWith, preflight, readJson } from "@/lib/api-auth";
-import { buildSystemPrompt, sanitizeAssistant } from "@/lib/assistant";
+import { buildSystemPrompt, enrichSnapshot, sanitizeAssistant, type ClientActivity } from "@/lib/assistant";
 import { chatJson, cleanText, GroqError, sniffAudio, transcribe } from "@/lib/groq";
 import { UUID } from "@/lib/publicbase";
 
@@ -59,13 +59,21 @@ export async function POST(req: Request) {
     return json({ error: missing ? "Falta ejecutar la migración 20261101_negocio_pro.sql" : "Sin acceso a esa empresa", code: snapErr.code }, missing ? 500 : 403);
   }
   const { data: org } = await supabase.from("organizations").select("name, trade_name").eq("id", orgId).maybeSingle();
+  // Meta y actividad de clientes (migración 20261102). Si aún no existen, el copiloto funciona sin ellos.
+  const { data: goalRow } = await supabase.from("organizations").select("monthly_goal").eq("id", orgId).maybeSingle();
+  const { data: activity } = await supabase.rpc("client_activity", { p_org: orgId });
+  const enriched = enrichSnapshot(
+    (snapshot ?? {}) as Record<string, unknown>,
+    ((activity ?? []) as ClientActivity[]).slice(0, 500),
+    goalRow?.monthly_goal == null ? null : Number(goalRow.monthly_goal),
+  );
 
   try {
     if (audio && kind) {
       text = await transcribe(key, audio, kind);
       if (!text) return json({ error: "No se oyó nada. Habla más cerca del micrófono.", code: "empty" }, 422);
     }
-    const raw = await chatJson(key, buildSystemPrompt(snapshot, String(org?.trade_name || org?.name || "")), `<pedido>\n${text}\n</pedido>`, 1800);
+    const raw = await chatJson(key, buildSystemPrompt(enriched, String(org?.trade_name || org?.name || "")), `<pedido>\n${text}\n</pedido>`, 1800);
     return json({ transcript: text, reply: sanitizeAssistant(raw) });
   } catch (e) {
     if (e instanceof GroqError && e.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto", transcript: text }, 503);

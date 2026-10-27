@@ -30,20 +30,36 @@ class ProRepo {
   static const _quoteSelect =
       'id, number, status, issue_date, valid_until, currency, tax_rate, notes, public_token, invoice_id, responder_name, response_note, responded_at, clients(name, tax_id), quote_items(description, quantity, unit_price, position)';
 
+  // Con origen (tienda) y celular del cliente: migración 20261102. Si falta, se usa la versión anterior.
+  static const _quoteSelectStore = '$_quoteSelect, source, contact_phone';
+
   static Future<List<QuoteRecord>> listQuotes({int limit = 200}) async {
-    final rows = await _db
+    Future<dynamic> run(String sel) => _db
         .from('quotes')
-        .select(_quoteSelect)
+        .select(sel)
         .eq('org_id', _org)
         .order('created_at', ascending: false)
         .order('position', referencedTable: 'quote_items', ascending: true)
         .limit(limit);
+    dynamic rows;
+    try {
+      rows = await run(_quoteSelectStore);
+    } on PostgrestException {
+      rows = await run(_quoteSelect);
+    }
     return (rows as List).map((r) => QuoteRecord.fromJson(Map<String, dynamic>.from(r as Map))).toList();
   }
 
   static Future<QuoteRecord> getQuote(String id) async {
-    final row = await _db.from('quotes').select(_quoteSelect).eq('id', id).order('position', referencedTable: 'quote_items', ascending: true).single();
-    return QuoteRecord.fromJson(Map<String, dynamic>.from(row));
+    Future<Map<String, dynamic>> run(String sel) async =>
+        Map<String, dynamic>.from(await _db.from('quotes').select(sel).eq('id', id).order('position', referencedTable: 'quote_items', ascending: true).single());
+    Map<String, dynamic> row;
+    try {
+      row = await run(_quoteSelectStore);
+    } on PostgrestException {
+      row = await run(_quoteSelect);
+    }
+    return QuoteRecord.fromJson(row);
   }
 
   static Future<String> createQuote(InvoiceDraft d, {String? validUntil}) async {

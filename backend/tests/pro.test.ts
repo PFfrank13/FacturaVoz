@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeAssistant, buildSystemPrompt } from "../src/lib/assistant";
+import { sanitizeAssistant, buildSystemPrompt, enrichSnapshot } from "../src/lib/assistant";
 import { buildReminderEmail, buildQuoteAnswerEmail, reminderLine, toneFor } from "../src/lib/collections";
 import { seal, unseal } from "../src/lib/crypto";
 import { extractJson, sniffImage, toNum } from "../src/lib/groq";
@@ -151,5 +151,25 @@ describe("groq json", () => {
     expect(extractJson('Aquí va:\n```json\n{"total": 10}\n```')).toEqual({ total: 10 });
     expect(extractJson("nada")).toBe(null);
     expect(extractJson("[1,2]")).toBe(null);
+  });
+});
+
+describe("copiloto: meta y clientes en riesgo", () => {
+  it("proyecta el cierre del mes y detecta clientes que se van", () => {
+    
+    const out = enrichSnapshot(
+      { today: "2026-10-10", sales_this_month: { total: 1000, count: 4 } },
+      [
+        { client_name: "Fiel", purchases: 6, total: 6000, avg_gap: 15, days_since: 5, last_purchase: "2026-10-05" },
+        { client_name: "Se va", purchases: 5, total: 5000, avg_gap: 10, days_since: 40, last_purchase: "2026-08-31" },
+        { client_name: "Nuevo", purchases: 1, total: 100, avg_gap: null, days_since: 80, last_purchase: "2026-07-22" },
+      ],
+      5000,
+    );
+    expect(out.goal_progress?.projected_month_close).toBe(3100);
+    expect(out.goal_progress?.needed_per_day).toBe(181.82);
+    expect(out.clients_at_risk.map((c) => c.client)).toEqual(["Se va"]);
+    expect(out.clients_at_risk[0].avg_ticket).toBe(1000);
+    expect(out.best_clients[0].client).toBe("Fiel");
   });
 });

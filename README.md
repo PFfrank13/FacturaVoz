@@ -15,3 +15,6 @@ Lee primero `docs/DESPLIEGUE.md` y `docs/SEGURIDAD.md` (incluye lo que NO está 
 
 **Novedades v1.1 "Negocio Pro"** (cotizaciones, enlaces de cobro, cobranza automática, gastos y rentabilidad,
 escáner con IA, Copiloto de voz, conciliación por foto, score de crédito, radar de stock): `docs/NEGOCIO_PRO.md`.
+
+**Novedades v1.2 "Revolución"** (tienda en línea con pedidos, facturación recurrente, Clientes 360, meta del mes con
+predicción, calculadora de margen, plan de rescate de caja con IA, nuevo Inicio): `docs/REVOLUCION.md`.

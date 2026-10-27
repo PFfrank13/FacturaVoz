@@ -288,13 +288,31 @@ List<Insight> buildInsights({
   required String currency,
   List<ProductVelocity> stock = const [],
   int pendingClaims = 0,
+  int storeOrders = 0,
+  int recurringDrafts = 0,
 }) {
   final out = <Insight>[];
+  if (storeOrders > 0) {
+    out.add(Insight(
+      kind: 'store_orders',
+      title: storeOrders == 1 ? '1 pedido web nuevo' : '$storeOrders pedidos web nuevos',
+      body: 'Llegaron desde tu tienda en línea. Confírmalos y conviértelos en factura con un toque.',
+      tone: 'ok',
+    ));
+  }
   if (pendingClaims > 0) {
     out.add(Insight(
       kind: 'claims',
       title: pendingClaims == 1 ? '1 pago reportado por confirmar' : '$pendingClaims pagos reportados por confirmar',
       body: 'Tus clientes avisaron que ya pagaron. Verifica y confirma con un toque.',
+      tone: 'info',
+    ));
+  }
+  if (recurringDrafts > 0) {
+    out.add(Insight(
+      kind: 'recurring',
+      title: recurringDrafts == 1 ? '1 factura mensual lista' : '$recurringDrafts facturas mensuales listas',
+      body: 'Se crearon solas según tu programación. Revísalas y emítelas.',
       tone: 'info',
     ));
   }
@@ -355,7 +373,7 @@ List<Insight> buildInsights({
       tone: dl != null && dl < 3 ? 'bad' : 'warn',
     ));
   }
-  return out.take(5).toList();
+  return out.take(6).toList();
 }
 
 // ───────────────────────── Conciliación de pagos por foto ─────────────────────────
