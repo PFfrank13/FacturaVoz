@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEmail, escapeHtml, isEmail, looksLikePdf, safeFilename } from "../src/lib/email";
+import { buildEmail, buildImportEmail, escapeHtml, isEmail, looksLikePdf, safeFilename } from "../src/lib/email";
 
 describe("email utils", () => {
   it("valida correos y rechaza inyección de cabeceras", () => {
@@ -18,5 +18,12 @@ describe("email utils", () => {
     expect(safeFilename("F001-00000001/../x")).toBe("F001-00000001_.._x.pdf");
     const m = buildEmail({ business: "<script>", client: "Ana", number: "F001-1", total: "PEN 10.00" });
     expect(m.html).not.toContain("<script>");
+  });
+  it("aviso de importación escapa y resume", () => {
+    const ok = buildImportEmail({ business: "<b>X</b>", status: "done", imported: 1005, skipped: 995 });
+    expect(ok.subject).toMatch(/importadas/);
+    expect(ok.html).toContain("1005");
+    expect(ok.html).not.toContain("<b>X</b>");
+    expect(buildImportEmail({ business: "A", status: "failed", imported: 0, skipped: 0, error: "<x>" }).html).not.toContain("<x>");
   });
 });

@@ -164,6 +164,7 @@ class InvoiceDraft {
     required this.currency,
     this.notes = '',
     this.transcript,
+    this.dueDate,
     List<LineItem>? items,
   }) : items = items ?? [];
 
@@ -173,6 +174,9 @@ class InvoiceDraft {
   String currency;
   String notes;
   String? transcript;
+
+  /// Fecha de vencimiento 'yyyy-MM-dd' si la venta es al crédito; null = al contado.
+  String? dueDate;
   List<LineItem> items;
 
   /// Respuesta de POST /api/parse -> {"invoice": {...}}

@@ -78,6 +78,17 @@ describe("payload", () => {
     expect((payload.details as Array<Record<string, unknown>>)[0]).toMatchObject({ tipAfeIgv: "10", igv: 36.18, mtoPrecioUnitario: 118.59 });
   });
 
+  it("factura al crédito declara forma de pago y cuota", () => {
+    const { payload } = buildInvoicePayload(base({ dueDate: "2026-11-30" }));
+    expect(payload.formaPago).toEqual({ moneda: "PEN", tipo: "Credito", monto: 237.18 });
+    expect(payload.cuotas).toEqual([{ moneda: "PEN", monto: 237.18, fechaPago: "2026-11-30T00:00:00-05:00" }]);
+    expect(validateFiscalInput(base({ dueDate: "2026-11-30" }))).toBeNull();
+    expect(validateFiscalInput(base({ dueDate: "2026-10-23" }))).toMatch(/posterior/);
+    expect(buildInvoicePayload(base()).payload.formaPago).toEqual({ tipo: "Contado" });
+    // la boleta no declara cuotas
+    expect(buildInvoicePayload(base({ docType: "03", dueDate: "2026-11-30" })).payload.cuotas).toBeUndefined();
+  });
+
   it("validaciones", () => {
     expect(validateFiscalInput(base())).toBeNull();
     expect(validateFiscalInput(base({ taxRate: 10 }))).toMatch(/18%/);

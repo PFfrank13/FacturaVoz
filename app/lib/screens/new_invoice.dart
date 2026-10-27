@@ -63,6 +63,9 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   final _clientTax = TextEditingController();
   final _clientEmail = TextEditingController();
   final _taxRate = TextEditingController();
+  bool _credit = false;
+  DateTime? _due;
+  bool _calOpen = false;
   final _notes = TextEditingController();
   final List<_Row> _rows = [];
   List<({String name, String taxId})> _known = const [];
@@ -259,6 +262,9 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     _client.text = d.clientName;
     _clientTax.text = d.clientTaxId;
     _taxRate.text = qtyText(d.taxRate);
+    _credit = false;
+    _due = null;
+    _calOpen = false;
     _notes.text = d.notes;
     _showNotes = d.notes.isNotEmpty;
     _transcript = d.transcript;
@@ -328,6 +334,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     if (_clientError() != null) return 'Falta el nombre del cliente.';
     if (_taxError() != null) return _taxError();
     if (_rateError() != null) return 'La tasa de impuesto debe estar entre 0 y 100.';
+    if (_credit && _due == null) return 'Elige la fecha de vencimiento del crédito.';
+    if (_credit && _due!.isBefore(DateUtils.dateOnly(DateTime.now()))) return 'La fecha de vencimiento no puede ser anterior a hoy.';
     if (_rows.isEmpty) return 'Agrega al menos una línea.';
     for (final r in _rows) {
       if (_descError(r) != null) return 'Cada línea necesita una descripción.';
@@ -376,6 +384,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         currency: _profile.currency,
         notes: _notes.text,
         transcript: _transcript,
+        dueDate: _credit ? todayIso(_due) : null,
         items: _currentItems(),
       ));
       _dirty = false;
@@ -553,6 +562,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           Reveal(index: 2, child: _linesSection(cur)),
           const SizedBox(height: 14),
           Reveal(index: 3, child: _taxSection(totals, cur)),
+          const SizedBox(height: 14),
+          Reveal(index: 4, child: _paymentSection()),
           const SizedBox(height: 14),
           Reveal(index: 4, child: _notesSection()),
           const SizedBox(height: 14),
@@ -861,7 +872,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         ]),
       ]),
     );
-    return KeyedSubtree(key: ObjectKey(r), child: card);
+    // Cada línea entra deslizándose (escalonada si la voz detectó varias) y se mantiene al reordenar.
+    return Reveal(key: ObjectKey(r), index: k, dy: 16, child: card);
   }
 
   void _removeRow(int k) {
@@ -888,61 +900,197 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       ));
   }
 
+  /// Tasas disponibles: IGV 18 % y 0 % (exonerado/inafecto) de SUNAT, más la tasa del negocio si es otra.
+  List<({double rate, String label})> _taxOptions(double? current) {
+    final label = _profile.taxLabel.isEmpty ? 'IGV' : _profile.taxLabel;
+    final base = _profile.taxRate ?? 0;
+    final out = <({double rate, String label})>[
+      (rate: 18.0, label: '$label 18% · Gravado'),
+      (rate: 0.0, label: '0% · Exonerado / Inafecto'),
+    ];
+    void ensure(double r) {
+      if (!out.any((o) => (o.rate - r).abs() < 0.001)) out.add((rate: r, label: '$label ${qtyText(r)}%'));
+    }
+
+    if (base > 0) ensure(base);
+    if (current != null) ensure(current);
+    return out;
+  }
+
   Widget _taxSection(Totals t, String cur) {
     final th = Theme.of(context);
     final rate = parseDecimal(_taxRate.text);
-    final base = _profile.taxRate ?? 0;
-    final presets = <double>{if (base > 0) base, 0};
-    final isPreset = rate != null && presets.any((p) => (p - rate).abs() < 0.001);
-    final custom = !isPreset;
+    final opts = _taxOptions(rate);
+    final selected = opts.where((o) => rate != null && (o.rate - rate).abs() < 0.001).firstOrNull;
     return _section(
       _profile.taxLabel.isEmpty ? 'Impuesto' : _profile.taxLabel,
       Icons.percent_rounded,
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final p in presets)
-            ChoiceChip(
-              label: Text(p == 0 ? 'Sin impuesto (0%)' : '${_profile.taxLabel} ${qtyText(p)}%'),
-              selected: rate != null && (p - rate).abs() < 0.001,
-              onSelected: (_) {
-                HapticFeedback.selectionClick();
-                _taxRate.text = qtyText(p);
-                _touch();
-              },
-            ),
-          ChoiceChip(
-            label: const Text('Otra tasa'),
-            selected: custom,
-            onSelected: (_) {
-              if (!custom) _taxRate.text = '';
-              _touch();
-            },
-          ),
-        ]),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          child: custom
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: SizedBox(
-                    width: 140,
-                    child: TextField(
-                      controller: _taxRate,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                      decoration: InputDecoration(labelText: 'Tasa %', errorText: _rateError()),
-                      onChanged: (_) => _touch(),
-                    ),
-                  ),
-                )
-              : const SizedBox(width: double.infinity),
+        DropdownButtonFormField<double>(
+          key: ValueKey('tax-${selected?.rate}'),
+          initialValue: selected?.rate,
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(18),
+          icon: const Icon(Icons.expand_more_rounded),
+          decoration: InputDecoration(labelText: 'Tipo de impuesto', errorText: _rateError()),
+          items: [for (final o in opts) DropdownMenuItem<double>(value: o.rate, child: Text(o.label, overflow: TextOverflow.ellipsis))],
+          onChanged: (v) {
+            if (v == null) return;
+            HapticFeedback.selectionClick();
+            _taxRate.text = qtyText(v);
+            _touch();
+          },
         ),
         const SizedBox(height: 14),
-        DataRow2('Subtotal', money(t.subtotal, cur)),
-        DataRow2(_profile.taxLabel.isEmpty ? 'Impuesto' : _profile.taxLabel, money(t.tax, cur)),
-        Divider(color: th.colorScheme.outline),
-        DataRow2('Total', money(t.total, cur), strong: true),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
+          child: Column(
+            key: ValueKey('${t.subtotal}-${t.tax}-${t.total}'),
+            children: [
+              DataRow2('Subtotal', money(t.subtotal, cur)),
+              DataRow2(_profile.taxLabel.isEmpty ? 'Impuesto' : _profile.taxLabel, money(t.tax, cur)),
+              Divider(color: th.colorScheme.outline),
+              DataRow2('Total', money(t.total, cur), strong: true),
+            ],
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ---------------- Condición de pago ----------------
+  static const _quickDays = [7, 15, 30, 60, 90];
+
+  String _dueText(DateTime d) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final days = d.difference(today).inDays;
+    final when = days == 0 ? 'hoy' : (days == 1 ? 'mañana' : 'en $days días');
+    return '${displayDate(todayIso(d))} · $when';
+  }
+
+  Widget _paymentSection() {
+    final th = Theme.of(context);
+    final today = DateUtils.dateOnly(DateTime.now());
+    final missing = _submitted && _credit && _due == null;
+    final due = _due;
+
+    Widget panel() => Column(key: const ValueKey('credit'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 16),
+          Text('Plazo rápido', style: th.textTheme.labelMedium?.copyWith(color: th.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final n in _quickDays)
+              ChoiceChip(
+                label: Text('$n días'),
+                selected: due != null && due.difference(today).inDays == n,
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _due = today.add(Duration(days: n));
+                    _calOpen = false;
+                    _dirty = true;
+                  });
+                },
+              ),
+          ]),
+          const SizedBox(height: 14),
+          Pressable(
+            scale: 0.985,
+            onTap: () => setState(() => _calOpen = !_calOpen),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: (missing ? Brand.bad : th.colorScheme.primary).withValues(alpha: _calOpen ? 0.14 : 0.07),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: missing ? Brand.bad : (_calOpen ? th.colorScheme.primary : Colors.transparent), width: 1.4),
+              ),
+              child: Row(children: [
+                Icon(Icons.event_rounded, color: missing ? Brand.bad : th.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Fecha límite de pago', style: th.textTheme.bodySmall),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(a), child: c)),
+                      child: Text(
+                        due == null ? 'Toca para elegir' : _dueText(due),
+                        key: ValueKey(due),
+                        style: th.textTheme.titleSmall?.copyWith(color: due == null ? th.colorScheme.onSurfaceVariant : null),
+                      ),
+                    ),
+                  ]),
+                ),
+                AnimatedRotation(turns: _calOpen ? 0.5 : 0, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic, child: const Icon(Icons.expand_more_rounded)),
+              ]),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 380),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _calOpen
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: ColoredBox(
+                        color: th.colorScheme.primary.withValues(alpha: 0.04),
+                        child: CalendarDatePicker(
+                          key: ValueKey(due),
+                          initialDate: due ?? today.add(const Duration(days: 30)),
+                          firstDate: today,
+                          lastDate: today.add(const Duration(days: 730)),
+                          onDateChanged: (d) {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _due = DateUtils.dateOnly(d);
+                              _calOpen = false;
+                              _dirty = true;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            child: missing
+                ? Padding(padding: const EdgeInsets.only(top: 8, left: 4), child: Text('Obligatorio: elige cuándo vence el pago.', style: th.textTheme.bodySmall?.copyWith(color: Brand.bad)))
+                : const SizedBox(width: double.infinity),
+          ),
+        ]);
+
+    return _section(
+      'Condición de pago',
+      Icons.payments_outlined,
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _PayToggle(
+          credit: _credit,
+          onChanged: (v) => setState(() {
+            _credit = v;
+            _calOpen = v && _due == null;
+            _dirty = true;
+          }),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
+            layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, if (current != null) current]),
+            child: _credit ? panel() : const SizedBox(key: ValueKey('cash'), width: double.infinity),
+          ),
+        ),
       ]),
     );
   }
@@ -1079,6 +1227,70 @@ class _RiskCard extends StatelessWidget {
           ),
         ]),
       ),
+    );
+  }
+}
+
+
+/// Selector "Al contado / Al crédito" con píldora deslizante.
+class _PayToggle extends StatelessWidget {
+  const _PayToggle({required this.credit, required this.onChanged});
+  final bool credit;
+  final ValueChanged<bool> onChanged;
+
+  Widget _seg(BuildContext context, IconData icon, String label, bool on, VoidCallback tap) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Expanded(
+      child: Pressable(
+        scale: 0.97,
+        onTap: tap,
+        child: SizedBox(
+          height: 46,
+          child: Center(
+            child: TweenAnimationBuilder<Color?>(
+              tween: ColorTween(end: on ? Colors.white : muted),
+              duration: const Duration(milliseconds: 260),
+              builder: (context, c, _) => Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 19, color: c),
+                const SizedBox(width: 7),
+                Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(color: c, fontWeight: FontWeight.w700))),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final th = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: th.colorScheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(18)),
+      child: Stack(children: [
+        Positioned.fill(
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            alignment: credit ? Alignment.centerRight : Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: Brand.heroGradient,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [BoxShadow(color: Brand.indigo.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Row(children: [
+          _seg(context, Icons.payments_rounded, 'Al contado', !credit, () => onChanged(false)),
+          _seg(context, Icons.schedule_rounded, 'Al crédito', credit, () => onChanged(true)),
+        ]),
+      ]),
     );
   }
 }

@@ -20,9 +20,13 @@ Responde SOLO un JSON con esta forma:
 "items": [{"description": string, "quantity": number, "unit_price": number}]}
 Reglas:
 - "client_name" es a quien se le factura ("para Juan Pérez", "a la empresa Corpax"). Si no se dice, "".
-- Si no se dice la cantidad, quantity = 1. unit_price es el precio de UNA unidad, en números (soles).
-- Si dicen un total para varias unidades ("3 sillas a 150 en total"), divide para obtener el unitario.
+- MULTI-PRODUCTO: cada producto o servicio distinto del dictado es UN elemento aparte en "items". Se separan por comas, "y", "más", "además" o por pausas. NUNCA juntes varios productos en uno solo ni dejes productos fuera.
+- Si no se dice la cantidad, quantity = 1 ("un", "una" = 1; "dos" = 2). unit_price es el precio de UNA unidad, en números (soles).
+- "2 cables a 10 soles" = quantity 2 y unit_price 10 (el "a" indica precio por unidad). Si dicen un total para varias unidades ("3 sillas a 150 en total"), divide para obtener el unitario.
 - Los importes son sin impuestos salvo que se diga lo contrario. Convierte números dichos en palabras a cifras ("ciento veinte" = 120, "mil quinientos" = 1500).
+- "description" es solo el nombre del producto o servicio, sin cantidad ni precio, con la primera letra en mayúscula.
+Ejemplo: "Factura a Carlos por una instalación a 100 soles, un router a 50 soles y 2 cables a 10 soles" =>
+{"client_name":"Carlos","tax_rate":null,"notes":null,"items":[{"description":"Instalación","quantity":1,"unit_price":100},{"description":"Router","quantity":1,"unit_price":50},{"description":"Cables","quantity":2,"unit_price":10}]}
 - No inventes datos: si falta algo, usa null, "" o una lista vacía.`;
 
 // ---------- CORS (solo el origen web de la app Flutter; las apps nativas no envían Origin) ----------

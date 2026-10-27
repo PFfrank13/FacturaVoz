@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   // La factura (RLS: solo si eres miembro de su empresa) define la empresa emisora
   const { data: inv } = await supabase
     .from("invoices")
-    .select("id, org_id, status, currency, tax_rate, client_id, clients(id, name), invoice_items(description, quantity, unit_price, position)")
+    .select("id, org_id, status, currency, tax_rate, due_date, client_id, clients(id, name), invoice_items(description, quantity, unit_price, position)")
     .eq("id", invoiceId)
     .order("position", { referencedTable: "invoice_items", ascending: true })
     .maybeSingle();
@@ -73,6 +73,7 @@ export async function POST(req: Request) {
     currency: inv.currency as "PEN" | "USD",
     afectacion,
     taxRate,
+    dueDate: (inv.due_date as string | null) ?? null,
     unit,
     issuer: {
       ruc: company.ruc as string,

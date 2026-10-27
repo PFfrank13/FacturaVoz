@@ -21,6 +21,8 @@ export type BuildInput = {
   issuer: Issuer;
   client: { tipoDoc: string; numDoc: string; name: string; address?: string | null };
   lines: Line[];
+  /** Vencimiento 'yyyy-MM-dd' si la venta es al crédito (solo se declara en facturas). */
+  dueDate?: string | null;
   now?: Date;
 };
 
@@ -46,6 +48,11 @@ export function validateFiscalInput(i: BuildInput): string | null {
   if (i.docType === "03" && i.client.tipoDoc === "-" && (i.currency === "USD" || c.total >= 700))
     return "Para boletas desde S/ 700 debes identificar al cliente (DNI u otro documento)";
   if (i.client.name.trim().length === 0) return "Falta el nombre del cliente";
+  if (i.docType === "01" && i.dueDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(i.dueDate)) return "La fecha de vencimiento no es válida";
+    const today = limaIso(i.now ?? new Date()).slice(0, 10);
+    if (i.dueDate <= today) return "La fecha de vencimiento del crédito debe ser posterior a hoy. Cámbiala en el detalle de la factura.";
+  }
   return null;
 }
 
@@ -70,6 +77,7 @@ export function buildInvoicePayload(i: BuildInput) {
     total: c.total,
   };
   const legend = amountLegend(c.total, i.currency);
+  const credit = i.docType === "01" && !!i.dueDate;
 
   const payload: Record<string, unknown> = {
     ublVersion: "2.1",
@@ -78,7 +86,8 @@ export function buildInvoicePayload(i: BuildInput) {
     serie: "PENDIENTE",
     correlativo: "0",
     fechaEmision: limaIso(i.now ?? new Date()),
-    formaPago: { tipo: "Contado" },
+    formaPago: credit ? { moneda: i.currency, tipo: "Credito", monto: c.total } : { tipo: "Contado" },
+    ...(credit ? { cuotas: [{ moneda: i.currency, monto: c.total, fechaPago: `${i.dueDate}T00:00:00-05:00` }] } : {}),
     tipoMoneda: i.currency,
     company: {
       ruc: i.issuer.ruc,

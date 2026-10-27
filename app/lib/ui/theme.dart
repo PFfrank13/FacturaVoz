@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
@@ -189,6 +191,40 @@ ThemeData buildTheme(Brightness b) {
       titleTextStyle: TextStyle(fontFamily: _font, fontSize: 19, fontWeight: FontWeight.w600, color: ink),
     ),
     listTileTheme: ListTileThemeData(iconColor: muted, textColor: ink),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? Colors.white : muted),
+      trackColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? primary : line),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: card,
+      selectedColor: scheme.primaryContainer,
+      side: BorderSide(color: line),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      labelStyle: TextStyle(fontFamily: _font, fontWeight: FontWeight.w600, color: ink),
+      showCheckmark: false,
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(
+        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: radius)),
+        side: WidgetStateProperty.all(BorderSide(color: line)),
+      ),
+    ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    ),
+    textSelectionTheme: TextSelectionThemeData(cursorColor: primary, selectionColor: primary.withValues(alpha: 0.25), selectionHandleColor: primary),
+    tooltipTheme: TooltipThemeData(
+      decoration: BoxDecoration(color: dark ? const Color(0xFF34336F) : Brand.lightInk, borderRadius: BorderRadius.circular(10)),
+      textStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12.5),
+    ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
   );
 }
@@ -215,4 +251,19 @@ class SoftPageTransitions extends PageTransitionsBuilder {
       ),
     );
   }
+}
+
+
+/// Desplazamiento con rebote suave en todas las plataformas y arrastre con ratón en web.
+class PremiumScrollBehavior extends MaterialScrollBehavior {
+  const PremiumScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.stylus, PointerDeviceKind.trackpad};
+
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) => child;
 }

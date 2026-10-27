@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_state.dart';
 import '../errors.dart';
@@ -28,6 +32,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _more = false;
   String _query = '';
   final _searchFocus = FocusNode();
+  RealtimeChannel? _chan;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -38,10 +44,38 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() {});
     });
     _load();
+    _subscribe();
+  }
+
+  /// Cambios en vivo: cualquier factura o cobro de la empresa (aunque lo haga otro miembro) refresca los totales.
+  void _subscribe() {
+    _chan?.unsubscribe();
+    _chan = null;
+    final org = Repo.activeOrgId;
+    if (org == null) return;
+    try {
+      PostgresChangeFilter f() => PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'org_id', value: org);
+      _chan = Supabase.instance.client
+          .channel('home-$org')
+          .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'invoices', filter: f(), callback: (_) => _liveReload())
+          .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'payments', filter: f(), callback: (_) => _liveReload())
+          .subscribe();
+    } catch (_) {
+      // Sin tiempo real igual funciona: se recarga al volver a esta pantalla.
+    }
+  }
+
+  void _liveReload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 450), () {
+      if (mounted) _load();
+    });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _chan?.unsubscribe();
     AppState.instance.removeListener(_onApp);
     _searchFocus.dispose();
     super.dispose();
@@ -71,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _limit = 100;
       setState(() => _items = null);
       _load();
+      _subscribe();
     } else {
       setState(() {});
     }
@@ -481,12 +516,18 @@ class _Row extends StatelessWidget {
       child: SoftCard(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(children: [
-          Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: t.colorScheme.primaryContainer, shape: BoxShape.circle),
-            child: Text(initial, style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18, color: t.colorScheme.primary)),
+          Hero(
+            tag: 'avatar-${inv.id}',
+            child: Material(
+              type: MaterialType.transparency,
+              child: Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: t.colorScheme.primaryContainer, shape: BoxShape.circle),
+                child: Text(initial, style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18, color: t.colorScheme.primary)),
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(

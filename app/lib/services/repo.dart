@@ -199,7 +199,19 @@ class Repo {
     });
     final rows = res as List;
     if (rows.isEmpty) throw AppException('No se pudo crear la factura');
-    return (rows.first as Map)['invoice_id'] as String;
+    final id = (rows.first as Map)['invoice_id'] as String;
+    // Venta al crédito: guarda la fecha de vencimiento (con reintentos; si fallara, se puede fijar desde el detalle).
+    if (d.dueDate != null) {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          await setDueDate(id, d.dueDate);
+          break;
+        } catch (_) {
+          await Future<void>.delayed(Duration(milliseconds: 300 * (attempt + 1)));
+        }
+      }
+    }
+    return id;
   }
 
   /// Clientes anteriores (sin duplicados) para autocompletar. Si falla, simplemente no hay sugerencias.

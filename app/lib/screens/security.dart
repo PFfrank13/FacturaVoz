@@ -101,7 +101,8 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
       body: LockBackdrop(
         child: SafeArea(
           child: Stack(children: [
-            AnimatedSwitcher(
+            Positioned.fill(
+              child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 350),
               child: _verified
                   ? PinSetupFlow(
@@ -123,7 +124,7 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
                       },
                       onDone: () => setState(() => _verified = true),
                     ),
-            ),
+            )),
             Positioned(
               left: 4,
               top: 4,

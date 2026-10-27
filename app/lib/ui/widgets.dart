@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -275,11 +276,24 @@ class DataRow2 extends StatelessWidget {
   }
 }
 
-/// Estado vacío: dice qué hacer, no solo que no hay nada.
-class EmptyState extends StatelessWidget {
+/// Estado vacío: dice qué hacer, no solo que no hay nada. La marca flota suavemente.
+class EmptyState extends StatefulWidget {
   const EmptyState({super.key, required this.title, required this.body});
   final String title;
   final String body;
+
+  @override
+  State<EmptyState> createState() => _EmptyStateState();
+}
+
+class _EmptyStateState extends State<EmptyState> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -287,11 +301,15 @@ class EmptyState extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 56, 32, 32),
       child: Column(children: [
-        const BrandMark(size: 60),
+        AnimatedBuilder(
+          animation: _c,
+          builder: (context, child) => Transform.translate(offset: Offset(0, -8 * Curves.easeInOut.transform(_c.value)), child: child),
+          child: const BrandMark(size: 60),
+        ),
         const SizedBox(height: 20),
-        Text(title, textAlign: TextAlign.center, style: t.textTheme.titleLarge),
+        Reveal(index: 1, dy: 12, child: Text(widget.title, textAlign: TextAlign.center, style: t.textTheme.titleLarge)),
         const SizedBox(height: 8),
-        Text(body, textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+        Reveal(index: 2, dy: 12, child: Text(widget.body, textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant))),
       ]),
     );
   }
@@ -446,10 +464,13 @@ class GradientButton extends StatelessWidget {
             boxShadow: Brand.softShadow(false, a: 0.35),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (busy)
-              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-            else
-              Icon(icon, color: Colors.white, size: 22),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (c, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: c)),
+              child: busy
+                  ? const SizedBox(key: ValueKey('busy'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                  : Icon(icon, key: const ValueKey('icon'), color: Colors.white, size: 22),
+            ),
             const SizedBox(width: 8),
             Text(label, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
           ]),
@@ -520,4 +541,93 @@ void disposeAfterClose(Iterable<ChangeNotifier> items) {
       c.dispose();
     }
   });
+}
+
+
+/// Lluvia de confeti para celebrar un logro (factura aceptada, importación lista). No bloquea toques.
+class ConfettiBurst extends StatefulWidget {
+  const ConfettiBurst({super.key, this.count = 70});
+  final int count;
+
+  @override
+  State<ConfettiBurst> createState() => _ConfettiBurstState();
+}
+
+class _ConfettiBurstState extends State<ConfettiBurst> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..forward();
+  late final List<_Piece> _pieces = _makePieces(widget.count);
+
+  static List<_Piece> _makePieces(int n) {
+    final r = math.Random(7);
+    const colors = [Brand.indigo, Brand.lilac, Brand.gold, Brand.goldDeep, Brand.ok, Color(0xFFFFD166)];
+    return List.generate(
+      n,
+      (i) => _Piece(
+        angle: -math.pi / 2 + (r.nextDouble() - 0.5) * math.pi * 1.1,
+        speed: 0.45 + r.nextDouble() * 0.75,
+        spin: (r.nextDouble() - 0.5) * 14,
+        size: 5 + r.nextDouble() * 6,
+        color: colors[i % colors.length],
+        round: r.nextBool(),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return const SizedBox.shrink();
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: AnimatedBuilder(animation: _c, builder: (context, _) => CustomPaint(size: Size.infinite, painter: _ConfettiPainter(_pieces, _c.value))),
+      ),
+    );
+  }
+}
+
+class _Piece {
+  const _Piece({required this.angle, required this.speed, required this.spin, required this.size, required this.color, required this.round});
+  final double angle;
+  final double speed;
+  final double spin;
+  final double size;
+  final Color color;
+  final bool round;
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter(this.pieces, this.t);
+  final List<_Piece> pieces;
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final origin = Offset(size.width / 2, size.height * 0.35);
+    final reach = size.shortestSide < 1 ? 300.0 : size.longestSide * 0.7;
+    final paint = Paint();
+    for (final p in pieces) {
+      final e = Curves.easeOutCubic.transform(t);
+      final pos = origin + Offset(math.cos(p.angle) * p.speed * reach * e, math.sin(p.angle) * p.speed * reach * e + 380 * t * t);
+      final fade = (1 - ((t - 0.6) / 0.4)).clamp(0.0, 1.0);
+      if (fade <= 0) continue;
+      paint.color = p.color.withValues(alpha: fade);
+      canvas.save();
+      canvas.translate(pos.dx, pos.dy);
+      canvas.rotate(p.spin * t);
+      if (p.round) {
+        canvas.drawCircle(Offset.zero, p.size / 2, paint);
+      } else {
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.55), const Radius.circular(1.5)), paint);
+      }
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => old.t != t;
 }

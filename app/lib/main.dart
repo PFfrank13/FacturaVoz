@@ -51,6 +51,7 @@ class FacturaVozApp extends StatelessWidget {
       builder: (context, mode, _) => MaterialApp(
         title: 'FacturaVoz',
         navigatorKey: appNavigatorKey,
+        scrollBehavior: const PremiumScrollBehavior(),
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),

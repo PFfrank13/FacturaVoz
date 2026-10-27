@@ -255,7 +255,9 @@ class _PinEntryState extends State<PinEntry> with TickerProviderStateMixin {
         physics: const ClampingScrollPhysics(),
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: c.maxHeight),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             SizedBox(height: gap),
             _stag(0, _PulseBadge(icon: widget.icon, ok: _ok)),
             SizedBox(height: gap * 0.7),
@@ -297,6 +299,7 @@ class _PinEntryState extends State<PinEntry> with TickerProviderStateMixin {
             if (widget.footer != null) ...[const SizedBox(height: 6), _stag(15, widget.footer!)],
             SizedBox(height: gap),
           ]),
+          ),
         ),
       );
     });

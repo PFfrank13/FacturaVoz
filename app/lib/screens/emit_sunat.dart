@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/api.dart';
+import '../ui/widgets.dart';
 
 /// Emisión de factura (01) o boleta (03) electrónica. El servidor reserva el número, envía a SUNAT
 /// y guarda el resultado; reintentar nunca consume otro correlativo.
@@ -133,13 +134,19 @@ class _EmitSunatScreenState extends State<EmitSunatScreen> {
     final ok = r.status == 'accepted';
     final rejected = r.status == 'rejected';
     final scheme = Theme.of(context).colorScheme;
-    return Card(
+    final card = Card(
       color: ok ? scheme.primaryContainer : scheme.errorContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Icon(ok ? Icons.verified : Icons.error_outline),
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 650),
+              curve: ok ? Curves.elasticOut : Curves.easeOutCubic,
+              builder: (context, v, child) => Transform.scale(scale: v.clamp(0.0, 1.5), child: child),
+              child: Icon(ok ? Icons.verified : Icons.error_outline),
+            ),
             const SizedBox(width: 8),
             Expanded(child: Text(ok ? 'Aceptada por SUNAT' : rejected ? 'Rechazada por SUNAT' : 'SUNAT no respondió', style: Theme.of(context).textTheme.titleMedium)),
           ]),
@@ -162,6 +169,8 @@ class _EmitSunatScreenState extends State<EmitSunatScreen> {
         ]),
       ),
     );
+    // Aceptada por SUNAT: confeti celebrando el comprobante.
+    return ok ? Stack(clipBehavior: Clip.none, children: [card, const Positioned.fill(child: ConfettiBurst())]) : card;
   }
 
   List<Widget> _form(Totals t) {

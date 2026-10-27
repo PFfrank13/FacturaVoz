@@ -9,6 +9,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'clients.dart';
 import 'fiscal_setup.dart';
+import 'import_screen.dart';
 import 'legal.dart';
 import 'orgs.dart';
 import 'products.dart';
@@ -120,7 +121,9 @@ class SettingsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: AppState.instance, builder: (context, _) => _page(context));
+
+  Widget _page(BuildContext context) {
     final t = Theme.of(context);
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
     final org = AppState.instance.activeOrg;
@@ -194,6 +197,12 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Clientes',
                     subtitle: 'Contactos, documentos y correos',
                     onTap: () => go(const ClientsScreen())),
+                Divider(indent: 72, color: t.colorScheme.outline),
+                _tile(context,
+                    icon: Icons.cloud_upload_rounded,
+                    title: 'Importar facturas antiguas',
+                    subtitle: 'Carga masiva desde SUNAT o tu sistema anterior',
+                    onTap: () => go(const ImportScreen())),
                 Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.insights_rounded,

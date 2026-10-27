@@ -62,6 +62,7 @@ class AppState extends ChangeNotifier {
   /// Cambia de empresa y lo recuerda en la cuenta (user_metadata).
   Future<void> switchOrg(Org o) async {
     Repo.activeOrgId = o.id;
+    notifyListeners(); // el nombre de la empresa cambia al instante en toda la app
     try {
       profile = await Repo.loadProfile();
     } catch (_) {}

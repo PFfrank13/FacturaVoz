@@ -264,7 +264,18 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       _snack('Correo enviado a ${to.trim()} (y copia para ti)');
       if (to.trim().toLowerCase() != inv.clientEmail.toLowerCase()) Repo.setClientEmail(inv.id, to);
     } catch (e) {
-      _snack(friendly(e));
+      if (e is AppException && e.code == 'resend_domain' && mounted) {
+        // El correo está en modo de prueba (sin dominio verificado): solo llega al dueño de la cuenta de Resend.
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            duration: const Duration(seconds: 10),
+            content: const Text('El envío automático aún no puede escribir a tus clientes (falta verificar el dominio de correo). Mientras tanto envía el PDF tú mismo.'),
+            action: SnackBarAction(label: 'Compartir PDF', onPressed: _share),
+          ));
+      } else {
+        _snack(friendly(e));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -318,7 +329,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         child: inv == null
             ? Center(
                 child: _error == null
-                    ? const CircularProgressIndicator()
+                    ? const SingleChildScrollView(padding: EdgeInsets.all(16), child: SkeletonList(count: 3))
                     : Padding(
                         padding: const EdgeInsets.all(24),
                         child: SoftCard(
@@ -439,6 +450,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         Text(f?.number ?? inv.number, style: t.textTheme.headlineMedium),
         const SizedBox(height: 10),
         StatusPill(pillLabel, tone: tone),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: inv.dueDate == null
+              ? const StatusPill('Al contado', tone: PillTone.neutral)
+              : StatusPill('Al crédito · vence ${displayDate(inv.dueDate!)}', tone: inv.isOverdue(todayIso()) ? PillTone.bad : PillTone.info),
+        ),
         if (_note != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -450,9 +467,32 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         if (f != null && f.status != 'accepted' && f.sunatMessage.isNotEmpty)
           Padding(padding: const EdgeInsets.only(top: 10), child: Text(f.sunatMessage, style: t.textTheme.bodySmall)),
         const SizedBox(height: 20),
-        Text(inv.clientName, style: t.textTheme.titleMedium),
-        if (inv.clientTaxId.isNotEmpty) Text(inv.clientTaxId, style: t.textTheme.bodySmall),
-        Text(displayDate(inv.issueDate), style: t.textTheme.bodySmall),
+        Row(children: [
+          Hero(
+            tag: 'avatar-${inv.id}',
+            child: Material(
+              type: MaterialType.transparency,
+              child: Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: t.colorScheme.primaryContainer, shape: BoxShape.circle),
+                child: Text(
+                  inv.clientName.trim().isEmpty || inv.clientName == '—' ? '·' : inv.clientName.trim().characters.first.toUpperCase(),
+                  style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18, color: t.colorScheme.primary),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(inv.clientName, style: t.textTheme.titleMedium),
+              if (inv.clientTaxId.isNotEmpty) Text(inv.clientTaxId, style: t.textTheme.bodySmall),
+              Text(displayDate(inv.issueDate), style: t.textTheme.bodySmall),
+            ]),
+          ),
+        ]),
         const SizedBox(height: 18),
         const Divider(),
         const SizedBox(height: 8),

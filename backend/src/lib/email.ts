@@ -38,3 +38,20 @@ export function buildEmail(opts: { business: string; client: string; number: str
 </td></tr></table></td></tr></table></body></html>`;
   return { subject, html };
 }
+
+/** Aviso de fin de importación masiva. */
+export function buildImportEmail(opts: { business: string; status: "done" | "failed"; imported: number; skipped: number; error?: string | null }) {
+  const business = escapeHtml(opts.business || "tu empresa");
+  const ok = opts.status === "done";
+  const subject = ok ? "Tus facturas ya están importadas" : "No pudimos terminar tu importación";
+  const detail = ok
+    ? `Importamos <b>${opts.imported}</b> factura(s) en <b>${business}</b>${opts.skipped > 0 ? ` y omitimos <b>${opts.skipped}</b> fila(s) repetidas o con datos no válidos` : ""}.`
+    : `La importación en <b>${business}</b> se detuvo${opts.error ? `: ${escapeHtml(opts.error)}` : ""}. Abre la app para reintentarlo.`;
+  const html = `<!doctype html><html lang="es"><body style="margin:0;background:#f8f6fd;font-family:Arial,Helvetica,sans-serif;color:#26254b">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:24px;overflow:hidden">
+<tr><td style="background:linear-gradient(135deg,#6a62e2,#b58bf5);padding:26px 28px;color:#ffffff;font-size:22px;font-weight:700">${escapeHtml(subject)}</td></tr>
+<tr><td style="padding:26px 28px;font-size:15px;line-height:1.55;color:#55577a">${detail}<p style="margin:18px 0 0;font-size:12px;color:#8a8cab">Enviado con FacturaVoz.</p></td></tr>
+</table></td></tr></table></body></html>`;
+  return { subject, html };
+}

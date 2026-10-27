@@ -262,7 +262,7 @@ class _OrgsScreenState extends State<OrgsScreen> {
                     if (_error != null)
                       Text(_error!, style: TextStyle(color: t.colorScheme.error))
                     else if (_members == null)
-                      const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+                      const SkeletonList(count: 2)
                     else
                       SoftCard(
                         padding: const EdgeInsets.symmetric(vertical: 6),
