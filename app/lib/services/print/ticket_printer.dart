@@ -174,7 +174,7 @@ TicketData ticketFromInternal(InvoiceRecord inv, Profile issuer) {
     clientDoc: inv.clientTaxId,
     currency: inv.currency,
     lines: [for (final i in inv.items) TicketLine(i.quantity, i.description, round2(i.unitPrice * (1 + inv.taxRate / 100)), round2(i.amount * (1 + inv.taxRate / 100)))],
-    totals: [('Subtotal', t.subtotal, false), ('${issuer.taxLabel.isEmpty ? 'IGV' : issuer.taxLabel}', t.tax, false), ('TOTAL', t.total, true)],
+    totals: [('Subtotal', t.subtotal, false), (issuer.taxLabel.isEmpty ? 'IGV' : issuer.taxLabel, t.tax, false), ('TOTAL', t.total, true)],
     footer: 'Documento interno. No es comprobante de pago.',
     warning: 'SIN VALIDEZ TRIBUTARIA',
   );

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show FrameTiming, ImageFilter, TimingsCallback;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

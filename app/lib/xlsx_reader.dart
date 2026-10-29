@@ -58,7 +58,7 @@ String _unescape(String s) {
   });
 }
 
-/// Une todo el texto de los nodos <t> dentro de un fragmento XML (texto enriquecido incluido).
+/// Une todo el texto de los nodos `<t>` dentro de un fragmento XML (texto enriquecido incluido).
 String _texts(String xml) {
   final b = StringBuffer();
   for (final m in RegExp(r'<(?:\w+:)?t(?:\s[^>]*)?>([\s\S]*?)</(?:\w+:)?t>').allMatches(xml)) {

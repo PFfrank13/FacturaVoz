@@ -9,7 +9,6 @@ import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
-import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';

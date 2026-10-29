@@ -260,7 +260,8 @@ Future<bool> showRecurringEditor(BuildContext context, {RecurringTemplate? templ
           err = '';
         });
         try {
-          final keepNext = template != null && template.dayOfMonth == day && template.nextRun.isNotEmpty;
+          // Se conserva la próxima fecha si no cambió el día (promoción de nulos válida en cualquier versión de Dart).
+          final keptRun = template != null && template.dayOfMonth == day && template.nextRun.isNotEmpty ? template.nextRun : null;
           await GrowthRepo.saveRecurring(RecurringTemplate(
             id: template?.id,
             clientName: client.text,
@@ -271,7 +272,7 @@ Future<bool> showRecurringEditor(BuildContext context, {RecurringTemplate? templ
             notes: notes.text,
             dayOfMonth: day,
             dueDays: dueDays,
-            nextRun: keepNext ? template!.nextRun : firstRunDate(todayIso(), day),
+            nextRun: keptRun ?? firstRunDate(todayIso(), day),
             active: active,
           ));
           if (ctx.mounted) Navigator.pop(ctx, true);

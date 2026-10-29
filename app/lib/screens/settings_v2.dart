@@ -395,10 +395,8 @@ class _JobFlowScreenState extends State<JobFlowScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 buildDefaultDragHandles: true,
-                onReorder: (a, b) => setState(() {
-                  if (b > a) b--;
-                  _steps.insert(b, _steps.removeAt(a));
-                }),
+                // onReorderItem (Flutter 3.41+): el índice nuevo ya viene ajustado.
+                onReorderItem: (a, b) => setState(() => _steps.insert(b, _steps.removeAt(a))),
                 children: [
                   for (final (i, st) in _steps.indexed)
                     ListTile(
