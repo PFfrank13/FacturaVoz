@@ -77,5 +77,9 @@
 	<string>FacturaVoz usa la cámara para leer tus comprobantes y constancias de pago.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>FacturaVoz lee las fotos y capturas que elijas (comprobantes y pagos de Yape o Plin).</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>FacturaVoz usa Bluetooth solo para imprimir tus tickets en tu ticketera.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FacturaVoz guarda la ubicación de tu cliente o trabajo solo cuando tocas "Estoy aquí".</string>
 </dict>
 </plist>
