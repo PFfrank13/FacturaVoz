@@ -12,6 +12,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'assistant.dart';
+import 'catalog.dart' show AvatarButton, FeatureStrip;
 import 'clients360.dart';
 import 'expenses.dart';
 import 'products.dart';
@@ -185,7 +186,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(16, widget.embedded ? top + 18 : 8, 16, 190),
+          padding: EdgeInsets.fromLTRB(16, widget.embedded ? top + 18 : 8, 16, 190 + MediaQuery.paddingOf(context).bottom),
           children: [
             Reveal(
               child: Row(children: [
@@ -196,6 +197,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
                   child: Text('${monthNames[_month - 1]} $_year', key: ValueKey(_monthKey), style: t.textTheme.titleSmall),
                 ),
                 IconButton(onPressed: _isCurrent ? null : () => _shift(1), icon: const Icon(Icons.chevron_right_rounded)),
+                if (widget.embedded) const AvatarButton(),
               ]),
             ),
             const SizedBox(height: 10),
@@ -224,7 +226,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
                   crossAxisSpacing: 10,
                   childAspectRatio: 1.2,
                   children: [
-                    MetricTile(icon: Icons.trending_up_rounded, label: 'Ventas (sin IGV)', value: money(p.sales, cur), delta: delta(p.sales, prev.sales), deltaGood: p.sales >= prev.sales),
+                    MetricTile(icon: Icons.trending_up_rounded, label: 'Ventas sin IGV', value: money(p.sales, cur), delta: delta(p.sales, prev.sales), deltaGood: p.sales >= prev.sales),
                     MetricTile(
                       icon: Icons.shopping_bag_rounded,
                       label: 'Gastos (sin IGV)',
@@ -238,17 +240,28 @@ class _ProfitScreenState extends State<ProfitScreen> {
                   ],
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Aquí las ventas van SIN IGV para calcular tu ganancia; en Inicio ves lo vendido CON IGV. Ambos cuentan solo comprobantes emitidos.',
+                    style: t.textTheme.bodySmall),
+              ),
+              if (widget.embedded) ...[
+                const SizedBox(height: 12),
+                const FeatureStrip(ids: ['impuestos', 'reportes', 'comisiones', 'alertas', 'banco', 'papelera']),
+              ],
               const SizedBox(height: 12),
               Reveal(index: 3, child: _igv(context, p, cur)),
               const SizedBox(height: 12),
               Reveal(
                 index: 4,
+                // Botones compactos: icono arriba y texto en UNA línea que se achica (antes "Escanear" y "Preguntar"
+                // se partían en dos renglones en pantallas angostas).
                 child: Row(children: [
-                  Expanded(child: OutlinedButton.icon(onPressed: _addExpense, icon: const Icon(Icons.add_rounded), label: const Text('Gasto'))),
+                  Expanded(child: _mini(context, Icons.add_rounded, 'Gasto', _addExpense)),
                   const SizedBox(width: 8),
-                  Expanded(child: OutlinedButton.icon(onPressed: _scan, icon: const Icon(Icons.document_scanner_rounded), label: const Text('Escanear'))),
+                  Expanded(child: _mini(context, Icons.document_scanner_rounded, 'Escanear', _scan)),
                   const SizedBox(width: 8),
-                  Expanded(child: OutlinedButton.icon(onPressed: () => openCopilot(context), icon: const Icon(Icons.auto_awesome_rounded), label: const Text('Preguntar'))),
+                  Expanded(child: _mini(context, Icons.auto_awesome_rounded, 'Preguntar', () => openCopilot(context))),
                 ]),
               ),
               const SizedBox(height: 20),
@@ -269,7 +282,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
               ),
               const SizedBox(height: 20),
               SectionTitle('Proyección de caja · 5 semanas', action: 'Ver gastos', onAction: () => pushPremium(context, const ExpensesScreen())),
-              Reveal(index: 6, child: _forecast(context, forecast, cur, daily)),
+              Reveal(index: 6, child: _forecast(context, forecast, cur, daily, hasActivity: p.invoiceCount > 0 || prev.invoiceCount > 0 || _receivables.isNotEmpty)),
               if (cats.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 const SectionTitle('¿En qué se va el dinero?'),
@@ -317,6 +330,25 @@ class _ProfitScreenState extends State<ProfitScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _mini(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+    final t = Theme.of(context);
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        height: 62,
+        decoration: BoxDecoration(border: Border.all(color: t.colorScheme.outline), borderRadius: BorderRadius.circular(16)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 20, color: t.colorScheme.primary),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, softWrap: false, style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700))),
+          ),
+        ]),
       ),
     );
   }
@@ -395,8 +427,18 @@ class _ProfitScreenState extends State<ProfitScreen> {
     );
   }
 
-  Widget _forecast(BuildContext context, CashForecast f, String cur, double daily) {
+  Widget _forecast(BuildContext context, CashForecast f, String cur, double daily, {required bool hasActivity}) {
     final t = Theme.of(context);
+    // Sin ventas ni cuentas por cobrar no hay nada que proyectar: mostrar "caja negativa" solo asustaría (error reportado).
+    if (!hasActivity) {
+      return SoftCard(
+        child: Row(children: [
+          const Icon(Icons.insights_rounded, color: Brand.indigo),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Cuando registres tus primeras ventas y gastos, aquí verás cómo se moverá tu caja las próximas 5 semanas.', style: t.textTheme.bodyMedium)),
+        ]),
+      );
+    }
     final maxAbs = f.weeks.fold<double>(1, (m, w) => [m, w.inflow, w.outflow].reduce((a, b) => a > b ? a : b));
     return SoftCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -412,6 +454,27 @@ class _ProfitScreenState extends State<ProfitScreen> {
           style: t.textTheme.bodySmall,
         ),
         const SizedBox(height: 14),
+        // El aviso va ARRIBA de las barras: así el botón nunca queda tapado por el micrófono flotante.
+        if (f.warning != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Brand.bad.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.warning_amber_rounded, color: Brand.bad, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text(f.warning!, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad, fontWeight: FontWeight.w600))),
+              ]),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: Brand.bad, minimumSize: const Size(64, 44)),
+                onPressed: () => openCopilot(context, ask: 'Mi caja se va a poner negativa. Dame un plan de rescate de 3 pasos con nombres y montos.'),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Plan de rescate con IA')),
+              ),
+            ]),
+          ),
         for (final w in f.weeks)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -432,26 +495,6 @@ class _ProfitScreenState extends State<ProfitScreen> {
                   textAlign: TextAlign.right,
                   style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 12.5, color: w.cumulative >= 0 ? Brand.ok : Brand.bad),
                 ),
-              ),
-            ]),
-          ),
-        if (f.warning != null)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Brand.bad.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Icon(Icons.warning_amber_rounded, color: Brand.bad, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text(f.warning!, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad, fontWeight: FontWeight.w600))),
-              ]),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: Brand.bad, minimumSize: const Size(64, 44)),
-                onPressed: () => openCopilot(context, ask: 'Mi caja se va a poner negativa. Dame un plan de rescate de 3 pasos con nombres y montos.'),
-                icon: const Icon(Icons.auto_awesome_rounded),
-                label: const Text('Plan de rescate con IA'),
               ),
             ]),
           ),

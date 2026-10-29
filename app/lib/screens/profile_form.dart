@@ -6,6 +6,8 @@ import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../ui/widgets.dart';
+import '../logic/doc_voice.dart' show rucValid;
+import '../services/v2_api.dart';
 
 /// Datos del emisor y ajustes de facturación. En el primer uso es obligatorio:
 /// moneda e impuesto los elige el usuario (no se asumen).
@@ -32,6 +34,38 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
   late final TextEditingController _serF;
   late final TextEditingController _serB;
   String? _currency;
+  bool _rucBusy = false;
+  String _rucMsg = '';
+
+  /// RUC → razón social, dirección y ubigeo desde SUNAT (si el servidor tiene proveedor configurado).
+  Future<void> _fillFromRuc() async {
+    final ruc = _taxId.text.replaceAll(RegExp(r'\D'), '');
+    if (ruc.length != 11 || !rucValid(ruc)) {
+      setState(() => _rucMsg = 'Escribe un RUC válido de 11 dígitos.');
+      return;
+    }
+    setState(() {
+      _rucBusy = true;
+      _rucMsg = '';
+    });
+    final r = await V2Api.lookup(ruc);
+    if (!mounted) return;
+    setState(() {
+      _rucBusy = false;
+      if (r.ok) {
+        final d = r.data!;
+        _name.text = d.name;
+        if (d.address.isNotEmpty) _address.text = d.address;
+        if (d.ubigeo.isNotEmpty) _ubigeo.text = d.ubigeo;
+        if (d.department.isNotEmpty) _dep.text = d.department;
+        if (d.province.isNotEmpty) _prov.text = d.province;
+        if (d.district.isNotEmpty) _dist.text = d.district;
+        _rucMsg = '✓ Datos de SUNAT completados. Revísalos antes de guardar.${!d.rucActive || !d.rucHabido ? ' Ojo: RUC ${d.status} ${d.condition}.' : ''}';
+      } else {
+        _rucMsg = r.message;
+      }
+    });
+  }
   bool _busy = false;
   String _error = '';
 
@@ -151,8 +185,23 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               TextFormField(
                 controller: _taxId,
                 maxLength: 30,
-                decoration: const InputDecoration(labelText: 'Documento fiscal (RUC, NIF, RFC…)'),
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Documento fiscal (RUC, NIF, RFC…)',
+                  suffixIcon: IconButton(
+                    tooltip: 'Completar con los datos de SUNAT',
+                    onPressed: _rucBusy ? null : _fillFromRuc,
+                    icon: _rucBusy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.travel_explore_rounded),
+                  ),
+                ),
+                validator: (v) {
+                  final d = (v ?? '').trim();
+                  // Solo se valida el dígito verificador cuando parece un RUC peruano (11 dígitos).
+                  if (RegExp(r'^\d{11}$').hasMatch(d) && !rucValid(d)) return 'Ese RUC no es válido (revisa los dígitos)';
+                  return null;
+                },
               ),
+              if (_rucMsg.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(_rucMsg, style: Theme.of(context).textTheme.bodySmall)),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _address,
@@ -198,6 +247,17 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                   ),
                 ],
               ),
+              // Desplegable rápido de tasas usuales en Perú (se puede escribir otra).
+              Wrap(spacing: 8, runSpacing: 6, children: [
+                for (final (label, tax, rate) in const [('IGV 18 %', 'IGV', '18'), ('Exonerado / inafecto 0 %', 'IGV', '0')])
+                  ActionChip(
+                    label: Text(label),
+                    onPressed: () => setState(() {
+                      _taxLabel.text = tax;
+                      _taxRate.text = rate;
+                    }),
+                  ),
+              ]),
               ]),
               if (!widget.onboarding) ...[
                 const SizedBox(height: 14),

@@ -362,9 +362,13 @@ class AssistantReply {
     this.draft,
     this.expense,
     this.transcript = '',
+    this.action = const {},
   });
 
-  final String intent; // question | invoice | quote | expense | collections | unknown
+  final String intent; // question | invoice | quote | expense | collections | void | show | fiado | summary | unknown
+
+  /// Copiloto 2.0: acción concreta (anular, mostrar una pantalla, anotar fiado). Siempre la confirma el usuario.
+  final Map<String, dynamic> action;
   final String answer;
   final String speak;
   final List<AssistantHighlight> highlights;
@@ -405,6 +409,7 @@ class AssistantReply {
       draft: draft,
       expense: expense,
       transcript: _s(body['transcript']),
+      action: r['action'] is Map ? Map<String, dynamic>.from(r['action'] as Map) : const {},
     );
   }
 }
@@ -443,7 +448,11 @@ class DocScan {
   final String category;
   final double confidence;
 
-  factory DocScan.fromJson(Map<String, dynamic> j) => DocScan(
+  /// Última lectura del escáner (v2.0). La hoja de confirmación del gasto la usa para avisar fechas antiguas,
+  /// RUC del comprador distinto y textos a mano, SIN modificar el escáner.
+  static DocScan? last;
+
+  factory DocScan.fromJson(Map<String, dynamic> j) => last = DocScan(
         docType: _s(j['doc_type']),
         supplierName: _s(j['supplier_name']),
         supplierTaxId: _s(j['supplier_tax_id']),

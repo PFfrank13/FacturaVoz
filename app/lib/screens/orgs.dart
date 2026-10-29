@@ -6,6 +6,7 @@ import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../ui/widgets.dart';
+import 'team.dart';
 
 /// Empresas del usuario y su equipo. Cambiar de empresa cambia los clientes y facturas que se ven.
 class OrgsScreen extends StatefulWidget {
@@ -257,6 +258,16 @@ class _OrgsScreenState extends State<OrgsScreen> {
                       if (active.isAdmin)
                         TextButton.icon(onPressed: _busy ? null : () => _invite(active), icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Agregar')),
                     ]),
+                    // v2.0: roles (cajero, técnico, vendedor, finanzas), invitaciones por correo y comisiones.
+                    if (active.isAdmin)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TeamScreen())).then((_) => _loadMembers()),
+                          icon: const Icon(Icons.admin_panel_settings_rounded),
+                          label: const Text('Roles y permisos del equipo'),
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     if (_error != null)
                       Text(_error!, style: TextStyle(color: t.colorScheme.error))

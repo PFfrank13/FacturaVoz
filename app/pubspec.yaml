@@ -1,7 +1,7 @@
 name: facturavoz
 description: FacturaVoz - facturación por voz (Android, iOS y Web).
 publish_to: "none"
-version: 1.2.0+3
+version: 2.0.0+4
 
 environment:
   sdk: ">=3.9.0 <4.0.0"
@@ -29,6 +29,17 @@ dependencies:
   # Negocio Pro: fotos de comprobantes/constancias y respuesta hablada del Copiloto
   image_picker: ^1.1.2
   flutter_tts: ^4.2.0
+  # v2.0: Excel (.xlsx) en el teléfono (ya viene con el paquete pdf; se declara para usarlo directamente)
+  archive: ">=3.4.0 <5.0.0"
+  # v2.0 (todas gratuitas y de código abierto):
+  barcode: ">=2.2.8 <3.0.0"            # QR nivel Q como imagen para ticketeras sin QR nativo (ya lo trae pdf)
+  mobile_scanner: ">=6.0.0 <8.0.0"     # leer códigos de barras con la cámara
+  print_bluetooth_thermal: ^1.1.6      # ticketeras Bluetooth ESC/POS (Android; iPhone BLE)
+  permission_handler: ^11.3.1          # permiso "Dispositivos cercanos" (Bluetooth) en Android 12+
+  quick_actions: ^1.1.0                # atajos al mantener presionado el ícono
+  flutter_map: ">=7.0.2 <9.0.0"        # mapa del cliente (OpenStreetMap, sin clave)
+  latlong2: ^0.9.1
+  geolocator: ">=13.0.0 <15.0.0"       # "estoy aquí": guardar la ubicación del cliente/trabajo
 
 dev_dependencies:
   flutter_test:

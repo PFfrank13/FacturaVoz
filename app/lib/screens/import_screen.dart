@@ -12,11 +12,22 @@ import '../import_logic.dart';
 import '../models.dart';
 import '../services/importer.dart';
 import '../services/repo.dart';
+import '../xlsx_reader.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
 /// Se ejecuta en otro hilo para no congelar la pantalla con archivos grandes.
-ParsedImport _parseBytes(Uint8List b) => parseImportText(decodeImportBytes(b));
+ParsedImport _parseBytes(Uint8List b) {
+  if (looksLikeOldXls(b)) {
+    return const ParsedImport(rows: [], rejected: 0, columns: {}, error: 'Es un Excel antiguo (.xls). Ábrelo en Excel y guárdalo como .xlsx o .csv.');
+  }
+  if (looksLikeZip(b)) {
+    final table = readXlsxTable(b);
+    if (table == null) return const ParsedImport(rows: [], rejected: 0, columns: {}, error: 'No pudimos abrir este Excel. Guárdalo de nuevo como .xlsx o .csv.');
+    return parseImportTable(table);
+  }
+  return parseImportText(decodeImportBytes(b));
+}
 
 class _FileResult {
   const _FileResult(this.name, this.parsed);
@@ -87,7 +98,7 @@ class _ImportScreenState extends State<ImportScreen> {
       _reading = true;
     });
     try {
-      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['csv', 'txt'], allowMultiple: true, withData: true);
+      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['csv', 'txt', 'xlsx', 'xls'], allowMultiple: true, withData: true);
       final picked = r?.files ?? const [];
       if (picked.isEmpty) {
         if (mounted) setState(() => _reading = false);
@@ -137,7 +148,7 @@ class _ImportScreenState extends State<ImportScreen> {
       if (mounted) {
         setState(() {
           _reading = false;
-          _error = 'No se pudo leer los archivos. Guárdalos como CSV (UTF-8) e inténtalo de nuevo.';
+          _error = 'No se pudo leer los archivos. Guárdalos como Excel (.xlsx) o CSV e inténtalo de nuevo.';
         });
       }
     }
@@ -311,8 +322,8 @@ class _ImportScreenState extends State<ImportScreen> {
         index: 1,
         child: SoftCard(
           child: Column(children: [
-            step(Icons.download_rounded, '1. Descarga tu registro', 'En el portal de SUNAT (SOL → Registro de Ventas) o en tu sistema anterior, exporta a CSV o TXT.'),
-            step(Icons.table_view_rounded, '2. Súbelo aquí', 'Detectamos las columnas solas. Si viene en Excel, guárdalo como "CSV (UTF-8)".'),
+            step(Icons.download_rounded, '1. Descarga tu registro', 'En el portal de SUNAT (SOL → Registro de Ventas) o en tu sistema anterior, exporta a Excel (.xlsx), CSV o TXT.'),
+            step(Icons.table_view_rounded, '2. Súbelo aquí', 'Detectamos las columnas solas, también en Excel (.xlsx). Los .xls antiguos guárdalos como .xlsx.'),
             step(Icons.verified_user_rounded, '3. Sin tu clave SOL', 'No pedimos usuario ni contraseña de SUNAT: solo el archivo que tú descargas.'),
           ]),
         ),

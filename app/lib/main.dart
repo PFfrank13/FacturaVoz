@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'access.dart';
 import 'app_state.dart';
+import 'models_v2.dart';
+import 'services/v2_repo.dart';
+import 'screens/business_setup.dart';
+import 'screens/license_gate.dart';
+import 'screens/welcome_employee.dart';
+import 'ui/motion.dart';
 import 'config.dart';
 import 'screens/lock_screen.dart';
 import 'services/app_lock.dart';
@@ -39,6 +46,8 @@ Future<void> main() async {
   await Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey);
   AppLock.instance.bind();
   runApp(const FacturaVozApp());
+  // Mide los primeros cuadros: en teléfonos lentos reduce efectos solo (si el usuario no eligió otra cosa).
+  PerfGuard.start();
 }
 
 class FacturaVozApp extends StatelessWidget {
@@ -58,8 +67,18 @@ class FacturaVozApp extends StatelessWidget {
         themeMode: mode,
         builder: (context, child) {
           // Evita que una fuente del sistema muy grande rompa los diseños (sigue respetando la accesibilidad hasta 125 %).
+          // También aplica "Animaciones reducidas" (interruptor de la app o teléfono lento) a TODA la app.
           final mq = MediaQuery.of(context);
-          return MediaQuery(data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)), child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: () => FocusManager.instance.primaryFocus?.unfocus(), child: LockOverlay(child: child!)));
+          return ListenableBuilder(
+            listenable: MotionPrefs.listenable,
+            builder: (context, _) => MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25),
+                disableAnimations: MotionPrefs.effective(mq.disableAnimations),
+              ),
+              child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: () => FocusManager.instance.primaryFocus?.unfocus(), child: LockOverlay(child: child!)),
+            ),
+          );
         },
         themeAnimationDuration: const Duration(milliseconds: 350),
         themeAnimationCurve: Curves.easeInOut,
@@ -151,7 +170,7 @@ class _ProfileGateState extends State<ProfileGate> {
           return _intro ? OnboardingScreen(onDone: _finishIntro) : const ProfileFormScreen(onboarding: true);
         }
         WidgetsBinding.instance.addPostFrameCallback((_) => AppLock.instance.allowSetup());
-        return const MainShell();
+        return const V2Gate();
       },
     );
   }
@@ -200,4 +219,74 @@ class _SplashState extends State<_Splash> with SingleTickerProviderStateMixin {
         scale: Tween<double>(begin: 0.92, end: 1.06).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
         child: const BrandMark(size: 72),
       );
+}
+
+/// Puertas v2.0 antes del shell: licencia bloqueada → pantalla de pago; empleado nuevo → bienvenida;
+/// dueño sin tipo de negocio → presentación. Si las migraciones v2 no están, todo sigue como antes.
+class V2Gate extends StatefulWidget {
+  const V2Gate({super.key});
+
+  @override
+  State<V2Gate> createState() => _V2GateState();
+}
+
+class _V2GateState extends State<V2Gate> {
+  OrgSettings? _settings;
+  String? _for;
+  bool _setupClosed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AppState.instance.addListener(_onApp);
+    _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onApp);
+    super.dispose();
+  }
+
+  void _onApp() {
+    if (_for != AppState.instance.activeOrg?.id) {
+      setState(() {
+        _settings = null;
+        _setupClosed = false;
+      });
+      _loadSettings();
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    final org = AppState.instance.activeOrg?.id;
+    _for = org;
+    final s = await V2Repo.settings(refresh: true);
+    if (mounted && _for == org) setState(() => _settings = s);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Access.instance,
+      builder: (context, _) {
+        final a = Access.instance;
+        // Bloqueado: nadie entra. Solo lectura: entra el dueño/administrador (para pagar o exportar); el personal ve
+        // la pantalla de pago (la base de datos igual no le muestra nada).
+        if (a.loaded && (a.license.mode == 'blocked' || (a.license.mode == 'restricted' && !a.isAdmin))) return const LicenseGateScreen();
+        if (a.loaded && !a.welcomed) return const EmployeeWelcomeScreen();
+        final s = _settings;
+        if (s == null) return const Scaffold(body: Center(child: _Splash()));
+        // Solo se muestra sola si la migración v2 está aplicada, el usuario administra y aún no la vio.
+        if (V2Repo.ready && !s.onboardingDone && a.isAdmin && !_setupClosed) {
+          return BusinessSetupScreen(onDone: () {
+            V2Repo.forgetSettings();
+            setState(() => _setupClosed = true);
+            _loadSettings();
+          });
+        }
+        return const MainShell();
+      },
+    );
+  }
 }

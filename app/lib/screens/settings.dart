@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../access.dart';
 import '../app_state.dart';
 import '../config.dart';
 import '../services/repo.dart';
@@ -22,9 +23,25 @@ import 'products.dart';
 import 'reports.dart';
 import 'security.dart';
 import 'profile_form.dart';
+import 'catalog.dart' show SearchButton;
+import 'settings_v2.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.embedded = false});
+
+  /// true como pestaña del shell (modo simple / técnico): sin flecha atrás y con espacio para el dock.
+  final bool embedded;
+
+  /// Intercala separadores entre las filas visibles.
+  List<Widget> _joined(BuildContext context, List<Widget> tiles) {
+    final line = Theme.of(context).colorScheme.outline;
+    return [
+      for (final (i, w) in tiles.indexed) ...[
+        if (i > 0) Divider(indent: 72, color: line),
+        w,
+      ],
+    ];
+  }
 
   Future<void> _pickTheme(BuildContext context) async {
     final m = await showModalBottomSheet<ThemeMode>(
@@ -127,17 +144,23 @@ class SettingsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(listenable: AppState.instance, builder: (context, _) => _page(context));
+  Widget build(BuildContext context) => ListenableBuilder(listenable: Listenable.merge([AppState.instance, Access.instance]), builder: (context, _) => _page(context));
 
   Widget _page(BuildContext context) {
     final t = Theme.of(context);
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
     final org = AppState.instance.activeOrg;
+    final a = Access.instance;
     void go(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
     return Scaffold(
-      appBar: AppBar(title: const Text('Ajustes')),
+      appBar: AppBar(
+        title: const Text('Ajustes'),
+        automaticallyImplyLeading: !embedded,
+        actions: const [SearchButton(), SizedBox(width: 12)],
+      ),
       body: SafeArea(
-        child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
+        bottom: !embedded,
+        child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: EdgeInsets.fromLTRB(16, 4, 16, embedded ? 150 : 32), children: [
           Reveal(
             child: Container(
               padding: const EdgeInsets.all(20),
@@ -163,53 +186,55 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
+          const SizedBox(height: 4),
+          // v2.0: tipo de negocio, modo simple, animaciones, equipo, plan, logo, impresora, PIN, reporte diario…
+          const Reveal(index: 1, child: BusinessSettingsCard()),
+          const SizedBox(height: 14),
           Reveal(
-            index: 1,
+            index: 2,
             child: SoftCard(
               padding: EdgeInsets.zero,
-              child: Column(children: [
+              child: Column(children: _joined(context, [
                 _tile(context,
                     icon: Icons.apartment_rounded,
-                    title: 'Empresas y equipo',
-                    subtitle: org?.name ?? 'Cambia de empresa o agrega a tu equipo',
+                    title: 'Empresas',
+                    subtitle: org?.name ?? 'Cambia de empresa o crea otra',
                     onTap: () => go(const OrgsScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
                     icon: Icons.inventory_2_rounded,
                     title: 'Productos y servicios',
-                    subtitle: 'Catálogo, precios y control de stock',
+                    subtitle: 'Catálogo, precios, código de barras y stock',
                     onTap: () => go(const ProductsScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.qr_code_2_rounded,
-                    title: 'Cobros y recordatorios',
-                    subtitle: 'Yape, Plin, banco, tarjeta y cobranza automática',
-                    onTap: () => pushPremium(context, const PaySettingsScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.storefront_rounded,
-                    title: 'Tienda en línea',
-                    subtitle: 'Tu catálogo como página web: recibe pedidos por WhatsApp',
-                    onTap: () => pushPremium(context, const StoreScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.event_repeat_rounded,
-                    title: 'Facturación recurrente',
-                    subtitle: 'Alquileres y mensualidades que se facturan solos',
-                    onTap: () => pushPremium(context, const RecurringScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.groups_rounded,
-                    title: 'Clientes 360',
-                    subtitle: 'Mejores clientes y los que se están yendo',
-                    onTap: () => pushPremium(context, const Clients360Screen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.shopping_bag_rounded,
-                    title: 'Gastos',
-                    subtitle: 'Compras y pagos del negocio (o escanéalos)',
-                    onTap: () => go(const ExpensesScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
+                if (a.can('settings'))
+                  _tile(context,
+                      icon: Icons.qr_code_2_rounded,
+                      title: 'Cobros y recordatorios',
+                      subtitle: 'Yape, Plin, banco, tarjeta y cobranza automática',
+                      onTap: () => pushPremium(context, const PaySettingsScreen())),
+                if (a.can('settings') && a.has('tienda'))
+                  _tile(context,
+                      icon: Icons.storefront_rounded,
+                      title: 'Tienda en línea',
+                      subtitle: 'Tu catálogo como página web: recibe pedidos por WhatsApp',
+                      onTap: () => pushPremium(context, const StoreScreen())),
+                if (a.can('finance') && a.has('recurrentes'))
+                  _tile(context,
+                      icon: Icons.event_repeat_rounded,
+                      title: 'Facturación recurrente',
+                      subtitle: 'Alquileres y mensualidades que se facturan solos',
+                      onTap: () => pushPremium(context, const RecurringScreen())),
+                if (a.can('finance'))
+                  _tile(context,
+                      icon: Icons.groups_rounded,
+                      title: 'Clientes 360',
+                      subtitle: 'Mejores clientes y los que se están yendo',
+                      onTap: () => pushPremium(context, const Clients360Screen())),
+                if (a.can('finance'))
+                  _tile(context,
+                      icon: Icons.shopping_bag_rounded,
+                      title: 'Gastos',
+                      subtitle: 'Compras y pagos del negocio (o escanéalos)',
+                      onTap: () => go(const ExpensesScreen())),
                 _tile(context,
                     icon: Icons.palette_outlined,
                     title: 'Apariencia',
@@ -219,50 +244,47 @@ class SettingsScreen extends StatelessWidget {
                       _ => 'Igual que el sistema',
                     },
                     onTap: () => _pickTheme(context)),
-                if (!kIsWeb) ...[
-                  Divider(indent: 72, color: t.colorScheme.outline),
+                if (!kIsWeb)
                   _tile(context,
                       icon: Icons.fingerprint_rounded,
                       title: 'Seguridad',
                       subtitle: 'PIN y huella para entrar',
                       onTap: () => go(const SecurityScreen())),
-                ],
-                Divider(indent: 72, color: t.colorScheme.outline),
                 _tile(context,
-                    icon: Icons.groups_rounded,
-                    title: 'Clientes',
+                    icon: Icons.contacts_rounded,
+                    title: 'Clientes (lista simple)',
                     subtitle: 'Contactos, documentos y correos',
                     onTap: () => go(const ClientsScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.cloud_upload_rounded,
-                    title: 'Importar facturas antiguas',
-                    subtitle: 'Carga masiva desde SUNAT o tu sistema anterior',
-                    onTap: () => go(const ImportScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.insights_rounded,
-                    title: 'Reportes',
-                    subtitle: 'Ventas por mes y exportar a Excel',
-                    onTap: () => go(const ReportsScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.business_outlined,
-                    title: 'Datos del negocio',
-                    subtitle: 'Nombre, documento, moneda e impuesto',
-                    onTap: () => go(const ProfileFormScreen())),
-                Divider(indent: 72, color: t.colorScheme.outline),
-                _tile(context,
-                    icon: Icons.verified_outlined,
-                    title: 'Facturación electrónica (SUNAT)',
-                    subtitle: 'RUC, usuario SOL y certificado digital',
-                    onTap: () => go(const FiscalSetupScreen())),
-              ]),
+                if (a.can('import'))
+                  _tile(context,
+                      icon: Icons.cloud_upload_rounded,
+                      title: 'Importar facturas antiguas',
+                      subtitle: 'Desde Excel (.xlsx) o CSV de SUNAT o tu sistema anterior',
+                      onTap: () => go(const ImportScreen())),
+                if (a.can('finance'))
+                  _tile(context,
+                      icon: Icons.insights_rounded,
+                      title: 'Reportes',
+                      subtitle: 'Ventas por mes y exportar a Excel',
+                      onTap: () => go(const ReportsScreen())),
+                if (a.can('settings'))
+                  _tile(context,
+                      icon: Icons.business_outlined,
+                      title: 'Datos del negocio',
+                      subtitle: 'Nombre, documento, moneda e impuesto',
+                      onTap: () => go(const ProfileFormScreen())),
+                if (a.can('settings'))
+                  _tile(context,
+                      icon: Icons.verified_outlined,
+                      title: 'Facturación electrónica (SUNAT)',
+                      subtitle: 'RUC, usuario SOL y certificado digital',
+                      onTap: () => go(const FiscalSetupScreen())),
+              ])),
             ),
           ),
           const SizedBox(height: 14),
           Reveal(
-            index: 2,
+            index: 3,
             child: SoftCard(
               padding: EdgeInsets.zero,
               child: Column(children: [

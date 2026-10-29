@@ -19,6 +19,16 @@ import '../ui/widgets.dart';
 import 'collections.dart';
 import 'expenses.dart';
 import 'new_invoice.dart';
+import '../models.dart';
+import '../services/repo.dart';
+import 'cash_day.dart';
+import 'clients_hub.dart';
+import 'fiados.dart';
+import 'invoice_detail.dart';
+import 'jobs.dart' show AgendaScreen;
+import 'products.dart';
+import 'profit.dart';
+import 'taxes.dart';
 
 /// Abre el Copiloto: pregunta por tu negocio o da una orden, por voz o por texto.
 /// Con [ask] la pregunta se envía sola al abrir (p. ej. "plan de rescate de caja").
@@ -76,6 +86,10 @@ class _CopilotSheetState extends State<_CopilotSheet> {
     '¿Qué producto se me está acabando?',
     'Gasté 50 soles en movilidad',
     'Cotiza a Corpax 3 sillas a 150',
+    'Dame el resumen del día',
+    'Muéstrame las ventas de ayer',
+    'Anota que Rosa me debe 30 de arroz',
+    '¿Cuánto debo guardar para SUNAT?',
   ];
 
   @override
@@ -265,6 +279,61 @@ class _CopilotSheetState extends State<_CopilotSheet> {
         }
       case 'collections':
         nav.push(MaterialPageRoute(builder: (_) => const CollectionsScreen()));
+      case 'fiado':
+        final a = r.action;
+        showFiadoSheet(
+          nav.context,
+          clientName: (a['client_name'] ?? '') as String,
+          kind: a['kind'] == 'abono' ? 'abono' : 'cargo',
+          amount: (a['amount'] as num?)?.toDouble(),
+          description: (a['description'] ?? '') as String,
+        ).then((ok) {
+          if (ok) AppState.instance.bump();
+        });
+      case 'show':
+        final a = r.action;
+        final range = (a['range'] ?? 'today') as String;
+        final Widget page = switch (a['screen']) {
+          'collections' => const CollectionsScreen(),
+          'expenses' => const ExpensesScreen(),
+          'stock' => const ProductsScreen(),
+          'clients' => const ClientsHubScreen(),
+          'agenda' => const AgendaScreen(),
+          'fiados' => const FiadosScreen(),
+          'taxes' => const TaxesScreen(),
+          'profit' => const ProfitScreen(),
+          'cash' => const CashDayScreen(),
+          _ => RangeSalesScreen(range: range),
+        };
+        nav.push(MaterialPageRoute(builder: (_) => page));
+      case 'void':
+        _openToVoid(nav, r.action);
+    }
+  }
+
+  /// "Anula la última boleta de Juan": busca el último comprobante ACEPTADO de ese cliente y abre su ficha, donde se
+  /// confirma la anulación (con el PIN del dueño si está activo). Nunca anula solo.
+  Future<void> _openToVoid(NavigatorState nav, Map<String, dynamic> a) async {
+    final name = ((a['client_name'] ?? '') as String).trim().toLowerCase();
+    final kind = (a['doc_kind'] ?? '') as String;
+    try {
+      final list = await Repo.listInvoices(limit: 300);
+      final match = list.where((i) {
+        if (i.fiscalStatus != 'accepted') return false;
+        if (name.isNotEmpty && !i.clientName.toLowerCase().contains(name)) return false;
+        final n = i.fiscalNumber ?? '';
+        if (kind == 'boleta' && !n.startsWith('B')) return false;
+        if (kind == 'factura' && !n.startsWith('F')) return false;
+        return true;
+      }).firstOrNull;
+      if (match == null) {
+        if (nav.mounted) ScaffoldMessenger.of(nav.context).showSnackBar(const SnackBar(content: Text('No encontré un comprobante aceptado de ese cliente.')));
+        return;
+      }
+      await nav.push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: match.id)));
+      AppState.instance.bump();
+    } catch (e) {
+      if (nav.mounted) ScaffoldMessenger.of(nav.context).showSnackBar(SnackBar(content: Text(friendly(e))));
     }
   }
 
@@ -273,6 +342,9 @@ class _CopilotSheetState extends State<_CopilotSheet> {
         'quote' => r.draft == null ? null : 'Revisar y guardar la cotización',
         'expense' => r.expense == null ? null : 'Confirmar el gasto',
         'collections' => 'Ir a Cobranza',
+        'fiado' => r.action.isEmpty ? null : (r.action['kind'] == 'abono' ? 'Confirmar el abono' : 'Confirmar el fiado'),
+        'show' => 'Ver ahora',
+        'void' => 'Buscar el comprobante para anular',
         _ => null,
       };
 
@@ -461,6 +533,77 @@ class _Bubble extends StatelessWidget {
         ),
         child: Text(text, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 15)),
       ),
+    );
+  }
+}
+
+
+/// "Muéstrame las ventas de ayer / de la semana": lista los comprobantes del rango con su total (solo emitidos).
+class RangeSalesScreen extends StatefulWidget {
+  const RangeSalesScreen({super.key, required this.range});
+  final String range; // today | yesterday | this_week | this_month | last_month
+
+  @override
+  State<RangeSalesScreen> createState() => _RangeSalesScreenState();
+}
+
+class _RangeSalesScreenState extends State<RangeSalesScreen> {
+  List<InvoiceRecord>? _items;
+  String? _error;
+
+  (DateTime, DateTime, String) _bounds() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return switch (widget.range) {
+      'yesterday' => (today.subtract(const Duration(days: 1)), today, 'Ayer'),
+      'this_week' => (today.subtract(Duration(days: today.weekday - 1)), today.add(const Duration(days: 1)), 'Esta semana'),
+      'this_month' => (DateTime(now.year, now.month, 1), today.add(const Duration(days: 1)), 'Este mes'),
+      'last_month' => (DateTime(now.year, now.month - 1, 1), DateTime(now.year, now.month, 1), 'Mes pasado'),
+      _ => (today, today.add(const Duration(days: 1)), 'Hoy'),
+    };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final (from, to, _) = _bounds();
+    Repo.listInvoicesBetween(todayIso(from), todayIso(to)).then((r) {
+      if (mounted) setState(() => _items = r.where((i) => i.status != 'draft' && i.fiscalStatus != 'rejected').toList());
+    }).catchError((Object e) {
+      if (mounted) setState(() => _error = friendly(e));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final (_, _, label) = _bounds();
+    final items = _items ?? const <InvoiceRecord>[];
+    final cur = AppState.instance.profile?.currency ?? 'PEN';
+    final total = items.where((i) => i.currency == cur).fold(0.0, (s, i) => s + i.totals.total);
+    return Scaffold(
+      appBar: AppBar(title: Text('Ventas · $label')),
+      body: _error != null
+          ? Center(child: Text(_error!))
+          : _items == null
+              ? const SkeletonList()
+              : ListView(padding: const EdgeInsets.all(16), children: [
+                  SoftCard(
+                    child: Row(children: [
+                      Expanded(child: Text('${items.length} ventas', style: t.textTheme.titleMedium)),
+                      Money(money(total, cur), size: 22, weight: FontWeight.w800),
+                    ]),
+                  ),
+                  const SizedBox(height: 10),
+                  if (items.isEmpty) const EmptyState(title: 'Sin ventas', body: 'No hay comprobantes emitidos en ese periodo.'),
+                  for (final i in items)
+                    ListTile(
+                      title: Text('${i.fiscalNumber ?? i.number} · ${i.clientName}'),
+                      subtitle: Text(displayDate(i.issueDate)),
+                      trailing: Money(money(i.totals.total, i.currency), weight: FontWeight.w700),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: i.id))),
+                    ),
+                ]),
     );
   }
 }

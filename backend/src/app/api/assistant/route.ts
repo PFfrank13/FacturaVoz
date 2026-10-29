@@ -1,7 +1,10 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { authenticateBearer, jsonWith, preflight, readJson } from "@/lib/api-auth";
 import { buildSystemPrompt, enrichSnapshot, sanitizeAssistant, type ClientActivity } from "@/lib/assistant";
 import { chatJson, cleanText, GroqError, sniffAudio, transcribe } from "@/lib/groq";
+import { limaToday } from "@/lib/publicdata";
 import { UUID } from "@/lib/publicbase";
+import { estimateTaxes, type Regime } from "@/lib/taxes";
 
 export const maxDuration = 45;
 export const OPTIONS = preflight;
@@ -48,6 +51,11 @@ export async function POST(req: Request) {
   const kind = audio ? sniffAudio(audio) : null;
   if (audio && !kind) return json({ error: "Formato de audio no válido" }, 400);
 
+  // Membresía: el Copiloto es función del plan (en modo desarrollo o prueba, todo está habilitado)
+  const { data: lic } = await supabase.rpc("my_license", { p_org: orgId });
+  const features = ((lic as { features?: Record<string, unknown> } | null)?.features ?? null) as Record<string, unknown> | null;
+  if (features && features.copiloto === false) return json({ error: "Tu plan no incluye el Copiloto. Mejora tu plan para usarlo.", code: "feature" }, 402);
+
   const { data: allowed, error: qErr } = await supabase.rpc("consume_api_quota", { p_per_minute: 5, p_per_day: 100 });
   if (qErr) return json({ error: "Falta ejecutar la migración de cuotas en Supabase", code: "quota_rpc" }, 500);
   if (allowed !== true) return json({ error: "Demasiadas consultas seguidas. Espera un minuto." }, 429);
@@ -67,6 +75,7 @@ export async function POST(req: Request) {
     ((activity ?? []) as ClientActivity[]).slice(0, 500),
     goalRow?.monthly_goal == null ? null : Number(goalRow.monthly_goal),
   );
+  Object.assign(enriched, { taxes: await taxContext(supabase, orgId) });
 
   try {
     if (audio && kind) {
@@ -79,5 +88,48 @@ export async function POST(req: Request) {
     if (e instanceof GroqError && e.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto", transcript: text }, 503);
     console.error("assistant: failed", e instanceof GroqError ? e.code : e instanceof Error ? e.name : "unknown");
     return json({ error: "No pude procesar tu pedido. Inténtalo de nuevo.", code: e instanceof GroqError ? e.code : "assistant", transcript: text }, 502);
+  }
+}
+
+type Summary = { sales_base?: number; sales_tax?: number };
+
+/** Impuestos del mes (estimado referencial) según el régimen del negocio. Solo cifras agregadas. */
+async function taxContext(supabase: SupabaseClient, orgId: string) {
+  try {
+    const today = limaToday();
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const d = new Date(`${monthStart}T00:00:00Z`);
+    const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+    const { data: org } = await supabase.from("organizations").select("currency").eq("id", orgId).maybeSingle();
+    const cur = (org?.currency as string | null) ?? "PEN";
+    const [{ data: m }, { data: y }, { data: st }, { data: exp }] = await Promise.all([
+      supabase.rpc("sales_summary", { p_org: orgId, p_from: monthStart, p_to: next, p_currency: cur }),
+      supabase.rpc("sales_summary", { p_org: orgId, p_from: `${today.slice(0, 4)}-01-01`, p_to: next, p_currency: cur }),
+      supabase.from("org_settings").select("tax_regime").eq("org_id", orgId).maybeSingle(),
+      supabase.from("expenses").select("tax").eq("org_id", orgId).eq("currency", cur).gte("spent_on", monthStart).lt("spent_on", next).limit(5000),
+    ]);
+    const month = (m ?? {}) as Summary;
+    const year = (y ?? {}) as Summary;
+    const purchasesTax = ((exp ?? []) as { tax: number | string }[]).reduce((a, e) => a + Number(e.tax || 0), 0);
+    const regime = ((st?.tax_regime as string | null) ?? null) as Regime | null;
+    const est = estimateTaxes({
+      regime,
+      monthSalesBase: Number(month.sales_base ?? 0),
+      monthSalesTax: Number(month.sales_tax ?? 0),
+      monthPurchasesTax: purchasesTax,
+      yearSalesBase: Number(year.sales_base ?? 0),
+    });
+    const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    const daysLeft = Math.max(1, lastDay - Number(today.slice(8, 10)) + 1);
+    return {
+      ...est,
+      month_sales_base: Number(month.sales_base ?? 0),
+      year_sales_base: Number(year.sales_base ?? 0),
+      purchases_igv_credit: Math.round(purchasesTax * 100) / 100,
+      save_per_day_until_month_end: Math.round((est.total / daysLeft) * 100) / 100,
+      disclaimer: "Estimado referencial: confírmalo con tu contador.",
+    };
+  } catch {
+    return null;
   }
 }

@@ -14,6 +14,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'products.dart';
+import 'store_v2.dart';
 
 /// Tienda en línea: tu catálogo como página web. Los clientes arman su pedido y te llega como cotización,
 /// en vivo, lista para convertir en factura con un toque.
@@ -223,6 +224,13 @@ class _StoreScreenState extends State<StoreScreen> {
                       ),
                       const SizedBox(height: 14),
                       GradientButton(label: _saving ? 'Guardando…' : 'Guardar', icon: Icons.check_rounded, busy: _saving, onPressed: _saving || !_isAdmin ? null : () => _save()),
+                      const SizedBox(height: 8),
+                      // v2.0: color, carta/tienda, recojo/delivery, pedido mínimo, reservas en línea.
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StoreOptionsScreen())),
+                        icon: const Icon(Icons.tune_rounded),
+                        label: const Text('Más opciones: carta, delivery, reservas'),
+                      ),
                     ]),
                   ),
                 ),

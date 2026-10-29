@@ -1,4 +1,4 @@
-// Lectura de archivos de comprobantes históricos (CSV/TXT del portal de SUNAT o de otro sistema).
+// Lectura de archivos de comprobantes históricos (CSV/TXT/XLSX del portal de SUNAT, de Excel o de otro sistema).
 // Lógica pura y probada: detecta separador, columnas (cliente, servicio, importe, fecha, número) y limpia los valores.
 import 'dart:convert';
 import 'dart:typed_data';
@@ -149,6 +149,16 @@ String parseDateIso(String raw) {
   return '$y-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
 }
 
+/// Fecha en texto o número de serie de Excel (p. ej. 46025 → 2026-01-04).
+String _dateCell(String raw) {
+  final iso = parseDateIso(raw);
+  if (iso.isNotEmpty) return iso;
+  final n = num.tryParse(raw.trim());
+  if (n == null || n < 20000 || n > 80000) return '';
+  final d = DateTime.utc(1899, 12, 30).add(Duration(days: n.floor()));
+  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
 int? _find(List<String> headers, List<String> exact, List<String> contains, {Set<int> taken = const {}}) {
   for (final e in exact) {
     final i = headers.indexOf(e);
@@ -165,7 +175,32 @@ int? _find(List<String> headers, List<String> exact, List<String> contains, {Set
 ParsedImport parseImportText(String text) {
   final firstLine = text.split(RegExp(r'\r?\n')).firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
   if (firstLine.isEmpty) return const ParsedImport(rows: [], rejected: 0, columns: {}, error: 'El archivo está vacío.');
-  final table = parseCsv(text, detectDelimiter(firstLine));
+  return parseImportTable(parseCsv(text, detectDelimiter(firstLine)));
+}
+
+/// Busca la fila de encabezados entre las primeras 15 (los Excel suelen traer títulos o filas vacías arriba).
+int headerRowIndex(List<List<String>> table) {
+  const keys = ['importe', 'total', 'monto', 'cliente', 'razonsocial', 'fecha', 'ruc', 'dni', 'descripcion', 'serie'];
+  var best = 0;
+  var bestScore = -1;
+  for (var k = 0; k < table.length && k < 15; k++) {
+    final h = table[k].map(_norm).toList();
+    var score = 0;
+    for (final key in keys) {
+      if (h.any((x) => x.contains(key))) score++;
+    }
+    if (score > bestScore) {
+      best = k;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/// Tabla ya separada en celdas (de un CSV o de un Excel .xlsx). La primera fila útil son los encabezados.
+ParsedImport parseImportTable(List<List<String>> source) {
+  final start = headerRowIndex(source);
+  final table = source.sublist(start);
   if (table.length < 2) return const ParsedImport(rows: [], rejected: 0, columns: {}, error: 'No encontramos filas con datos.');
   final raw = table.first.map((h) => h.trim()).toList();
   final h = raw.map(_norm).toList();
@@ -216,7 +251,7 @@ ParsedImport parseImportText(String text) {
       taxId: cell(r, taxI),
       description: cell(r, descI),
       number: number,
-      date: parseDateIso(cell(r, dateI)),
+      date: _dateCell(cell(r, dateI)),
       currency: (cur == 'USD' || cur == 'DOLARES' || cur == 'US\$') ? 'USD' : 'PEN',
       amount: amount,
     ));

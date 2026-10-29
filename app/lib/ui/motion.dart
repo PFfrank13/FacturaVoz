@@ -854,7 +854,8 @@ class QuickAction extends StatelessWidget {
                   ),
               ]),
               const SizedBox(height: 7),
-              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: t.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+              // Una sola línea que se achica si no entra ("Escanear" ya no se parte ni se corta).
+              FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, softWrap: false, textAlign: TextAlign.center, style: t.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600))),
             ]),
           ),
         ),
@@ -905,4 +906,295 @@ class TagChip extends StatelessWidget {
           Text(label, style: TextStyle(fontFamily: 'Inter', fontSize: 11.5, fontWeight: FontWeight.w700, color: color)),
         ]),
       );
+}
+
+// ═════════════════════════ v2.0 · Sistema central de movimiento ═════════════════════════
+// Una sola fuente de duraciones, curvas y resortes: así toda la app "se mueve igual".
+// Reglas (errores que ya tuvimos y no deben volver):
+//  · Sombras y radios NUNCA con curvas que rebotan (easeOutBack/elastic dan valores negativos): usa Motion.shadow.
+//  · Los rebotes solo en escalas (scale) y nunca por debajo de 0.
+//  · Respeta "Reducir animaciones" del sistema y el interruptor de la app (reduceMotion(context)).
+class Motion {
+  static const instant = Duration(milliseconds: 90);
+  static const fast = Duration(milliseconds: 180);
+  static const medium = Duration(milliseconds: 280);
+  static const slow = Duration(milliseconds: 420);
+  static const page = Duration(milliseconds: 420);
+  static const count = Duration(milliseconds: 900);
+  static const stagger = Duration(milliseconds: 55);
+
+  static const standard = Curves.easeOutCubic;
+  static const enter = Curves.easeOutCubic;
+  static const exit = Curves.easeInCubic;
+  static const emphasized = Curves.easeInOutCubicEmphasized;
+
+  /// Rebote suave para escalas (botones, chips). NO usar en sombras ni tamaños que puedan quedar negativos.
+  static const spring = Curves.easeOutBack;
+
+  /// Para sombras, radios y opacidades: sin rebote.
+  static const shadow = Curves.easeOutCubic;
+
+  static Duration d(BuildContext context, Duration base) => reduceMotion(context) ? Duration.zero : base;
+}
+
+/// Deslizar una fila para acciones rápidas (cobrar, WhatsApp, duplicar) con vibración al cruzar el umbral.
+/// No borra la fila: al soltar ejecuta la acción y vuelve a su lugar.
+class SwipeActions extends StatefulWidget {
+  const SwipeActions({super.key, required this.child, this.left, this.right});
+  final Widget child;
+
+  /// Acción al deslizar hacia la DERECHA (aparece a la izquierda).
+  final SwipeAction? left;
+
+  /// Acción al deslizar hacia la IZQUIERDA (aparece a la derecha).
+  final SwipeAction? right;
+
+  @override
+  State<SwipeActions> createState() => _SwipeActionsState();
+}
+
+class SwipeAction {
+  const SwipeAction({required this.icon, required this.label, required this.color, required this.onTrigger});
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTrigger;
+}
+
+class _SwipeActionsState extends State<SwipeActions> with SingleTickerProviderStateMixin {
+  late final AnimationController _back = AnimationController(vsync: this, duration: Motion.medium);
+  double _dx = 0;
+  double _from = 0;
+  bool _armed = false;
+  static const _threshold = 84.0;
+
+  @override
+  void dispose() {
+    _back.dispose();
+    super.dispose();
+  }
+
+  void _update(DragUpdateDetails d) {
+    if (_back.isAnimating) {
+      _back.stop();
+      _dx = 0;
+    }
+    var next = _dx + d.delta.dx;
+    if (widget.left == null && next > 0) next = 0;
+    if (widget.right == null && next < 0) next = 0;
+    next = next.clamp(-140.0, 140.0);
+    final armed = next.abs() >= _threshold;
+    if (armed != _armed) {
+      if (armed) Haptics.select();
+      _armed = armed;
+    }
+    setState(() => _dx = next);
+  }
+
+  void _end(DragEndDetails _) {
+    final action = _dx > 0 ? widget.left : widget.right;
+    if (_armed && action != null) {
+      Haptics.soft();
+      action.onTrigger();
+    }
+    _armed = false;
+    _from = _dx;
+    _back.forward(from: 0).whenComplete(() {
+      if (mounted) setState(() => _dx = 0);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _back,
+      builder: (context, child) {
+        final x = _back.isAnimating ? _from * (1 - Motion.standard.transform(_back.value)) : _dx;
+        final a = x > 0 ? widget.left : widget.right;
+        final p = (x.abs() / _threshold).clamp(0.0, 1.0);
+        return GestureDetector(
+          onHorizontalDragUpdate: _update,
+          onHorizontalDragEnd: _end,
+          child: Stack(children: [
+            if (a != null && x != 0)
+              Positioned.fill(
+                child: Container(
+                  alignment: x > 0 ? Alignment.centerLeft : Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  decoration: BoxDecoration(color: a.color.withValues(alpha: 0.12 + 0.18 * p), borderRadius: BorderRadius.circular(24)),
+                  child: Transform.scale(
+                    scale: 0.8 + 0.25 * p,
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(a.icon, color: a.color),
+                      Text(a.label, style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: a.color)),
+                    ]),
+                  ),
+                ),
+              ),
+            Transform.translate(offset: Offset(x, 0), child: child),
+          ]),
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// Hace "vibrar" su contenido cuando [trigger] cambia (errores que se explican con movimiento, no con pantallas rojas).
+class Shake extends StatefulWidget {
+  const Shake({super.key, required this.trigger, required this.child});
+  final int trigger;
+  final Widget child;
+
+  @override
+  State<Shake> createState() => _ShakeState();
+}
+
+class _ShakeState extends State<Shake> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+
+  @override
+  void didUpdateWidget(covariant Shake old) {
+    super.didUpdateWidget(old);
+    if (widget.trigger != old.trigger && !reduceMotion(context)) {
+      Haptics.warning();
+      _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        child: widget.child,
+        builder: (context, child) => Transform.translate(offset: Offset(math.sin(_c.value * math.pi * 6) * 8 * (1 - _c.value), 0), child: child),
+      );
+}
+
+/// Onda de voz en vivo mientras se dicta ([level] 0..1 actualizado por el grabador).
+class VoiceWave extends StatefulWidget {
+  const VoiceWave({super.key, required this.level, this.active = true, this.color, this.height = 46, this.bars = 28});
+  final double level;
+  final bool active;
+  final Color? color;
+  final double height;
+  final int bars;
+
+  @override
+  State<VoiceWave> createState() => _VoiceWaveState();
+}
+
+class _VoiceWaveState extends State<VoiceWave> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.color ?? Theme.of(context).colorScheme.primary;
+    if (reduceMotion(context)) {
+      return SizedBox(height: widget.height, child: Center(child: Container(height: 4 + widget.level * (widget.height - 4), width: 6, color: color)));
+    }
+    return RepaintBoundary(
+      child: SizedBox(
+        height: widget.height,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) => CustomPaint(painter: _WavePainter(_c.value, widget.active ? widget.level.clamp(0.0, 1.0) : 0, color, widget.bars), size: Size.infinite),
+        ),
+      ),
+    );
+  }
+}
+
+class _WavePainter extends CustomPainter {
+  _WavePainter(this.t, this.level, this.color, this.bars);
+  final double t;
+  final double level;
+  final Color color;
+  final int bars;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width / (bars * 1.6);
+    final p = Paint()
+      ..color = color
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = w;
+    for (var i = 0; i < bars; i++) {
+      final phase = (i / bars) * math.pi * 2;
+      final amp = 0.15 + 0.85 * level * (0.55 + 0.45 * math.sin(t * math.pi * 2 * 1.6 + phase * 1.7).abs());
+      final h = math.max(3.0, size.height * amp);
+      final x = (i + 0.5) * size.width / bars;
+      canvas.drawLine(Offset(x, (size.height - h) / 2), Offset(x, (size.height + h) / 2), p..color = color.withValues(alpha: 0.45 + 0.55 * amp));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WavePainter old) => old.t != t || old.level != level || old.color != color;
+}
+
+/// Cambio de estado visible (pendiente → cobrada): el contenido nuevo entra deslizando y con fundido.
+class StatusMorph extends StatelessWidget {
+  const StatusMorph({super.key, required this.status, required this.child});
+  final String status;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+        duration: Motion.d(context, Motion.medium),
+        switchInCurve: Motion.enter,
+        switchOutCurve: Motion.exit,
+        transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(a), child: c)),
+        child: KeyedSubtree(key: ValueKey(status), child: child),
+      );
+}
+
+/// Detecta teléfonos lentos midiendo los primeros cuadros: si van por encima de ~20 ms, reduce efectos solo.
+class PerfGuard {
+  PerfGuard._();
+  static final ValueNotifier<bool> slowDevice = ValueNotifier(false);
+  static bool _started = false;
+
+  static void start() {
+    if (_started) return;
+    _started = true;
+    final samples = <int>[];
+    late TimingsCallback cb;
+    cb = (List<FrameTiming> timings) {
+      for (final t in timings) {
+        samples.add(t.totalSpan.inMicroseconds);
+      }
+      if (samples.length >= 180) {
+        samples.sort();
+        final p75 = samples[(samples.length * 0.75).floor()];
+        if (p75 > 20000) slowDevice.value = true;
+        WidgetsBinding.instance.removeTimingsCallback(cb);
+      }
+    };
+    WidgetsBinding.instance.addTimingsCallback(cb);
+  }
+}
+
+/// Preferencia de movimiento de la app: null = automático (sistema + teléfono lento), true = reducidas, false = completas.
+/// main.dart la aplica a toda la app vía MediaQuery.disableAnimations, así cada widget solo pregunta reduceMotion(context).
+class MotionPrefs {
+  MotionPrefs._();
+  static final ValueNotifier<bool?> userReduced = ValueNotifier(null);
+  static Listenable get listenable => Listenable.merge([userReduced, PerfGuard.slowDevice]);
+  static bool effective(bool system) {
+    final u = userReduced.value;
+    if (system || u == true) return true;
+    if (u == false) return false;
+    return PerfGuard.slowDevice.value;
+  }
 }

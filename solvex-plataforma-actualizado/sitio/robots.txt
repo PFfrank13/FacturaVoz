@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://solvex.pe/sitemap.xml

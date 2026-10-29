@@ -1,0 +1,21 @@
+{
+  "name": "solvex-hub",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Solvex Hub: servidor de licencias, cobros y ERP de clientes para todos los productos de Solvex. Sin dependencias externas.",
+  "type": "commonjs",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning src/server.js --dev",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/*.test.js\"",
+    "setup": "node --disable-warning=ExperimentalWarning scripts/setup.js",
+    "crear-admin": "node --disable-warning=ExperimentalWarning scripts/create-admin.js",
+    "demo": "node --disable-warning=ExperimentalWarning scripts/seed-demo.js --dev",
+    "respaldo": "node --disable-warning=ExperimentalWarning scripts/backup.js",
+    "restaurar": "node --disable-warning=ExperimentalWarning scripts/restore.js",
+    "verificar-auditoria": "node --disable-warning=ExperimentalWarning scripts/verify-audit.js",
+    "rotar-llave-datos": "node --disable-warning=ExperimentalWarning scripts/rotate-data-key.js"
+  },
+  "dependencies": {}
+}

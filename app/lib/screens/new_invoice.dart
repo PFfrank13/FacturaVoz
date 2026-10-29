@@ -22,6 +22,10 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'products.dart';
+import '../access.dart';
+import '../logic/doc_voice.dart' as docv;
+import '../services/v2_api.dart';
+import '../services/v2_repo.dart';
 
 enum _Phase { idle, recording, processing, review }
 
@@ -83,6 +87,14 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   bool _showNotes = false;
   int? _validDays = 15; // vigencia de la cotización
   Map<String, ClientPayStats> _stats = const {};
+
+  // v2.0: consulta DNI/RUC (con caché en el servidor) y venta en dólares con tipo de cambio.
+  bool _lookingUp = false;
+  String _lookupMsg = '';
+  String _lookedUp = '';
+  late String _currency = _profile.currency;
+  double? _fx;
+  String _fxMsg = '';
 
   Profile get _profile => AppState.instance.profile!;
   String get _noun => widget.quote ? 'cotización' : 'factura';
@@ -281,6 +293,17 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       ..addAll((d.items.isEmpty ? [LineItem()] : d.items).map(_Row.new));
     _client.text = d.clientName;
     _clientTax.text = d.clientTaxId;
+    // Dictado: "factura para el RUC 20100070970…" → se detecta el documento y se consultan sus datos.
+    if (d.clientTaxId.trim().isEmpty && (d.transcript ?? '').isNotEmpty) {
+      final found = docv.extractDoc(d.transcript!);
+      if (found != null) _clientTax.text = found.number;
+    }
+    if (docv.docKind(_clientTax.text) != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _lookup(auto: true);
+      });
+    }
+    _currency = d.currency.isEmpty ? _profile.currency : d.currency;
     _taxRate.text = qtyText(d.taxRate);
     _credit = false;
     _due = null;
@@ -294,6 +317,54 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   }
 
   void _touch() => setState(() => _dirty = true);
+
+  /// Consulta DNI (RENIEC) o RUC (SUNAT) con el proveedor configurado en el servidor. Si no hay proveedor o falla,
+  /// se escribe a mano (nunca bloquea la venta).
+  Future<void> _lookup({bool auto = false}) async {
+    final n = _clientTax.text.replaceAll(RegExp(r'\D'), '');
+    final kind = docv.docKind(n);
+    if (kind == null) {
+      if (!auto) setState(() => _lookupMsg = n.length == 11 ? 'Ese RUC no es válido (revisa los dígitos).' : 'Escribe un DNI de 8 dígitos o un RUC de 11.');
+      return;
+    }
+    if (_lookingUp || (auto && _lookedUp == n)) return;
+    setState(() {
+      _lookingUp = true;
+      _lookupMsg = '';
+      _lookedUp = n;
+    });
+    final r = await V2Api.lookup(n);
+    if (!mounted) return;
+    setState(() {
+      _lookingUp = false;
+      if (r.ok) {
+        final d = r.data!;
+        if (_client.text.trim().isEmpty || _client.text.trim().toLowerCase() != d.name.toLowerCase()) _client.text = d.name;
+        _lookupMsg = d.kind == 'ruc' && (!d.rucActive || !d.rucHabido)
+            ? '⚠️ RUC ${d.status.isEmpty ? '' : d.status} ${d.condition}. SUNAT puede rechazar facturas a este RUC.'
+            : '✓ ${d.kind == 'ruc' ? 'SUNAT' : 'RENIEC'}: ${d.name}${d.fullAddress.isNotEmpty ? ' · ${d.fullAddress}' : ''}';
+        _dirty = true;
+      } else {
+        _lookupMsg = r.message.isEmpty ? 'Escribe el nombre a mano.' : r.message;
+      }
+    });
+  }
+
+  Future<void> _setCurrency(String c) async {
+    setState(() {
+      _currency = c;
+      _fx = null;
+      _fxMsg = '';
+      _dirty = true;
+    });
+    if (c == 'PEN') return;
+    final r = await V2Api.fx(todayIso(), currency: c);
+    if (!mounted) return;
+    setState(() {
+      _fx = r.sell;
+      _fxMsg = r.sell != null ? 'Tipo de cambio SUNAT (venta) de hoy: ${r.sell!.toStringAsFixed(3)}' : r.message;
+    });
+  }
 
   // ---------------- Revisión ----------------
   List<LineItem> _currentItems() => _rows
@@ -401,7 +472,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         clientName: _client.text,
         clientTaxId: _clientTax.text,
         taxRate: parseDecimal(_taxRate.text)!,
-        currency: _profile.currency,
+        currency: _currency,
         notes: _notes.text,
         transcript: _transcript,
         dueDate: _credit ? todayIso(_due) : null,
@@ -413,6 +484,12 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         id = await ProRepo.createQuote(draft, validUntil: days == null ? null : todayIso(DateTime.now().add(Duration(days: days))));
       } else {
         id = await Repo.createInvoice(draft);
+        // Venta en otra moneda: se guarda el tipo de cambio del día (para reportes en soles).
+        if (_currency != 'PEN' && _fx != null) {
+          try {
+            await V2Repo.setExchangeRate(id, _fx!);
+          } catch (_) {}
+        }
       }
       _dirty = false;
       final mail = _clientEmail.text.trim();
@@ -578,7 +655,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     final t = Theme.of(context);
     final rate = parseDecimal(_taxRate.text) ?? 0;
     final totals = computeTotals(_currentItems(), rate);
-    final cur = _profile.currency;
+    final cur = _currency;
     final bottom = MediaQuery.of(context).padding.bottom;
     final heard = _transcript != null && _transcript!.trim().isNotEmpty;
     final noLines = heard && _rows.length == 1 && _rows.first.desc.text.trim().isEmpty && _rows.first.price.text.trim().isEmpty;
@@ -741,19 +818,40 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           labelText: 'DNI o RUC (opcional)',
           counterText: '',
           prefixIcon: const Icon(Icons.numbers_rounded),
-          suffixIcon: kind == null
-              ? null
-              : Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: Align(
-                    widthFactor: 1,
-                    child: StatusPill(kind.label, tone: _taxError() == null ? PillTone.ok : PillTone.warn),
-                  ),
-                ),
+          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (kind != null) StatusPill(kind.label, tone: _taxError() == null ? PillTone.ok : PillTone.warn),
+            IconButton(
+              tooltip: 'Buscar nombre con el DNI/RUC',
+              onPressed: _lookingUp ? null : () => _lookup(),
+              icon: _lookingUp ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.travel_explore_rounded),
+            ),
+          ]),
           errorText: _taxError(),
         ),
-        onChanged: (_) => _touch(),
+        onChanged: (v) {
+          _touch();
+          // Al completar 8 (DNI) u 11 (RUC) dígitos válidos se consulta solo.
+          if (docv.docKind(v) != null) _lookup(auto: true);
+        },
       ),
+      if (_lookupMsg.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 6, left: 4),
+          child: Align(alignment: Alignment.centerLeft, child: Text(_lookupMsg, style: Theme.of(context).textTheme.bodySmall)),
+        ),
+      if (!widget.quote && Access.instance.has('multimoneda')) ...[
+        const SizedBox(height: 12),
+        Row(children: [
+          Text('Moneda', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(width: 12),
+          SegmentedButton<String>(
+            segments: const [ButtonSegment(value: 'PEN', label: Text('Soles')), ButtonSegment(value: 'USD', label: Text('Dólares'))],
+            selected: {_currency == 'USD' ? 'USD' : 'PEN'},
+            onSelectionChanged: (v) => _setCurrency(v.first),
+          ),
+        ]),
+        if (_fxMsg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6, left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(_fxMsg, style: Theme.of(context).textTheme.bodySmall))),
+      ],
       const SizedBox(height: 12),
       TextField(
         controller: _clientEmail,

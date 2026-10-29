@@ -199,47 +199,116 @@ export function sameOrigin(req: Request): boolean {
   }
 }
 
-export type StoreProduct = { id: string; name: string; price: number; priceWithTax: number; service: boolean };
+export type StoreProduct = {
+  id: string;
+  name: string;
+  price: number;
+  priceWithTax: number;
+  service: boolean;
+  category: string;
+  description: string;
+  image: string | null;
+  featured: boolean;
+  wholesalePrice: number | null;
+  wholesaleMinQty: number | null;
+  stock: number | null;
+};
 export type PublicStore = {
   slug: string;
   business: string;
   taxId: string;
   headline: string;
+  about: string;
   whatsapp: string;
   currency: string;
   taxRate: number;
+  color: string;
+  mode: "tienda" | "carta";
+  pickup: boolean;
+  delivery: boolean;
+  deliveryNote: string;
+  minOrder: number | null;
+  booking: boolean;
+  logo: string | null;
+  categories: string[];
   products: StoreProduct[];
 };
 
-/** Catálogo público /tienda/<slug> (solo productos activos y visibles en tienda). */
+/** Catálogo público /tienda/<slug> (solo productos activos y visibles en tienda). Fotos con URL firmada (1 h). */
 export async function getPublicStore(slug: string): Promise<PublicStore | null> {
   const s = (slug ?? "").toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(s)) return null;
   const admin = createAdminClient();
-  const { data: st } = await admin.from("org_store").select("org_id, slug, headline, whatsapp, enabled").eq("slug", s).maybeSingle();
+  const { data: st } = await admin.from("org_store").select("*").eq("slug", s).maybeSingle();
   if (!st || st.enabled !== true) return null;
-  const { data: org } = await admin.from("organizations").select("name, trade_name, tax_id, currency, default_tax_rate").eq("id", st.org_id).maybeSingle();
+  const { data: org } = await admin.from("organizations").select("name, trade_name, tax_id, currency, default_tax_rate, logo_path").eq("id", st.org_id).maybeSingle();
   if (!org) return null;
   const rate = org.default_tax_rate == null ? 18 : Number(org.default_tax_rate);
-  const { data: prods } = await admin
+  // Columnas nuevas (20261108): si la migración aún no corre, se usa el catálogo básico.
+  let prods: Record<string, unknown>[] = [];
+  const full = await admin
     .from("products")
-    .select("id, name, unit_price, unit")
+    .select("id, name, unit_price, unit, category, description, image_path, featured, wholesale_price, wholesale_min_qty, stock, sort")
     .eq("org_id", st.org_id)
     .eq("active", true)
     .eq("in_store", true)
+    .order("featured", { ascending: false })
+    .order("sort", { ascending: true })
     .order("name", { ascending: true })
-    .limit(300);
+    .limit(400);
+  if (full.error) {
+    const basic = await admin.from("products").select("id, name, unit_price, unit").eq("org_id", st.org_id).eq("active", true).eq("in_store", true).order("name").limit(400);
+    prods = (basic.data ?? []) as Record<string, unknown>[];
+  } else prods = (full.data ?? []) as Record<string, unknown>[];
+  const paths = prods.map((p) => p.image_path).filter((x): x is string => typeof x === "string" && x.length > 0);
+  const signed = new Map<string, string>();
+  if (paths.length) {
+    const { data: urls } = await admin.storage.from("org-media").createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  let logo: string | null = null;
+  if (org.logo_path) {
+    const { data: lu } = await admin.storage.from("org-media").createSignedUrl(org.logo_path as string, 3600);
+    logo = lu?.signedUrl ?? null;
+  }
+  const withTax = (n: number) => Math.round(n * (1 + rate / 100) * 100) / 100;
+  const products: StoreProduct[] = prods.map((p) => {
+    const price = Number(p.unit_price);
+    const wp = p.wholesale_price == null ? null : Number(p.wholesale_price);
+    return {
+      id: String(p.id),
+      name: String(p.name),
+      price,
+      priceWithTax: withTax(price),
+      service: p.unit === "ZZ",
+      category: String(p.category ?? "").trim(),
+      description: String(p.description ?? ""),
+      image: typeof p.image_path === "string" ? signed.get(p.image_path) ?? null : null,
+      featured: p.featured === true,
+      wholesalePrice: wp == null ? null : withTax(wp),
+      wholesaleMinQty: p.wholesale_min_qty == null ? null : Number(p.wholesale_min_qty),
+      stock: st.show_stock === true && p.stock != null ? Number(p.stock) : null,
+    };
+  });
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     slug: s,
     business: (org.trade_name as string | null) || (org.name as string),
     taxId: (org.tax_id as string | null) ?? "",
     headline: (st.headline as string | null) ?? "",
+    about: (st.about as string | null) ?? "",
     whatsapp: (st.whatsapp as string | null) ?? "",
     currency: (org.currency as string | null) ?? "PEN",
     taxRate: rate,
-    products: ((prods ?? []) as { id: string; name: string; unit_price: number | string; unit: string }[]).map((p) => {
-      const price = Number(p.unit_price);
-      return { id: p.id, name: p.name, price, priceWithTax: Math.round(price * (1 + rate / 100) * 100) / 100, service: p.unit === "ZZ" };
-    }),
+    color: /^#[0-9a-fA-F]{6}$/.test(String(st.theme_color ?? "")) ? String(st.theme_color) : "#6a62e2",
+    mode: st.mode === "carta" ? "carta" : "tienda",
+    pickup: st.pickup !== false,
+    delivery: st.delivery === true,
+    deliveryNote: (st.delivery_note as string | null) ?? "",
+    minOrder: st.min_order == null ? null : Number(st.min_order),
+    booking: st.booking === true,
+    logo,
+    categories,
+    products,
   };
 }

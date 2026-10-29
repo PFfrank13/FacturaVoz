@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'catalog.dart' show AvatarButton, FeatureStrip;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -223,10 +225,17 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             if (widget.embedded)
               Reveal(
                 child: Row(children: [
-                  Expanded(child: Text('Cobranza', style: t.textTheme.headlineMedium)),
+                  Expanded(child: Text('Cobrar y pagar', style: t.textTheme.headlineMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
                   IconButton.filledTonal(onPressed: _openSettings, icon: const Icon(Icons.tune_rounded), tooltip: 'Medios de cobro y recordatorios'),
+                  const SizedBox(width: 6),
+                  const AvatarButton(),
                 ]),
               ),
+            // v2.0: todo lo de cobrar y pagar a un toque (solo lo que el plan y el rol permiten).
+            if (widget.embedded) ...[
+              const SizedBox(height: 12),
+              const FeatureStrip(ids: ['fiados', 'caja', 'avisos', 'banco', 'gastos', 'escanear']),
+            ],
             const SizedBox(height: 12),
             if (_error != null)
               SoftCard(child: Column(children: [Text(_error!, textAlign: TextAlign.center), TextButton(onPressed: _load, child: const Text('Reintentar'))]))

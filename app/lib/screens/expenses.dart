@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../models_pro.dart';
+import '../logic/scan_checks.dart';
 import '../reports.dart' show monthNames, monthRange;
 import '../services/pro_repo.dart';
 import '../ui/motion.dart';
@@ -37,6 +38,21 @@ Future<bool> showExpenseSheet(BuildContext context, {Expense? prefill}) async {
   var hasIgv = (prefill?.tax ?? 0) > 0;
   var err = '';
   var saving = false;
+  // v2.0: avisos sobre lo leído por el escáner (sin tocar el escáner): fecha antigua, comprador distinto, a mano.
+  final scan = prefill?.source == 'scan' ? DocScan.last : null;
+  final handwritten = scan != null && looksHandwritten(supplierTaxId: scan.supplierTaxId, docNumber: scan.docNumber, docType: scan.docType);
+  final warnings = scan == null
+      ? const <ScanWarning>[]
+      : scanWarnings(
+          issueDate: scan.issueDate,
+          supplierTaxId: scan.supplierTaxId,
+          clientTaxId: scan.clientTaxId,
+          docType: scan.docType,
+          confidence: shownConfidence(scan.confidence, handwritten: handwritten),
+          looksHandwritten: handwritten,
+          myRuc: AppState.instance.profile?.taxId ?? '',
+          today: todayIso(),
+        );
 
   final ok = await showModalBottomSheet<bool>(
     context: context,
@@ -91,6 +107,19 @@ Future<bool> showExpenseSheet(BuildContext context, {Expense? prefill}) async {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(prefill == null ? 'Nuevo gasto' : 'Confirma el gasto', style: t.textTheme.titleLarge),
             if (prefill?.source == 'scan') Text('Leído de la foto: revisa los montos antes de guardar.', style: t.textTheme.bodySmall),
+            if (scan != null)
+              Text('Seguridad de la lectura: ${(shownConfidence(scan.confidence, handwritten: handwritten) * 100).round()} %${handwritten ? ' (escrito a mano)' : ''}', style: t.textTheme.bodySmall),
+            for (final w in warnings)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: (w.serious ? Brand.bad : Brand.warn).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(w.serious ? Icons.error_outline_rounded : Icons.info_outline_rounded, size: 18, color: w.serious ? Brand.bad : Brand.warn),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(w.text, style: t.textTheme.bodySmall)),
+                ]),
+              ),
             if (prefill?.source == 'voice') Text('Entendí esto de lo que dijiste.', style: t.textTheme.bodySmall),
             const SizedBox(height: 16),
             TextField(

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://hub.solvex.pe http://localhost:8080; form-action 'none'; base-uri 'none'; object-src 'none'">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;800&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<link rel="stylesheet" href="css/site.css">
+<script src="js/config.js" defer></script>
+<script src="js/legal.js" defer></script>
+<title>Libro de Reclamaciones · Solvex</title>
+<meta name="description" content="Libro de Reclamaciones virtual de Solvex, conforme al Código de Protección y Defensa del Consumidor.">
+</head>
+<body class="site"><div class="page"><div class="wrap"><main class="doc">
+<a class="back" href="index.html">← Volver a Solvex</a>
+<h1>Libro de Reclamaciones</h1>
+<p>Conforme al Código de Protección y Defensa del Consumidor (Ley N.º 29571). Proveedor: <b data-k="NOMBRE_COMERCIAL">Solvex</b><span data-if="RAZON_SOCIAL"> (<span data-k="RAZON_SOCIAL"></span>)</span><span data-k="RUC" data-prefix=" · RUC "></span><span data-k="DIRECCION" data-prefix=" · "></span>.</p>
+<p><b>Reclamo:</b> disconformidad relacionada con los productos o servicios. <b>Queja:</b> disconformidad no relacionada con los productos o servicios, o malestar respecto a la atención al público.</p>
+<form class="lrform" id="lr" novalidate>
+  <fieldset><legend>1. Tus datos</legend>
+    <div class="field"><label for="c-name">Nombre completo</label><input id="c-name" maxlength="120" autocomplete="name" required></div>
+    <div class="two"><div class="field"><label for="c-dt">Documento</label><select id="c-dt"><option value="DNI">DNI</option><option value="CE">Carné de extranjería</option><option value="PAS">Pasaporte</option><option value="RUC">RUC</option></select></div>
+    <div class="field"><label for="c-dn">Número</label><input id="c-dn" maxlength="15" inputmode="numeric" required></div></div>
+    <div class="two"><div class="field"><label for="c-em">Correo (te enviamos la constancia)</label><input id="c-em" type="email" maxlength="254" autocomplete="email" required></div>
+    <div class="field"><label for="c-ph">Teléfono</label><input id="c-ph" maxlength="20" autocomplete="tel"></div></div>
+    <div class="field"><label for="c-ad">Domicilio</label><input id="c-ad" maxlength="200" autocomplete="street-address" required></div>
+    <div class="field"><label for="c-gu">Si eres menor de edad: nombre de tu padre, madre o apoderado</label><input id="c-gu" maxlength="120"></div>
+  </fieldset>
+  <fieldset><legend>2. Bien contratado</legend>
+    <div class="radios"><label><input type="radio" name="gt" value="servicio" checked> Servicio</label><label><input type="radio" name="gt" value="producto"> Producto</label></div>
+    <div class="two"><div class="field"><label for="c-gd">Descripción</label><input id="c-gd" maxlength="300" placeholder="Ej. Sistema de Barbería, plan mensual" required></div>
+    <div class="field"><label for="c-am">Monto reclamado (S/, opcional)</label><input id="c-am" inputmode="decimal" maxlength="12"></div></div>
+  </fieldset>
+  <fieldset><legend>3. Detalle</legend>
+    <div class="radios"><label><input type="radio" name="kind" value="reclamo" checked> Reclamo</label><label><input type="radio" name="kind" value="queja"> Queja</label></div>
+    <div class="field"><label for="c-de">Detalle</label><textarea id="c-de" maxlength="3000" required></textarea></div>
+    <div class="field"><label for="c-rq">Pedido (qué solución esperas)</label><textarea id="c-rq" maxlength="1500" required></textarea></div>
+  </fieldset>
+  <input class="hp" id="c-web" tabindex="-1" autocomplete="off" aria-hidden="true">
+  <label class="consent dark"><input type="checkbox" id="c-ok"> <span>Declaro que los datos son verdaderos y acepto recibir la constancia y la respuesta en mi correo.</span></label>
+  <button type="submit" class="btn-dark">Enviar</button>
+  <p class="formmsg" id="lr-msg" role="status" aria-live="polite"></p>
+</form>
+<div class="receipt" id="lr-ok" role="status"></div>
+<p>La respuesta se envía en un plazo máximo de 15 días hábiles. La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI.</p>
+<nav class="doc-foot" aria-label="Documentos legales"><a href="terminos.html">Términos y condiciones</a><a href="reembolsos.html">Cancelación y reembolsos</a><a href="privacidad.html">Privacidad</a><a href="reclamaciones.html">Libro de Reclamaciones</a></nav>
+</main></div></div></body></html>

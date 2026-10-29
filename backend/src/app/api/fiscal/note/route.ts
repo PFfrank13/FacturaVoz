@@ -34,6 +34,10 @@ export async function POST(req: Request) {
   if (!doc) return json({ error: "Este comprobante no se emitió a SUNAT" }, 404);
   if (doc.status !== "accepted") return json({ error: "Solo se puede anular un comprobante aceptado por SUNAT" }, 409);
   const orgId = doc.org_id as string;
+  // Antifraude: si la empresa configuró PIN de administrador, anular exige haberlo validado (o ser administrador).
+  const { data: pin } = await supabase.rpc("pin_status", { p_org: orgId });
+  const pinState = (pin ?? null) as { enabled?: boolean; ok?: boolean } | null;
+  if (pinState?.enabled && !pinState.ok) return json({ error: "Para anular se necesita el PIN de administrador.", code: "pin_required" }, 423);
   const { data: company } = await supabase.from("fiscal_companies").select("ruc, env").eq("org_id", orgId).maybeSingle();
   if (!company) return json({ error: "Configura primero la facturación electrónica en Ajustes" }, 412);
 

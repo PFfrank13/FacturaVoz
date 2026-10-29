@@ -20,9 +20,25 @@ void android() {
   const manifestPath = 'android/app/src/main/AndroidManifest.xml';
   var m = read(manifestPath);
   if (m != null) {
-    for (final perm in ['android.permission.INTERNET', 'android.permission.RECORD_AUDIO', 'android.permission.USE_BIOMETRIC']) {
+    for (final perm in [
+      'android.permission.INTERNET',
+      'android.permission.RECORD_AUDIO',
+      'android.permission.USE_BIOMETRIC',
+      // v2.0: lector de códigos (cámara), ubicación del cliente y ticketeras Bluetooth (Android 12+).
+      'android.permission.CAMERA',
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.BLUETOOTH_CONNECT',
+      'android.permission.BLUETOOTH_SCAN',
+    ]) {
       if (!m!.contains('"$perm"')) {
         m = m.replaceFirst('<application', '<uses-permission android:name="$perm"/>\n    <application');
+      }
+    }
+    // Bluetooth clásico solo hasta Android 11 (maxSdkVersion 30), como recomienda Google.
+    for (final perm in ['android.permission.BLUETOOTH', 'android.permission.BLUETOOTH_ADMIN']) {
+      if (!m!.contains('"$perm"')) {
+        m = m.replaceFirst('<application', '<uses-permission android:name="$perm" android:maxSdkVersion="30"/>\n    <application');
       }
     }
     if (!m!.contains('android:allowBackup')) {
@@ -129,6 +145,20 @@ void ios() {
       RegExp(r'</dict>\s*</plist>'),
       '\t<key>NSPhotoLibraryUsageDescription</key>\n'
       '\t<string>FacturaVoz lee las fotos y capturas que elijas (comprobantes y pagos de Yape o Plin).</string>\n</dict>\n</plist>',
+    );
+  }
+  if (!s.contains('NSBluetoothAlwaysUsageDescription')) {
+    s = s.replaceFirst(
+      RegExp(r'</dict>\s*</plist>'),
+      '\t<key>NSBluetoothAlwaysUsageDescription</key>\n'
+      '\t<string>FacturaVoz usa Bluetooth solo para imprimir tus tickets en tu ticketera.</string>\n</dict>\n</plist>',
+    );
+  }
+  if (!s.contains('NSLocationWhenInUseUsageDescription')) {
+    s = s.replaceFirst(
+      RegExp(r'</dict>\s*</plist>'),
+      '\t<key>NSLocationWhenInUseUsageDescription</key>\n'
+      '\t<string>FacturaVoz guarda la ubicación de tu cliente o trabajo solo cuando tocas "Estoy aquí".</string>\n</dict>\n</plist>',
     );
   }
   if (!s.contains('com.facturavoz.app')) {

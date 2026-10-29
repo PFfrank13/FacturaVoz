@@ -9,6 +9,11 @@ import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import '../services/v2_repo.dart';
+import '../ui/barcode_scanner.dart';
+import 'client_profile.dart' show StorageImage;
 
 /// Elige un producto del catálogo (solo activos). Devuelve null si se cierra sin elegir.
 Future<Product?> pickProduct(BuildContext context, String currency) {
@@ -133,6 +138,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final cost = TextEditingController(text: p?.unitCost == null ? '' : qtyText(p!.unitCost!));
     var inStore = p?.inStore ?? true;
     var err = '';
+    // v2.0: código de barras, foto, categoría, descripción y precio por mayor.
+    final extra = p == null ? null : await V2Repo.productExtra(p.id);
+    if (!mounted) return;
+    final barcode = TextEditingController(text: (extra?['barcode'] ?? '') as String);
+    final category = TextEditingController(text: (extra?['category'] ?? '') as String);
+    final description = TextEditingController(text: (extra?['description'] ?? '') as String);
+    final wholesale = TextEditingController(text: extra?['wholesale_price'] == null ? '' : qtyText((extra!['wholesale_price'] as num).toDouble()));
+    final wholesaleMin = TextEditingController(text: extra?['wholesale_min_qty'] == null ? '' : qtyText((extra!['wholesale_min_qty'] as num).toDouble()));
+    final oldImage = extra?['image_path'] as String?;
+    Uint8List? newImage;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -200,7 +215,79 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 value: inStore,
                 onChanged: (v) => setS(() => inStore = v),
                 title: const Text('Mostrar en mi tienda en línea'),
+                subtitle: inStore ? Text(unit == 'NIU' ? 'Para publicarlo necesita foto y código de barras.' : 'Para publicarlo necesita una foto.') : null,
               ),
+              // ── Foto (se comprime en el teléfono antes de subirla; se guarda en Storage privado) ──
+              Row(children: [
+                SizedBox(
+                  width: 74,
+                  height: 74,
+                  child: newImage != null
+                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.memory(newImage!, fit: BoxFit.cover))
+                      : (oldImage != null && oldImage.isNotEmpty
+                          ? StorageImage(path: oldImage)
+                          : Container(
+                              decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
+                              child: const Icon(Icons.add_a_photo_rounded),
+                            )),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Wrap(spacing: 8, runSpacing: 6, children: [
+                    for (final src in const [ImageSource.camera, ImageSource.gallery])
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final x = await ImagePicker().pickImage(source: src, maxWidth: 1200, imageQuality: 75);
+                          if (x == null) return;
+                          final b = await x.readAsBytes();
+                          setS(() => newImage = b);
+                        },
+                        icon: Icon(src == ImageSource.camera ? Icons.photo_camera_rounded : Icons.photo_library_rounded, size: 18),
+                        label: Text(src == ImageSource.camera ? 'Foto' : 'Galería'),
+                      ),
+                  ]),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              TextField(
+                controller: barcode,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Código de barras',
+                  helperText: 'Escanéalo o usa tu lector (pistola) con el cursor aquí.',
+                  suffixIcon: IconButton(
+                    tooltip: 'Escanear con la cámara',
+                    onPressed: () async {
+                      final c = await scanBarcode(ctx);
+                      if (c != null) setS(() => barcode.text = c);
+                    },
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(child: TextField(controller: category, decoration: const InputDecoration(labelText: 'Categoría (ej.: Bebidas)'))),
+              ]),
+              const SizedBox(height: 10),
+              TextField(controller: description, maxLines: 2, maxLength: 400, decoration: const InputDecoration(labelText: 'Descripción para la tienda (opcional)', counterText: '')),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: wholesale,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Precio por mayor (opcional)'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: wholesaleMin,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Desde (unidades)'),
+                  ),
+                ),
+              ]),
               if (unit == 'NIU') ...[
                 const SizedBox(height: 6),
                 SwitchListTile(
@@ -238,10 +325,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.check_rounded,
                 onPressed: () {
                   final v = price.text.trim().isEmpty ? 0.0 : parseDecimal(price.text);
+                  final hasImage = newImage != null || (oldImage != null && oldImage.isNotEmpty);
                   if (name.text.trim().isEmpty) {
                     setS(() => err = 'El nombre es obligatorio');
                   } else if (v == null || v < 0 || v > 10000000) {
                     setS(() => err = 'Escribe un precio válido');
+                  } else if (inStore && !hasImage) {
+                    setS(() => err = 'Para mostrarlo en la tienda agrega una foto (o apaga "Mostrar en mi tienda").');
+                  } else if (inStore && unit == 'NIU' && barcode.text.trim().isEmpty) {
+                    setS(() => err = 'Para mostrarlo en la tienda agrega su código de barras (o apaga "Mostrar en mi tienda").');
+                  } else if (wholesale.text.trim().isNotEmpty && (parseDecimal(wholesale.text) == null || parseDecimal(wholesaleMin.text) == null)) {
+                    setS(() => err = 'Para el precio por mayor indica también desde cuántas unidades.');
                   } else {
                     Navigator.pop(ctx, true);
                   }
@@ -258,10 +352,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final stockChanged = stockValue != p?.stock || reorderValue != p?.reorderPoint;
     final costValue = parseDecimal(cost.text);
     final growthChanged = costValue != p?.unitCost || inStore != (p?.inStore ?? true);
-    disposeAfterClose([name, price, stock, reorder, cost]);
+    final extraFields = <String, dynamic>{
+      'barcode': barcode.text.trim().isEmpty ? null : barcode.text.trim(),
+      'category': category.text.trim().isEmpty ? null : category.text.trim(),
+      'description': description.text.trim().isEmpty ? null : description.text.trim(),
+      'wholesale_price': parseDecimal(wholesale.text),
+      'wholesale_min_qty': parseDecimal(wholesale.text) == null ? null : parseDecimal(wholesaleMin.text),
+    };
+    final imageToUpload = newImage;
+    disposeAfterClose([name, price, stock, reorder, cost, barcode, category, description, wholesale, wholesaleMin]);
     if (ok != true) return;
     try {
       final id = await Repo.saveProduct(id: p?.id, name: values.$1, unitPrice: values.$2, unit: values.$3);
+      try {
+        if (imageToUpload != null) extraFields['image_path'] = await V2Repo.upload('productos', imageToUpload);
+        await V2Repo.saveProductExtra(id, extraFields);
+      } catch (e) {
+        _snack(e.toString().contains('23505') ? 'Guardado, pero ese código de barras ya lo tiene otro producto.' : 'Guardado. ${V2Repo.missingHint(e)}');
+      }
       if (stockChanged) {
         try {
           await ProRepo.setStockConfig(id, stock: stockValue, reorderPoint: reorderValue);

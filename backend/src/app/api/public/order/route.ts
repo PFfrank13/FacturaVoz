@@ -22,6 +22,9 @@ export async function POST(req: Request) {
   const name = typeof body.name === "string" ? body.name.slice(0, 120) : "";
   const phone = typeof body.phone === "string" ? body.phone.replace(/\D/g, "").replace(/^51(?=9\d{8}$)/, "") : "";
   const note = typeof body.note === "string" ? body.note.replace(/[\u0000-\u001f]/g, " ").slice(0, 300) : "";
+  const table = typeof body.table === "string" && /^[0-9A-Za-z \-]{1,12}$/.test(body.table) ? body.table : "";
+  const fulfillment = body.fulfillment === "delivery" ? "delivery" : body.fulfillment === "mesa" ? "mesa" : "recojo";
+  const address = typeof body.address === "string" ? body.address.replace(/[\u0000-\u001f]/g, " ").slice(0, 200) : "";
   const items = Array.isArray(body.items)
     ? body.items.slice(0, 30).map((i) => {
         const o = (i ?? {}) as Record<string, unknown>;
@@ -31,7 +34,14 @@ export async function POST(req: Request) {
   if (items.length === 0) return json({ error: "Tu pedido está vacío" }, 400);
 
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("store_place_order", { p_slug: slug, p_name: name, p_phone: phone, p_note: note, p_items: items });
+  // v2 (mesa, recojo/delivery, comandas). Si la migración 20261108 aún no corre, se usa la función original.
+  let { data, error } = await admin.rpc("store_place_order2", {
+    p_slug: slug, p_name: name, p_phone: phone, p_note: note, p_items: items,
+    p_table: table || null, p_fulfillment: fulfillment, p_address: address || null,
+  });
+  if (error && (error.code === "PGRST202" || error.code === "42883")) {
+    ({ data, error } = await admin.rpc("store_place_order", { p_slug: slug, p_name: name, p_phone: phone, p_note: note, p_items: items }));
+  }
   if (error) {
     // Los mensajes de la función son nuestros y seguros para mostrar.
     const status = error.code === "P0002" ? 404 : error.code === "P0001" ? 429 : error.code === "22023" ? 400 : 500;
@@ -47,7 +57,7 @@ export async function POST(req: Request) {
     const total = fmtMoney(Number(row.total), row.currency);
     await sendResend(
       to,
-      `🛍️ Nuevo pedido web ${row.quote_number} · ${total}`,
+      `${table ? `🍽️ Mesa ${table}` : "🛍️ Nuevo pedido web"} ${row.quote_number} · ${total}`,
       `<!doctype html><html lang="es"><body style="font-family:Arial,Helvetica,sans-serif;background:#f8f6fd;padding:24px;color:#26254b">
 <div style="max-width:520px;margin:auto;background:#fff;border-radius:20px;padding:24px">
 <h2 style="margin:0 0 10px">Nuevo pedido desde tu tienda</h2>

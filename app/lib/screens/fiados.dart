@@ -1,0 +1,419 @@
+// Libreta de fiados (Fase 8 · módulo 2): quién te debe, cuánto y desde cuándo; cargos y abonos en dos toques,
+// recordatorio por WhatsApp y límite de crédito por cliente. También por voz: "anota que Rosa me debe 30 de arroz".
+import 'package:flutter/material.dart';
+
+import '../access.dart';
+import '../app_state.dart';
+import '../errors.dart';
+import '../models.dart';
+import '../models_v2.dart';
+import '../services/v2_repo.dart';
+import '../ui/motion.dart';
+import '../ui/theme.dart';
+import '../ui/widgets.dart';
+import 'client_profile.dart';
+import 'trash.dart';
+
+String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
+
+class FiadosScreen extends StatefulWidget {
+  const FiadosScreen({super.key});
+
+  @override
+  State<FiadosScreen> createState() => _FiadosScreenState();
+}
+
+class _FiadosScreenState extends State<FiadosScreen> {
+  List<CreditBalance>? _list;
+  String? _error;
+  String _q = '';
+  bool _all = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final r = await V2Repo.creditBalances();
+      if (mounted) {
+        setState(() {
+          _list = r;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = V2Repo.missingHint(e));
+    }
+  }
+
+  Future<void> _new() async {
+    if (await showFiadoSheet(context, kind: 'cargo')) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final q = _q.trim().toLowerCase();
+    final list = (_list ?? const <CreditBalance>[]).where((b) => (_all || b.balance > 0.004) && (q.isEmpty || b.name.toLowerCase().contains(q))).toList()
+      ..sort((a, b) => b.balance.compareTo(a.balance));
+    final total = (_list ?? const <CreditBalance>[]).fold(0.0, (s, b) => s + (b.balance > 0 ? b.balance : 0));
+    final today = todayIso();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Fiados')),
+      floatingActionButton: FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.add_rounded), label: const Text('Anotar fiado')),
+      body: _error != null
+          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          : _list == null
+              ? const SkeletonList()
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
+                    Reveal(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26)),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Te deben en fiados', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
+                          CountUp(value: total, builder: (_, v) => Text(money(v, _cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800))),
+                          Text('${list.where((b) => b.balance > 0).length} clientes con saldo', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
+                        ]),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(onChanged: (v) => setState(() => _q = v), decoration: const InputDecoration(hintText: 'Buscar cliente', prefixIcon: Icon(Icons.search_rounded), isDense: true)),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilterChip(label: const Text('Mostrar también los que ya pagaron'), selected: _all, onSelected: (v) => setState(() => _all = v)),
+                    ),
+                    const SizedBox(height: 6),
+                    if (list.isEmpty)
+                      const EmptyState(title: 'Nadie te debe 🎉', body: 'Cuando alguien se lleve algo fiado, anótalo con el botón de abajo o dile al copiloto: "anota que Rosa me debe 30".')
+                    else
+                      for (final (i, b) in list.indexed)
+                        Reveal(
+                          key: ValueKey(b.clientId),
+                          index: i < 8 ? i : 8,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: SwipeActions(
+                              left: SwipeAction(
+                                icon: Icons.payments_rounded,
+                                label: 'Abono',
+                                color: Brand.ok,
+                                onTrigger: () => showFiadoSheet(context, clientId: b.clientId, clientName: b.name, kind: 'abono').then((ok) {
+                                  if (ok) _load();
+                                }),
+                              ),
+                              right: b.phone.isEmpty
+                                  ? null
+                                  : SwipeAction(
+                                      icon: Icons.chat_rounded,
+                                      label: 'Recordar',
+                                      color: const Color(0xFF1FA855),
+                                      onTrigger: () => openWhatsApp(context, b.phone,
+                                          'Hola ${b.name.split(' ').first}, te saluda ${AppState.instance.activeOrg?.name ?? 'tu bodega'}. Tu cuenta pendiente es de ${money(b.balance, _cur)}. Puedes pagar por Yape o Plin. ¡Gracias!'),
+                                    ),
+                              child: Pressable(
+                                onTap: () => showClientLedger(context, b).then((_) => _load()),
+                                child: SoftCard(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(children: [
+                                    Expanded(
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        Text(b.name, style: t.textTheme.titleSmall),
+                                        Text(
+                                          [
+                                            if (b.lastMove != null) 'Último movimiento ${shortDateTime(b.lastMove!)}',
+                                            if (b.oldestDue != null) (b.oldestDue!.compareTo(today) < 0 ? 'VENCIDO desde ${displayDate(b.oldestDue!)}' : 'Paga hasta ${displayDate(b.oldestDue!)}'),
+                                          ].join(' · '),
+                                          style: t.textTheme.bodySmall?.copyWith(color: b.oldestDue != null && b.oldestDue!.compareTo(today) < 0 ? Brand.bad : null),
+                                        ),
+                                        if (b.overLimit) const Padding(padding: EdgeInsets.only(top: 4), child: TagChip('Pasó su límite', color: Brand.bad, icon: Icons.warning_amber_rounded)),
+                                      ]),
+                                    ),
+                                    Money(money(b.balance, _cur), size: 17, weight: FontWeight.w800, color: b.balance > 0 ? Brand.bad : Brand.ok),
+                                  ]),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                  ]),
+                ),
+    );
+  }
+}
+
+/// Movimientos de un cliente (cargos y abonos) con opción de borrar (va a la papelera).
+Future<void> showClientLedger(BuildContext context, CreditBalance b) => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => SizedBox(height: MediaQuery.of(context).size.height * 0.8, child: _Ledger(balance: b)),
+    );
+
+class _Ledger extends StatefulWidget {
+  const _Ledger({required this.balance});
+  final CreditBalance balance;
+
+  @override
+  State<_Ledger> createState() => _LedgerState();
+}
+
+class _LedgerState extends State<_Ledger> {
+  List<CreditMove>? _moves;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final m = await V2Repo.creditMoves(widget.balance.clientId);
+      if (mounted) setState(() => _moves = m);
+    } catch (_) {
+      if (mounted) setState(() => _moves = const []);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final b = widget.balance;
+    final bal = (_moves ?? const <CreditMove>[]).fold(0.0, (s, m) => s + (m.kind == 'abono' ? -m.amount : m.amount));
+    return Column(children: [
+      ListTile(
+        title: Text(b.name, style: t.textTheme.titleLarge),
+        subtitle: Text('Saldo: ${money(bal, _cur)}'),
+        trailing: IconButton(tooltip: 'Ver ficha', onPressed: () => pushPremium(context, ClientProfileScreen(clientId: b.clientId)), icon: const Icon(Icons.person_rounded)),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => showFiadoSheet(context, clientId: b.clientId, clientName: b.name, kind: 'cargo').then((ok) {
+                if (ok) _load();
+              }),
+              icon: const Icon(Icons.add_shopping_cart_rounded),
+              label: const Text('Fió'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: () => showFiadoSheet(context, clientId: b.clientId, clientName: b.name, kind: 'abono').then((ok) {
+                if (ok) _load();
+              }),
+              icon: const Icon(Icons.payments_rounded),
+              label: const Text('Abonó'),
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 8),
+      Expanded(
+        child: _moves == null
+            ? const SkeletonList(count: 3)
+            : ListView(children: [
+                for (final m in _moves!)
+                  ListTile(
+                    leading: Icon(m.kind == 'abono' ? Icons.south_west_rounded : Icons.north_east_rounded, color: m.kind == 'abono' ? Brand.ok : Brand.bad),
+                    title: Text(m.description.isEmpty ? (m.kind == 'abono' ? 'Abono${m.method != null ? ' (${paymentMethods[m.method] ?? m.method})' : ''}' : 'Fiado') : m.description),
+                    subtitle: Text([if (m.createdAt != null) shortDateTime(m.createdAt!), if (m.dueDate != null) 'paga hasta ${displayDate(m.dueDate!)}'].join(' · ')),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Money('${m.kind == 'abono' ? '−' : '+'}${money(m.amount, _cur)}', color: m.kind == 'abono' ? Brand.ok : Brand.bad),
+                      if (Access.instance.can('finance'))
+                        IconButton(
+                          tooltip: 'Borrar',
+                          icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                          onPressed: () async {
+                            try {
+                              await V2Repo.deleteCredit(m.id);
+                              if (context.mounted) showUndo(context, rowId: m.id, label: 'Movimiento borrado', onRestored: _load);
+                              _load();
+                            } catch (e) {
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendly(e))));
+                            }
+                          },
+                        ),
+                    ]),
+                  ),
+              ]),
+      ),
+    ]);
+  }
+}
+
+/// Anotar un fiado (cargo) o un abono. Si no se pasa cliente, deja elegirlo o crearlo. Devuelve true si se guardó.
+Future<bool> showFiadoSheet(BuildContext context, {String? clientId, String? clientName, String kind = 'cargo', double? amount, String description = ''}) async {
+  final r = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _FiadoForm(clientId: clientId, clientName: clientName, kind: kind, amount: amount, description: description),
+  );
+  return r == true;
+}
+
+class _FiadoForm extends StatefulWidget {
+  const _FiadoForm({this.clientId, this.clientName, required this.kind, this.amount, this.description = ''});
+  final String? clientId;
+  final String? clientName;
+  final String kind;
+  final double? amount;
+  final String description;
+
+  @override
+  State<_FiadoForm> createState() => _FiadoFormState();
+}
+
+class _FiadoFormState extends State<_FiadoForm> {
+  late String _kind = widget.kind;
+  late String? _clientId = widget.clientId;
+  late String _clientName = widget.clientName ?? '';
+  late final _amount = TextEditingController(text: widget.amount?.toStringAsFixed(2) ?? '');
+  late final _desc = TextEditingController(text: widget.description);
+  String _method = 'efectivo';
+  String? _due;
+  List<ClientProfile> _clients = const [];
+  bool _busy = false;
+  int _shake = 0;
+  String _msg = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (_clientId == null) {
+      V2Repo.clients().then((c) {
+        if (!mounted) return;
+        setState(() {
+          _clients = c;
+          // Por voz llega solo el nombre: si coincide exacto con un cliente, se elige solo.
+          final exact = c.where((x) => x.name.trim().toLowerCase() == _clientName.trim().toLowerCase()).toList();
+          if (_clientName.isNotEmpty && exact.length == 1) _clientId = exact.first.id;
+        });
+      }).catchError((_) {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final a = parseDecimal(_amount.text) ?? 0;
+    if (a <= 0 || (_clientId == null && _clientName.trim().isEmpty)) {
+      setState(() {
+        _shake++;
+        _msg = a <= 0 ? 'Escribe el monto.' : 'Elige o escribe el cliente.';
+      });
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      var id = _clientId;
+      // Cliente nuevo: se crea solo con el nombre (luego puedes completar su ficha).
+      id ??= await V2Repo.saveClient(ClientProfile(id: '', name: _clientName.trim(), tags: ['fiado']), isNew: true);
+      await V2Repo.addCredit(clientId: id, kind: _kind, amount: a, description: _desc.text, dueDate: _due, method: _method);
+      if (!mounted) return;
+      Haptics.success();
+      showSuccess(context, _kind == 'abono' ? 'Abono registrado' : 'Fiado anotado');
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _msg = V2Repo.missingHint(e);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
+      child: ListView(shrinkWrap: true, children: [
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'cargo', label: Text('Se llevó fiado'), icon: Icon(Icons.add_shopping_cart_rounded)),
+            ButtonSegment(value: 'abono', label: Text('Me pagó'), icon: Icon(Icons.payments_rounded)),
+          ],
+          selected: {_kind},
+          onSelectionChanged: (s) => setState(() => _kind = s.first),
+        ),
+        const SizedBox(height: 14),
+        if (widget.clientId != null)
+          ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.person_rounded), title: Text(_clientName))
+        else
+          Autocomplete<ClientProfile>(
+            initialValue: TextEditingValue(text: _clientName),
+            optionsBuilder: (v) => v.text.trim().isEmpty ? const Iterable<ClientProfile>.empty() : _clients.where((c) => c.name.toLowerCase().contains(v.text.toLowerCase())).take(8),
+            displayStringForOption: (c) => c.name,
+            onSelected: (c) => setState(() {
+              _clientId = c.id;
+              _clientName = c.name;
+            }),
+            fieldViewBuilder: (ctx, ctrl, focus, submit) => TextField(
+              controller: ctrl,
+              focusNode: focus,
+              onChanged: (v) {
+                _clientName = v;
+                _clientId = null;
+              },
+              decoration: const InputDecoration(labelText: 'Cliente (si es nuevo, escribe su nombre)', prefixIcon: Icon(Icons.person_search_rounded)),
+            ),
+          ),
+        const SizedBox(height: 10),
+        Shake(
+          trigger: _shake,
+          child: TextField(
+            controller: _amount,
+            autofocus: widget.clientId != null,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontFamily: 'Inter', fontSize: 24, fontWeight: FontWeight.w800),
+            decoration: InputDecoration(labelText: 'Monto', prefixText: '${currencySymbols[_cur] ?? _cur} '),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(controller: _desc, decoration: InputDecoration(labelText: _kind == 'cargo' ? '¿Qué se llevó? (opcional)' : 'Nota (opcional)')),
+        const SizedBox(height: 10),
+        if (_kind == 'abono')
+          Wrap(spacing: 8, children: [
+            for (final m in const ['efectivo', 'yape', 'plin', 'transferencia'])
+              ChoiceChip(label: Text(paymentMethods[m] ?? m), selected: _method == m, onSelected: (_) => setState(() => _method = m)),
+          ])
+        else
+          Wrap(spacing: 8, children: [
+            for (final (label, days) in const [('Sin fecha', 0), ('En 7 días', 7), ('En 15 días', 15), ('Fin de mes', -1)])
+              ChoiceChip(
+                label: Text(label),
+                selected: (days == 0 && _due == null) || (days != 0 && _due == _dueFor(days)),
+                onSelected: (_) => setState(() => _due = days == 0 ? null : _dueFor(days)),
+              ),
+          ]),
+        if (_msg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_msg, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad))),
+        const SizedBox(height: 16),
+        GradientButton(label: _kind == 'abono' ? 'Registrar abono' : 'Anotar fiado', icon: Icons.check_rounded, busy: _busy, onPressed: _busy ? null : _save),
+      ]),
+    );
+  }
+
+  static String _dueFor(int days) {
+    final now = DateTime.now();
+    if (days < 0) return todayIso(DateTime(now.year, now.month + 1, 0));
+    return todayIso(now.add(Duration(days: days)));
+  }
+}

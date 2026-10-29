@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
@@ -17,6 +19,11 @@ import 'recurring.dart';
 import 'share_sheet.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../access.dart';
+import '../config.dart';
+import '../services/print/ticket_printer.dart';
+import '../services/v2_repo.dart';
+import 'owner_control.dart' show ensureOwnerPin;
 
 class InvoiceDetailScreen extends StatefulWidget {
   const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false});
@@ -68,6 +75,99 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   }
 
   void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  // ───── v2.0: marca del emisor (logo, plantilla, color) para PDF y ticket ─────
+  PdfBrand? _brand;
+  Map<String, dynamic> _branding = const {};
+
+  Future<PdfBrand> _loadBrand() async {
+    if (_brand != null) return _brand!;
+    _branding = await V2Repo.branding();
+    final logo = await V2Repo.download(_branding['logo_path'] as String?);
+    return _brand = PdfBrand(logo: logo, template: (_branding['pdf_template'] ?? 'clasico') as String, color: PdfBrand.parseHex(_branding['brand_color'] as String?));
+  }
+
+  Future<Uint8List> _pdf({FiscalDoc? fiscal}) async => buildInvoicePdf(_inv!, AppState.instance.profile!, fiscal: fiscal, brand: await _loadBrand());
+
+  /// Ticket térmico 58/80 mm: Bluetooth o red (ESC/POS) o PDF de rollo. Si la impresora falla, ofrece el PDF.
+  Future<void> _printTicket() async {
+    final inv = _inv!;
+    setState(() => _busy = true);
+    try {
+      final brand = await _loadBrand();
+      final cfg = await PrinterStore.load(orgWidth: (_branding['ticket_width'] as num?)?.toInt());
+      final f = _fiscal;
+      final data = f != null && f.status != 'rejected' ? ticketFromFiscal(f) : ticketFromInternal(inv, AppState.instance.profile!);
+      if (cfg.kind == 'pdf') {
+        final pdf = await buildTicketPdf(data, width: cfg.width, logo: brand.logo);
+        await Printing.layoutPdf(name: 'ticket-${f?.number ?? inv.number}.pdf', onLayout: (_) => pdf);
+      } else {
+        final logo = await logoRaster(brand.logo, cfg.width == 58 ? 256 : 384);
+        await sendEscPos(cfg, buildEscPosTicket(data, width: cfg.width, logo: logo, nativeQr: cfg.nativeQr, openDrawer: cfg.openDrawer));
+        if (mounted) showSuccess(context, 'Ticket impreso', icon: Icons.print_rounded);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text(e is StateError ? e.message : 'No se pudo imprimir. ${friendly(e)}'),
+        action: SnackBarAction(
+          label: 'Ticket PDF',
+          onPressed: () async {
+            final inv2 = _inv!;
+            final f = _fiscal;
+            final data = f != null && f.status != 'rejected' ? ticketFromFiscal(f) : ticketFromInternal(inv2, AppState.instance.profile!);
+            final pdf = await buildTicketPdf(data, width: 80, logo: _brand?.logo);
+            await Printing.layoutPdf(name: 'ticket.pdf', onLayout: (_) => pdf);
+          },
+        ),
+      ));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Portal del cliente: ve y descarga sus comprobantes (PDF, XML, CDR) y su historial con un enlace privado.
+  Future<void> _portal() async {
+    final inv = _inv!;
+    setState(() => _busy = true);
+    try {
+      final token = await V2Repo.portalToken(inv.id);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final business = AppState.instance.activeOrg?.name ?? '';
+      await shareLinkSheet(
+        context,
+        title: 'Comprobante para tu cliente',
+        subtitle: 'Un enlace privado donde ve, imprime o descarga este comprobante (y su historial con tu negocio). Sin cuentas ni contraseñas.',
+        url: '${Config.apiBase}/portal/$token',
+        message: 'Hola ${inv.clientName == '—' ? '' : inv.clientName}, aquí tienes tu comprobante ${_fiscal?.number ?? inv.number} de $business:',
+      );
+    } catch (e) {
+      _snack(V2Repo.missingHint(e));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _survey() async {
+    final inv = _inv!;
+    setState(() => _busy = true);
+    try {
+      final token = await V2Repo.surveyToken(inv.id);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await shareLinkSheet(
+        context,
+        title: 'Encuesta de satisfacción',
+        subtitle: 'Tu cliente responde de 1 a 5 estrellas en 10 segundos. Si algo salió mal, te avisamos.',
+        url: '${Config.apiBase}/encuesta/$token',
+        message: '¡Gracias por tu compra en ${AppState.instance.activeOrg?.name ?? 'nuestro negocio'}! ¿Nos cuentas cómo te fue? Toma 10 segundos:',
+      );
+    } catch (e) {
+      _snack(V2Repo.missingHint(e));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<bool> _confirm(String title, String body, String action) async {
     final ok = await showDialog<bool>(
@@ -147,6 +247,8 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       ),
     );
     if (reason == null || !mounted) return;
+    // Antifraude: si la empresa tiene PIN del dueño, se pide antes de anular (el servidor lo vuelve a exigir).
+    if (!await ensureOwnerPin(context, reason: 'Para anular un comprobante se necesita el PIN del dueño.') || !mounted) return;
     if (!await _confirm('¿Emitir la nota de crédito?', 'Esta acción se envía a SUNAT y no se puede deshacer.', 'Emitir nota')) return;
     setState(() => _busy = true);
     try {
@@ -179,11 +281,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   }
 
   Future<void> _shareNote() async {
-    final inv = _inv!;
     final n = _note!;
     setState(() => _busy = true);
     try {
-      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: n);
+      final bytes = await _pdf(fiscal: n);
       await Printing.sharePdf(bytes: bytes, filename: '${n.number}.pdf');
     } catch (_) {
       _snack('No se pudo generar el PDF.');
@@ -208,7 +309,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     final inv = _inv!;
     setState(() => _busy = true);
     try {
-      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
+      final bytes = await _pdf(fiscal: _fiscal);
       await Printing.sharePdf(bytes: bytes, filename: '${inv.number}.pdf');
     } catch (_) {
       _snack('No se pudo generar el PDF.');
@@ -222,7 +323,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     final inv = _inv;
     if (inv == null) return;
     try {
-      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
+      final bytes = await _pdf(fiscal: _fiscal);
       await EmailApi.send(invoiceId: inv.id, pdf: bytes);
       if (mounted) _snack('Te enviamos una copia a tu correo.');
     } catch (_) {
@@ -263,7 +364,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
     setState(() => _busy = true);
     try {
-      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
+      final bytes = await _pdf(fiscal: _fiscal);
       await EmailApi.send(invoiceId: inv.id, to: to, pdf: bytes);
       _snack('Correo enviado a ${to.trim()} (y copia para ti)');
       if (to.trim().toLowerCase() != inv.clientEmail.toLowerCase()) Repo.setClientEmail(inv.id, to);
@@ -326,7 +427,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     final inv = _inv!;
     setState(() => _busy = true);
     try {
-      final bytes = await buildInvoicePdf(inv, AppState.instance.profile!, fiscal: _fiscal);
+      final bytes = await _pdf(fiscal: _fiscal);
       if (!mounted) return;
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => Scaffold(
@@ -395,6 +496,22 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       Expanded(child: _quick(Icons.mail_outline_rounded, 'Correo', _email)),
                       const SizedBox(width: 10),
                       Expanded(child: _quick(Icons.copy_all_rounded, 'Duplicar', _duplicate)),
+                    ]),
+                  ),
+                  const SizedBox(height: 10),
+                  Reveal(
+                    index: 2,
+                    child: Row(children: [
+                      Expanded(child: _quick(Icons.print_rounded, 'Ticket', _printTicket)),
+                      const SizedBox(width: 10),
+                      if (Access.instance.has('portal_cliente')) ...[
+                        Expanded(child: _quick(Icons.link_rounded, 'Enlace', _portal)),
+                        const SizedBox(width: 10),
+                      ],
+                      if (Access.instance.has('encuestas') && inv.status != 'draft')
+                        Expanded(child: _quick(Icons.sentiment_satisfied_alt_rounded, 'Encuesta', _survey))
+                      else
+                        const Expanded(child: SizedBox()),
                     ]),
                   ),
                   const SizedBox(height: 14),
@@ -501,7 +618,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(f == null ? 'Nota de venta' : (f.docType == '01' ? 'Factura electrónica' : 'Boleta de venta electrónica'), style: t.textTheme.bodySmall),
         const SizedBox(height: 4),
-        Text(f?.number ?? inv.number, style: t.textTheme.headlineMedium),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(f?.number ?? inv.number, style: t.textTheme.headlineMedium)),
+        // Serie-correlativo SUNAT (F001-00000023) vs. número interno (F-2026-0023): se dice claro cuál es cuál.
+        Text(
+          f == null ? 'Número interno: aún no es un comprobante SUNAT. Al emitir recibe su serie (F001/B001) y correlativo.' : 'N.° SUNAT ${f.number} · N.° interno ${inv.number}',
+          style: t.textTheme.bodySmall?.copyWith(color: muted),
+        ),
         const SizedBox(height: 10),
         StatusPill(pillLabel, tone: tone),
         Padding(

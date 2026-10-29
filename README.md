@@ -18,3 +18,9 @@ escáner con IA, Copiloto de voz, conciliación por foto, score de crédito, rad
 
 **Novedades v1.2 "Revolución"** (tienda en línea con pedidos, facturación recurrente, Clientes 360, meta del mes con
 predicción, calculadora de margen, plan de rescate de caja con IA, nuevo Inicio): `docs/REVOLUCION.md`.
+
+**Novedades v2.0** (app ordenada por tipo de negocio y modo simple, Ficha 360 de clientes, trabajos y agenda,
+equipo con roles, venta rápida con código de barras, fiados, cierre de caja, impuestos "¿cuánto me queda?",
+tickets térmicos con logo, licencias Solvex Hub, Copiloto 2.0 y 21 módulos más): **empieza por `CAMBIOS_v2.0.md`**
+(qué instalar y en qué orden). Luego `docs/MAPA_DE_FUNCIONES.md`, `docs/GUIA_PRUEBAS_15MIN.md`,
+`docs/SOLVEX_HUB.md` y `docs/HOJA_DE_RUTA.md`.

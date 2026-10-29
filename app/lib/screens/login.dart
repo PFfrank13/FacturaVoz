@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
+import 'employee_login.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'legal.dart';
@@ -460,6 +461,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         ),
       ),
       if (!_sent) ...[
+        const SizedBox(height: 14),
+        // v2.0: acceso de empleados invitados por su empresa (mismo correo de la invitación).
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => showEmployeeLogin(context),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          icon: const Icon(Icons.badge_rounded),
+          label: const Text('Iniciar con Empresa'),
+        ),
+      ],
+      // Google/Apple quedan OCULTOS (no borrados) hasta activar GOOGLE_LOGIN=true; correo y contraseña siempre visibles.
+      if (!_sent && Config.googleLogin) ...[
         const SizedBox(height: 18),
         Row(children: [
           Expanded(child: Divider(color: t.colorScheme.outline)),
@@ -482,6 +494,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             () => _soon('El acceso con Apple estará disponible junto con la versión de iPhone.'),
           ),
         ]),
+      ],
+      if (!_sent) ...[
         const SizedBox(height: 6),
         TextButton(
           onPressed: () => setState(() {

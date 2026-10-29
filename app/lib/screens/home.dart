@@ -17,7 +17,13 @@ import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../access.dart';
+import '../models_v2.dart';
+import '../services/v2_repo.dart';
 import 'assistant.dart';
+import 'catalog.dart';
+import 'client_profile.dart' show openWhatsApp;
+import 'jobs.dart' show JobDetailScreen;
 import 'clients360.dart';
 import 'expenses.dart';
 import 'goal_sheet.dart';
@@ -26,7 +32,6 @@ import 'new_invoice.dart';
 import 'products.dart';
 import 'recurring.dart';
 import 'scan.dart';
-import 'settings.dart';
 import 'store.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -59,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double? _goal;
   int _storeOrders = 0;
   int _recurringDrafts = 0;
+  Map<String, dynamic>? _summary; // ventas del mes con la MISMA regla que "Mi negocio" (sales_summary)
+  List<DailyAlert> _alerts = const [];
 
   @override
   void initState() {
@@ -160,6 +167,16 @@ class _HomeScreenState extends State<HomeScreen> {
       final v = await ProRepo.productVelocity();
       if (mounted) setState(() => _stock = v);
     } catch (_) {}
+    final cur = AppState.instance.profile?.currency ?? 'PEN';
+    final now = DateTime.now();
+    final sum = await V2Repo.salesSummary(todayIso(DateTime(now.year, now.month, 1)), todayIso(DateTime(now.year, now.month + 1, 1)), cur);
+    final alerts = await V2Repo.dailyAlerts();
+    if (mounted) {
+      setState(() {
+        _summary = sum;
+        _alerts = alerts;
+      });
+    }
     final c = await ProRepo.countPendingClaims();
     final goal = await GrowthRepo.monthlyGoal();
     final orders = await GrowthRepo.countNewStoreOrders();
@@ -263,18 +280,34 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) _load();
   }
 
-  /// Total del mes en la moneda del negocio. Excluye comprobantes rechazados por SUNAT.
-  ({double total, int count}) _month(String currency) {
+  /// Ventas del mes: UNA sola definición en toda la app (servidor: sales_summary). Cuenta comprobantes emitidos o
+  /// cobrados (con IGV); NO cuenta borradores, rechazados por SUNAT ni anulados. Antes Inicio sumaba borradores y
+  /// "Mi negocio" no: por eso mostraban cifras distintas. Sin la migración v2 se usa la misma regla en el teléfono.
+  ({double total, int count, int drafts, double draftsTotal}) _month(String currency) {
+    final s = _summary;
+    if (s != null) {
+      return (
+        total: ((s['sales_total'] as num?) ?? 0).toDouble(),
+        count: ((s['sales_count'] as num?) ?? 0).toInt(),
+        drafts: ((s['drafts_count'] as num?) ?? 0).toInt(),
+        draftsTotal: ((s['drafts_total'] as num?) ?? 0).toDouble(),
+      );
+    }
     final now = DateTime.now();
     final prefix = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    var total = 0.0;
-    var count = 0;
+    var total = 0.0, drafts = 0.0;
+    var count = 0, nDrafts = 0;
     for (final i in _items ?? const <InvoiceRecord>[]) {
       if (!i.issueDate.startsWith(prefix) || i.currency != currency || i.fiscalStatus == 'rejected') continue;
+      if (i.status == 'draft') {
+        drafts += i.totals.total;
+        nDrafts++;
+        continue;
+      }
       total += i.totals.total;
       count++;
     }
-    return (total: round2(total), count: count);
+    return (total: round2(total), count: count, drafts: nDrafts, draftsTotal: round2(drafts));
   }
 
   @override
@@ -314,6 +347,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 currency: currency,
                 total: m.total,
                 count: m.count,
+                drafts: m.drafts,
+                draftsTotal: m.draftsTotal,
                 loaded: _items != null,
                 goal: _goal,
                 series: dailySeries(_items ?? const <InvoiceRecord>[], currency: currency, today: todayIso()),
@@ -329,11 +364,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
                     children: [
-                      QuickAction(icon: Icons.mic_rounded, label: 'Facturar', colors: const [Color(0xFFFFA77F), Color(0xFFFF7E9A)], onTap: _newInvoice),
-                      QuickAction(icon: Icons.request_quote_rounded, label: 'Cotizar', colors: const [Color(0xFF8E7CF2), Color(0xFF6A62E2)], onTap: _quickQuote),
-                      QuickAction(icon: Icons.document_scanner_rounded, label: 'Escanear', colors: const [Color(0xFF5BC0EB), Color(0xFF3A86FF)], onTap: () => _push(const ScanScreen())),
-                      QuickAction(icon: Icons.shopping_bag_rounded, label: 'Gasto', colors: const [Color(0xFFFFC56E), Color(0xFFFF9F43)], onTap: _quickExpense),
-                      QuickAction(
+                      if (Access.instance.can('sell')) QuickAction(icon: Icons.mic_rounded, label: 'Facturar', colors: const [Color(0xFFFFA77F), Color(0xFFFF7E9A)], onTap: _newInvoice),
+                      if (Access.instance.can('sell') && Access.instance.has('cotizaciones'))
+                        QuickAction(icon: Icons.request_quote_rounded, label: 'Cotizar', colors: const [Color(0xFF8E7CF2), Color(0xFF6A62E2)], onTap: _quickQuote),
+                      if (Access.instance.can('finance'))
+                        QuickAction(icon: Icons.document_scanner_rounded, label: 'Escanear', colors: const [Color(0xFF5BC0EB), Color(0xFF3A86FF)], onTap: () => _push(const ScanScreen())),
+                      if (Access.instance.can('finance')) QuickAction(icon: Icons.shopping_bag_rounded, label: 'Gasto', colors: const [Color(0xFFFFC56E), Color(0xFFFF9F43)], onTap: _quickExpense),
+                      if (Access.instance.has('tienda'))
+                        QuickAction(
                         icon: Icons.storefront_rounded,
                         label: 'Tienda',
                         badge: _storeOrders,
@@ -348,7 +386,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       QuickAction(icon: Icons.groups_rounded, label: 'Clientes', colors: const [Color(0xFFF78FB3), Color(0xFFD94A8E)], onTap: () => _push(const Clients360Screen())),
-                      QuickAction(
+                      if (Access.instance.has('recurrentes') && Access.instance.can('finance'))
+                        QuickAction(
                         icon: Icons.event_repeat_rounded,
                         label: 'Mensuales',
                         badge: _recurringDrafts,
@@ -361,6 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+            SliverToBoxAdapter(child: _CopilotCards(alerts: _alerts, onChanged: _load)),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
@@ -539,6 +579,8 @@ class _Header extends StatelessWidget {
     required this.currency,
     required this.total,
     required this.count,
+    required this.drafts,
+    required this.draftsTotal,
     required this.loaded,
     required this.goal,
     required this.series,
@@ -548,6 +590,8 @@ class _Header extends StatelessWidget {
   final String currency;
   final double total;
   final int count;
+  final int drafts;
+  final double draftsTotal;
   final bool loaded;
   final double? goal;
   final List<double> series;
@@ -596,15 +640,9 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Pressable(
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-                  child: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
-                ),
-              ),
+              const SearchButton(onDark: true),
+              const SizedBox(width: 8),
+              const AvatarButton(onDark: true),
             ]),
           ),
           const SizedBox(height: 22),
@@ -613,7 +651,7 @@ class _Header extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Reveal(
                   index: 1,
-                  child: Text('Facturado este mes', style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 14, fontWeight: FontWeight.w500)),
+                  child: Text('Vendido este mes (con IGV)', style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 14, fontWeight: FontWeight.w500)),
                 ),
                 const SizedBox(height: 4),
                 if (!loaded)
@@ -680,7 +718,8 @@ class _Header extends StatelessWidget {
             Reveal(
               index: 3,
               child: Wrap(spacing: 8, runSpacing: 6, children: [
-                _HeaderPill(count == 0 ? 'Aún sin comprobantes este mes' : (count == 1 ? '1 comprobante' : '$count comprobantes')),
+                _HeaderPill(count == 0 ? 'Aún sin ventas emitidas este mes' : (count == 1 ? '1 venta emitida' : '$count ventas emitidas')),
+                if (drafts > 0) _HeaderPill('$drafts ${drafts == 1 ? 'borrador' : 'borradores'} sin emitir · ${money(draftsTotal, currency)}'),
                 if (g != null && !g.reached)
                   _HeaderPill(g.onTrack ? 'Vas bien · cierras en ${money(g.projected, currency)}' : 'Te faltan ${money(g.neededPerDay, currency)}/día'),
                 if (g != null && g.reached) const _HeaderPill('¡Meta cumplida!'),
@@ -841,6 +880,156 @@ class _InsightCard extends StatelessWidget {
               Text(insight.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: t.textTheme.bodySmall),
             ]),
           ),
+        ]),
+      ),
+    );
+  }
+}
+
+
+/// Copiloto 2.0 proactivo: tarjetas con lo que conviene hacer HOY (visitas, fiados vencidos, cumpleaños) y el
+/// resumen ejecutivo hablado de 30 segundos. Todo viene de daily_alerts (RLS: cada rol ve lo suyo).
+class _CopilotCards extends StatelessWidget {
+  const _CopilotCards({required this.alerts, required this.onChanged});
+  final List<DailyAlert> alerts;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final a = Access.instance;
+    final org = AppState.instance.activeOrg?.name ?? 'tu negocio';
+    final cards = <Widget>[
+      if (a.has('copiloto'))
+        _card(
+          context,
+          icon: Icons.record_voice_over_rounded,
+          color: Brand.indigo,
+          title: 'Tu resumen en 30 segundos',
+          body: 'Ventas, quién te debe, gastos, impuestos y qué hacer hoy. Te lo leo en voz alta.',
+          action: 'Escuchar',
+          onTap: () => openCopilot(context, ask: 'Dame mi resumen ejecutivo de hoy en 30 segundos: ventas, por cobrar, gastos, impuestos a guardar y una acción para hoy.'),
+        ),
+      for (final x in alerts.take(4))
+        (switch (x.kind) {
+          'visit_today' || 'visit_tomorrow' => _card(
+              context,
+              icon: Icons.event_available_rounded,
+              color: Brand.lilac,
+              title: '${x.kind == 'visit_today' ? 'Hoy' : 'Mañana'}: ${x.title}',
+              body: x.client.isEmpty ? 'Visita o cita agendada' : 'Con ${x.client}',
+              action: 'Ver',
+              onTap: () {
+                final id = x.data['job_id'] as String?;
+                if (id != null) pushPremium(context, JobDetailScreen(jobId: id)).then((_) => onChanged());
+              },
+            ),
+          'fiado_due' => _card(
+              context,
+              icon: Icons.menu_book_rounded,
+              color: Brand.bad,
+              title: 'Fiado vencido: ${x.client}',
+              body: 'Recuérdale con un mensaje amable por WhatsApp.',
+              action: 'Escribir',
+              onTap: () => openWhatsApp(context, x.phone, 'Hola ${x.client.split(' ').first}, te saluda $org. Te recordamos tu cuenta pendiente. ¡Gracias!'),
+            ),
+          'birthday' => _card(
+              context,
+              icon: Icons.cake_rounded,
+              color: Brand.goldDeep,
+              title: '¡${x.client} cumple años!',
+              body: 'Un saludo hoy fideliza más que un descuento.',
+              action: 'Saludar',
+              onTap: () => openWhatsApp(context, x.phone, '¡Feliz cumpleaños, ${x.client.split(' ').first}! 🎂 Te saluda $org.'),
+            ),
+          'job_late' => _card(
+              context,
+              icon: Icons.running_with_errors_rounded,
+              color: Brand.bad,
+              title: 'Atrasado: ${x.title}',
+              body: x.client,
+              action: 'Ver',
+              onTap: () {
+                final id = x.data['job_id'] as String?;
+                if (id != null) pushPremium(context, JobDetailScreen(jobId: id)).then((_) => onChanged());
+              },
+            ),
+          _ => _card(
+              context,
+              icon: Icons.person_search_rounded,
+              color: Brand.warn,
+              title: '${x.client}: hace ${x.data['days'] ?? 'tiempo'} días no compra',
+              body: 'Escríbele: un mensaje a tiempo recupera clientes.',
+              action: 'Escribir',
+              onTap: () => openWhatsApp(context, x.phone, 'Hola ${x.client.split(' ').first}, te saluda $org. ¡Hace tiempo no te vemos! ¿Te ayudamos con algo?'),
+            ),
+        }),
+      if (a.can('finance') && a.has('reportes'))
+        _card(
+          context,
+          icon: Icons.savings_rounded,
+          color: Brand.ok,
+          title: '¿Cuánto me queda?',
+          body: 'Lo que debes guardar para SUNAT y tu ganancia real del mes.',
+          action: 'Ver',
+          onTap: () {
+            final f = featureById('impuestos');
+            if (f != null) openFeature(context, f);
+          },
+        ),
+    ];
+    if (cards.isEmpty) return const SizedBox.shrink();
+    return Reveal(
+      index: 2,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(children: [
+              const Icon(Icons.auto_awesome_rounded, size: 18, color: Brand.indigo),
+              const SizedBox(width: 6),
+              Text('Tu copiloto te sugiere', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 132,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: cards.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (_, i) => cards[i],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context, {required IconData icon, required Color color, required String title, required String body, required String action, required VoidCallback onTap}) {
+    final t = Theme.of(context);
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        width: 250,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: t.colorScheme.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+          boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: 0.06),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 4),
+          Expanded(child: Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.textTheme.bodySmall)),
+          Align(alignment: Alignment.centerRight, child: Text(action, style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w800, color: color))),
         ]),
       ),
     );

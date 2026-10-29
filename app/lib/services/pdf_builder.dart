@@ -23,11 +23,37 @@ String _docLabel(String t) => switch (t) {
       _ => 'DOC.',
     };
 
+/// Marca del emisor para el PDF (v2.0): logo, plantilla y color. Todo opcional.
+class PdfBrand {
+  const PdfBrand({this.logo, this.template = 'clasico', this.color});
+  final Uint8List? logo;
+  final String template; // clasico | moderno | minimal
+  final int? color; // 0xFFRRGGBB
+
+  static int? parseHex(String? hex) {
+    final h = (hex ?? '').replaceAll('#', '');
+    if (!RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(h)) return null;
+    return int.parse('FF$h', radix: 16);
+  }
+}
+
 /// PDF A4 generado en el dispositivo.
 /// - Con [fiscal]: representación impresa del comprobante electrónico (formato SUNAT, con QR y hash),
 ///   construida SOLO con el contenido enviado a SUNAT.
 /// - Sin [fiscal]: nota de venta interna, marcada claramente como SIN VALIDEZ TRIBUTARIA.
-Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc? fiscal}) async {
+Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc? fiscal, PdfBrand brand = const PdfBrand()}) async {
+  final minimal = brand.template == 'minimal';
+  final modern = brand.template == 'moderno';
+  final accent = brand.color != null ? PdfColor.fromInt(brand.color!) : (minimal ? _ink : _brand);
+  pw.MemoryImage? logo;
+  if (brand.logo != null && brand.logo!.isNotEmpty) {
+    try {
+      logo = pw.MemoryImage(brand.logo!);
+    } catch (_) {
+      logo = null; // un logo dañado nunca impide generar el comprobante
+    }
+  }
+  final logoImg = logo; // copia final: se usa dentro del constructor de páginas
   final regular = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans.ttf'));
   final bold = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'));
   final doc = pw.Document(
@@ -74,9 +100,13 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
         for (final b in view.banners) banner(b.$1, b.$2),
         // ---- Cabecera: emisor + recuadro del comprobante
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          if (logoImg != null) ...[
+            pw.Container(width: 70, height: 60, alignment: pw.Alignment.topLeft, child: pw.Image(logoImg, fit: pw.BoxFit.contain)),
+            pw.SizedBox(width: 10),
+          ],
           pw.Expanded(
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text(view.issuerName, style: st(15, b: true, color: _brand)),
+              pw.Text(view.issuerName, style: st(15, b: true, color: accent)),
               if (view.issuerTrade.isNotEmpty && view.issuerTrade != view.issuerName) pw.Text(view.issuerTrade, style: st(9.5)),
               pw.SizedBox(height: 3),
               for (final l in view.issuerLines) pw.Text(l, style: st(8.5, color: _muted)),
@@ -86,13 +116,17 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
           pw.Container(
             width: 190,
             padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-            decoration: pw.BoxDecoration(border: pw.Border.all(color: _brand, width: 1.4), borderRadius: pw.BorderRadius.circular(4)),
+            decoration: pw.BoxDecoration(
+              color: modern ? accent : null,
+              border: pw.Border.all(color: accent, width: minimal ? 0.8 : 1.4),
+              borderRadius: pw.BorderRadius.circular(modern ? 8 : 4),
+            ),
             child: pw.Column(children: [
-              if (view.issuerRuc.isNotEmpty) pw.Text('R.U.C. ${view.issuerRuc}', style: st(11, b: true)),
+              if (view.issuerRuc.isNotEmpty) pw.Text('R.U.C. ${view.issuerRuc}', style: st(11, b: true, color: modern ? PdfColors.white : _ink)),
               pw.SizedBox(height: 4),
-              pw.Text(view.title, textAlign: pw.TextAlign.center, style: st(11, b: true, color: _brand)),
+              pw.Text(view.title, textAlign: pw.TextAlign.center, style: st(11, b: true, color: modern ? PdfColors.white : accent)),
               pw.SizedBox(height: 4),
-              pw.Text(view.number, style: st(12, b: true)),
+              pw.Text(view.number, style: st(12, b: true, color: modern ? PdfColors.white : _ink)),
             ]),
           ),
         ]),
@@ -100,7 +134,11 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
         // ---- Cliente y datos
         pw.Container(
           padding: const pw.EdgeInsets.all(9),
-          decoration: pw.BoxDecoration(color: _soft, borderRadius: pw.BorderRadius.circular(4)),
+          decoration: pw.BoxDecoration(
+            color: minimal ? null : _soft,
+            border: minimal ? pw.Border.all(color: _line, width: 0.6) : null,
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
           child: pw.Column(children: [
             _kv('Señor(es)', view.clientName, st),
             if (view.clientDoc.isNotEmpty) _kv(view.clientDocLabel, view.clientDoc, st),
@@ -124,7 +162,7 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
           },
           children: [
             pw.TableRow(
-              decoration: pw.BoxDecoration(color: _brand),
+              decoration: pw.BoxDecoration(color: accent),
               children: [cell('#', head: true), cell('Cant.', head: true, right: true), cell('Unid.', head: true), cell('Descripción', head: true), cell('V. Unit.', head: true, right: true), cell('Importe', head: true, right: true)],
             ),
             for (var k = 0; k < view.rows.length; k++)
@@ -165,12 +203,13 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
             padding: const pw.EdgeInsets.only(top: 10),
             decoration: pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: _line, width: 0.8))),
             child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.BarcodeWidget(barcode: pw.Barcode.qrCode(), data: view.qr!, width: 86, height: 86),
+              // QR con corrección de errores nivel Q (25 %), como pide SUNAT para la representación impresa.
+              pw.BarcodeWidget(barcode: pw.Barcode.qrCode(errorCorrectLevel: pw.BarcodeQRCorrectionLevel.quartile), data: view.qr!, width: 86, height: 86),
               pw.SizedBox(width: 12),
               pw.Expanded(
                 child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                   pw.Text(view.statusLine, style: st(9, b: true)),
-                  if (view.hash.isNotEmpty) pw.Padding(padding: const pw.EdgeInsets.only(top: 3), child: pw.Text('Hash: ${view.hash}', style: st(7.5, color: _muted))),
+                  if (view.hash.isNotEmpty) pw.Padding(padding: const pw.EdgeInsets.only(top: 3), child: pw.Text('Valor resumen: ${view.hash}', style: st(7.5, color: _muted))),
                   pw.SizedBox(height: 4),
                   pw.Text(view.legalNote, style: st(7.5, color: _muted)),
                 ]),
@@ -275,8 +314,8 @@ _View _fiscalView(FiscalDoc f) {
     total.toStringAsFixed(2),
     isoDate,
     tipoDoc,
-    client['numDoc'],
-    '',
+    client['numDoc'] ?? '',
+    f.hash, // valor resumen: campo 10 del QR (Anexo N.° 6, num. 6.4)
   ].join('|');
 
   final banners = <(String, PdfColor)>[];
@@ -305,7 +344,7 @@ _View _fiscalView(FiscalDoc f) {
     date: date,
     currency: cur,
     currencyName: _currencyName(cur),
-    paymentLine: 'Contado',
+    paymentLine: _paymentLine(p, cur),
     rows: details
         .map((d) => _Row(_d(d['cantidad']), (d['unidad'] ?? 'NIU') as String, (d['descripcion'] ?? '') as String, _d(d['mtoValorUnitario']), _d(d['mtoValorVenta'])))
         .toList(),
@@ -326,6 +365,18 @@ _View _fiscalView(FiscalDoc f) {
     legalNote: 'Representación impresa de la ${f.docType == '01' ? 'Factura Electrónica' : (f.isCreditNote ? 'Nota de Crédito Electrónica' : 'Boleta de Venta Electrónica')}. '
         'Puede consultar su validez en https://www.sunat.gob.pe con los datos del código QR.',
   );
+}
+
+/// Forma de pago tal como se envió a SUNAT (Contado / Crédito con sus cuotas).
+String _paymentLine(Map<String, dynamic> p, String cur) {
+  final fp = _m(p['formaPago']);
+  if ((fp['tipo'] ?? 'Contado') != 'Credito') return 'Contado';
+  final cuotas = ((p['cuotas'] ?? const []) as List).map(_m).toList();
+  if (cuotas.isEmpty) return 'Crédito';
+  final parts = [
+    for (final (i, c) in cuotas.indexed) 'Cuota ${i + 1}: ${money(_d(c['monto']), cur)} vence ${displayDate('${c['fechaPago'] ?? ''}'.split('T').first)}',
+  ];
+  return 'Crédito · ${parts.join(' · ')}';
 }
 
 /// "Documento que modifica: F001-00000012 · Motivo: …" a partir de la nota enviada a SUNAT.
