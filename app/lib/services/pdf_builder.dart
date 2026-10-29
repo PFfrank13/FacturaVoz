@@ -355,6 +355,7 @@ _View _fiscalView(FiscalDoc f) {
       ('IGV (${qtyText(rate.toDouble())}%)', igv, false),
       ('IMPORTE TOTAL', total, true),
     ],
+
     legend: f.legend,
     notes: f.isCreditNote ? _noteReference(p) : '',
     banners: banners,
