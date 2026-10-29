@@ -429,14 +429,21 @@ class SoftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: padding,
+    final shape = BorderRadius.circular(radius);
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: color ?? Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: shape,
         boxShadow: Brand.softShadow(dark, a: 0.07),
       ),
-      child: child,
+      // Material transparente ENCIMA del color: los ListTile/InkWell de adentro dibujan su efecto de toque aquí
+      // (si no, el color de la tarjeta lo tapa y Flutter muestra "EXCEPTION CAUGHT BY FLUTTER FRAMEWORK" en depuración).
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: shape,
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding, child: child),
+      ),
     );
   }
 }
