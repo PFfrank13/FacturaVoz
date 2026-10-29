@@ -12,6 +12,8 @@ import '../import_logic.dart';
 import '../models.dart';
 import '../services/importer.dart';
 import '../services/repo.dart';
+import '../services/workbook_import.dart';
+import 'workbook_import.dart';
 import '../xlsx_reader.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -118,6 +120,13 @@ class _ImportScreenState extends State<ImportScreen> {
             _error = problem!;
           });
         }
+        return;
+      }
+      // Libro con varias hojas (clientes + comprobantes + detalle + catálogo): importador relacional.
+      if (picked.length == 1 && picked.first.bytes != null && looksLikeWorkbook(picked.first.bytes!)) {
+        if (mounted) setState(() => _reading = false);
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute<bool>(builder: (_) => WorkbookImportScreen(bytes: picked.first.bytes!, fileName: picked.first.name)));
         return;
       }
       final results = <_FileResult>[];
@@ -264,7 +273,13 @@ class _ImportScreenState extends State<ImportScreen> {
     return PopScope(
       canPop: _phase != _Phase.uploading,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Importar facturas')),
+        appBar: AppBar(title: const Text('Importar facturas'), actions: [
+          IconButton(
+            tooltip: 'Importaciones anteriores',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const WorkbookHistoryScreen())),
+          ),
+        ]),
         body: SafeArea(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 380),

@@ -1,4 +1,52 @@
-# Mapa de funciones de FacturaVoz v2.0
+# Mapa de funciones de FacturaVoz v3
+
+**Nada se borró.** Todo lo que existía sigue ahí; en v3 se **reubicó** para que cada rubro vea primero lo suyo.
+La única puerta a TODAS las funciones es el botón **Menú** (Inicio, arriba a la derecha; también en el avatar),
+con buscador por texto y por voz. Lo que no es de tu rubro está en Menú → **Otras funciones**.
+
+## Cambios de lugar (función → antes → ahora → cómo se llega)
+
+| Función | Antes (v2) | Ahora (v3) | Cómo se llega |
+|---|---|---|---|
+| Barra de abajo | 5 destinos fijos (modo simple/completo) | **4 destinos de tu rubro** + micrófono | Siempre visible (ver `docs/RUBROS.md`) |
+| Lista de comprobantes (búsqueda, filtros, "por cobrar") | Pestaña Inicio | **Menú → Vender → Comprobantes** | Menú · buscador ("boletas") |
+| Inicio | Lista + tarjetas + resumen | **Inicio limpio**: saludo, hoy, meta del mes, 1–2 sugerencias del Copiloto, 3–4 accesos del rubro | Pestaña Inicio |
+| Todas las funciones | Avatar → Todas las funciones | **Menú** (por áreas del rubro, con candados del plan). La lista antigua sigue en Ajustes → Todas las funciones | Inicio → Menú · Avatar → Menú |
+| Facturar por voz / Caja rápida / Cuaderno / Cotización | Botones separados | **Nueva venta** (una puerta con las 4 formas) | Inicio → Nueva venta · micrófono |
+| Cobranza + Fiados + Avisos Yape/Plin | 3 pantallas | **Lo que me deben** (pestañas) | Barra "Cobrar"/"Cobranza"/"Pensiones" · Menú |
+| Mi negocio + ¿Cuánto me queda? + Reportes + Comisiones | 4 pantallas | **Mi negocio** (pestañas) | Barra "Negocio" · Menú → Mi negocio (todo junto) |
+| Alertas, Bitácora, PIN, Papelera, Huella | Repartidos | **Ajustes → Seguridad** | Ajustes → Seguridad · Menú → Ajustes |
+| Escanear comprobante de proveedor | Cobrar y pagar | **Dentro de Gastos** (botón escanear) y en Menú | Menú → Plata → Gastos |
+| Tipo de negocio | Ajustes → Tu negocio | **Rubro** con vista previa | Ajustes → Rubro · Menú → Ajustes → Cambiar de rubro |
+| "Otro / personalizado" | Plantilla | **Eliminado de las opciones**: se pide elegir rubro (datos intactos) | Aparece solo una vez al dueño |
+| Modo simple | Ajustes | Solo para empresas sin rubro. Nuevo **Modo Fácil** (letras grandes, por persona) | Ajustes → Modo Fácil · presentación |
+| Presentación inicial | Ajustes → Tipo de negocio | Ajustes → Menú → *Ver la presentación otra vez* | Menú → Ajustes |
+| Importar Excel/CSV de facturas | Mi negocio → Importar | Igual; **si el Excel tiene varias hojas** se abre el **importador de libro** (clientes + comprobantes + detalle + catálogo) | Menú → Mi negocio → Importar datos · historial con "Deshacer" |
+| Ayuda | — | **Ajustes → Ayuda por WhatsApp** (con versión, rubro y plan) | Ajustes |
+
+## Funciones nuevas en v3
+
+| Función | Rubro principal | Dónde |
+|---|---|---|
+| Reposición inteligente | Bodega | Inicio · Menú → Tu bodega |
+| Cuentas y costo por plato (cuenta dividida, propina, margen) | Restaurante | Inicio · Menú → Tu local |
+| Mensualidades y corte por mora | Servicios técnicos | Inicio · Menú → Tu servicio |
+| Paquetes y sesiones (no-shows) | Salón, consultorio, academia | Inicio · Menú |
+| Historial privado del paciente | Consultorio | Inicio · Menú → Tu consulta |
+| Les toca volver (recordatorios) | Taller, salón, consultorio | Menú |
+| Buscar por placa | Taller | Inicio · Menú → Tu taller |
+| Crédito por cliente | Mayorista | Inicio · Menú → Tu distribuidora |
+| Pensiones pendientes por grupo | Academia | Inicio · Menú → Tu academia |
+| Margen por obra (+ gastos por obra) | Construcción | Inicio · Menú → Tus obras |
+| Importador de libro Excel con "Deshacer" | Todos | Menú → Importar datos |
+| Voz premium del Copiloto | Pro/Empresa | Copiloto → "Escuchar" o preguntar hablando |
+| Datos de práctica del rubro | Todos | Ajustes → Datos de práctica |
+| Tienda: pago con Yape/Plin, ficha para Google, "instalar" en el celular | Todos con tienda | `/tienda/<slug>` |
+
+---
+
+# Referencia v2 (se mantiene; los lugares cambiados están en la tabla de arriba)
+
 
 Dónde está cada cosa en la app, qué plan la incluye y quién la ve. **Nada se borró**: lo que antes estaba en otro
 lugar sigue existiendo y se puede abrir desde **Todas las funciones** (avatar → Todas las funciones) o desde el

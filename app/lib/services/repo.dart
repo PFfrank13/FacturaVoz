@@ -130,6 +130,9 @@ class Repo {
   // Con cobros (migración 20261030); si aún no existe, se usa la versión anterior.
   static const _invoiceSelectPay = '$_invoiceSelect, due_date, payments(amount)';
 
+  // v3 (migración 20261113): tipo, anulado, importado y montos guardados.
+  static const _invoiceSelectV3 = '$_invoiceSelectPay, doc_kind, voided_at, import_job_id, totals_locked, amt_base, amt_tax, amt_total';
+
   // Versión mínima: sirve aunque aún no existan las tablas/columnas fiscales (migración 2).
   static const _invoiceSelectBasic =
       'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id), invoice_items(description, quantity, unit_price, position)';
@@ -141,12 +144,16 @@ class Repo {
         .limit(limit);
     dynamic rows;
     try {
-      rows = await q(_invoiceSelectPay);
+      rows = await q(_invoiceSelectV3);
     } on PostgrestException {
       try {
-        rows = await q(_invoiceSelect);
+        rows = await q(_invoiceSelectPay);
       } on PostgrestException {
-        rows = await q(_invoiceSelectBasic);
+        try {
+          rows = await q(_invoiceSelect);
+        } on PostgrestException {
+          rows = await q(_invoiceSelectBasic);
+        }
       }
     }
     return (rows as List).map((r) => InvoiceRecord.fromJson(Map<String, dynamic>.from(r as Map))).toList();
@@ -174,12 +181,16 @@ class Repo {
 
     dynamic rows;
     try {
-      rows = await q(_invoiceSelectPay);
+      rows = await q(_invoiceSelectV3);
     } on PostgrestException {
       try {
-        rows = await q(_invoiceSelect);
+        rows = await q(_invoiceSelectPay);
       } on PostgrestException {
-        rows = await q(_invoiceSelectBasic);
+        try {
+          rows = await q(_invoiceSelect);
+        } on PostgrestException {
+          rows = await q(_invoiceSelectBasic);
+        }
       }
     }
     return (rows as List).map((r) => InvoiceRecord.fromJson(Map<String, dynamic>.from(r as Map))).toList();
@@ -331,12 +342,16 @@ class Repo {
 
     Map<String, dynamic> row;
     try {
-      row = await q(_invoiceSelectPay);
+      row = await q(_invoiceSelectV3);
     } on PostgrestException {
       try {
-        row = await q(_invoiceSelect);
+        row = await q(_invoiceSelectPay);
       } on PostgrestException {
-        row = await q(_invoiceSelectBasic);
+        try {
+          row = await q(_invoiceSelect);
+        } on PostgrestException {
+          row = await q(_invoiceSelectBasic);
+        }
       }
     }
     return InvoiceRecord.fromJson(row);

@@ -16,8 +16,20 @@ const unitPrice = (p: StoreProduct, qty: number) => (p.wholesalePrice != null &&
  * compartible (/tienda/<slug>/p/<id>), carrito flotante, recojo/delivery o mesa (?mesa=4) y pedido por WhatsApp.
  * Los precios SIEMPRE los pone la base de datos al registrar el pedido (no el navegador).
  */
-export default function StoreCart({ store, initialProduct = null, table = "" }: { store: PublicStore; initialProduct?: string | null; table?: string }) {
+export default function StoreCart({ store, initialProduct = null }: { store: PublicStore; initialProduct?: string | null }) {
   const [cart, setCart] = useState<Record<string, number>>({});
+  // La mesa (?mesa=4) se lee en el navegador: así la página puede ser estática (ISR) y cargar al instante.
+  const [table, setTable] = useState("");
+  useEffect(() => {
+    const m = new URLSearchParams(window.location.search).get("mesa") ?? "";
+    if (/^[0-9A-Za-z \-]{1,12}$/.test(m)) setTable(m);
+  }, []);
+  const payOptions = [
+    ...(store.pay?.yape ? (["yape"] as const) : []),
+    ...(store.pay?.plin ? (["plin"] as const) : []),
+    "efectivo" as const,
+  ];
+  const [pay, setPay] = useState<string>(payOptions[0]);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [open, setOpen] = useState<StoreProduct | null>(store.products.find((p) => p.id === initialProduct) ?? null);
@@ -88,7 +100,7 @@ export default function StoreCart({ store, initialProduct = null, table = "" }: 
           slug: store.slug,
           name,
           phone,
-          note,
+          note: [note, isMesa ? "" : `Pago: ${pay === "yape" ? "Yape" : pay === "plin" ? "Plin" : "efectivo al recibir"}`].filter(Boolean).join(" · ").slice(0, 300),
           table: isMesa ? table : "",
           fulfillment: isMesa ? "mesa" : ful,
           address: ful === "delivery" ? address : "",
@@ -295,8 +307,25 @@ export default function StoreCart({ store, initialProduct = null, table = "" }: 
               <input className={input} placeholder="Tu nombre" value={name} onChange={(e) => setName(e.target.value.slice(0, 120))} autoComplete="name" />
               <input className={input} placeholder="Celular (9 dígitos)" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))} autoComplete="tel" />
               {!isMesa && ful === "delivery" ? <input className={input} placeholder="Dirección de entrega" value={address} onChange={(e) => setAddress(e.target.value.slice(0, 200))} autoComplete="street-address" /> : null}
-              <input className={input} placeholder={isMesa ? "Indicaciones para cocina (opcional)" : "Nota (opcional)"} value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} />
+              <input className={input} placeholder={isMesa ? "Indicaciones para cocina (opcional)" : "Nota (opcional)"} value={note} onChange={(e) => setNote(e.target.value.slice(0, 260))} />
             </div>
+            {!isMesa ? (
+              <fieldset className="mt-4">
+                <legend className="mb-2 text-sm font-semibold">¿Cómo pagas?</legend>
+                <div className="grid grid-cols-3 gap-2">
+                  {payOptions.map((o) => (
+                    <button key={o} type="button" aria-pressed={pay === o} onClick={() => setPay(o)} className="rounded-2xl py-3 text-sm font-semibold" style={pay === o ? { background: accent, color: "#fff" } : { background: "#f3f1fc" }}>
+                      {o === "yape" ? "Yape" : o === "plin" ? "Plin" : "Efectivo"}
+                    </button>
+                  ))}
+                </div>
+                {pay === "yape" || pay === "plin" ? (
+                  <p className="mt-2 text-[13px] text-[#55577a]">
+                    Yapea/Plinea {fmt(total, store.currency)} al <b>{pay === "yape" ? store.pay.yape : store.pay.plin}</b> y envía tu pedido. El negocio confirma el pago antes de prepararlo.
+                  </p>
+                ) : null}
+              </fieldset>
+            ) : null}
             {error ? <p className="mt-3 text-sm text-[#d94a5e]">{error}</p> : null}
             <button disabled={busy || belowMin || !name.trim() || phone.length !== 9} onClick={send} className="mt-4 w-full rounded-2xl py-4 text-[16px] font-semibold text-white disabled:opacity-50" style={{ background: accent }}>
               {busy ? "Enviando…" : isMesa ? "Enviar a cocina" : "Enviar pedido"}

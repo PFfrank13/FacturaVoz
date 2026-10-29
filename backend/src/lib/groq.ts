@@ -154,3 +154,103 @@ export function toNum(v: unknown): number {
 }
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** Modelos del Copiloto en tiempo real: el más rápido primero (gpt-oss-20b ≈ 1000 tokens/s en Groq). */
+export const fastModels = () => uniq([process.env.COPILOT_MODEL, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.1-8b-instant"]);
+
+/**
+ * Lee el valor (aún incompleto) de una propiedad de texto dentro de un JSON que se está generando.
+ * Ej.: '{"answer":"Vendiste S/ 1' → { text: "Vendiste S/ 1", done: false }. Pura y probada.
+ */
+export function partialJsonString(buf: string, key: string): { text: string; done: boolean } | null {
+  const m = new RegExp(`"${key}"\\s*:\\s*"`).exec(buf);
+  if (!m) return null;
+  let i = m.index + m[0].length;
+  let out = "";
+  while (i < buf.length) {
+    const c = buf[i];
+    if (c === '"') return { text: out, done: true };
+    if (c === "\\") {
+      if (i + 1 >= buf.length) break; // escape incompleto: esperar más
+      const n = buf[i + 1];
+      if (n === "u") {
+        if (i + 6 > buf.length) break;
+        const code = parseInt(buf.slice(i + 2, i + 6), 16);
+        if (Number.isNaN(code)) return { text: out, done: false };
+        out += String.fromCharCode(code);
+        i += 6;
+        continue;
+      }
+      out += n === "n" ? "\n" : n === "t" ? "\t" : n === "r" ? "" : n === "b" || n === "f" ? "" : n;
+      i += 2;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return { text: out, done: false };
+}
+
+/**
+ * Chat en modo streaming (SSE de Groq). Llama a onText con TODO el contenido acumulado cada vez que llega un trozo.
+ * Sin "JSON mode" (no siempre admite streaming): el modelo igual responde un JSON y se valida al final.
+ */
+export async function chatStream(
+  key: string,
+  system: string,
+  user: string,
+  onText: (full: string) => void,
+  maxTokens = 1200,
+): Promise<string> {
+  let res: Response | null = null;
+  for (const model of fastModels()) {
+    res = await fetch(`${GROQ}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        stream: true,
+        max_completion_tokens: maxTokens,
+        ...(model.startsWith("openai/") ? { reasoning_effort: "low" } : {}),
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (res.status !== 404 && res.status !== 400) break;
+    console.error("groq: model unavailable", model, res.status);
+  }
+  if (!res) throw new GroqError(502, "llm_none");
+  if (!res.ok || !res.body) throw new GroqError(res.status, `llm_${res.status}`);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let pending = "";
+  let full = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    pending += dec.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = pending.indexOf("\n")) >= 0) {
+      const line = pending.slice(0, nl).trim();
+      pending = pending.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") continue;
+      try {
+        const j = JSON.parse(data) as { choices?: { delta?: { content?: string } }[] };
+        const piece = j.choices?.[0]?.delta?.content;
+        if (piece) {
+          full += piece;
+          onText(full);
+        }
+      } catch {
+        // trozo malformado: se ignora
+      }
+    }
+  }
+  return full;
+}

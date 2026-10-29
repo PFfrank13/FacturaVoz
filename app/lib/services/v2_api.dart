@@ -62,7 +62,7 @@ class V2Api {
   /// Consulta DNI/RUC. Nunca lanza por "no encontrado": devuelve el motivo para dejar escribir a mano.
   static Future<LookupResult> lookup(String number) async {
     try {
-      final (status, body) = await _post('/api/lookup', {'number': number}, seconds: 15);
+      final (status, body) = await _post('/api/lookup', {'number': number, if (Repo.activeOrgId != null) 'org_id': Repo.activeOrgId}, seconds: 15);
       if (body['ok'] == true && body['data'] is Map) return LookupResult(data: DocLookup.fromJson(Map<String, dynamic>.from(body['data'] as Map)));
       return LookupResult(message: (body['message'] ?? body['error'] ?? 'Escribe los datos a mano.') as String, reason: (body['reason'] ?? 'http_$status') as String);
     } on AppException catch (e) {

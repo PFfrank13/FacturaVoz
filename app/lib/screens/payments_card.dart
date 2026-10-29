@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
+import '../rubros.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -60,7 +62,10 @@ class _PaymentsCardState extends State<PaymentsCard> {
   Future<void> _add() async {
     final amount = TextEditingController(text: _balance > 0 ? qtyText(_balance) : '');
     final note = TextEditingController();
-    var method = 'efectivo';
+    // Medios de cobro en el orden de TU rubro (el primero queda elegido); los demás siguen disponibles.
+    final preferred = rubroFor(Access.instance.rubro)?.payMethods ?? const ['efectivo'];
+    final methods = [...preferred.where(paymentMethods.containsKey), ...paymentMethods.keys.where((k) => !preferred.contains(k))];
+    var method = methods.first;
     var err = '';
     final cur = widget.invoice.currency;
     final ok = await showModalBottomSheet<bool>(
@@ -85,8 +90,8 @@ class _PaymentsCardState extends State<PaymentsCard> {
               ),
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final e in paymentMethods.entries)
-                  ChoiceChip(label: Text(e.value), selected: method == e.key, onSelected: (_) => setS(() => method = e.key)),
+                for (final k in methods)
+                  ChoiceChip(label: Text(paymentMethods[k]!), selected: method == k, onSelected: (_) => setS(() => method = k)),
               ]),
               const SizedBox(height: 12),
               TextField(controller: note, maxLength: 200, decoration: const InputDecoration(labelText: 'Nota (opcional)', counterText: '')),

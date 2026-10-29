@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { authenticateBearer, jsonWith, preflight, readJson } from "@/lib/api-auth";
+import { authenticateBearer, corsHeaders, jsonWith, preflight, readJson } from "@/lib/api-auth";
 import { buildSystemPrompt, enrichSnapshot, sanitizeAssistant, type ClientActivity } from "@/lib/assistant";
-import { chatJson, cleanText, GroqError, sniffAudio, transcribe } from "@/lib/groq";
+import { chatJson, chatStream, cleanText, extractJson, GroqError, partialJsonString, sniffAudio, transcribe } from "@/lib/groq";
 import { limaToday } from "@/lib/publicdata";
 import { UUID } from "@/lib/publicbase";
 import { estimateTaxes, type Regime } from "@/lib/taxes";
+import { isRubro, redactMoney, rubroContext, rubroPromptBlock } from "@/lib/rubro-copilot";
 
 export const maxDuration = 45;
 export const OPTIONS = preflight;
@@ -50,45 +51,138 @@ export async function POST(req: Request) {
 
   const kind = audio ? sniffAudio(audio) : null;
   if (audio && !kind) return json({ error: "Formato de audio no válido" }, 400);
+  const wantsStream = (req.headers.get("accept") ?? "").includes("text/event-stream");
 
+  // Permisos y cuota EN PARALELO (antes iban uno tras otro y sumaban medio segundo o más).
+  const [{ data: lic }, quota] = await Promise.all([
+    supabase.rpc("my_license", { p_org: orgId }),
+    supabase.rpc("consume_api_quota", { p_per_minute: 8, p_per_day: 150 }),
+  ]);
   // Membresía: el Copiloto es función del plan (en modo desarrollo o prueba, todo está habilitado)
-  const { data: lic } = await supabase.rpc("my_license", { p_org: orgId });
   const features = ((lic as { features?: Record<string, unknown> } | null)?.features ?? null) as Record<string, unknown> | null;
   if (features && features.copiloto === false) return json({ error: "Tu plan no incluye el Copiloto. Mejora tu plan para usarlo.", code: "feature" }, 402);
+  if (quota.error) return json({ error: "Falta ejecutar la migración de cuotas en Supabase", code: "quota_rpc" }, 500);
+  if (quota.data !== true) return json({ error: "Demasiadas consultas seguidas. Espera un minuto." }, 429);
 
-  const { data: allowed, error: qErr } = await supabase.rpc("consume_api_quota", { p_per_minute: 5, p_per_day: 100 });
-  if (qErr) return json({ error: "Falta ejecutar la migración de cuotas en Supabase", code: "quota_rpc" }, 500);
-  if (allowed !== true) return json({ error: "Demasiadas consultas seguidas. Espera un minuto." }, 429);
+  // El contexto del negocio se arma MIENTRAS se transcribe el audio.
+  const plan = String((lic as { plan?: string } | null)?.plan ?? "");
+  const ctxPromise = gatherContext(supabase, orgId, plan, features);
+  const sttPromise = audio && kind ? transcribe(key, audio, kind) : Promise.resolve(text);
+  // Evita "unhandled rejection" si uno falla antes de que se lo espere.
+  ctxPromise.catch(() => null);
+  sttPromise.catch(() => null);
 
-  // Resumen del negocio (RLS: solo si el usuario es miembro de esa empresa)
-  const { data: snapshot, error: snapErr } = await supabase.rpc("business_snapshot", { p_org: orgId });
-  if (snapErr) {
-    const missing = snapErr.code === "PGRST202" || snapErr.code === "42883";
-    return json({ error: missing ? "Falta ejecutar la migración 20261101_negocio_pro.sql" : "Sin acceso a esa empresa", code: snapErr.code }, missing ? 500 : 403);
-  }
-  const { data: org } = await supabase.from("organizations").select("name, trade_name").eq("id", orgId).maybeSingle();
-  // Meta y actividad de clientes (migración 20261102). Si aún no existen, el copiloto funciona sin ellos.
-  const { data: goalRow } = await supabase.from("organizations").select("monthly_goal").eq("id", orgId).maybeSingle();
-  const { data: activity } = await supabase.rpc("client_activity", { p_org: orgId });
-  const enriched = enrichSnapshot(
-    (snapshot ?? {}) as Record<string, unknown>,
-    ((activity ?? []) as ClientActivity[]).slice(0, 500),
-    goalRow?.monthly_goal == null ? null : Number(goalRow.monthly_goal),
-  );
-  Object.assign(enriched, { taxes: await taxContext(supabase, orgId) });
-
-  try {
-    if (audio && kind) {
-      text = await transcribe(key, audio, kind);
+  if (!wantsStream) {
+    try {
+      const [ctx, heard] = await Promise.all([ctxPromise, sttPromise]);
+      if (ctx.error) return json({ error: ctx.error, code: ctx.code }, ctx.status);
+      text = heard;
       if (!text) return json({ error: "No se oyó nada. Habla más cerca del micrófono.", code: "empty" }, 422);
+      const raw = await chatJson(key, buildSystemPrompt(ctx.snapshot ?? {}, ctx.name ?? "", ctx.extra), `<pedido>\n${text}\n</pedido>`, 1800);
+      return json({ transcript: text, reply: sanitizeAssistant(raw) });
+    } catch (e) {
+      if (e instanceof GroqError && e.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto", transcript: text }, 503);
+      console.error("assistant: failed", e instanceof GroqError ? e.code : e instanceof Error ? e.name : "unknown");
+      return json({ error: "No pude procesar tu pedido. Inténtalo de nuevo.", code: e instanceof GroqError ? e.code : "assistant", transcript: text }, 502);
     }
-    const raw = await chatJson(key, buildSystemPrompt(enriched, String(org?.trade_name || org?.name || "")), `<pedido>\n${text}\n</pedido>`, 1800);
-    return json({ transcript: text, reply: sanitizeAssistant(raw) });
-  } catch (e) {
-    if (e instanceof GroqError && e.status === 429) return json({ error: "Servicio ocupado, inténtalo en un minuto", transcript: text }, 503);
-    console.error("assistant: failed", e instanceof GroqError ? e.code : e instanceof Error ? e.name : "unknown");
-    return json({ error: "No pude procesar tu pedido. Inténtalo de nuevo.", code: e instanceof GroqError ? e.code : "assistant", transcript: text }, 502);
   }
+
+  // ── Tiempo real (SSE): transcript → la respuesta palabra por palabra → respuesta final validada ──
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (obj: Record<string, unknown>) => controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      try {
+        send({ t: "status", text: audio ? "Escuchando lo que dijiste…" : "Pensando…" });
+        const heard = await sttPromise;
+        text = heard;
+        if (!text) {
+          send({ t: "error", error: "No se oyó nada. Habla más cerca del micrófono.", code: "empty" });
+          return controller.close();
+        }
+        if (audio) send({ t: "transcript", text });
+        const ctx = await ctxPromise;
+        if (ctx.error) {
+          send({ t: "error", error: ctx.error, code: ctx.code });
+          return controller.close();
+        }
+        let shown = "";
+        const full = await chatStream(key, buildSystemPrompt(ctx.snapshot ?? {}, ctx.name ?? "", ctx.extra), `<pedido>\n${text}\n</pedido>`, (buf) => {
+          const p = partialJsonString(buf, "answer");
+          if (!p) return;
+          // Se manda solo lo nuevo; nunca un trozo de escape a medias (partialJsonString ya lo espera).
+          if (p.text.length > shown.length && p.text.startsWith(shown)) {
+            send({ t: "delta", text: p.text.slice(shown.length) });
+            shown = p.text;
+          }
+        });
+        const parsed = extractJson(full);
+        if (!parsed) {
+          send({ t: "error", error: "No pude armar la respuesta. Inténtalo de nuevo.", code: "llm_json" });
+          return controller.close();
+        }
+        send({ t: "final", transcript: text, reply: sanitizeAssistant(parsed) });
+        controller.close();
+      } catch (e) {
+        const busy = e instanceof GroqError && e.status === 429;
+        console.error("assistant/stream: failed", e instanceof GroqError ? e.code : e instanceof Error ? e.name : "unknown");
+        send({ t: "error", error: busy ? "Servicio ocupado, inténtalo en un minuto" : "No pude procesar tu pedido. Inténtalo de nuevo.", code: e instanceof GroqError ? e.code : "assistant", transcript: text });
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders(req.headers.get("origin")),
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store, no-transform",
+      "X-Accel-Buffering": "no",
+      Connection: "keep-alive",
+    },
+  });
+}
+
+type Ctx =
+  | { snapshot: Record<string, unknown>; name: string; extra: { block: string; rubroData: Record<string, unknown> }; error?: undefined }
+  | { error: string; code?: string; status: number; snapshot?: undefined; name?: undefined; extra?: undefined };
+
+/** Todo lo que el Copiloto necesita saber, en UNA ronda de consultas paralelas (RLS con el token del usuario). */
+async function gatherContext(supabase: SupabaseClient, orgId: string, plan: string, features: Record<string, unknown> | null): Promise<Ctx> {
+  // Rol y rubro primero (deciden qué datos se consultan); todo lo demás en paralelo.
+  const [access, settings] = await Promise.all([
+    supabase.rpc("my_access", { p_org: orgId }),
+    supabase.from("org_settings").select("business_type").eq("org_id", orgId).maybeSingle(),
+  ]);
+  const acc = (access.data ?? {}) as { role?: string; can?: { finance?: boolean } };
+  const role = acc.role ?? "owner";
+  const canMoney = access.error ? true : acc.can?.finance === true;
+  const bt = (settings.data as { business_type?: string } | null)?.business_type;
+  const rubro = isRubro(bt) ? bt : null;
+  const [snap, org, activity, taxes, rubroData] = await Promise.all([
+    supabase.rpc("business_snapshot", { p_org: orgId }),
+    supabase.from("organizations").select("name, trade_name, monthly_goal").eq("id", orgId).maybeSingle(),
+    canMoney ? supabase.rpc("client_activity", { p_org: orgId }) : Promise.resolve({ data: [], error: null }),
+    canMoney ? taxContext(supabase, orgId) : Promise.resolve(null),
+    rubroContext(supabase, orgId, rubro, canMoney),
+  ]);
+  if (snap.error) {
+    const missing = snap.error.code === "PGRST202" || snap.error.code === "42883";
+    return { error: missing ? "Falta ejecutar la migración 20261101_negocio_pro.sql" : "Sin acceso a esa empresa", code: snap.error.code, status: missing ? 500 : 403 };
+  }
+  // Si la columna monthly_goal aún no existe, se reintenta sin ella (el Copiloto funciona igual).
+  let o = org.data as { name?: string; trade_name?: string; monthly_goal?: number | string | null } | null;
+  if (org.error) o = ((await supabase.from("organizations").select("name, trade_name").eq("id", orgId).maybeSingle()).data ?? null) as typeof o;
+  const enriched = enrichSnapshot(
+    (snap.data ?? {}) as Record<string, unknown>,
+    ((activity.data ?? []) as ClientActivity[]).slice(0, 500),
+    o?.monthly_goal == null ? null : Number(o.monthly_goal),
+  );
+  Object.assign(enriched, { taxes });
+  return {
+    snapshot: canMoney ? enriched : redactMoney(enriched),
+    name: String(o?.trade_name || o?.name || ""),
+    extra: { block: rubroPromptBlock({ rubro, role, canMoney, plan, features }), rubroData },
+  };
 }
 
 type Summary = { sales_base?: number; sales_tax?: number };

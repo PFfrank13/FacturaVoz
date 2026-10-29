@@ -6,6 +6,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'rubros.dart';
 import 'services/repo.dart';
 
 /// Estado de la licencia tal como lo devuelve my_license().
@@ -75,9 +76,11 @@ class LicenseInfo {
 /// Funciones básicas que todo plan incluye.
 const coreFeatures = {'facturar', 'clientes', 'cobros', 'voz'};
 
-/// ¿El plan incluye [key]? Puro (se prueba con flutter test).
-bool planHas(LicenseInfo l, String key) {
+/// ¿El plan incluye [key]? Puro (se prueba con flutter test). El núcleo del rubro va en todos los planes
+/// (igual que private.has_feature + private.rubro_core en la base).
+bool planHas(LicenseInfo l, String key, {String? rubro}) {
   if (!l.enforced || l.dev || l.source == 'local' || coreFeatures.contains(key)) return true;
+  if (rubroIncludes(rubro, key)) return true;
   final v = l.features[key];
   if (v is bool) return v;
   if (v is num) return v != 0;
@@ -104,7 +107,10 @@ class Access extends ChangeNotifier {
   bool loaded = false;
 
   bool can(String what) => _can[what] ?? isAdmin;
-  bool has(String feature) => planHas(license, feature);
+  /// Rubro de la empresa activa (lo fija la estructura principal al leer los ajustes).
+  String? rubro;
+
+  bool has(String feature) => planHas(license, feature, rubro: rubro);
   int limit(String feature) => planLimit(license, feature);
 
   String get roleLabel => roleName(role);

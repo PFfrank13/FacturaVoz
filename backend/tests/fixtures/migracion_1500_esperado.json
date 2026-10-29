@@ -1,0 +1,23 @@
+{
+ "clients": 250,
+ "documents": 1500,
+ "facturas": 1168,
+ "boletas": 274,
+ "credit_notes": 58,
+ "lines": 3738,
+ "products": 14,
+ "voided": 117,
+ "invalid_docs": 3,
+ "net_total": {
+  "PEN": 621469.52,
+  "USD": 9343.51
+ },
+ "receivable": {
+  "PEN": 235231.31,
+  "USD": 3184.18
+ },
+ "collected": {
+  "PEN": 411460.79,
+  "USD": 6864.36
+ }
+}

@@ -476,7 +476,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         ? const PayScore(null, 'Sin historial suficiente', 'neutral')
         : payScore(creditInvoices: st.creditInvoices, settled: st.settled, avgDaysLate: st.avgDaysLate, maxDaysLate: st.maxDaysLate, overdueBalance: st.overdueBalance);
     final scoreColor = switch (score.tone) { 'ok' => Brand.ok, 'warn' => Brand.warn, 'bad' => Brand.bad, _ => t.colorScheme.onSurfaceVariant };
-    final bought = _invoices.where((i) => i.status != 'draft' && i.fiscalStatus != 'rejected').fold(0.0, (s, i) => s + i.totals.total);
+    final bought = _invoices.where((i) => i.countsAsSale).fold(0.0, (s, i) => s + i.signedTotal);
     return SoftCard(
       padding: const EdgeInsets.all(16),
       child: Row(children: [

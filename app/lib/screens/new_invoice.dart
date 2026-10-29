@@ -92,6 +92,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   bool _lookingUp = false;
   String _lookupMsg = '';
   String _lookedUp = '';
+  String _rucWarning = ''; // RUC de baja o no habido: se pregunta antes de guardar (J3)
   late String _currency = _profile.currency;
   double? _fx;
   String _fxMsg = '';
@@ -340,11 +341,13 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       if (r.ok) {
         final d = r.data!;
         if (_client.text.trim().isEmpty || _client.text.trim().toLowerCase() != d.name.toLowerCase()) _client.text = d.name;
-        _lookupMsg = d.kind == 'ruc' && (!d.rucActive || !d.rucHabido)
-            ? '⚠️ RUC ${d.status.isEmpty ? '' : d.status} ${d.condition}. SUNAT puede rechazar facturas a este RUC.'
-            : '✓ ${d.kind == 'ruc' ? 'SUNAT' : 'RENIEC'}: ${d.name}${d.fullAddress.isNotEmpty ? ' · ${d.fullAddress}' : ''}';
+        _rucWarning = d.warningText;
+        _lookupMsg = _rucWarning.isNotEmpty
+            ? '⚠️ $_rucWarning'
+            : '✓ ${d.kind == 'ruc' ? 'SUNAT' : 'RENIEC'}: ${d.name}${d.tradeName.isNotEmpty ? ' (${d.tradeName})' : ''}${d.fullAddress.isNotEmpty ? ' · ${d.fullAddress}' : ''}';
         _dirty = true;
       } else {
+        _rucWarning = '';
         _lookupMsg = r.message.isEmpty ? 'Escribe el nombre a mano.' : r.message;
       }
     });
@@ -444,6 +447,22 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       HapticFeedback.heavyImpact();
       setState(() => _error = err);
       return;
+    }
+    // RUC de baja / no habido según SUNAT: se avisa y se pregunta si continúa (no se bloquea).
+    if (_rucWarning.isNotEmpty && _lookedUp == _clientTax.text.replaceAll(RegExp(r'\D'), '')) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.gpp_maybe_rounded, color: Brand.warn, size: 32),
+          title: const Text('RUC con observaciones en SUNAT'),
+          content: Text(_rucWarning),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Revisar')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Continuar igual')),
+          ],
+        ),
+      );
+      if (go != true) return;
     }
     final risk = _risk();
     if (risk.level == RiskLevel.high) {

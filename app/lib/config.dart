@@ -8,6 +8,11 @@ class Config {
   static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const privacyUrl = String.fromEnvironment('PRIVACY_URL');
+  static const termsUrl = String.fromEnvironment('TERMS_URL');
+
+  /// WhatsApp de soporte (9 dígitos o con 51). Vacío = el botón de ayuda abre el correo de soporte.
+  static const supportWhatsapp = String.fromEnvironment('SUPPORT_WHATSAPP');
+  static const appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '3.0.0');
 
   /// Muestra "Continuar con Google" (requiere activar el proveedor en Supabase). --dart-define=GOOGLE_LOGIN=true
   static const googleLogin = bool.fromEnvironment('GOOGLE_LOGIN');

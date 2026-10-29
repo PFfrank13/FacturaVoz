@@ -36,11 +36,14 @@ import 'collections.dart';
 import 'expenses.dart';
 import 'fiados.dart';
 import 'fiscal_setup.dart';
+import 'home.dart' show HomeScreen;
+import 'hubs_v3.dart';
 import 'import_screen.dart';
 import 'invoice_detail.dart';
 import 'jobs.dart';
 import 'kitchen.dart';
 import 'license_gate.dart';
+import 'menu.dart';
 import 'new_invoice.dart';
 import 'notebook.dart';
 import 'notices.dart';
@@ -55,6 +58,8 @@ import 'promos.dart';
 import 'quotes.dart';
 import 'recurring.dart';
 import 'reports.dart';
+import 'rubro_picker.dart';
+import 'rubro_tools.dart';
 import 'scan.dart';
 import 'security.dart';
 import 'settings.dart';
@@ -98,13 +103,13 @@ class FeatureEntry {
   final List<String> keywords;
   final bool mobileOnly;
 
-  bool get allowed {
-    final a = Access.instance;
-    if (feature != null && !a.has(feature!)) return false;
-    if (perm != null && !a.can(perm!)) return false;
-    if (mobileOnly && kIsWeb) return false;
-    return true;
-  }
+  bool get allowed => roleOk && planOk;
+
+  /// ¿El rol lo permite (y la plataforma)? Si no, no se muestra.
+  bool get roleOk => (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
+
+  /// ¿El plan lo incluye (con el núcleo del rubro)? Si no, se muestra con candado: "Disponible en el plan X".
+  bool get planOk => feature == null || Access.instance.has(feature!);
 }
 
 const groupOrder = ['Vender', 'Clientes y trabajos', 'Cobrar y pagar', 'Mi negocio', 'Control del dueño', 'Ajustes'];
@@ -122,6 +127,7 @@ const groupColors = <String, Color>{
 List<FeatureEntry> featureCatalog() => [
       // ───── Vender ─────
       FeatureEntry(id: 'facturar', title: 'Facturar por voz', subtitle: 'Boleta o factura dictada o escrita', icon: Icons.mic_rounded, group: 'Vender', feature: 'facturar', perm: 'sell', keywords: const ['boleta', 'factura', 'vender', 'comprobante', 'sunat'], builder: (_) => const NewInvoiceScreen()),
+      FeatureEntry(id: 'comprobantes', title: 'Comprobantes', subtitle: 'Todas tus boletas y facturas, con búsqueda y filtros', icon: Icons.receipt_long_rounded, group: 'Vender', keywords: const ['boletas', 'facturas', 'lista', 'historial', 'anular', 'sunat'], builder: (_) => const HomeScreen()),
       FeatureEntry(id: 'pos', title: 'Venta rápida (caja)', subtitle: 'Toca productos o escanea su código de barras', icon: Icons.point_of_sale_rounded, group: 'Vender', module: 'pos', feature: 'facturar', perm: 'sell', keywords: const ['caja', 'pos', 'codigo de barras', 'carrito'], builder: (_) => const PosScreen()),
       FeatureEntry(id: 'cotizaciones', title: 'Cotizaciones y pedidos', subtitle: 'Cotiza, comparte y convierte en factura', icon: Icons.request_quote_rounded, group: 'Vender', module: 'cotizaciones', feature: 'cotizaciones', perm: 'sell', keywords: const ['presupuesto', 'proforma', 'pedido web'], builder: (_) => const QuotesScreen()),
       FeatureEntry(id: 'cuaderno', title: 'Del cuaderno a la factura', subtitle: 'Foto de tu cuaderno, nota o WhatsApp → venta', icon: Icons.menu_book_rounded, group: 'Vender', module: 'cuaderno_ia', feature: 'cuaderno_ia', perm: 'sell', keywords: const ['foto', 'nota', 'ia', 'cuaderno'], builder: (_) => const NotebookScreen()),
@@ -131,13 +137,20 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'carta', title: 'Carta QR y comandas', subtitle: 'Pedidos por mesa directo a cocina', icon: Icons.restaurant_menu_rounded, group: 'Vender', module: 'carta_qr', feature: 'carta_qr', keywords: const ['restaurante', 'mesa', 'cocina', 'comanda', 'menu'], builder: (_) => const KitchenScreen()),
       FeatureEntry(id: 'precios', title: 'Precios y promociones', subtitle: 'Mayorista, "lleva 3 paga 2" y cupones', icon: Icons.local_offer_rounded, group: 'Vender', module: 'precios', feature: 'precios', perm: 'products_edit', keywords: const ['descuento', 'promocion', 'cupon', 'mayorista'], builder: (_) => const PromosScreen()),
       FeatureEntry(id: 'puntos', title: 'Puntos y fidelización', subtitle: 'Premia a tus clientes frecuentes', icon: Icons.loyalty_rounded, group: 'Vender', module: 'fidelizacion', feature: 'fidelizacion', keywords: const ['puntos', 'cumpleanos', 'premio'], builder: (_) => const LoyaltyScreen()),
+      FeatureEntry(id: 'reponer', title: 'Reposición inteligente', subtitle: 'Qué se te acaba y el pedido para tu proveedor', icon: Icons.shopping_cart_checkout_rounded, group: 'Vender', feature: 'stock', keywords: const ['reponer', 'comprar', 'proveedor', 'se acaba', 'pedido'], builder: (_) => const ReorderScreen()),
+      FeatureEntry(id: 'platos', title: 'Cuentas y costo por plato', subtitle: 'Divide la cuenta, propina y margen de cada plato', icon: Icons.restaurant_rounded, group: 'Vender', feature: 'carta_qr', keywords: const ['dividir', 'cuenta', 'propina', 'plato', 'costo', 'margen'], builder: (_) => const DishesScreen()),
       // ───── Clientes y trabajos ─────
       FeatureEntry(id: 'clientes', title: 'Clientes', subtitle: 'Ficha 360: deuda, historial, fotos y WhatsApp', icon: Icons.people_alt_rounded, group: 'Clientes y trabajos', perm: 'clients', keywords: const ['contacto', 'ruc', 'dni', 'ficha'], builder: (_) => const ClientsHubScreen()),
       FeatureEntry(id: 'clientes360', title: 'Análisis de clientes', subtitle: 'Mejores clientes y los que se están yendo', icon: Icons.insights_rounded, group: 'Clientes y trabajos', perm: 'finance', keywords: const ['360', 'segmentos', 'riesgo'], builder: (_) => const Clients360Screen()),
       FeatureEntry(id: 'trabajos', title: 'Trabajos', subtitle: 'Seguimiento por estados, técnicos y fotos', icon: Icons.assignment_rounded, group: 'Clientes y trabajos', module: 'trabajos', feature: 'trabajos', perm: 'jobs', keywords: const ['instalacion', 'servicio', 'orden', 'tecnico', 'reparacion', 'obra'], builder: (_) => const JobsScreen()),
       FeatureEntry(id: 'agenda', title: 'Agenda y citas', subtitle: 'Visitas, citas y reservas en línea', icon: Icons.calendar_month_rounded, group: 'Clientes y trabajos', module: 'agenda', feature: 'agenda', perm: 'jobs', keywords: const ['cita', 'reserva', 'calendario', 'visita'], builder: (_) => const AgendaScreen()),
       FeatureEntry(id: 'encuestas', title: 'Encuestas de satisfacción', subtitle: '¿Qué tan contento quedó tu cliente?', icon: Icons.sentiment_satisfied_alt_rounded, group: 'Clientes y trabajos', module: 'encuestas', feature: 'encuestas', keywords: const ['opinion', 'calificacion', 'estrellas'], builder: (_) => const SurveysScreen()),
+      FeatureEntry(id: 'paquetes', title: 'Paquetes y sesiones', subtitle: 'Sesiones prepagadas y quién falta a sus citas', icon: Icons.card_giftcard_rounded, group: 'Clientes y trabajos', feature: 'agenda', keywords: const ['paquete', 'sesiones', 'no vino', 'prepago', 'bono'], builder: (_) => const PackagesScreen()),
+      FeatureEntry(id: 'historial', title: 'Historial privado', subtitle: 'Notas por paciente que solo ves tú', icon: Icons.lock_person_rounded, group: 'Clientes y trabajos', feature: 'agenda', perm: 'clients', keywords: const ['historia', 'paciente', 'nota', 'privado', 'clinica'], builder: (_) => const PrivateHistoryScreen()),
+      FeatureEntry(id: 'recordatorios', title: 'Les toca volver', subtitle: 'Mantenimientos, controles y retoques', icon: Icons.alarm_rounded, group: 'Clientes y trabajos', keywords: const ['recordatorio', 'mantenimiento', 'control', 'volver'], builder: (_) => const RemindersScreen()),
+      FeatureEntry(id: 'placas', title: 'Buscar por placa', subtitle: 'El carro, su dueño y su historial', icon: Icons.directions_car_rounded, group: 'Clientes y trabajos', feature: 'trabajos', keywords: const ['placa', 'vehiculo', 'carro', 'auto', 'moto'], builder: (_) => const PlateScreen()),
       // ───── Cobrar y pagar ─────
+      FeatureEntry(id: 'me_deben', title: 'Lo que me deben', subtitle: 'Cobranza, fiados y avisos de Yape/Plin juntos', icon: Icons.request_page_rounded, group: 'Cobrar y pagar', perm: 'collect', keywords: const ['deben', 'deuda', 'cobrar', 'fiado'], builder: (_) => const OwedHubScreen()),
       FeatureEntry(id: 'cobranza', title: 'Cobranza', subtitle: 'Quién te debe y recordatorios por WhatsApp', icon: Icons.account_balance_wallet_rounded, group: 'Cobrar y pagar', feature: 'cobros', perm: 'collect', keywords: const ['deuda', 'cobrar', 'vencidas', 'recordatorio'], builder: (_) => const CollectionsScreen()),
       FeatureEntry(id: 'fiados', title: 'Libreta de fiados', subtitle: 'Anota lo que te deben y los abonos', icon: Icons.menu_book_rounded, group: 'Cobrar y pagar', module: 'fiados', feature: 'fiados', perm: 'collect', keywords: const ['fiado', 'credito', 'cuaderno', 'abono'], builder: (_) => const FiadosScreen()),
       FeatureEntry(id: 'caja', title: 'Caja y cierre del día', subtitle: 'Cuadra el efectivo y envía el reporte', icon: Icons.lock_clock_rounded, group: 'Cobrar y pagar', module: 'caja', feature: 'caja', perm: 'collect', keywords: const ['cierre', 'arqueo', 'efectivo', 'turno'], builder: (_) => const CashDayScreen()),
@@ -145,12 +158,17 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'banco', title: 'Conciliación bancaria', subtitle: 'Sube tu estado de cuenta y cruza los cobros', icon: Icons.account_balance_rounded, group: 'Cobrar y pagar', module: 'conciliacion', feature: 'conciliacion', perm: 'finance', keywords: const ['banco', 'estado de cuenta', 'bcp', 'interbank', 'bbva'], builder: (_) => const BankReconScreen()),
       FeatureEntry(id: 'gastos', title: 'Gastos y pagos', subtitle: 'Compras y pagos del negocio', icon: Icons.shopping_bag_rounded, group: 'Cobrar y pagar', perm: 'finance', keywords: const ['compra', 'proveedor', 'pagar'], builder: (_) => const ExpensesScreen()),
       FeatureEntry(id: 'escanear', title: 'Escanear comprobante', subtitle: 'Foto de la factura de tu proveedor', icon: Icons.document_scanner_rounded, group: 'Cobrar y pagar', perm: 'finance', keywords: const ['ocr', 'foto', 'proveedor', 'compra'], builder: (_) => const ScanScreen()),
+      FeatureEntry(id: 'corte', title: 'Mensualidades y corte', subtitle: 'Quién no pagó, aviso previo, corte y reconexión', icon: Icons.wifi_off_rounded, group: 'Cobrar y pagar', feature: 'recurrentes', perm: 'collect', keywords: const ['corte', 'moroso', 'mensualidad', 'reconexion', 'abonado'], builder: (_) => const CutoffScreen()),
+      FeatureEntry(id: 'credito', title: 'Crédito por cliente', subtitle: 'Límite, lo usado y quién se pasó', icon: Icons.credit_score_rounded, group: 'Cobrar y pagar', perm: 'finance', keywords: const ['credito', 'limite', 'linea'], builder: (_) => const CreditScreen()),
+      FeatureEntry(id: 'morosidad', title: 'Pensiones pendientes', subtitle: 'Morosidad por grupo y aviso al apoderado', icon: Icons.school_rounded, group: 'Cobrar y pagar', feature: 'recurrentes', perm: 'collect', keywords: const ['pension', 'moroso', 'apoderado', 'alumno'], builder: (_) => const MorosityScreen()),
       // ───── Mi negocio ─────
+      FeatureEntry(id: 'negocio_hub', title: 'Mi negocio (todo junto)', subtitle: 'Ganancia, cuánto me queda, reportes y comisiones', icon: Icons.dashboard_rounded, group: 'Mi negocio', perm: 'finance', keywords: const ['resumen', 'ganancia', 'reportes'], builder: (_) => const BusinessHubScreen()),
       FeatureEntry(id: 'negocio', title: 'Mi negocio', subtitle: 'Ganancia real, flujo de caja y stock', icon: Icons.insights_rounded, group: 'Mi negocio', perm: 'finance', keywords: const ['ganancia', 'utilidad', 'rentabilidad'], builder: (_) => const ProfitScreen()),
       FeatureEntry(id: 'impuestos', title: '¿Cuánto me queda?', subtitle: 'Impuestos estimados y lo que debes guardar', icon: Icons.savings_rounded, group: 'Mi negocio', module: 'impuestos', feature: 'reportes', perm: 'finance', keywords: const ['igv', 'renta', 'sunat', 'impuesto', 'rus', 'mype'], builder: (_) => const TaxesScreen()),
       FeatureEntry(id: 'reportes', title: 'Reportes', subtitle: 'Ventas por mes y exportar a Excel', icon: Icons.table_view_rounded, group: 'Mi negocio', feature: 'reportes', perm: 'finance', keywords: const ['excel', 'exportar', 'contador'], builder: (_) => const ReportsScreen()),
       FeatureEntry(id: 'comisiones', title: 'Ventas por vendedor', subtitle: 'Ranking, metas y comisiones', icon: Icons.emoji_events_rounded, group: 'Mi negocio', module: 'comisiones', feature: 'comisiones', keywords: const ['comision', 'vendedor', 'meta', 'ranking'], builder: (_) => const CommissionsScreen()),
       FeatureEntry(id: 'importar', title: 'Importar datos', subtitle: 'Facturas antiguas desde Excel o CSV', icon: Icons.cloud_upload_rounded, group: 'Mi negocio', perm: 'import', keywords: const ['excel', 'csv', 'xlsx', 'migrar'], builder: (_) => const ImportScreen()),
+      FeatureEntry(id: 'margen_obra', title: 'Margen por obra', subtitle: 'Cobrado, gastado y lo que te queda en cada obra', icon: Icons.engineering_rounded, group: 'Mi negocio', feature: 'trabajos', perm: 'finance', keywords: const ['obra', 'margen', 'valorizacion', 'subcontratista'], builder: (_) => const JobMarginScreen()),
       // ───── Control del dueño ─────
       FeatureEntry(id: 'alertas', title: 'Alertas del dueño', subtitle: 'Anulaciones, descuentos y caja que no cuadra', icon: Icons.shield_rounded, group: 'Control del dueño', module: 'antifraude', feature: 'antifraude', perm: 'team', keywords: const ['fraude', 'anulacion', 'distancia'], builder: (_) => const AlertsScreen()),
       FeatureEntry(id: 'bitacora', title: 'Bitácora', subtitle: 'Quién hizo qué y cuándo (no se puede alterar)', icon: Icons.history_rounded, group: 'Control del dueño', feature: 'antifraude', perm: 'team', keywords: const ['auditoria', 'historial', 'log'], builder: (_) => const AuditScreen()),
@@ -165,7 +183,8 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'marca', title: 'Logo y comprobantes', subtitle: 'Tu logo, diseño del PDF y ticket', icon: Icons.palette_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['logo', 'pdf', 'plantilla', 'diseno', 'ticket'], builder: (_) => const BrandingScreen()),
       FeatureEntry(id: 'impresora', title: 'Impresora de tickets', subtitle: 'Bluetooth o red, 58 u 80 mm', icon: Icons.print_rounded, group: 'Ajustes', keywords: const ['ticketera', 'bluetooth', 'termica', 'imprimir'], builder: (_) => const PrinterSettingsScreen()),
       FeatureEntry(id: 'medios', title: 'Medios de cobro', subtitle: 'Yape, Plin, banco y cobranza automática', icon: Icons.qr_code_2_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['yape', 'plin', 'cuenta', 'mercado pago'], builder: (_) => const PaySettingsScreen()),
-      FeatureEntry(id: 'tipo', title: 'Tipo de negocio y modo', subtitle: 'Plantilla, modo simple y presentación', icon: Icons.dashboard_customize_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['plantilla', 'simple', 'onboarding', 'presentacion'], builder: (ctx) => BusinessSetupScreen(reopened: true, onDone: () => Navigator.of(ctx).pop())),
+      FeatureEntry(id: 'tipo', title: 'Cambiar de rubro', subtitle: 'Bodega, restaurante, taller… con vista previa', icon: Icons.dashboard_customize_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['rubro', 'tipo de negocio', 'plantilla', 'giro'], builder: (_) => RubroPickerScreen(current: Access.instance.rubro)),
+      FeatureEntry(id: 'presentacion', title: 'Ver la presentación otra vez', subtitle: 'Rubro y modo Fácil paso a paso', icon: Icons.slideshow_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['onboarding', 'presentacion', 'inicio', 'facil'], builder: (ctx) => BusinessSetupScreen(reopened: true, onDone: () => Navigator.of(ctx).pop())),
       FeatureEntry(id: 'modulos', title: 'Funciones a la vista', subtitle: 'Elige qué se ve primero', icon: Icons.tune_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['modulos', 'ocultar', 'mostrar'], builder: (_) => const ModulesScreen()),
       FeatureEntry(id: 'plan', title: 'Mi plan', subtitle: 'Qué incluye, prueba gratis y pagos', icon: Icons.workspace_premium_rounded, group: 'Ajustes', keywords: const ['licencia', 'pago', 'suscripcion', 'prueba'], builder: (_) => const PlanScreen()),
       FeatureEntry(id: 'api', title: 'API y webhooks', subtitle: 'Conecta tu web o sistema', icon: Icons.integration_instructions_rounded, group: 'Ajustes', module: 'api_publica', feature: 'api_publica', perm: 'team', keywords: const ['api', 'integracion', 'webhook', 'desarrollador'], builder: (_) => const ApiAccessScreen()),
@@ -407,11 +426,11 @@ Future<void> showAccountSheet(BuildContext context) {
           tile('plan'),
           tile('empresas'),
           ListTile(
-            leading: const Icon(Icons.apps_rounded),
-            title: const Text('Todas las funciones'),
+            leading: const Icon(Icons.menu_rounded),
+            title: const Text('Menú (todas las funciones)'),
             onTap: () {
               Navigator.of(ctx).pop();
-              pushPremium(nav.context, const AllFunctionsScreen());
+              pushPremium(nav.context, const MenuScreen());
             },
           ),
           ListTile(

@@ -65,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _storeOrders = 0;
   int _recurringDrafts = 0;
   Map<String, dynamic>? _summary; // ventas del mes con la MISMA regla que "Mi negocio" (sales_summary)
+  bool _summaryTried = false; // hasta tener la cifra del servidor se muestra un esqueleto (nunca un número a medias)
   List<DailyAlert> _alerts = const [];
 
   @override
@@ -146,6 +147,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
+    // La cifra del mes viene del servidor (una consulta agregada) EN PARALELO con la lista.
+    _loadSummary();
     try {
       final r = await Repo.listInvoices(limit: _limit);
       if (mounted) {
@@ -167,16 +170,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final v = await ProRepo.productVelocity();
       if (mounted) setState(() => _stock = v);
     } catch (_) {}
-    final cur = AppState.instance.profile?.currency ?? 'PEN';
-    final now = DateTime.now();
-    final sum = await V2Repo.salesSummary(todayIso(DateTime(now.year, now.month, 1)), todayIso(DateTime(now.year, now.month + 1, 1)), cur);
     final alerts = await V2Repo.dailyAlerts();
-    if (mounted) {
-      setState(() {
-        _summary = sum;
-        _alerts = alerts;
-      });
-    }
+    if (mounted) setState(() => _alerts = alerts);
     final c = await ProRepo.countPendingClaims();
     final goal = await GrowthRepo.monthlyGoal();
     final orders = await GrowthRepo.countNewStoreOrders();
@@ -188,6 +183,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _goal = goal;
         _storeOrders = orders;
         _recurringDrafts = drafts;
+      });
+    }
+  }
+
+  Future<void> _loadSummary() async {
+    final cur = AppState.instance.profile?.currency ?? 'PEN';
+    final now = DateTime.now();
+    final sum = await V2Repo.salesSummary(todayIso(DateTime(now.year, now.month, 1)), todayIso(DateTime(now.year, now.month + 1, 1)), cur);
+    if (mounted) {
+      setState(() {
+        _summary = sum ?? _summary;
+        _summaryTried = true;
       });
     }
   }
@@ -304,8 +311,9 @@ class _HomeScreenState extends State<HomeScreen> {
         nDrafts++;
         continue;
       }
-      total += i.totals.total;
-      count++;
+      if (!i.countsAsSale) continue;
+      total += i.signedTotal;
+      if (!i.isCreditNote) count++;
     }
     return (total: round2(total), count: count, drafts: nDrafts, draftsTotal: round2(drafts));
   }
@@ -349,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 count: m.count,
                 drafts: m.drafts,
                 draftsTotal: m.draftsTotal,
-                loaded: _items != null,
+                loaded: _summary != null || (_summaryTried && _items != null),
                 goal: _goal,
                 series: dailySeries(_items ?? const <InvoiceRecord>[], currency: currency, today: todayIso()),
                 onGoal: () => _setGoal(m.total),
@@ -400,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: _CopilotCards(alerts: _alerts, onChanged: _load)),
+            SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
@@ -889,10 +897,12 @@ class _InsightCard extends StatelessWidget {
 
 /// Copiloto 2.0 proactivo: tarjetas con lo que conviene hacer HOY (visitas, fiados vencidos, cumpleaños) y el
 /// resumen ejecutivo hablado de 30 segundos. Todo viene de daily_alerts (RLS: cada rol ve lo suyo).
-class _CopilotCards extends StatelessWidget {
-  const _CopilotCards({required this.alerts, required this.onChanged});
+/// Sugerencias del Copiloto (datos reales del día). Se usa en Comprobantes y en el Inicio limpio (máximo 2).
+class CopilotCards extends StatelessWidget {
+  const CopilotCards({super.key, required this.alerts, required this.onChanged, this.max = 99});
   final List<DailyAlert> alerts;
   final VoidCallback onChanged;
+  final int max;
 
   @override
   Widget build(BuildContext context) {
@@ -979,6 +989,7 @@ class _CopilotCards extends StatelessWidget {
         ),
     ];
     if (cards.isEmpty) return const SizedBox.shrink();
+    if (cards.length > max) cards.removeRange(max, cards.length);
     return Reveal(
       index: 2,
       child: Padding(

@@ -210,6 +210,10 @@ class InvoiceRecord {
     required this.items,
     this.fiscalStatus,
     this.fiscalNumber,
+    this.docKind,
+    this.voided = false,
+    this.imported = false,
+    this.lockedTotals,
   });
 
   final String id;
@@ -228,8 +232,19 @@ class InvoiceRecord {
   final List<LineItem> items;
   final String? fiscalStatus; // pending | accepted | rejected | error (null = sin comprobante electrónico)
   final String? fiscalNumber; // F001-00000007
+  final String? docKind; // factura | boleta | nota_credito | nota_venta (null = se decide al emitir)
+  final bool voided; // anulado: no cuenta como venta
+  final bool imported; // vino del sistema anterior (no se reenvía a SUNAT)
+  final Totals? lockedTotals; // montos tal como venían del archivo importado
 
-  Totals get totals => computeTotals(items, taxRate);
+  Totals get totals => lockedTotals ?? computeTotals(items, taxRate);
+  bool get isCreditNote => docKind == 'nota_credito';
+
+  /// ¿Cuenta como venta? MISMA regla que el servidor (sales_summary): emitido o pagado, no anulado, no rechazado.
+  bool get countsAsSale => (status == 'sent' || status == 'paid') && !voided && fiscalStatus != 'rejected';
+
+  /// Total con signo: las notas de crédito restan.
+  double get signedTotal => isCreditNote ? -totals.total : totals.total;
 
   /// Saldo por cobrar (nunca negativo).
   double get balance {
@@ -238,7 +253,7 @@ class InvoiceRecord {
   }
 
   /// ¿Hay algo por cobrar? Solo facturas emitidas, no rechazadas ni ya pagadas.
-  bool get receivable => status != 'draft' && status != 'paid' && fiscalStatus != 'rejected' && balance > 0.004;
+  bool get receivable => status != 'draft' && status != 'paid' && fiscalStatus != 'rejected' && !voided && !isCreditNote && balance > 0.004;
 
   /// Vencida: por cobrar y con fecha de vencimiento anterior a [today] ('yyyy-MM-dd').
   bool isOverdue(String today) => receivable && dueDate != null && dueDate!.compareTo(today) < 0;
@@ -266,6 +281,10 @@ class InvoiceRecord {
       items: ((j['invoice_items'] ?? []) as List)
           .map((e) => LineItem.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
+      docKind: j['doc_kind'] as String?,
+      voided: j['voided_at'] != null,
+      imported: j['import_job_id'] != null,
+      lockedTotals: j['totals_locked'] == true ? Totals(_num(j['amt_base']), _num(j['amt_tax']), _num(j['amt_total'])) : null,
     );
   }
 }

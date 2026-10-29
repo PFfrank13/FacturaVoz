@@ -9,10 +9,12 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../models_pro.dart';
 import '../services/pro_api.dart';
+import '../services/voice.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -119,6 +121,7 @@ class _CopilotSheetState extends State<_CopilotSheet> {
 
   @override
   void dispose() {
+    _sub?.cancel();
     _timer?.cancel();
     _amp?.cancel();
     _recorder.dispose();
@@ -128,10 +131,19 @@ class _CopilotSheetState extends State<_CopilotSheet> {
     super.dispose();
   }
 
-  Future<void> _speak(String s) async {
+  /// [premium]: voz natural del servidor (solo si la pidieron con "Escuchar" o preguntaron hablando).
+  /// Si no hay voz premium (sin clave, sin cuota o sin internet) se usa la voz del teléfono.
+  Future<void> _speak(String s, {bool premium = false}) async {
     if (_muted || s.trim().isEmpty) return;
     try {
       await _tts.stop();
+      await PremiumVoice.instance.stop();
+      if (premium && await PremiumVoice.instance.speak(s)) return;
+      final n = PremiumVoice.instance.notice.value;
+      if (premium && n.isNotEmpty && mounted && Access.instance.isAdmin) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(n)));
+        PremiumVoice.instance.notice.value = '';
+      }
       await _tts.speak(s);
     } catch (_) {}
   }
@@ -220,39 +232,64 @@ class _CopilotSheetState extends State<_CopilotSheet> {
     await _ask(audio: bytes);
   }
 
-  // ───────────── Pregunta ─────────────
+  // ───────────── Pregunta (en tiempo real) ─────────────
+  StreamSubscription<CopilotEvent>? _sub;
+  String _liveQuestion = '';
+  String _liveAnswer = '';
+  String _liveStatus = '';
+
   Future<void> _ask({String? text, Uint8List? audio}) async {
     final profile = AppState.instance.profile;
     if (profile == null) return;
     final q = text?.trim() ?? '';
     if (audio == null && q.isEmpty) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    await _tts.stop();
+    await _sub?.cancel();
     setState(() {
       _phase = _Phase.thinking;
       _error = '';
       _text.clear();
+      _liveQuestion = audio != null ? '🎙️' : q;
+      _liveAnswer = '';
+      _liveStatus = audio != null ? 'Escuchando lo que dijiste…' : 'Pensando…';
     });
     _toBottom();
-    try {
-      final r = audio != null
-          ? await AssistantApi.askAudio(audio, filename: kIsWeb ? 'copiloto.webm' : 'copiloto.m4a', mimeType: kIsWeb ? 'audio/webm' : 'audio/mp4', profile: profile)
-          : await AssistantApi.askText(q, profile);
+    final events = audio != null
+        ? CopilotStream.ask(audio: audio, filename: kIsWeb ? 'copiloto.webm' : 'copiloto.m4a', mimeType: kIsWeb ? 'audio/webm' : 'audio/mp4', profile: profile)
+        : CopilotStream.ask(text: q, profile: profile);
+    _sub = events.listen((e) {
       if (!mounted) return;
-      Haptics.success();
-      setState(() {
-        _turns.add(_Turn(audio != null ? (r.transcript.isEmpty ? '🎙️' : r.transcript) : q, r));
-        _phase = _Phase.idle;
-      });
-      _toBottom();
-      _speak(r.speak);
-    } catch (e) {
-      if (!mounted) return;
-      Haptics.error();
-      setState(() {
-        _phase = _Phase.idle;
-        _error = friendly(e);
-      });
-    }
+      switch (e.type) {
+        case 'status':
+          setState(() => _liveStatus = e.text);
+        case 'transcript':
+          setState(() => _liveQuestion = e.text);
+        case 'delta':
+          // Las palabras aparecen apenas el modelo las escribe.
+          setState(() => _liveAnswer += e.text);
+          _toBottom();
+        case 'final':
+          final r = e.reply!;
+          Haptics.success();
+          setState(() {
+            _turns.add(_Turn(audio != null ? (r.transcript.isEmpty ? _liveQuestion : r.transcript) : q, r));
+            _phase = _Phase.idle;
+            _liveAnswer = '';
+            _liveQuestion = '';
+          });
+          _toBottom();
+          _speak(r.speak, premium: audio != null);
+        case 'error':
+          Haptics.error();
+          setState(() {
+            _phase = _Phase.idle;
+            _liveAnswer = '';
+            _liveQuestion = '';
+            _error = friendly(e.error ?? AppException('No pude procesar tu pedido.'));
+          });
+      }
+    });
   }
 
   // ───────────── Acciones ─────────────
@@ -365,7 +402,10 @@ class _CopilotSheetState extends State<_CopilotSheet> {
             tooltip: _muted ? 'Activar voz' : 'Silenciar voz',
             onPressed: () {
               setState(() => _muted = !_muted);
-              if (_muted) _tts.stop();
+              if (_muted) {
+                _tts.stop();
+                PremiumVoice.instance.stop();
+              }
             },
             icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
           ),
@@ -400,7 +440,30 @@ class _CopilotSheetState extends State<_CopilotSheet> {
                 _Bubble(text: turn.question),
                 if (turn.reply != null) Reveal(key: ValueKey('r$i'), child: _answer(context, turn.reply!, last: i == _turns.length - 1)),
               ],
-            if (_turns.isNotEmpty && (thinking || listening))
+            // Respuesta EN VIVO: la pregunta y el texto que va llegando, palabra por palabra.
+            if (thinking && _liveQuestion.isNotEmpty) ...[
+              if (_turns.isNotEmpty || _liveAnswer.isNotEmpty) _Bubble(text: _liveQuestion),
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 14),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: t.colorScheme.surface,
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(22), bottomLeft: Radius.circular(22), bottomRight: Radius.circular(22)),
+                    boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: 0.08),
+                  ),
+                  child: _liveAnswer.isEmpty
+                      ? Row(children: [
+                          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(_liveStatus, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant))),
+                        ])
+                      : Text('$_liveAnswer▍', style: t.textTheme.bodyLarge),
+                ),
+              ),
+            ],
+            if (_turns.isNotEmpty && listening)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Center(child: AiOrb(size: 90, level: _level, active: listening, thinking: thinking)),
@@ -492,7 +555,7 @@ class _CopilotSheetState extends State<_CopilotSheet> {
               child: IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Escuchar',
-                onPressed: () => _speak(r.speak.isEmpty ? r.answer : r.speak),
+                onPressed: () => _speak(r.speak.isEmpty ? r.answer : r.speak, premium: true),
                 icon: Icon(Icons.volume_up_rounded, size: 18, color: t.colorScheme.onSurfaceVariant),
               ),
             ),
@@ -568,7 +631,7 @@ class _RangeSalesScreenState extends State<RangeSalesScreen> {
     super.initState();
     final (from, to, _) = _bounds();
     Repo.listInvoicesBetween(todayIso(from), todayIso(to)).then((r) {
-      if (mounted) setState(() => _items = r.where((i) => i.status != 'draft' && i.fiscalStatus != 'rejected').toList());
+      if (mounted) setState(() => _items = r.where((i) => i.countsAsSale).toList());
     }).catchError((Object e) {
       if (mounted) setState(() => _error = friendly(e));
     });
@@ -580,7 +643,7 @@ class _RangeSalesScreenState extends State<RangeSalesScreen> {
     final (_, _, label) = _bounds();
     final items = _items ?? const <InvoiceRecord>[];
     final cur = AppState.instance.profile?.currency ?? 'PEN';
-    final total = items.where((i) => i.currency == cur).fold(0.0, (s, i) => s + i.totals.total);
+    final total = items.where((i) => i.currency == cur).fold(0.0, (s, i) => s + i.signedTotal);
     return Scaffold(
       appBar: AppBar(title: Text('Ventas · $label')),
       body: _error != null

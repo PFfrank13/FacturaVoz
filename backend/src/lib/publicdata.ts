@@ -232,6 +232,7 @@ export type PublicStore = {
   logo: string | null;
   categories: string[];
   products: StoreProduct[];
+  pay: { yape: string; plin: string };
 };
 
 /** Catálogo público /tienda/<slug> (solo productos activos y visibles en tienda). Fotos con URL firmada (1 h). */
@@ -310,5 +311,10 @@ export async function getPublicStore(slug: string): Promise<PublicStore | null> 
     logo,
     categories,
     products,
+    pay: await (async () => {
+      // Yape/Plin para pagar al hacer el pedido (solo números públicos que el dueño eligió mostrar).
+      const { data: ps } = await admin.from("org_pay_settings").select("yape_phone, plin_phone").eq("org_id", st.org_id).maybeSingle();
+      return { yape: (ps?.yape_phone as string | null) ?? "", plin: (ps?.plin_phone as string | null) ?? "" };
+    })(),
   };
 }

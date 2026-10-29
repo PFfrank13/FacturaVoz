@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'models.dart';
 import 'models_pro.dart';
-import 'reports.dart' show countsAsSale;
+import 'reports.dart' show countsAsSale, signOf;
 
 /// Inteligencia financiera PURA (sin Flutter ni red): se prueba con `flutter test`.
 /// Score de crédito por cliente, antigüedad de deudas, predicción de cobro, flujo de caja proyectado,
@@ -200,9 +200,9 @@ ProfitSummary profitOf({
   for (final i in invoices) {
     if (!_sale(i, currency)) continue;
     final t = i.totals;
-    sales += t.subtotal;
-    salesTax += t.tax;
-    n++;
+    sales += signOf(i) * t.subtotal;
+    salesTax += signOf(i) * t.tax;
+    if (!i.isCreditNote) n++;
   }
   for (final e in expenses) {
     if (e.currency != currency) continue;
@@ -252,7 +252,7 @@ List<MonthPoint> monthlySeries({
   for (final i in invoices) {
     if (!_sale(i, currency) || i.issueDate.length < 7) continue;
     final k = i.issueDate.substring(0, 7);
-    if (s.containsKey(k)) s[k] = s[k]! + i.totals.subtotal;
+    if (s.containsKey(k)) s[k] = s[k]! + signOf(i) * i.totals.subtotal;
   }
   for (final x in expenses) {
     if (x.currency != currency || x.spentOn.length < 7) continue;
@@ -350,8 +350,8 @@ List<Insight> buildInsights({
     if (!_sale(i, currency) || i.issueDate.length < 10) continue;
     final k = i.issueDate.substring(0, 7);
     final dd = int.parse(i.issueDate.substring(8, 10));
-    if (k == thisMonth) cur += i.totals.total;
-    if (k == prevKey && dd <= day) last += i.totals.total;
+    if (k == thisMonth) cur += i.signedTotal;
+    if (k == prevKey && dd <= day) last += i.signedTotal;
   }
   if (last > 0 && cur > 0) {
     final pct = ((cur - last) / last * 100).round();

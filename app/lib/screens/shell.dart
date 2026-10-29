@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../access.dart';
 import '../app_state.dart';
 import '../models_v2.dart';
+import '../rubros.dart';
 import '../services/quick_launch.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
@@ -15,13 +16,20 @@ import '../ui/theme.dart';
 import 'assistant.dart';
 import 'catalog.dart';
 import 'clients_hub.dart';
+import 'cash_day.dart';
 import 'collections.dart';
+import 'fiados.dart';
 import 'home.dart';
+import 'hubs_v3.dart';
+import 'inicio.dart';
 import 'invoice_detail.dart';
 import 'jobs.dart';
+import 'kitchen.dart';
 import 'license_gate.dart';
 import 'new_invoice.dart';
 import 'profit.dart';
+import 'quotes.dart';
+import 'rubro_picker.dart';
 import 'sell_hub.dart';
 import 'settings.dart';
 
@@ -54,6 +62,31 @@ const _dBusiness = _Dest('business', Icons.insights_rounded, 'Negocio', 'Mi nego
 const _dSettings = _Dest('settings', Icons.settings_rounded, 'Ajustes', 'Ajustes');
 const _dJobs = _Dest('jobs', Icons.assignment_rounded, 'Trabajos', 'Mis trabajos');
 const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda');
+
+/// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
+const _rubroIcons = <String, IconData>{
+  'home': Icons.space_dashboard_rounded,
+  'sell': Icons.point_of_sale_rounded,
+  'clients': Icons.people_alt_rounded,
+  'collect': Icons.account_balance_wallet_rounded,
+  'business': Icons.insights_rounded,
+  'jobs': Icons.assignment_rounded,
+  'agenda': Icons.calendar_month_rounded,
+  'quotes': Icons.request_quote_rounded,
+  'fiados': Icons.menu_book_rounded,
+  'tables': Icons.table_restaurant_rounded,
+  'cash': Icons.lock_clock_rounded,
+};
+
+/// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
+bool _destAllowed(String id, Access a) => switch (id) {
+      'sell' || 'quotes' => a.can('sell'),
+      'collect' || 'fiados' || 'cash' => a.can('collect'),
+      'business' => a.can('finance'),
+      'jobs' || 'agenda' => a.can('jobs'),
+      'clients' => a.can('clients'),
+      _ => true,
+    };
 
 class _MainShellState extends State<MainShell> {
   String _tab = 'home';
@@ -89,9 +122,26 @@ class _MainShellState extends State<MainShell> {
     _watchLicense();
   }
 
+  bool _gateShown = false;
+
   Future<void> _reloadSettings() async {
     final s = await V2Repo.settings();
+    Access.instance.rubro = s.businessType;
     if (mounted) setState(() => _settings = s);
+    _maybeGate(s);
+  }
+
+  /// "Otro / personalizado" ya no existe: el dueño elige su rubro una vez (nada se pierde mientras tanto).
+  void _maybeGate(OrgSettings s) {
+    if (_gateShown || !V2Repo.ready || !s.onboardingDone || rubroFor(s.businessType) != null) return;
+    _gateShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (ctx) => RubroPickerScreen(current: s.businessType, gate: true, onDone: () => Navigator.of(ctx).pop()),
+      ));
+    });
   }
 
   /// Si el Hub cambia la licencia (pago, corte), la app se entera al instante.
@@ -133,6 +183,17 @@ class _MainShellState extends State<MainShell> {
     final a = Access.instance;
     final simple = _settings?.simpleMode ?? false;
     if (a.role == 'tecnico') return const [_dJobs, _dAgenda, _dClients, _dSettings];
+    // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
+    final spec = rubroFor(_settings?.businessType);
+    if (spec != null) {
+      final out = [
+        for (final n in spec.nav)
+          if (_destAllowed(n.id, a)) _Dest(n.id, _rubroIcons[n.id] ?? Icons.circle_outlined, n.label, n.label),
+      ];
+      if (out.length < 4 && !out.any((d) => d.id == 'clients') && a.can('clients')) out.add(_Dest('clients', _rubroIcons['clients']!, spec.word('clients'), spec.word('clients')));
+      if (out.length < 4) out.add(_dSettings);
+      return out.take(4).toList();
+    }
     final out = <_Dest>[];
     if (!simple) out.add(_dHome);
     if (a.can('sell')) out.add(_dSell);
@@ -150,6 +211,12 @@ class _MainShellState extends State<MainShell> {
 
   void _go(String id) {
     if (id == _tab) return;
+    if (!_dests().any((d) => d.id == id)) {
+      // Ese destino no está en la barra de este rubro: se abre como pantalla.
+      final f = featureById(const {'sell': 'facturar', 'collect': 'cobranza', 'business': 'negocio', 'clients': 'clientes', 'jobs': 'trabajos', 'agenda': 'agenda'}[id] ?? id);
+      if (f != null && f.allowed) openFeature(context, f);
+      return;
+    }
     Haptics.select();
     setState(() {
       _tab = id;
@@ -170,14 +237,33 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  Widget _page(String id) => switch (id) {
+  Widget _page(String id) {
+    // v3: con rubro, Inicio limpio y los hubs agrupados (E). Sin rubro, la estructura v2 de siempre.
+    if (rubroFor(_settings?.businessType) != null) {
+      switch (id) {
+        case 'home':
+          return const InicioScreen();
+        case 'collect':
+          return const OwedHubScreen();
+        case 'business':
+          return const BusinessHubScreen();
+      }
+    }
+    return _pageV2(id);
+  }
+
+  Widget _pageV2(String id) => switch (id) {
         'home' => HomeScreen(embedded: true, onNavigate: (i) => _go(const ['home', 'sell', 'collect', 'business'][i.clamp(0, 3)])),
         'sell' => SellHubScreen(embedded: true, settings: _settings),
         'clients' => const ClientsHubScreen(embedded: true),
         'collect' => const CollectionsScreen(embedded: true),
         'business' => const ProfitScreen(embedded: true),
-        'jobs' => const JobsScreen(embedded: true, mine: true),
+        'jobs' => JobsScreen(embedded: true, mine: Access.instance.role == 'tecnico'),
         'agenda' => const AgendaScreen(embedded: true),
+        'quotes' => const QuotesScreen(embedded: true),
+        'fiados' => const FiadosScreen(),
+        'cash' => const CashDayScreen(),
+        'tables' => const KitchenScreen(),
         _ => const SettingsScreen(embedded: true),
       };
 
@@ -208,7 +294,7 @@ class _MainShellState extends State<MainShell> {
                     for (final d in dests)
                       if (_built.contains(d.id))
                         // Clave estable: al construir otra pestaña no se pierde el estado de las demás.
-                        _TabSlot(key: ValueKey('tab-${d.id}'), active: d.id == _tab, child: _page(d.id)),
+                        _TabSlot(key: ValueKey('tab-${d.id}'), active: d.id == _tab, child: RepaintBoundary(child: _page(d.id))),
                   ]),
                 ),
               ),

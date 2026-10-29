@@ -1,7 +1,7 @@
 name: facturavoz
 description: FacturaVoz - facturación por voz (Android, iOS y Web).
 publish_to: "none"
-version: 2.0.0+4
+version: 3.0.0+5
 
 environment:
   sdk: ">=3.9.0 <4.0.0"
@@ -29,6 +29,7 @@ dependencies:
   # Negocio Pro: fotos de comprobantes/constancias y respuesta hablada del Copiloto
   image_picker: ^1.1.2
   flutter_tts: ^4.2.0
+  audioplayers: ^6.1.0                 # reproducir la voz premium (MP3 del servidor); si falla, voz del teléfono
   # v2.0: Excel (.xlsx) en el teléfono (ya viene con el paquete pdf; se declara para usarlo directamente)
   archive: ">=3.4.0 <5.0.0"
   # v2.0 (todas gratuitas y de código abierto):

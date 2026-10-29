@@ -22,3 +22,12 @@ Cómo correrlos (en una base de datos de prueba vacía):
 
 Los bloques entre `\set ON_ERROR_STOP 0` y `\set ON_ERROR_STOP 1` son operaciones que **deben fallar**
 (un cajero viendo gastos, una cotización sin plan, etc.). Si el guion termina con código 0, pasó.
+
+## v3
+| Archivo | Qué prueba |
+|---|---|
+| `test_v3_import.sql` | Importa el libro sintético de 1 500 comprobantes por bloques (necesita `/tmp/pg/wb_payload.json` generado con el analizador), compara conteos y neto, misma cifra en Inicio/series/Copiloto, idempotencia, protección de campos del servidor, otra empresa bloqueada, deshacer. |
+| `test_v3_rubros.sql` | Historial privado por rol, paquetes (no se "devuelven" sesiones), recordatorios, aislamiento entre empresas. |
+| `test_v3_voz.sql` | Cuotas de voz premium (empresa y global) y de DNI/RUC (persona y empresa). |
+| `test_v3_rls_audit.sql` | Auditoría: un usuario de otra empresa no ve NINGUNA fila de las 50 tablas con `org_id`. |
+| `bench_v3.sql` | 10 000 comprobantes: tiempos antes/después (ver `docs/RENDIMIENTO.md`). |

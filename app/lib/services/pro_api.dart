@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -10,6 +11,9 @@ import '../errors.dart';
 import '../models.dart';
 import '../models_pro.dart';
 import 'repo.dart';
+
+/// Token de sesión para llamar al servidor propio (nunca una clave secreta).
+Future<String> apiToken() => _token();
 
 Future<String> _token() async {
   final auth = Supabase.instance.client.auth;
@@ -76,6 +80,87 @@ class AssistantApi {
     final body = _decode(res);
     if (res.statusCode == 200 && body['reply'] is Map) return AssistantReply.fromJson(body, profile);
     _fail(res, body, 'No pude procesar tu pedido.');
+  }
+}
+
+/// Evento del Copiloto en tiempo real: status | transcript | delta (texto nuevo) | final (respuesta completa) | error.
+class CopilotEvent {
+  const CopilotEvent(this.type, {this.text = '', this.reply, this.error, this.code});
+  final String type;
+  final String text;
+  final AssistantReply? reply;
+  final AppException? error;
+  final String? code;
+}
+
+/// Copiloto en TIEMPO REAL (Server-Sent Events): la respuesta aparece palabra por palabra mientras se genera.
+/// En la web el navegador puede entregar todo al final (igual funciona, solo que sin el efecto de escritura).
+class CopilotStream {
+  static Stream<CopilotEvent> ask({String? text, Uint8List? audio, String filename = 'audio.m4a', String mimeType = 'audio/mp4', required Profile profile}) async* {
+    final uri = Uri.parse('${Config.apiBase}/api/assistant');
+    final http.BaseRequest req;
+    if (audio != null) {
+      req = http.MultipartRequest('POST', uri)
+        ..fields.addAll({if (Repo.activeOrgId != null) 'org_id': Repo.activeOrgId!})
+        ..files.add(http.MultipartFile.fromBytes('audio', audio, filename: filename, contentType: MediaType.parse(mimeType)));
+    } else {
+      req = http.Request('POST', uri)
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode({'text': text ?? '', 'org_id': Repo.activeOrgId});
+    }
+    req.headers['Authorization'] = 'Bearer ${await _token()}';
+    req.headers['Accept'] = 'text/event-stream';
+    final client = http.Client();
+    try {
+      final http.StreamedResponse res;
+      try {
+        res = await client.send(req).timeout(const Duration(seconds: 20));
+      } catch (_) {
+        throw AppException('No hay conexión con el servidor. Inténtalo de nuevo.', code: 'net');
+      }
+      if (res.statusCode != 200 || !(res.headers['content-type'] ?? '').contains('text/event-stream')) {
+        final full = await http.Response.fromStream(res);
+        final body = _decode(full);
+        // Servidor anterior (sin streaming): responde JSON normal y se usa tal cual.
+        if (full.statusCode == 200 && body['reply'] is Map) {
+          yield CopilotEvent('final', text: (body['transcript'] ?? '') as String, reply: AssistantReply.fromJson(body, profile));
+          return;
+        }
+        _fail(full, body, 'No pude procesar tu pedido.');
+      }
+      final lines = res.stream.transform(utf8.decoder).transform(const LineSplitter()).timeout(const Duration(seconds: 45));
+      await for (final line in lines) {
+        if (!line.startsWith('data:')) continue;
+        Map<String, dynamic> e;
+        try {
+          e = Map<String, dynamic>.from(jsonDecode(line.substring(5).trim()) as Map);
+        } catch (_) {
+          continue;
+        }
+        switch (e['t']) {
+          case 'status':
+          case 'transcript':
+          case 'delta':
+            yield CopilotEvent(e['t'] as String, text: (e['text'] ?? '') as String);
+          case 'final':
+            yield CopilotEvent('final', text: (e['transcript'] ?? '') as String, reply: AssistantReply.fromJson(e, profile));
+            return;
+          case 'error':
+            final t = e['transcript'];
+            yield CopilotEvent('error',
+                error: AppException((e['error'] ?? 'No pude procesar tu pedido.') as String, code: e['code'] as String?, transcript: t is String && t.trim().isNotEmpty ? t : null));
+            return;
+        }
+      }
+    } on AppException catch (e) {
+      yield CopilotEvent('error', error: e);
+    } on TimeoutException {
+      yield CopilotEvent('error', error: AppException('La respuesta tardó demasiado. Inténtalo de nuevo.', code: 'timeout'));
+    } catch (_) {
+      yield CopilotEvent('error', error: AppException('Se cortó la conexión. Inténtalo de nuevo.', code: 'net'));
+    } finally {
+      client.close();
+    }
   }
 }
 

@@ -546,7 +546,18 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                   ],
-                  if (_fiscal == null || _fiscal!.status != 'accepted')
+                  if (inv.imported || inv.voided)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        inv.voided
+                            ? 'Comprobante anulado: no cuenta como venta.'
+                            : 'Importado de tu sistema anterior: ya se emitió allá, por eso no se envía a SUNAT desde aquí.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  if (!inv.imported && !inv.voided && (_fiscal == null || _fiscal!.status != 'accepted'))
                     GradientButton(
                       onPressed: _busy ? null : _emitSunat,
                       icon: Icons.verified_rounded,
@@ -566,14 +577,14 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                       icon: Icon(kIsWeb ? Icons.download : Icons.ios_share),
                       label: Text('PDF de la nota ${_note!.number}'),
                     ),
-                  if (inv.status == 'draft' && _fiscal == null)
+                  if (inv.status == 'draft' && _fiscal == null && !inv.imported)
                     OutlinedButton(
                       onPressed: _busy
                           ? null
                           : () => _setStatus('sent', 'Marcar como enviada', 'Una nota de venta enviada ya no se puede editar ni eliminar.'),
                       child: const Text('Marcar como enviada (sin comprobante SUNAT)'),
                     ),
-                  if (inv.status == 'sent' && _fiscal == null)
+                  if (inv.status == 'sent' && _fiscal == null && !inv.voided && !inv.isCreditNote)
                     OutlinedButton(
                       onPressed: _busy ? null : () => _setStatus('paid', 'Marcar como pagada', 'Se registrará la factura como pagada.'),
                       child: const Text('Marcar como pagada'),
@@ -612,16 +623,29 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     final t = Theme.of(context);
     final muted = t.colorScheme.onSurfaceVariant;
     final f = _fiscal;
-    final pillLabel = f == null ? statusLabel(inv.status) : '${fiscalStatusLabel(f.status)}${f.env == 'beta' ? ' · prueba' : ''}';
-    final tone = f == null ? (inv.status == 'paid' ? PillTone.ok : PillTone.neutral) : StatusPill.toneForFiscal(f.status);
+    final pillLabel = inv.voided
+        ? 'Anulado'
+        : f == null
+            ? (inv.isCreditNote ? 'Nota de crédito (resta)' : statusLabel(inv.status))
+            : '${fiscalStatusLabel(f.status)}${f.env == 'beta' ? ' · prueba' : ''}';
+    final tone = inv.voided ? PillTone.bad : f == null ? (inv.status == 'paid' ? PillTone.ok : PillTone.neutral) : StatusPill.toneForFiscal(f.status);
+    const kindName = {'factura': 'Factura', 'boleta': 'Boleta', 'nota_credito': 'Nota de crédito', 'nota_venta': 'Nota de venta'};
     return TicketPaper(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(f == null ? 'Nota de venta' : (f.docType == '01' ? 'Factura electrónica' : 'Boleta de venta electrónica'), style: t.textTheme.bodySmall),
+        Text(
+            f == null
+                ? (inv.imported ? '${kindName[inv.docKind] ?? 'Comprobante'} (importado)' : 'Nota de venta')
+                : (f.docType == '01' ? 'Factura electrónica' : 'Boleta de venta electrónica'),
+            style: t.textTheme.bodySmall),
         const SizedBox(height: 4),
         FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(f?.number ?? inv.number, style: t.textTheme.headlineMedium)),
         // Serie-correlativo SUNAT (F001-00000023) vs. número interno (F-2026-0023): se dice claro cuál es cuál.
         Text(
-          f == null ? 'Número interno: aún no es un comprobante SUNAT. Al emitir recibe su serie (F001/B001) y correlativo.' : 'N.° SUNAT ${f.number} · N.° interno ${inv.number}',
+          f == null
+              ? (inv.imported
+                  ? 'Número del sistema anterior.'
+                  : 'Número interno: aún no es un comprobante SUNAT. Al emitir recibe su serie (F001/B001) y correlativo.')
+              : 'N.° SUNAT ${f.number} · N.° interno ${inv.number}',
           style: t.textTheme.bodySmall?.copyWith(color: muted),
         ),
         const SizedBox(height: 10),

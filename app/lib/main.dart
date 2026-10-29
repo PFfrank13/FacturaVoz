@@ -70,10 +70,13 @@ class FacturaVozApp extends StatelessWidget {
           // También aplica "Animaciones reducidas" (interruptor de la app o teléfono lento) a TODA la app.
           final mq = MediaQuery.of(context);
           return ListenableBuilder(
-            listenable: MotionPrefs.listenable,
+            listenable: Listenable.merge([MotionPrefs.listenable, AppState.instance.easyMode]),
             builder: (context, _) => MediaQuery(
               data: mq.copyWith(
-                textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25),
+                // Modo Fácil: todo un 20 % más grande (hasta 145 %).
+                textScaler: AppState.instance.easyMode.value
+                    ? TextScaler.linear((mq.textScaler.scale(1) * 1.2).clamp(1.15, 1.45))
+                    : mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25),
                 disableAnimations: MotionPrefs.effective(mq.disableAnimations),
               ),
               child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: () => FocusManager.instance.primaryFocus?.unfocus(), child: LockOverlay(child: child!)),

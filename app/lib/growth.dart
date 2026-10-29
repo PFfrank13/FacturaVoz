@@ -64,7 +64,7 @@ List<double> dailySeries(Iterable<InvoiceRecord> invoices, {required String curr
     if (i.currency != currency || i.status == 'draft' || !countsAsSale(i) || i.issueDate.length < 10) continue;
     final k = daysBetween(start, i.issueDate);
     if (k < 0 || k >= days) continue;
-    out[k] += i.totals.total;
+    out[k] += i.signedTotal;
   }
   return [for (final v in out) round2(v)];
 }

@@ -8,6 +8,7 @@ import '../models_pro.dart';
 import '../reports.dart' show monthNames, monthRange;
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -37,6 +38,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
   int _token = 0;
 
   List<InvoiceRecord> _invoices = const [];
+  Map<String, dynamic>? _server; // ventas del mes calculadas en la base (misma cifra que Inicio y Copiloto)
   List<Expense> _expenses = const [];
   List<DatedPayment> _payments = const [];
   List<InvoiceRecord> _receivables = const [];
@@ -87,7 +89,10 @@ class _ProfitScreenState extends State<ProfitScreen> {
     try {
       final first = monthRange(DateTime(_year, _month - 5, 1).year, DateTime(_year, _month - 5, 1).month).from;
       final r = monthRange(_year, _month);
+      final cur0 = AppState.instance.profile?.currency ?? 'PEN';
+      final serverF = V2Repo.salesSummary(r.from, r.toExclusive, cur0);
       final invoices = await Repo.listInvoicesBetween(first, r.toExclusive);
+      final server = await serverF;
       var expenses = const <Expense>[];
       var payments = const <DatedPayment>[];
       var receivables = const <InvoiceRecord>[];
@@ -109,6 +114,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
       if (!mounted || token != _token) return;
       setState(() {
         _invoices = invoices;
+        _server = server;
         _expenses = expenses;
         _payments = payments;
         _receivables = receivables;
@@ -162,7 +168,20 @@ class _ProfitScreenState extends State<ProfitScreen> {
     bool inMonth(String iso, String key) => iso.startsWith(key);
     final monthInv = _invoices.where((i) => inMonth(i.issueDate, _monthKey));
     final monthExp = _expenses.where((e) => inMonth(e.spentOn, _monthKey));
-    final p = profitOf(invoices: monthInv, expenses: monthExp, payments: _payments, currency: cur);
+    final local = profitOf(invoices: monthInv, expenses: monthExp, payments: _payments, currency: cur);
+    // La cifra de ventas del mes SIEMPRE es la del servidor si está disponible (no depende de cuántas filas bajaron).
+    final sv = _server;
+    final p = sv == null
+        ? local
+        : ProfitSummary(
+            sales: ((sv['sales_base'] as num?) ?? 0).toDouble(),
+            salesTax: ((sv['sales_tax'] as num?) ?? 0).toDouble(),
+            expenses: local.expenses,
+            expenseTax: local.expenseTax,
+            cashIn: local.cashIn,
+            cashOut: local.cashOut,
+            invoiceCount: ((sv['sales_count'] as num?) ?? 0).toInt(),
+          );
     final prev = profitOf(
       invoices: _invoices.where((i) => inMonth(i.issueDate, prevKey)),
       expenses: _expenses.where((e) => inMonth(e.spentOn, prevKey)),

@@ -1,20 +1,26 @@
 // Ajustes v2.0: tipo de negocio, modo simple, funciones a la vista, animaciones, equipo, plan, marca, impresora,
 // control del dueño y reporte diario. Lo que el rol no puede cambiar no aparece (y RLS lo impide igual).
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../access.dart';
 import '../app_state.dart';
+import '../config.dart';
 import '../business_templates.dart';
 import '../models_v2.dart';
+import '../rubros.dart';
+import '../services/rubro_repo.dart';
+import '../services/voice.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'branding.dart';
-import 'business_setup.dart';
 import 'catalog.dart';
 import 'license_gate.dart';
+import 'menu.dart' show upgradeLabel;
 import 'owner_control.dart';
+import 'rubro_picker.dart';
 import 'team.dart';
 import 'trash.dart';
 
@@ -34,6 +40,9 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
     super.initState();
     _load();
     V2Repo.changed.addListener(_load);
+    PremiumVoice.instance.refreshUsage().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -170,9 +179,23 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
     void go(Widget w) => pushPremium(context, w);
     final rows = <Widget>[
       if (admin && s != null)
-        _row(Icons.dashboard_customize_rounded, 'Tipo de negocio', '${s.template.name} · ver la presentación otra vez',
-            () => go(BusinessSetupScreen(reopened: true, onDone: () => Navigator.of(context).pop()))),
-      if (admin && s != null)
+        _row(Icons.dashboard_customize_rounded, 'Rubro', '${rubroFor(s.businessType)?.name ?? 'Sin elegir'} · cambiar con vista previa',
+            () => go(RubroPickerScreen(current: s.businessType))),
+      _row(
+        Icons.text_increase_rounded,
+        'Modo Fácil',
+        AppState.instance.easyMode.value ? 'Letras y botones grandes' : 'Apagado: tamaño normal',
+        () {},
+        trailing: Switch(
+          value: AppState.instance.easyMode.value,
+          onChanged: (v) async {
+            await AppState.instance.setEasyMode(v);
+            if (mounted) setState(() {});
+          },
+        ),
+      ),
+      // Modo simple antiguo: solo si la empresa aún no eligió rubro (con rubro, la barra la define el rubro).
+      if (admin && s != null && rubroFor(s.businessType) == null)
         _row(
           Icons.looks_4_rounded,
           'Modo simple',
@@ -188,6 +211,21 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
                   },
           ),
         ),
+      if (a.has('copiloto'))
+        _row(
+          Icons.record_voice_over_rounded,
+          'Voz del Copiloto',
+          switch (PremiumVoice.instance.usage.value) {
+            null => 'Voz natural cuando tocas "Escuchar" o preguntas hablando',
+            (final u, final l) => 'Voz natural usada hoy: $u de $l caracteres (lo repetido no se cobra)',
+          },
+          () {},
+          trailing: const SizedBox.shrink(),
+        ),
+      _row(Icons.support_agent_rounded, 'Ayuda por WhatsApp', 'Escríbenos: el mensaje ya lleva tu versión, rubro y plan', () => openSupport(context)),
+      _row(Icons.security_rounded, 'Seguridad', 'Alertas, bitácora, PIN, papelera y huella', () => showSecuritySheet(context)),
+      if (admin && s != null && rubroFor(s.businessType) != null)
+        _row(Icons.science_rounded, 'Datos de práctica', 'Productos y clientes de ejemplo de tu rubro (se borran con un toque)', () => showPracticeSheet(context, rubroFor(s.businessType)!)),
       if (admin) _row(Icons.tune_rounded, 'Funciones a la vista', 'Elige qué se ve primero (nada se borra)', () => go(const ModulesScreen())),
       if (admin && s != null)
         _row(Icons.linear_scale_rounded, 'Pasos de tus ${s.jobsWord.toLowerCase()}', s.statuses.map((x) => x.label).join(' → '), () => go(const JobFlowScreen())),
@@ -463,5 +501,91 @@ class _JobFlowScreenState extends State<JobFlowScreen> {
               ),
             ]),
     );
+  }
+}
+
+
+/// Ajustes → Seguridad (E): alertas del dueño, bitácora, PIN, papelera y bloqueo con huella en un solo lugar.
+void showSecuritySheet(BuildContext context) {
+  final items = [for (final id in const ['alertas', 'bitacora', 'pin', 'papelera', 'seguridad']) if (featureById(id) case final f? when f.roleOk) f];
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (c) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        for (final f in items)
+          ListTile(
+            leading: Icon(f.planOk ? f.icon : Icons.lock_rounded),
+            title: Text(f.title),
+            subtitle: Text(f.planOk ? f.subtitle : upgradeLabel(f)),
+            onTap: () {
+              Navigator.pop(c);
+              if (f.planOk) {
+                openFeature(context, f);
+              } else {
+                pushPremium(context, const PlanScreen());
+              }
+            },
+          ),
+      ]),
+    ),
+  );
+}
+
+/// Datos de práctica del rubro: claramente marcados ("práctica") y se borran con un toque.
+void showPracticeSheet(BuildContext context, RubroSpec spec) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (c) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Datos de práctica · ${spec.name}', style: Theme.of(c).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text('Agrega ${spec.practiceProducts.length} ${spec.word('products').toLowerCase()} y ${spec.practiceClients.length} ${spec.word('clients').toLowerCase()} de ejemplo para probar sin miedo. '
+              'Quedan marcados como "práctica" y no cuentan como ventas mientras no emitas comprobantes con ellos.'),
+          const SizedBox(height: 16),
+          Row(children: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(c);
+                await RubroRepo.clearPractice();
+                if (context.mounted) showSuccess(context, 'Datos de práctica borrados');
+              },
+              child: const Text('Borrar los de práctica'),
+            ),
+            const Spacer(),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(c);
+                final n = await RubroRepo.loadPractice([for (final p in spec.practiceProducts) (p.name, p.price, p.unit, p.cost)], spec.practiceClients);
+                if (context.mounted) showSuccess(context, n == 0 ? 'Ya estaban cargados' : 'Listo: $n datos de práctica');
+              },
+              child: const Text('Cargar'),
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  );
+}
+
+
+/// Ayuda (G): abre WhatsApp de soporte con el CONTEXTO (versión, rubro, plan, rol). Sin datos de clientes ni montos.
+Future<void> openSupport(BuildContext context) async {
+  final a = Access.instance;
+  final text = 'Hola, necesito ayuda con FacturaVoz.\n'
+      '— Versión ${Config.appVersion} · Rubro: ${rubroFor(a.rubro)?.name ?? 'sin elegir'} · Plan: ${a.license.dev ? 'desarrollo' : a.license.plan} · Rol: ${a.roleLabel}\n'
+      'Mi consulta: ';
+  final n = Config.supportWhatsapp.replaceAll(RegExp(r'\D'), '');
+  if (n.isEmpty) {
+    // Sin número configurado no se inventa uno: se avisa (se define al compilar con --dart-define=SUPPORT_WHATSAPP=…).
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El número de soporte aún no está configurado en esta versión de la app.')));
+    return;
+  }
+  final uri = Uri.https('wa.me', '/${n.length == 9 ? '51$n' : n}', {'text': text});
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir WhatsApp.')));
   }
 }

@@ -1,9 +1,12 @@
 // Presentación v2.0 (Fase 1): animada, saltable y se puede volver a abrir desde Ajustes.
-// Pregunta el TIPO DE NEGOCIO (10 plantillas + Otro) y si prefiere la app SIMPLE (Vender, Clientes, Cobrar, Ajustes)
-// o COMPLETA. La plantilla solo ordena la pantalla: ninguna función se borra ni se bloquea.
+// v3: pregunta el RUBRO (9 rubros; "Otro / personalizado" ya no existe) y si prefiere el modo FÁCIL (letras grandes).
+// El rubro define la barra, las palabras y los accesos; ninguna función se borra (todo sigue en Menú → Otras funciones).
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../business_templates.dart';
+import '../rubros.dart';
+import '../services/rubro_apply.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -24,8 +27,8 @@ class BusinessSetupScreen extends StatefulWidget {
 class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
   final _pages = PageController();
   int _page = 0;
-  String _type = 'otro';
-  bool _simple = true;
+  String _type = '';
+  bool _easy = AppState.instance.easyMode.value;
   bool _saving = false;
   OrgSettings? _settings;
 
@@ -36,8 +39,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
       if (!mounted) return;
       setState(() {
         _settings = s;
-        _type = s.businessType;
-        _simple = s.simpleMode;
+        _type = rubroFor(s.businessType)?.id ?? '';
       });
     });
   }
@@ -57,15 +59,16 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
   Future<void> _finish({bool skipped = false}) async {
     setState(() => _saving = true);
     final s = _settings ?? OrgSettings();
-    if (!skipped) {
-      s.businessType = _type;
-      s.simpleMode = _simple;
-    }
-    s.onboardingDone = true;
     try {
-      await V2Repo.saveSettings(s);
+      if (!skipped && rubroFor(_type) != null) {
+        await applyRubro(_type, firstTime: true);
+        await AppState.instance.setEasyMode(_easy);
+      } else {
+        s.onboardingDone = true; // sin rubro: la app lo pedirá después (no se bloquea nada)
+        await V2Repo.saveSettings(s);
+      }
     } catch (_) {
-      // Sin la migración v2 (o sin permiso de administrador) la presentación igual se cierra.
+      // Sin la migración (o sin permiso de administrador) la presentación igual se cierra.
     }
     if (!mounted) return;
     Haptics.success();
@@ -164,9 +167,9 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.92),
-            itemCount: businessTemplates.length,
+            itemCount: rubros.length,
             itemBuilder: (context, i) {
-              final b = businessTemplates[i];
+              final b = templateFor(rubros[i].id);
               final on = b.id == _type;
               return Reveal(
                 index: i < 8 ? i : 8,
@@ -212,7 +215,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
         child: Row(children: [
           TextButton(onPressed: () => _go(0), child: const Text('Atrás')),
           const SizedBox(width: 8),
-          Expanded(child: GradientButton(label: 'Continuar', icon: Icons.arrow_forward_rounded, onPressed: () => _go(2))),
+          Expanded(child: GradientButton(label: 'Continuar', icon: Icons.arrow_forward_rounded, onPressed: _type.isEmpty ? null : () => _go(2))),
         ]),
       ),
     ]);
@@ -221,12 +224,13 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
   Widget _mode(BuildContext context) {
     final t = Theme.of(context);
     final tpl = templateFor(_type);
-    Widget option(bool simple, String title, String body, IconData icon) {
-      final on = _simple == simple;
+    final tips = rubroFor(_type)?.notes ?? tpl.tips;
+    Widget option(bool easy, String title, String body, IconData icon) {
+      final on = _easy == easy;
       return Pressable(
         onTap: () {
           Haptics.select();
-          setState(() => _simple = simple);
+          setState(() => _easy = easy);
         },
         child: AnimatedContainer(
           duration: Motion.d(context, Motion.fast),
@@ -256,13 +260,13 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
     return ListView(padding: const EdgeInsets.all(24), children: [
       Text('¿Cómo quieres ver la app?', style: t.textTheme.headlineSmall),
       const SizedBox(height: 16),
-      option(true, 'Simple', 'Solo 4 botones: Vender, Clientes, Cobrar y Ajustes. Ideal para empezar.', Icons.looks_4_rounded),
-      option(false, 'Completa', 'Inicio con resumen, Vender, Clientes, Cobrar y pagar, y Mi negocio con reportes.', Icons.dashboard_rounded),
-      if (tpl.tips.isNotEmpty) ...[
+      option(false, 'Normal', 'Tu barra de ${rubroFor(_type)?.name.toLowerCase() ?? 'negocio'}: ${rubroFor(_type)?.nav.map((n) => n.label).join(', ') ?? ''} y el micrófono al centro.', Icons.dashboard_rounded),
+      option(true, 'Fácil', 'Lo mismo, con letras y botones más grandes. Lo puedes cambiar en Ajustes.', Icons.text_increase_rounded),
+      if (tips.isNotEmpty) ...[
         const SizedBox(height: 8),
         Text('Para ${tpl.name.toLowerCase()}:', style: t.textTheme.titleSmall),
         const SizedBox(height: 8),
-        for (final tip in tpl.tips)
+        for (final tip in tips)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

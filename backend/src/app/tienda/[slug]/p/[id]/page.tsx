@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import StoreCart from "@/components/public/StoreCart";
 import { NotFoundCard } from "@/components/public/Shell";
 import { getPublicStore } from "@/lib/publicdata";
+import { productJsonLd } from "@/lib/storeseo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 type P = { params: Promise<{ slug: string; id: string }> };
 
@@ -25,5 +26,11 @@ export default async function ProductPage({ params }: P) {
   const { slug, id } = await params;
   const store = await getPublicStore(slug).catch(() => null);
   if (!store) return <NotFoundCard text="Esta tienda no existe o está cerrada por ahora." />;
-  return <StoreCart store={store} initialProduct={store.products.some((p) => p.id === id) ? id : null} />;
+  const p = store.products.find((x) => x.id === id);
+  return (
+    <>
+      {p ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd(store, p) }} /> : null}
+      <StoreCart store={store} initialProduct={p ? id : null} />
+    </>
+  );
 }

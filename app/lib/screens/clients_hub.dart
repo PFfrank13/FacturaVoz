@@ -6,6 +6,7 @@ import '../access.dart';
 import '../app_state.dart';
 import '../models.dart';
 import '../models_v2.dart';
+import '../rubros.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -136,7 +137,7 @@ class _ClientsHubScreenState extends State<ClientsHubScreen> {
         .toList();
     final a = Access.instance;
     return Scaffold(
-      appBar: widget.embedded ? null : AppBar(title: const Text('Clientes')),
+      appBar: widget.embedded ? null : AppBar(title: Text(rubroFor(Access.instance.rubro)?.word('clients') ?? 'Clientes')),
       body: RefreshIndicator(
         onRefresh: _load,
         child: CustomScrollView(slivers: [
@@ -147,7 +148,7 @@ class _ClientsHubScreenState extends State<ClientsHubScreen> {
                 if (widget.embedded)
                   Reveal(
                     child: Row(children: [
-                      Expanded(child: Text('Clientes', style: t.textTheme.headlineMedium)),
+                      Expanded(child: Text(rubroFor(Access.instance.rubro)?.word('clients') ?? 'Clientes', style: t.textTheme.headlineMedium)),
                       const SearchButton(),
                       const SizedBox(width: 8),
                       const AvatarButton(),

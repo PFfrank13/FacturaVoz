@@ -38,11 +38,15 @@ export async function POST(req: Request) {
   // La factura (RLS: solo si eres miembro de su empresa) define la empresa emisora
   const { data: inv } = await supabase
     .from("invoices")
-    .select("id, org_id, status, currency, tax_rate, due_date, client_id, clients(id, name), invoice_items(description, quantity, unit_price, position)")
+    .select("id, org_id, status, currency, tax_rate, due_date, client_id, import_job_id, voided_at, doc_kind, clients(id, name), invoice_items(description, quantity, unit_price, position)")
     .eq("id", invoiceId)
     .order("position", { referencedTable: "invoice_items", ascending: true })
     .maybeSingle();
   if (!inv) return json({ error: "Factura no encontrada" }, 404);
+  // Comprobantes traídos de otro sistema ya fueron emitidos allá: nunca se reenvían a SUNAT.
+  if (inv.import_job_id) return json({ error: "Este comprobante se importó de tu sistema anterior: ya fue emitido allá y no se vuelve a enviar a SUNAT." }, 409);
+  if (inv.voided_at) return json({ error: "Este comprobante está anulado." }, 409);
+  if (inv.doc_kind === "nota_credito") return json({ error: "Las notas de crédito se emiten desde el comprobante original (Anular)." }, 409);
   const orgId = inv.org_id as string;
 
   // Empresa habilitada (el RUC sale de la tabla del servidor, NO de datos editables)

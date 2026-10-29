@@ -15,8 +15,12 @@ String _two(int n) => n.toString().padLeft(2, '0');
   return (from: '$year-${_two(month)}-01', toExclusive: '${next.year}-${_two(next.month)}-01');
 }
 
-/// Los comprobantes rechazados por SUNAT no cuentan como venta.
-bool countsAsSale(InvoiceRecord i) => i.fiscalStatus != 'rejected';
+/// LA regla de ventas (igual que el servidor, sales_summary): emitido o pagado, no anulado, no rechazado por SUNAT.
+/// Las notas de crédito cuentan, pero RESTAN (ver [signOf]).
+bool countsAsSale(InvoiceRecord i) => i.countsAsSale;
+
+/// +1 venta normal, −1 nota de crédito.
+double signOf(InvoiceRecord i) => i.isCreditNote ? -1.0 : 1.0;
 
 class ClientTotal {
   ClientTotal(this.name, this.total, this.count);
@@ -63,26 +67,29 @@ Map<String, CurrencyReport> buildReport(List<InvoiceRecord> invoices, {int topN 
     var sub = 0.0, tax = 0.0, total = 0.0, recv = 0.0, over = 0.0;
     final clients = <String, (double, int)>{};
     final days = <int, double>{};
+    var n = 0;
     for (final i in list) {
       final t = i.totals;
-      sub += t.subtotal;
-      tax += t.tax;
-      total += t.total;
+      final sg = signOf(i);
+      if (!i.isCreditNote) n++;
+      sub += sg * t.subtotal;
+      tax += sg * t.tax;
+      total += sg * t.total;
       if (i.receivable) {
         recv += i.balance;
         if (i.isOverdue(now)) over += i.balance;
       }
       final key = i.clientName.trim().isEmpty ? '—' : i.clientName.trim();
       final prev = clients[key] ?? (0.0, 0);
-      clients[key] = (prev.$1 + t.total, prev.$2 + 1);
+      clients[key] = (prev.$1 + sg * t.total, prev.$2 + (i.isCreditNote ? 0 : 1));
       final day = int.tryParse(i.issueDate.split('-').last) ?? 0;
-      days[day] = round2((days[day] ?? 0) + t.total);
+      days[day] = round2((days[day] ?? 0) + sg * t.total);
     }
     final top = clients.entries.map((e) => ClientTotal(e.key, round2(e.value.$1), e.value.$2)).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
     out[cur] = CurrencyReport(
       currency: cur,
-      count: list.length,
+      count: n,
       subtotal: round2(sub),
       tax: round2(tax),
       total: round2(total),

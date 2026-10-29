@@ -1,7 +1,8 @@
 /**
  * Tipo de cambio desde un proveedor configurable (sin datos inventados).
  *   FX_API_URL  p. ej. https://api.decolecta.com/v1/tipo-cambio/sunat?date={date}   ({date} = AAAA-MM-DD, {currency} = USD)
- *   FX_API_TOKEN (o DOC_API_TOKEN) → "Authorization: Bearer <token>"
+ *   FX_API_TOKEN → "Authorization: Bearer <token>" (v3: ya NO se reutiliza DOC_API_TOKEN, para no enviar el token de
+ *   APISPERU a otro proveedor)
  */
 export type Fx = { buy: number | null; sell: number | null; source: string };
 
@@ -31,7 +32,7 @@ export async function fetchFx(date: string, currency: string): Promise<Fx | null
   const tpl = process.env.FX_API_URL ?? "";
   if (!/^https:\/\//.test(tpl)) return null;
   const url = tpl.replace("{date}", encodeURIComponent(date)).replace("{currency}", encodeURIComponent(currency));
-  const token = (process.env.FX_API_TOKEN ?? process.env.DOC_API_TOKEN ?? "").trim();
+  const token = (process.env.FX_API_TOKEN ?? "").trim();
   try {
     const r = await fetch(url, { headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal: AbortSignal.timeout(8_000), cache: "no-store" });
     if (!r.ok) return null;

@@ -26,6 +26,16 @@ class AppState extends ChangeNotifier {
   /// Apariencia elegida (se recuerda en la cuenta). Escucha este notifier para cambiar el tema al instante.
   final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
 
+  /// Modo Fácil (E): letras más grandes y menos cosas en pantalla. Preferencia de la persona (se recuerda en su cuenta).
+  final ValueNotifier<bool> easyMode = ValueNotifier(false);
+
+  Future<void> setEasyMode(bool v) async {
+    easyMode.value = v;
+    try {
+      await Supabase.instance.client.auth.updateUser(UserAttributes(data: {'easy_mode': v}));
+    } catch (_) {}
+  }
+
   static ThemeMode _parseTheme(Object? v) => switch (v) {
         'light' => ThemeMode.light,
         'dark' => ThemeMode.dark,
@@ -46,6 +56,7 @@ class AppState extends ChangeNotifier {
     try {
       final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
       themeMode.value = _parseTheme(meta?['theme']);
+      easyMode.value = meta?['easy_mode'] == true;
       final rm = meta?['reduced_motion'];
       MotionPrefs.userReduced.value = rm is bool ? rm : null;
       // v2.0: si el dueño invitó este correo, se une a su empresa ANTES de listar empresas.
@@ -109,6 +120,7 @@ class AppState extends ChangeNotifier {
     V2Repo.forgetSettings();
     Access.instance.clear();
     themeMode.value = ThemeMode.system;
+    easyMode.value = false;
     error = null;
     loading = false;
     notifyListeners();

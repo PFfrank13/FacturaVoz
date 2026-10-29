@@ -208,10 +208,18 @@ class V2Repo {
     return path;
   }
 
+  // A3: el mismo enlace firmado se reutiliza mientras sea válido → la imagen sale de la caché y no se descarga de nuevo.
+  static final Map<String, (String, DateTime)> _signed = {};
+
   static Future<String?> signedUrl(String? path, {int seconds = 3600}) async {
     if (path == null || path.isEmpty) return null;
+    final hit = _signed[path];
+    if (hit != null && hit.$2.isAfter(DateTime.now())) return hit.$1;
     try {
-      return await _db.storage.from(bucket).createSignedUrl(path, seconds);
+      final url = await _db.storage.from(bucket).createSignedUrl(path, seconds);
+      if (_signed.length > 500) _signed.clear();
+      _signed[path] = (url, DateTime.now().add(Duration(seconds: seconds - 120)));
+      return url;
     } catch (_) {
       return null;
     }

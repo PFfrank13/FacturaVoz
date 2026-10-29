@@ -793,7 +793,22 @@ class NotebookSale {
 
 /// Resultado de la consulta DNI/RUC (POST /api/lookup).
 class DocLookup {
-  const DocLookup({required this.kind, required this.number, required this.name, this.address = '', this.district = '', this.province = '', this.department = '', this.ubigeo = '', this.status = '', this.condition = ''});
+  const DocLookup({
+    required this.kind,
+    required this.number,
+    required this.name,
+    this.address = '',
+    this.district = '',
+    this.province = '',
+    this.department = '',
+    this.ubigeo = '',
+    this.status = '',
+    this.condition = '',
+    this.tradeName = '',
+    this.firstNames = '',
+    this.lastNames = '',
+    this.warning = '',
+  });
   final String kind;
   final String number;
   final String name;
@@ -804,8 +819,22 @@ class DocLookup {
   final String ubigeo;
   final String status;
   final String condition;
-  bool get rucActive => status.isEmpty || status.contains('ACTIVO');
+  final String tradeName; // RUC: nombre comercial
+  final String firstNames; // DNI
+  final String lastNames; // DNI
+  final String warning; // aviso del servidor si el RUC no está ACTIVO y HABIDO
+  bool get rucActive => status.isEmpty || status == 'ACTIVO';
   bool get rucHabido => condition.isEmpty || condition == 'HABIDO';
+
+  /// Aviso en lenguaje simple (el del servidor o, si es un servidor antiguo, uno calculado aquí).
+  String get warningText {
+    if (kind != 'ruc') return '';
+    if (warning.isNotEmpty) return warning;
+    if (!rucActive) return 'Ojo: este RUC figura como "$status" en SUNAT. Confirma con tu cliente antes de emitirle una factura.';
+    if (!rucHabido) return 'Ojo: este RUC figura como "$condition" en SUNAT. Confirma la dirección con tu cliente antes de emitir.';
+    return '';
+  }
+
   String get fullAddress => [address, district, province, department].where((e) => e.trim().isNotEmpty && e.trim() != '-').join(', ');
   factory DocLookup.fromJson(Map<String, dynamic> j) => DocLookup(
         kind: _s(j['kind']),
@@ -818,5 +847,9 @@ class DocLookup {
         ubigeo: _s(j['ubigeo']),
         status: _s(j['status']),
         condition: _s(j['condition']),
+        tradeName: _s(j['tradeName']),
+        firstNames: _s(j['firstNames']),
+        lastNames: _s(j['lastNames']),
+        warning: _s(j['warning']),
       );
 }
