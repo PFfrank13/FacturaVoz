@@ -283,7 +283,7 @@ class _PaymentsCardState extends State<PaymentsCard> {
           const SizedBox(height: 6),
           InkWell(
             onTap: _pickDue,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(Radii.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(children: [

@@ -1,0 +1,5 @@
+# FacturaVoz v3.1 — Fase 6 (sistema de diseño + verificación a fondo)
+- **Sistema de diseño**: `docs/DESIGN_SYSTEM.md` con auditoría real (43 colores sueltos, ~100 radios y ~500 espacios con números sueltos), tokens nuevos `Radii` y `Gap`, paleta por función `Brand.fnPalette` (tonos más oscuros para que el texto blanco se lea) y reglas. Las pantallas viejas no se migraron en bloque (sin poder compilar aquí); se migran al tocarlas.
+- **Verificación completa de la base de datos** (Postgres 16, base nueva para cada guion, toda la cadena de migraciones 20261023→20261118): fase0, sunat, crm, roles, mod1, mod2, licencias, rubros v3, voz v3, **auditoría de aislamiento (51 tablas con org_id, 0 filas de otra empresa visibles, incluida la nueva `agent_tasks`)** y planes por rubro v3.1: todos pasan. (Los errores que imprimen son las pruebas de "esto debe fallar".) Falta correr aquí `test_v3_import` (necesita el archivo de carga) y `bench_v3`.
+- Servidor: tsc OK y 118 pruebas.
+No verificado: `flutter analyze/test` ni el teléfono.

@@ -179,8 +179,17 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
     void go(Widget w) => pushPremium(context, w);
     final rows = <Widget>[
       if (admin && s != null)
-        _row(Icons.dashboard_customize_rounded, 'Rubro', '${rubroFor(s.businessType)?.name ?? 'Sin elegir'} · cambiar con vista previa',
-            () => go(RubroPickerScreen(current: s.businessType))),
+        _row(
+            Icons.dashboard_customize_rounded,
+            'Rubro',
+            rubroFor(s.businessType) == null ? 'Sin elegir · tócalo para elegir (se elige una sola vez)' : '${rubroFor(s.businessType)!.name} · fijo (si necesitas cambiarlo, escríbenos y lo hacemos sin perder datos)',
+            () {
+              if (rubroFor(s.businessType) == null) {
+                go(RubroPickerScreen(current: s.businessType));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El rubro queda fijo. Escríbenos por WhatsApp y lo cambiamos sin perder tus datos.')));
+              }
+            }),
       _row(
         Icons.text_increase_rounded,
         'Modo Fácil',

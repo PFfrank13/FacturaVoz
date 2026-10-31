@@ -1,7 +1,7 @@
 // Menú (E): la ÚNICA puerta a todas las funciones, ordenada por las áreas de TU rubro, con buscador de texto y voz.
 //  - Lo que tu rol no permite: no aparece.
 //  - Lo que tu plan no incluye: aparece con candado y "Disponible en el plan X" (toca para mejorar tu plan).
-//  - Lo que no es de tu rubro: en "Otras funciones" (nada se borra).
+//  - Lo que no es de tu rubro NO se muestra (el rubro queda fijo; la plataforma lo cambia sin perder datos).
 import 'package:flutter/material.dart';
 
 import '../access.dart';
@@ -22,7 +22,7 @@ class MenuScreen extends StatefulWidget {
 
 /// Plan mínimo que trae la función (para el texto del candado).
 String upgradeLabel(FeatureEntry f) {
-  final code = f.feature == null ? null : minPlanFor(f.feature!, planFeatures);
+  final code = f.feature == null ? null : minPlanFor(f.feature!, planFeatures, rubro: Access.instance.rubro);
   return code == null ? 'No incluido en tu plan' : 'Disponible en el plan ${planName(code)}';
 }
 
@@ -37,7 +37,6 @@ class _MenuScreenState extends State<MenuScreen> {
     final byId = {for (final f in all) f.id: f};
     final areas = spec?.areas ?? [for (final g in groupOrder) RubroArea(g, [for (final f in all) if (f.group == g) f.id])];
     final shown = <String>{for (final a in areas) ...a.features};
-    final others = all.where((f) => !shown.contains(f.id)).toList();
     final q = _q.trim();
     final hits = q.isEmpty
         ? const <FeatureEntry>[]
@@ -48,7 +47,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
     Widget tile(FeatureEntry f) {
       final locked = !f.planOk;
-      final c = groupColors[f.group] ?? Brand.indigo;
+      final c = featureColor(f.id);
       return ListTile(
         leading: Container(
           width: 40,
@@ -96,17 +95,6 @@ class _MenuScreenState extends State<MenuScreen> {
               ),
               const SizedBox(height: 10),
             ],
-          if (others.isNotEmpty)
-            SoftCard(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: ExpansionTile(
-                shape: const Border(),
-                leading: const Icon(Icons.apps_rounded),
-                title: const Text('Otras funciones'),
-                subtitle: Text('${others.length} que no son de tu rubro (siguen disponibles)'),
-                children: [for (final f in others) tile(f)],
-              ),
-            ),
         ],
       ]),
     );

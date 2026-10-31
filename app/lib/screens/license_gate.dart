@@ -22,6 +22,7 @@ const _featureNames = <String, String>{
   'stock': 'Inventario',
   'recurrentes': 'Facturación recurrente',
   'copiloto': 'Copiloto con IA',
+  'copiloto_agente': 'Tareas del Copiloto (agente)',
   'trabajos': 'Trabajos y seguimiento',
   'agenda': 'Agenda y citas',
   'reportes': 'Reportes e impuestos',
@@ -238,7 +239,7 @@ class _PlanScreenState extends State<PlanScreen> {
               Reveal(
                 child: Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28)),
+                  decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(l.dev ? 'Modo desarrollo' : 'Plan ${l.plan}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicStore, StoreProduct } from "@/lib/publicdata";
 
 const SYMBOLS: Record<string, string> = { PEN: "S/", USD: "US$", EUR: "€" };
@@ -158,31 +158,36 @@ export default function StoreCart({ store, initialProduct = null }: { store: Pub
 
   return (
     <main className="min-h-screen bg-[#f8f6fd] pb-40 text-[#26254b]">
-      <header className="px-5 pb-16 pt-9 text-white" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc 55%, #b58bf5)` }}>
-        <div className="mx-auto flex max-w-3xl items-center gap-4">
-          {store.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={store.logo} alt={store.business} className="h-16 w-16 rounded-2xl bg-white object-contain p-1.5 shadow-lg" />
-          ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 text-3xl">{store.mode === "carta" ? "🍽️" : "🛍️"}</div>
-          )}
+      <header className="relative overflow-hidden px-5 pb-20 pt-10 text-white" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}d9 55%, #b58bf5)` }}>
+        <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/10" />
+        <div className="relative mx-auto flex max-w-3xl items-center gap-4">
+          <Logo src={store.logo} name={store.business} mode={store.mode} />
           <div className="min-w-0">
             <p className="text-[13px] font-medium opacity-85">{isMesa ? `Mesa ${table} · Carta digital` : store.mode === "carta" ? "Carta digital" : "Pedidos en línea"}</p>
-            <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight">{store.business}</h1>
+            <h1 className="text-[28px] font-extrabold leading-tight tracking-tight sm:text-[32px]">{store.business}</h1>
             {store.headline ? <p className="mt-1 text-[14.5px] opacity-90">{store.headline}</p> : null}
           </div>
         </div>
+        <div className="relative mx-auto mt-5 flex max-w-3xl flex-wrap gap-2 text-[12.5px] font-semibold">
+          {!isMesa && store.pickup ? <span className="rounded-full bg-white/20 px-3 py-1.5">🏪 Recojo en tienda</span> : null}
+          {!isMesa && store.delivery ? <span className="rounded-full bg-white/20 px-3 py-1.5">🛵 Delivery</span> : null}
+          {!isMesa && store.minOrder != null ? <span className="rounded-full bg-white/20 px-3 py-1.5">Pedido mínimo {fmt(store.minOrder, store.currency)}</span> : null}
+          {!isMesa && store.pay?.yape ? <span className="rounded-full bg-white/20 px-3 py-1.5">Yape</span> : null}
+          {!isMesa && store.pay?.plin ? <span className="rounded-full bg-white/20 px-3 py-1.5">Plin</span> : null}
+          <span className="rounded-full bg-white/20 px-3 py-1.5">{store.products.length} {store.mode === "carta" ? "platos" : "productos"}</span>
+        </div>
       </header>
 
-      <div className="mx-auto -mt-10 max-w-3xl px-4">
-        <input className={`${input} shadow-lg shadow-black/5`} placeholder="¿Qué buscas hoy?" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="relative z-[1] mx-auto -mt-12 max-w-3xl px-4">
+        <input className={`${input} shadow-xl shadow-black/10`} placeholder={store.mode === "carta" ? "¿Qué se te antoja?" : "¿Qué buscas hoy?"} value={q} onChange={(e) => setQ(e.target.value)} />
         {store.about ? <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-[14px] text-[#55577a]">{store.about}</p> : null}
         {store.booking ? (
           <a href={`/reservar/${store.slug}`} className="mt-3 block rounded-2xl bg-white px-4 py-3 text-[14.5px] font-semibold shadow-sm" style={{ color: accent }}>📅 Reserva tu cita en línea →</a>
         ) : null}
 
         {store.categories.length > 1 ? (
-          <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          <div className="sticky top-0 z-10 -mx-4 mt-3 flex gap-2 overflow-x-auto bg-[#f8f6fd]/90 px-4 py-2 backdrop-blur">
             {["", ...store.categories].map((c) => (
               <button key={c || "_all"} onClick={() => setCat(c)} className="shrink-0 rounded-full px-4 py-2 text-[14px] font-semibold transition" style={cat === c ? { background: accent, color: "#fff" } : { background: "#fff", color: "#26254b" }}>
                 {c || "Todo"}
@@ -215,7 +220,7 @@ export default function StoreCart({ store, initialProduct = null }: { store: Pub
             return (
               <li key={p.id} className={`flex flex-col overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(0,0,0,0.35)] transition ${n ? "ring-2" : ""}`} style={n ? { boxShadow: `0 0 0 2px ${accent}66` } : undefined}>
                 <button onClick={() => setOpen(p)} className="text-left">
-                  <Thumb p={p} h="h-32" />
+                  <Thumb p={p} h="aspect-[4/3]" badge={p.featured ? "⭐" : n ? "En tu pedido" : ""} soldOut={out} accent={accent} />
                   <div className="px-3 pt-3">
                     <p className="line-clamp-2 min-h-[2.5em] text-[14.5px] font-semibold leading-tight">{p.name}</p>
                     <p className="mt-1 text-[15px] font-bold tabular-nums" style={{ color: accent }}>{fmt(p.priceWithTax, store.currency)}</p>
@@ -247,7 +252,7 @@ export default function StoreCart({ store, initialProduct = null }: { store: Pub
       {open ? (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setOpen(null)}>
           <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-white sm:rounded-[28px]" onClick={(e) => e.stopPropagation()}>
-            <Thumb p={open} h="h-64" />
+            <Thumb p={open} h="aspect-[4/3]" />
             <div className="p-6">
               <h2 className="text-xl font-bold">{open.name}</h2>
               <p className="mt-1 text-lg font-bold" style={{ color: accent }}>{fmt(open.priceWithTax, store.currency)}</p>
@@ -341,10 +346,58 @@ export default function StoreCart({ store, initialProduct = null }: { store: Pub
   );
 }
 
-function Thumb({ p, h }: { p: StoreProduct; h: string }) {
-  if (p.image) {
+/** Foto del producto. Si la imagen no carga (enlace vencido o sin red), se muestra un fondo con icono; nunca un cuadro roto. */
+function Thumb({ p, h, badge = "", soldOut = false, accent = "#6a62e2" }: { p: StoreProduct; h: string; badge?: string; soldOut?: boolean; accent?: string }) {
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+  // La imagen pudo cargar o fallar ANTES de que React la "hidratara": se revisa al montar.
+  useEffect(() => {
+    const el = ref.current;
+    if (el?.complete) {
+      if (el.naturalWidth > 0) setLoaded(true);
+      else setFailed(true);
+    }
+  }, [p.image]);
+  const show = p.image && !failed;
+  return (
+    <div className={`relative ${h} w-full overflow-hidden bg-gradient-to-br from-[#ebe9ff] to-[#fbe7ef]`}>
+      {show ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={ref}
+          src={p.image ?? ""}
+          alt={p.name}
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+          className={`h-full w-full object-cover transition duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-4xl">{p.service ? "🛠️" : "📦"}</div>
+      )}
+      {badge ? <span className="absolute left-2 top-2 rounded-full px-2.5 py-1 text-[11.5px] font-bold text-white shadow" style={{ background: accent }}>{badge}</span> : null}
+      {soldOut ? <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-bold text-[#d94a5e]">Agotado</div> : null}
+    </div>
+  );
+}
+
+function Logo({ src, name, mode }: { src: string | null; name: string; mode: "tienda" | "carta" }) {
+  const [failed, setFailed] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el?.complete && el.naturalWidth === 0) setFailed(true);
+  }, [src]);
+  if (src && !failed) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={p.image} alt={p.name} loading="lazy" decoding="async" className={`${h} w-full object-cover`} />;
+    return <img ref={ref} src={src} alt={name} onError={() => setFailed(true)} className="h-20 w-20 shrink-0 rounded-3xl bg-white object-contain p-2 shadow-xl" />;
   }
-  return <div className={`${h} flex w-full items-center justify-center bg-gradient-to-br from-[#ebe9ff] to-[#fbe7ef] text-4xl`}>{p.service ? "🛠️" : "📦"}</div>;
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+  return (
+    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white/20 text-3xl font-extrabold shadow-xl">
+      {initials || (mode === "carta" ? "🍽️" : "🛍️")}
+    </div>
+  );
 }

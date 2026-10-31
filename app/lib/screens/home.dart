@@ -350,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: _Header(
+              child: HomeHeader(
                 name: AppState.instance.activeOrg?.name ?? profile?.businessName ?? '',
                 currency: currency,
                 total: m.total,
@@ -367,7 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Reveal(
                 index: 1,
                 child: SizedBox(
-                  height: 104,
+                  height: MediaQuery.textScalerOf(context).scale(104),
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
@@ -531,7 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : Reveal(
                       key: ValueKey(list[i].id),
                       index: 3 + (i < 8 ? i : 8),
-                      child: RepaintBoundary(child: _Row(inv: list[i], onTap: () => _open(list[i]))),
+                      child: RepaintBoundary(child: InvoiceRow(inv: list[i], onTap: () => _open(list[i]))),
                     ),
                   ),
                 );
@@ -581,8 +581,8 @@ class _ErrorBox extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({
+class HomeHeader extends StatelessWidget {
+  const HomeHeader({
     required this.name,
     required this.currency,
     required this.total,
@@ -593,7 +593,13 @@ class _Header extends StatelessWidget {
     required this.goal,
     required this.series,
     required this.onGoal,
+    this.todayTotal,
+    this.todayCount,
+    this.onMenu,
   });
+  final double? todayTotal;
+  final int? todayCount;
+  final VoidCallback? onMenu;
   final String name;
   final String currency;
   final double total;
@@ -639,7 +645,7 @@ class _Header extends StatelessWidget {
                 child: Container(
                   height: 44,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 19),
                     SizedBox(width: 6),
@@ -647,6 +653,22 @@ class _Header extends StatelessWidget {
                   ]),
                 ),
               ),
+              if (onMenu != null) ...[
+                const SizedBox(width: 8),
+                Pressable(
+                  onTap: onMenu,
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.menu_rounded, color: Colors.white, size: 19),
+                      SizedBox(width: 5),
+                      Text('Menú', style: TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    ]),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               const SearchButton(onDark: true),
               const SizedBox(width: 8),
@@ -726,11 +748,12 @@ class _Header extends StatelessWidget {
             Reveal(
               index: 3,
               child: Wrap(spacing: 8, runSpacing: 6, children: [
-                _HeaderPill(count == 0 ? 'Aún sin ventas emitidas este mes' : (count == 1 ? '1 venta emitida' : '$count ventas emitidas')),
-                if (drafts > 0) _HeaderPill('$drafts ${drafts == 1 ? 'borrador' : 'borradores'} sin emitir · ${money(draftsTotal, currency)}'),
+                if (todayTotal != null) HomeHeaderPill('Hoy ${money(todayTotal!, currency)} · ${todayCount == 1 ? '1 venta' : '${todayCount ?? 0} ventas'}'),
+                HomeHeaderPill(count == 0 ? 'Aún sin ventas emitidas este mes' : (count == 1 ? '1 venta emitida' : '$count ventas emitidas')),
+                if (drafts > 0) HomeHeaderPill('$drafts ${drafts == 1 ? 'borrador' : 'borradores'} sin emitir · ${money(draftsTotal, currency)}'),
                 if (g != null && !g.reached)
-                  _HeaderPill(g.onTrack ? 'Vas bien · cierras en ${money(g.projected, currency)}' : 'Te faltan ${money(g.neededPerDay, currency)}/día'),
-                if (g != null && g.reached) const _HeaderPill('¡Meta cumplida!'),
+                  HomeHeaderPill(g.onTrack ? 'Vas bien · cierras en ${money(g.projected, currency)}' : 'Te faltan ${money(g.neededPerDay, currency)}/día'),
+                if (g != null && g.reached) const HomeHeaderPill('¡Meta cumplida!'),
               ]),
             ),
           if (loaded && series.any((v) => v > 0)) ...[
@@ -750,20 +773,20 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _HeaderPill extends StatelessWidget {
-  const _HeaderPill(this.text);
+class HomeHeaderPill extends StatelessWidget {
+  const HomeHeaderPill(this.text);
   final String text;
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
         child: Text(text, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
       );
 }
 
-class _Row extends StatelessWidget {
-  const _Row({required this.inv, required this.onTap});
+class InvoiceRow extends StatelessWidget {
+  const InvoiceRow({required this.inv, required this.onTap});
   final InvoiceRecord inv;
   final VoidCallback onTap;
 

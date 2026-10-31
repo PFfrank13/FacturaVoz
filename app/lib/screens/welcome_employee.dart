@@ -98,7 +98,7 @@ class _EmployeeWelcomeScreenState extends State<EmployeeWelcomeScreen> {
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(18)),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(Radii.lg)),
                         child: Row(children: [
                           Icon(icon, color: Colors.white),
                           const SizedBox(width: 12),

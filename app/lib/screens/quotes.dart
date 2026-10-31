@@ -539,7 +539,7 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: t.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(14)),
+                          decoration: BoxDecoration(color: t.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(Radii.md)),
                           child: Text(
                             '${q.status == 'rejected' ? 'Rechazada' : 'Aceptada'} por ${q.responderName.isEmpty ? 'el cliente' : q.responderName}'
                             '${q.responseNote.isEmpty ? '' : ': “${q.responseNote}”'}',

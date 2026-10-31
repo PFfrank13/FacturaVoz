@@ -202,3 +202,22 @@ class PayApi {
     _fail(res, body, 'No se pudo guardar.');
   }
 }
+
+/// Tareas del Copiloto (plan Empresa): POST /api/agent y /api/agent/decide.
+class AgentApi {
+  static Future<Map<String, dynamic>> _call(String path, Map<String, dynamic> payload, int seconds) async {
+    final req = http.Request('POST', Uri.parse('${Config.apiBase}$path'))
+      ..headers['Authorization'] = 'Bearer ${await _token()}'
+      ..headers['Content-Type'] = 'application/json'
+      ..body = jsonEncode(payload);
+    final res = await _send(req, seconds);
+    final body = _decode(res);
+    if (res.statusCode == 200) return body;
+    _fail(res, body, 'No pude completar la tarea.');
+  }
+
+  /// El Copiloto prepara la tarea (queda "por aprobar"; aún no hace nada).
+  static Future<void> create(String text) => _call('/api/agent', {'text': text, 'org_id': Repo.activeOrgId}, 50);
+
+  static Future<Map<String, dynamic>> decide(String taskId, {required bool approve}) => _call('/api/agent/decide', {'task_id': taskId, 'decision': approve ? 'approve' : 'reject'}, 30);
+}

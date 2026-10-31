@@ -19,6 +19,7 @@ import '../services/api.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
+import '../logic/credit.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'products.dart';
@@ -87,6 +88,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   bool _showNotes = false;
   int? _validDays = 15; // vigencia de la cotización
   Map<String, ClientPayStats> _stats = const {};
+  Map<String, (double, double)> _limits = const {}; // cliente -> (límite, deuda actual)
 
   // v2.0: consulta DNI/RUC (con caché en el servidor) y venta en dólares con tipo de cambio.
   bool _lookingUp = false;
@@ -110,12 +112,61 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     ProRepo.clientStats().then((v) {
       if (mounted) setState(() => _stats = v);
     }).catchError((Object _) {});
+    _loadCreditLimits();
     final init = widget.initial;
     if (init != null) {
       _loadDraft(init);
       _phase = _Phase.review;
       _dirty = true;
     }
+  }
+
+  /// Límite de crédito y deuda actual por cliente, para avisar al vender al crédito. Si falla, no se muestra el aviso.
+  Future<void> _loadCreditLimits() async {
+    try {
+      final clients = await V2Repo.clients();
+      if (!clients.any((c) => (c.creditLimit ?? 0) > 0)) return;
+      final rec = await ProRepo.listReceivables();
+      final used = <String, double>{};
+      for (final i in rec.where((i) => i.currency == _currency)) {
+        final k = clientKey(i.clientName);
+        used[k] = round2((used[k] ?? 0) + i.balance);
+      }
+      final m = <String, (double, double)>{
+        for (final c in clients)
+          if ((c.creditLimit ?? 0) > 0) clientKey(c.name): (c.creditLimit!, used[clientKey(c.name)] ?? 0),
+      };
+      if (mounted) setState(() => _limits = m);
+    } catch (_) {}
+  }
+
+  Widget _limitWarning(ThemeData th) {
+    final e = _limits[clientKey(_client.text)];
+    if (e == null) return const SizedBox.shrink();
+    final total = computeTotals(_currentItems(), parseDecimal(_taxRate.text) ?? 0).total;
+    final r = creditCheck(limit: e.$1, used: e.$2, newTotal: total);
+    if (r.level == CreditLevel.none || r.level == CreditLevel.ok) return const SizedBox.shrink();
+    final over = r.level == CreditLevel.over;
+    final c = over ? Brand.bad : Brand.warn;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(Radii.md), border: Border.all(color: c.withValues(alpha: 0.25))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(over ? Icons.block_rounded : Icons.warning_amber_rounded, color: c, size: 20),
+          const SizedBox(width: Gap.sm),
+          Expanded(
+            child: Text(
+              over
+                  ? 'Con esta venta pasaría su límite de crédito (${money(r.limit, _currency)}) por ${money(r.excess, _currency)}. Ya debe ${money(r.used, _currency)}. Tú decides si le vendes igual.'
+                  : 'Con esta venta usaría casi todo su límite: debería ${money(r.after, _currency)} de ${money(r.limit, _currency)}.',
+              style: th.textTheme.bodySmall,
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   @override
@@ -462,7 +513,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           ],
         ),
       );
-      if (go != true || !mounted) return;
+      if (go != true) return;
     }
     final risk = _risk();
     if (risk.level == RiskLevel.high) {
@@ -801,7 +852,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
               elevation: 8,
               shadowColor: Brand.indigo.withValues(alpha: 0.25),
               color: t.colorScheme.surface,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(Radii.lg),
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 64, maxHeight: 260),
                 child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
@@ -1082,7 +1133,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           key: ValueKey('tax-${selected?.rate}'),
           initialValue: selected?.rate,
           isExpanded: true,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(Radii.lg),
           icon: const Icon(Icons.expand_more_rounded),
           decoration: InputDecoration(labelText: 'Tipo de impuesto', errorText: _rateError()),
           items: [for (final o in opts) DropdownMenuItem<double>(value: o.rate, child: Text(o.label, overflow: TextOverflow.ellipsis))],
@@ -1133,6 +1184,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
             _CreditHint(score: scoreClient(_stats[clientKey(_client.text)]), stats: _stats[clientKey(_client.text)]),
             const SizedBox(height: 14),
           ],
+          _limitWarning(th),
           Text('Plazo rápido', style: th.textTheme.labelMedium?.copyWith(color: th.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -1410,7 +1462,7 @@ class _RiskCard extends StatelessWidget {
         key: ValueKey('${report.level.name}${report.reasons.length}'),
         width: double.infinity,
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: c.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(18)),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(Radii.lg)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon, color: c, size: 22),
           const SizedBox(width: 10),
@@ -1463,7 +1515,7 @@ class _PayToggle extends StatelessWidget {
     final th = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: th.colorScheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(18)),
+      decoration: BoxDecoration(color: th.colorScheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(Radii.lg)),
       child: Stack(children: [
         Positioned.fill(
           child: AnimatedAlign(
@@ -1475,7 +1527,7 @@ class _PayToggle extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: Brand.heroGradient,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(Radii.md),
                   boxShadow: [BoxShadow(color: Brand.indigo.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
                 ),
               ),

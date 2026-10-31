@@ -16,6 +16,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../finance.dart' show addDays, daysBetween;
+import '../logic/cutoff.dart';
+import '../logic/obra.dart';
+import '../logic/stagnant.dart';
 import '../models.dart';
 import '../models_pro.dart';
 import '../models_v2.dart';
@@ -146,6 +149,7 @@ class _ReorderScreenState extends State<ReorderScreen> {
     final rows = (_rows ?? const <ProductVelocity>[]).where((v) => v.stock != null && suggestedOrder(v, days: _days) > 0).toList()
       ..sort((a, b) => (a.daysLeft ?? 999).compareTo(b.daysLeft ?? 999));
     final untracked = (_rows ?? const <ProductVelocity>[]).where((v) => v.stock == null).length;
+    final stuck = stagnantProducts(_rows ?? const <ProductVelocity>[]);
     return Scaffold(
       appBar: AppBar(title: const Text('Reposición inteligente')),
       body: _error != null
@@ -177,6 +181,18 @@ class _ReorderScreenState extends State<ReorderScreen> {
                           ),
                       ]),
                     ),
+                  if (stuck.isNotEmpty) ...[
+                    const SizedBox(height: Gap.lg),
+                    const SectionTitle('No se movieron en 30 días'),
+                    Text('Tienen stock pero no vendiste ninguno. No compres más hasta que roten; los recién agregados también pueden salir aquí.', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: Gap.sm),
+                    SoftCard(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(children: [
+                        for (final v in stuck) ListTile(dense: true, title: Text(v.name), trailing: Text('${qtyText(v.stock ?? 0)} en stock')),
+                      ]),
+                    ),
+                  ],
                 ]),
       floatingActionButton: rows.isEmpty
           ? null
@@ -358,9 +374,24 @@ class _CutoffScreenState extends State<CutoffScreen> {
     await RubroRepo.setServiceState(c.id, c.extra, state);
     c.extra['servicio'] = state;
     c.extra['servicio_fecha'] = todayIso();
+    if (state == 'activo') c.extra.remove('aviso_corte_fecha');
     if (mounted) {
       setState(() {});
       showSuccess(context, state == 'cortado' ? 'Registrado: servicio cortado' : 'Registrado: servicio reconectado');
+    }
+  }
+
+  Future<void> _notice(_Debtor d) async {
+    final c = d.client;
+    if (c == null) return;
+    await openWhatsApp(context, c.phone,
+        'Hola ${d.name.split(' ').first}, te escribe $_biz. Tienes ${money(d.balance, _cur)} pendiente de tu servicio. '
+        'Para evitar la suspensión, por favor regulariza tu pago. Si ya pagaste, envíanos tu constancia. ¡Gracias!');
+    await RubroRepo.setCutoffNotice(c.id, c.extra);
+    c.extra['aviso_corte_fecha'] = todayIso();
+    if (mounted) {
+      setState(() {});
+      showSuccess(context, 'Aviso registrado hoy. Podrás registrar el corte desde mañana.');
     }
   }
 
@@ -380,7 +411,7 @@ class _CutoffScreenState extends State<CutoffScreen> {
                       for (final d in const [1, 5, 15, 30]) ChoiceChip(label: Text('Atrasados $d+ días'), selected: _minDays == d, onSelected: (_) => setState(() => _minDays = d)),
                     ]),
                     const SizedBox(height: 8),
-                    Text('Primero se avisa; recién después se corta. Registra cada corte y reconexión.', style: Theme.of(context).textTheme.bodySmall),
+                    Text('Primero se avisa por WhatsApp; el corte se habilita desde el día siguiente al aviso. Registra cada corte y reconexión.', style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(height: 8),
                     if (rows.isEmpty)
                       _empty(context, Icons.wifi_rounded, 'Nadie con ese atraso', 'Todos tus abonados están al día para este filtro.')
@@ -396,19 +427,16 @@ class _CutoffScreenState extends State<CutoffScreen> {
                                 if (d.client?.extra['servicio'] == 'cortado') const StatusPill('Cortado', tone: PillTone.bad),
                               ]),
                               Text('Debe ${money(d.balance, _cur)} · ${d.count} recibo(s) · ${d.maxDays} días de atraso'),
+                              if (d.client != null && d.client?.extra['servicio'] != 'cortado') Text(noticeLabel(d.client!.extra, todayIso()), style: Theme.of(context).textTheme.bodySmall),
                               const SizedBox(height: 8),
                               Wrap(spacing: 8, runSpacing: 6, children: [
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.chat_rounded, size: 18),
                                   label: const Text('Aviso previo'),
-                                  onPressed: d.client == null || d.client!.phone.isEmpty
-                                      ? null
-                                      : () => openWhatsApp(context, d.client!.phone,
-                                          'Hola ${d.name.split(' ').first}, te escribe $_biz. Tienes ${money(d.balance, _cur)} pendiente de tu servicio. '
-                                          'Para evitar la suspensión, por favor regulariza tu pago. Si ya pagaste, envíanos tu constancia. ¡Gracias!'),
+                                  onPressed: d.client == null || d.client!.phone.isEmpty ? null : () => _notice(d),
                                 ),
                                 if (d.client?.extra['servicio'] != 'cortado')
-                                  TextButton(onPressed: d.client == null ? null : () => _state(d, 'cortado'), child: const Text('Registrar corte'))
+                                  TextButton(onPressed: d.client == null || !canCut(d.client!.extra, todayIso()) ? null : () => _state(d, 'cortado'), child: const Text('Registrar corte'))
                                 else
                                   TextButton(onPressed: () => _state(d, 'activo'), child: const Text('Registrar reconexión')),
                               ]),
@@ -944,7 +972,7 @@ class _CreditScreenState extends State<CreditScreen> {
                                 if (r.over) const StatusPill('Pasó el límite', tone: PillTone.bad),
                               ]),
                               const SizedBox(height: 6),
-                              if (r.limit > 0) LinearProgressIndicator(value: (r.used / r.limit).clamp(0, 1).toDouble(), minHeight: 8, borderRadius: BorderRadius.circular(8), color: r.over ? Brand.bad : null),
+                              if (r.limit > 0) LinearProgressIndicator(value: (r.used / r.limit).clamp(0, 1).toDouble(), minHeight: 8, borderRadius: BorderRadius.circular(Radii.sm), color: r.over ? Brand.bad : null),
                               const SizedBox(height: 6),
                               Text(r.limit > 0
                                   ? 'Debe ${money(r.used, _cur)} de ${money(r.limit, _cur)} · ${r.left >= 0 ? 'le queda ${money(r.left, _cur)}' : 'pasó por ${money(-r.left, _cur)}'}'
@@ -968,6 +996,7 @@ class MorosityScreen extends StatefulWidget {
 
 class _MorosityScreenState extends State<MorosityScreen> {
   Map<String, List<(ClientProfile?, String, double)>>? _groups;
+  final Map<String, int> _days = {}; // apoderado -> días de atraso de su deuda más vieja
   String? _error;
 
   @override
@@ -982,8 +1011,12 @@ class _MorosityScreenState extends State<MorosityScreen> {
       final byName = {for (final c in clients) c.name.trim().toLowerCase(): c};
       final rec = await ProRepo.listReceivables();
       final debt = <String, double>{};
+      final today = todayIso();
+      _days.clear();
       for (final i in rec.where((i) => i.currency == _cur)) {
         debt[i.clientName] = round2((debt[i.clientName] ?? 0) + i.balance);
+        final late = i.dueDate == null ? 0 : daysBetween(i.dueDate!, today);
+        if (late > (_days[i.clientName] ?? 0)) _days[i.clientName] = late;
       }
       final g = <String, List<(ClientProfile?, String, double)>>{};
       for (final e in debt.entries) {
@@ -991,10 +1024,21 @@ class _MorosityScreenState extends State<MorosityScreen> {
         final group = ((c?.extra['grupo'] ?? '') as Object).toString().trim();
         g.putIfAbsent(group.isEmpty ? 'Sin grupo' : group, () => []).add((c, e.key, e.value));
       }
+      for (final l in g.values) {
+        l.sort((a, b) => (_days[b.$2] ?? 0).compareTo(_days[a.$2] ?? 0)); // primero los más atrasados
+      }
       if (mounted) setState(() => _groups = g);
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));
     }
+  }
+
+  Future<void> _warn(ClientProfile c, String name, double amount) async {
+    await openWhatsApp(context, c.phone,
+        'Hola, le escribe $_biz. Tiene una pensión pendiente de ${money(amount, _cur)}${(c.extra['alumno'] ?? '').toString().isEmpty ? '' : ' de ${c.extra['alumno']}'}. ¿Le ayudamos con el pago? Gracias.');
+    await RubroRepo.setNoticeDate(c.id, c.extra, pensionNoticeKey);
+    c.extra[pensionNoticeKey] = todayIso();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -1018,14 +1062,16 @@ class _MorosityScreenState extends State<MorosityScreen> {
                             for (final (c, name, amount) in g[k]!)
                               ListTile(
                                 title: Text(name),
-                                subtitle: Text([if ((c?.extra['alumno'] ?? '').toString().isNotEmpty) 'Alumno: ${c!.extra['alumno']}', 'Debe ${money(amount, _cur)}'].join(' · ')),
+                                subtitle: Text([
+                                  if ((c?.extra['alumno'] ?? '').toString().isNotEmpty) 'Alumno: ${c!.extra['alumno']}',
+                                  'Debe ${money(amount, _cur)}',
+                                  if ((_days[name] ?? 0) > 0) '${_days[name]} días de atraso',
+                                  if (c != null && lastNoticeText(c.extra, pensionNoticeKey, todayIso()).isNotEmpty) lastNoticeText(c.extra, pensionNoticeKey, todayIso()),
+                                ].join(' · ')),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.chat_rounded),
                                   tooltip: 'Avisar al apoderado',
-                                  onPressed: c == null || c.phone.isEmpty
-                                      ? null
-                                      : () => openWhatsApp(context, c.phone,
-                                          'Hola, le escribe $_biz. Tiene una pensión pendiente de ${money(amount, _cur)}${(c.extra['alumno'] ?? '').toString().isEmpty ? '' : ' de ${c.extra['alumno']}'}. ¿Le ayudamos con el pago? Gracias.'),
+                                  onPressed: c == null || c.phone.isEmpty ? null : () => _warn(c, name, amount),
                                 ),
                               ),
                           ]),
@@ -1140,12 +1186,26 @@ class _JobMarginScreenState extends State<JobMarginScreen> {
                                 Text(o.job.title, style: Theme.of(context).textTheme.titleMedium),
                                 if (o.job.clientName.isNotEmpty) Text(o.job.clientName, style: Theme.of(context).textTheme.bodySmall),
                                 const SizedBox(height: 8),
-                                LinearProgressIndicator(value: o.progress.clamp(0, 1).toDouble(), minHeight: 8, borderRadius: BorderRadius.circular(8)),
+                                LinearProgressIndicator(value: o.progress.clamp(0, 1).toDouble(), minHeight: 8, borderRadius: BorderRadius.circular(Radii.sm)),
                                 const SizedBox(height: 6),
                                 DataRow2('Contratado (hitos)', money(o.agreed, _cur)),
                                 DataRow2('Facturado', money(o.invoiced, _cur)),
                                 DataRow2('Gastado', money(o.spent, _cur)),
                                 DataRow2('Te queda', money(round2(o.invoiced - o.spent), _cur), strong: true),
+                                Builder(builder: (context) {
+                                  final sg = obraSignal(agreed: o.agreed, invoiced: o.invoiced, spent: o.spent);
+                                  if (sg.alert == ObraAlert.none) return const SizedBox.shrink();
+                                  final over = sg.alert == ObraAlert.over;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: Gap.sm),
+                                    child: Text(
+                                      over
+                                          ? 'Ya gastaste ${(sg.spentShare * 100).round()} % del contrato: revisa antes de seguir comprando.'
+                                          : 'Llevas gastado ${(sg.spentShare * 100).round()} % del contrato pero facturado solo ${(sg.invoicedShare * 100).round()} %. Revisa si falta facturar un hito o si el gasto se pasó.',
+                                      style: TextStyle(fontWeight: FontWeight.w700, color: over ? Brand.bad : Brand.warn),
+                                    ),
+                                  );
+                                }),
                                 if (o.margin != null)
                                   Text('Margen ${(o.margin! * 100).round()} %', style: TextStyle(fontWeight: FontWeight.w800, color: o.margin! < 0.1 ? Brand.bad : o.margin! < 0.25 ? Brand.warn : Brand.ok)),
                                 Align(

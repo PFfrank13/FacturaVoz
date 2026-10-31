@@ -237,13 +237,15 @@ class _ProfitScreenState extends State<ProfitScreen> {
               const SizedBox(height: 12),
               Reveal(
                 index: 2,
-                child: GridView.count(
-                  crossAxisCount: 2,
+                child: GridView(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 1.2,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    mainAxisExtent: MediaQuery.textScalerOf(context).scale(138),
+                  ),
                   children: [
                     MetricTile(icon: Icons.trending_up_rounded, label: 'Ventas sin IGV', value: money(p.sales, cur), delta: delta(p.sales, prev.sales), deltaGood: p.sales >= prev.sales),
                     MetricTile(
@@ -384,7 +386,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: positive ? Brand.heroGradient : const LinearGradient(colors: [Color(0xFFD94A5E), Color(0xFFFF8A7A)]),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(Radii.xl),
         boxShadow: Brand.softShadow(false, a: 0.25),
       ),
       child: Row(children: [
@@ -478,7 +480,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
           Container(
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Brand.bad.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: Brand.bad.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(Radii.md)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 const Icon(Icons.warning_amber_rounded, color: Brand.bad, size: 20),
@@ -531,7 +533,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
             builder: (context, k, _) => Container(
               width: (box.maxWidth * k).clamp(3, box.maxWidth).toDouble(),
               height: 8,
-              decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(Radii.sm)),
             ),
           ),
         ),

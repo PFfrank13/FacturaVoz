@@ -214,11 +214,13 @@ class InvoiceRecord {
     this.voided = false,
     this.imported = false,
     this.lockedTotals,
+    this.createdAt,
   });
 
   final String id;
   final String number;
   final String issueDate;
+  final DateTime? createdAt; // hora real de creación (para "Clientes de hoy")
   final String status; // draft | sent | paid
   final String currency;
   final double taxRate;
@@ -284,6 +286,7 @@ class InvoiceRecord {
       docKind: j['doc_kind'] as String?,
       voided: j['voided_at'] != null,
       imported: j['import_job_id'] != null,
+      createdAt: j['created_at'] is String ? DateTime.tryParse(j['created_at'] as String)?.toLocal() : null,
       lockedTotals: j['totals_locked'] == true ? Totals(_num(j['amt_base']), _num(j['amt_tax']), _num(j['amt_total'])) : null,
     );
   }

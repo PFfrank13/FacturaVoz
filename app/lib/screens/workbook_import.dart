@@ -216,7 +216,7 @@ class _WorkbookImportScreenState extends State<WorkbookImportScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Guardando ${_p.step.toLowerCase()}…', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            LinearProgressIndicator(value: _p.fraction, minHeight: 8, borderRadius: BorderRadius.circular(8)),
+            LinearProgressIndicator(value: _p.fraction, minHeight: 8, borderRadius: BorderRadius.circular(Radii.sm)),
             const SizedBox(height: 8),
             Text('${_p.done} de ${_p.total}'),
             const SizedBox(height: 8),

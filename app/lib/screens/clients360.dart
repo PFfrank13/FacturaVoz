@@ -119,7 +119,7 @@ class _Clients360ScreenState extends State<Clients360Screen> {
           else ...[
             Reveal(
               child: Aurora(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(Radii.xl),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Row(children: [

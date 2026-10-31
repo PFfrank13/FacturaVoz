@@ -360,7 +360,7 @@ Future<bool> reconcileFromPhoto(BuildContext context, List<InvoiceRecord> receiv
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: i == 0 ? t.colorScheme.primaryContainer : t.colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(Radii.lg),
                         border: i == 0 ? Border.all(color: t.colorScheme.primary, width: 1.5) : null,
                       ),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

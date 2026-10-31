@@ -223,7 +223,7 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                       Container(
                         width: 44,
                         height: 44,
-                        decoration: BoxDecoration(color: const Color(0xFF00B1EA).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14)),
+                        decoration: BoxDecoration(color: const Color(0xFF00B1EA).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(Radii.md)),
                         child: const Icon(Icons.credit_card_rounded, color: Color(0xFF009EE3)),
                       ),
                       const SizedBox(width: 12),

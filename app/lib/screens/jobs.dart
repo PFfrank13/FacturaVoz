@@ -11,6 +11,7 @@ import '../access.dart';
 import '../app_state.dart';
 import '../business_templates.dart';
 import '../errors.dart';
+import '../logic/appointments.dart';
 import '../models.dart';
 import '../models_v2.dart';
 import '../services/location.dart';
@@ -366,7 +367,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 3),
                   decoration: BoxDecoration(
                     color: on ? t.colorScheme.primary : t.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(Radii.lg),
                     border: Border.all(color: DateUtils.isSameDay(d, today) ? t.colorScheme.primary : t.colorScheme.outline),
                   ),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -404,7 +405,27 @@ class _AgendaScreenState extends State<AgendaScreen> {
                                   Expanded(
                                     child: Padding(
                                       padding: const EdgeInsets.only(bottom: 10),
-                                      child: _JobCard(job: j, onTap: () => pushPremium(context, JobDetailScreen(jobId: j.id!)).then((_) => _load())),
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                                        _JobCard(job: j, onTap: () => pushPremium(context, JobDetailScreen(jobId: j.id!)).then((_) => _load())),
+                                        if (needsConfirmation(at: j.scheduledAt, done: j.done, phone: j.clientPhone))
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton.icon(
+                                              icon: const Icon(Icons.chat_rounded, size: 18),
+                                              label: const Text('Confirmar por WhatsApp'),
+                                              onPressed: () => openWhatsApp(
+                                                context,
+                                                j.clientPhone,
+                                                confirmationMessage(
+                                                  clientName: j.clientName,
+                                                  business: AppState.instance.activeOrg?.name ?? AppState.instance.profile?.businessName ?? '',
+                                                  what: j.title,
+                                                  at: j.scheduledAt!,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ]),
                                     ),
                                   ),
                                 ]),
@@ -486,7 +507,25 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _setStatus(JobStatus st) => _run(() => V2Repo.setJobStatus(_j!.id!, st.key), ok: st.done ? '¡Terminado!' : 'Estado: ${st.label}');
+  Future<void> _setStatus(JobStatus st) async {
+    await _run(() => V2Repo.setJobStatus(_j!.id!, st.key), ok: st.done ? '¡Terminado!' : 'Estado: ${st.label}');
+    final j = _j;
+    if (!mounted || j == null || !readyStatusKeys.contains(st.key)) return;
+    final phone = j.contactPhone.isNotEmpty ? j.contactPhone : j.clientPhone;
+    if (phone.trim().isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 8),
+      content: Text('¿Avisamos a ${j.clientName.split(' ').first} que ya está listo?'),
+      action: SnackBarAction(
+        label: 'Avisar',
+        onPressed: () => openWhatsApp(
+          context,
+          phone,
+          readyMessage(clientName: j.clientName, business: AppState.instance.activeOrg?.name ?? AppState.instance.profile?.businessName ?? '', what: j.title),
+        ),
+      ),
+    ));
+  }
 
   Future<void> _photo(String kind) async {
     final j = _j;
@@ -868,7 +907,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                 return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Text('Facturado ${money(billed, cur)} de ${money(total, cur)}', style: t.textTheme.titleSmall),
                                   const SizedBox(height: 6),
-                                  LinearProgressIndicator(value: total <= 0 ? 0 : billed / total, minHeight: 8, borderRadius: BorderRadius.circular(8)),
+                                  LinearProgressIndicator(value: total <= 0 ? 0 : billed / total, minHeight: 8, borderRadius: BorderRadius.circular(Radii.sm)),
                                 ]);
                               }),
                               const SizedBox(height: 8),

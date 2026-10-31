@@ -13,6 +13,7 @@ import '../business_templates.dart';
 import '../errors.dart';
 import '../logic/doc_voice.dart';
 import '../logic/pay_score.dart';
+import '../logic/regulars.dart';
 import '../models.dart';
 import '../models_pro.dart';
 import '../models_v2.dart';
@@ -411,7 +412,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
     final days = c.lastContactAt == null ? null : DateTime.now().difference(c.lastContactAt!).inDays;
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28)),
+      decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
@@ -446,7 +447,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
 
   Widget _chip(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
         child: Text(text, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
       );
 
@@ -459,7 +460,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
           Container(
             width: 52,
             height: 52,
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(18)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(Radii.lg)),
             child: Icon(icon, color: color),
           ),
           const SizedBox(height: 6),
@@ -487,6 +488,19 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
             if (_fiado > 0) Text('incluye fiado ${money(_fiado, cur)}', style: t.textTheme.bodySmall),
             const SizedBox(height: 6),
             Text('Te compró ${money(bought, cur)} en total', style: t.textTheme.bodySmall),
+            Builder(builder: (_) {
+              final r = classifyRegular(_invoices, today: todayIso(), rubro: Access.instance.rubro);
+              if (r.tier == RegularTier.sinCompras) return const SizedBox.shrink();
+              final star = r.tier == RegularTier.casero || r.tier == RegularTier.frecuente;
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  StatusPill('${star ? '⭐ ' : ''}${r.label}', tone: star ? PillTone.ok : PillTone.neutral),
+                  Text('${r.purchases90} ${r.purchases90 == 1 ? 'compra' : 'compras'} en ${r.rules.windowDays} días', style: t.textTheme.bodySmall),
+                  if (r.suggestedDiscountPct > 0) Text('· descuento sugerido ${r.suggestedDiscountPct.toStringAsFixed(0)} %', style: t.textTheme.bodySmall),
+                ]),
+              );
+            }),
           ]),
         ),
         Column(children: [
@@ -550,8 +564,13 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.receipt_long_rounded),
-              title: Text(i.fiscalNumber ?? i.number),
-              subtitle: Text('${displayDate(i.issueDate)}${i.receivable ? ' · saldo ${money(i.balance, i.currency)}' : ''}'),
+              title: Text('${switch (i.docKind) { 'factura' => 'Factura', 'boleta' => 'Boleta', 'nota_credito' => 'Nota de crédito', 'nota_venta' => 'Nota de venta', _ => 'Comprobante' }} ${i.fiscalNumber ?? i.number}'),
+              subtitle: Text(
+                '${displayDate(i.issueDate)}${i.receivable ? ' · saldo ${money(i.balance, i.currency)}' : ''}'
+                '${i.items.isEmpty ? '' : '\n${i.items.first.description}${i.items.length > 1 ? ' y ${i.items.length - 1} más' : ''}'}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: Money(money(i.totals.total, i.currency), weight: FontWeight.w700),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: i.id))).then((_) => _load()),
             ),
@@ -658,7 +677,7 @@ class _StorageImageState extends State<StorageImage> {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(Radii.md),
       child: _url == null
           ? Container(color: t.colorScheme.surfaceContainerHighest)
           : GestureDetector(

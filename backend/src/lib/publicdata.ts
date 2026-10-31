@@ -264,12 +264,12 @@ export async function getPublicStore(slug: string): Promise<PublicStore | null> 
   const paths = prods.map((p) => p.image_path).filter((x): x is string => typeof x === "string" && x.length > 0);
   const signed = new Map<string, string>();
   if (paths.length) {
-    const { data: urls } = await admin.storage.from("org-media").createSignedUrls(paths, 3600);
+    const { data: urls } = await admin.storage.from("org-media").createSignedUrls(paths, 86400);
     for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
   }
   let logo: string | null = null;
   if (org.logo_path) {
-    const { data: lu } = await admin.storage.from("org-media").createSignedUrl(org.logo_path as string, 3600);
+    const { data: lu } = await admin.storage.from("org-media").createSignedUrl(org.logo_path as string, 86400);
     logo = lu?.signedUrl ?? null;
   }
   const withTax = (n: number) => Math.round(n * (1 + rate / 100) * 100) / 100;

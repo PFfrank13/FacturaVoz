@@ -1,5 +1,5 @@
 {
-  "_leeme": "Planes de FacturaVoz para cargar en Solvex Hub (Productos → FACTURAVOZ → Planes). Precios PROPUESTOS en soles, con IGV incluido: ajústalos a tu estrategia antes de publicar. Las claves de 'features' son las que lee la app y la base de datos (private.has_feature). max_users = -1 significa sin límite.",
+  "_leeme": "Planes de FacturaVoz para cargar en Solvex Hub (Productos → FACTURAVOZ → Planes). Precios PROPUESTOS en soles, con IGV incluido: ajústalos a tu estrategia antes de publicar. Las claves de 'features' son las que lee la app y la base de datos (private.has_feature). max_users = -1 significa sin límite. v3.1: los 3 planes son iguales para todos los rubros, pero lo que desbloquean cambia según el rubro (matriz en la app y en private.plan_matrix): Básico = esenciales del rubro; Pro = Básico + 1 módulo estrella + Copiloto; Empresa = todo + Copiloto agente (copiloto_agente). Estas marcas de abajo son la UNIÓN de lo que cada plan da a algún rubro: cualquier otra función que actives en una licencia concreta se respeta como complemento (add-on).",
   "product": {
     "code": "FACTURAVOZ",
     "name": "FacturaVoz",
@@ -26,19 +26,19 @@
         "cotizaciones": true,
         "tienda": false,
         "stock": true,
-        "recurrentes": false,
+        "recurrentes": true,
         "copiloto": false,
-        "trabajos": false,
-        "agenda": false,
+        "trabajos": true,
+        "agenda": true,
         "reportes": true,
         "multisucursal": false,
         "fiados": true,
         "caja": true,
         "cuaderno_ia": false,
         "portal_cliente": false,
-        "precios": false,
+        "precios": true,
         "fidelizacion": false,
-        "carta_qr": false,
+        "carta_qr": true,
         "conciliacion": false,
         "comisiones": false,
         "avisos_pago": true,
@@ -46,6 +46,7 @@
         "api_publica": false,
         "encuestas": false,
         "antifraude": false,
+        "copiloto_agente": false,
         "max_users": 1,
         "max_branches": 1
       }
@@ -78,7 +79,7 @@
         "multisucursal": false,
         "fiados": true,
         "caja": true,
-        "cuaderno_ia": true,
+        "cuaderno_ia": false,
         "portal_cliente": true,
         "precios": true,
         "fidelizacion": true,
@@ -86,10 +87,11 @@
         "conciliacion": false,
         "comisiones": true,
         "avisos_pago": true,
-        "multimoneda": true,
+        "multimoneda": false,
         "api_publica": false,
-        "encuestas": true,
+        "encuestas": false,
         "antifraude": false,
+        "copiloto_agente": false,
         "max_users": 5,
         "max_branches": 1
       }
@@ -134,6 +136,7 @@
         "api_publica": true,
         "encuestas": true,
         "antifraude": true,
+        "copiloto_agente": true,
         "max_users": 20,
         "max_branches": 5
       }

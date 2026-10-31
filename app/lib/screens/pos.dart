@@ -240,7 +240,7 @@ class _PosScreenState extends State<PosScreen> {
                             final cols = (c.maxWidth / 150).floor().clamp(2, 6);
                             return GridView.builder(
                               padding: const EdgeInsets.fromLTRB(12, 8, 12, 120),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.82),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(200)),
                               itemCount: list.length,
                               itemBuilder: (context, i) {
                                 final p = list[i];
@@ -254,7 +254,7 @@ class _PosScreenState extends State<PosScreen> {
                                     duration: Motion.d(context, Motion.fast),
                                     decoration: BoxDecoration(
                                       color: t.colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(18),
+                                      borderRadius: BorderRadius.circular(Radii.lg),
                                       border: Border.all(color: n > 0 ? t.colorScheme.primary : t.colorScheme.outline, width: n > 0 ? 2 : 1),
                                     ),
                                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -274,7 +274,7 @@ class _PosScreenState extends State<PosScreen> {
                                               top: 6,
                                               child: Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(99)),
+                                                decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(Radii.pill)),
                                                 child: Text(qtyText(n), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w800)),
                                               ),
                                             ),

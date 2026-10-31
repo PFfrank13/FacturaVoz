@@ -101,7 +101,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
           else ...[
             Reveal(
               child: Aurora(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(Radii.xl),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -309,7 +309,7 @@ Future<bool> showRecurringEditor(BuildContext context, {RecurringTemplate? templ
               Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(18)),
+                decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(Radii.lg)),
                 child: Column(children: [
                   TextField(controller: l.desc, maxLength: 200, onChanged: (_) => setS(() {}), decoration: const InputDecoration(labelText: 'Servicio o producto', counterText: '')),
                   const SizedBox(height: 8),

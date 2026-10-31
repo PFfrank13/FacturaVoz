@@ -107,7 +107,7 @@ class _SellHubScreenState extends State<SellHubScreen> {
               onTap: Access.instance.can('sell') ? _voiceSale : () {},
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(gradient: Brand.coralGradient, borderRadius: BorderRadius.circular(28), boxShadow: Brand.softShadow(false, a: 0.22)),
+                decoration: BoxDecoration(gradient: Brand.coralGradient, borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.22)),
                 child: Row(children: [
                   Container(
                     width: 58,
@@ -209,7 +209,7 @@ class _SellHubScreenState extends State<SellHubScreen> {
                   boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: 0.06),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Icon(f.icon, color: groupColors[f.group] ?? Brand.indigo, size: 26),
+                  Icon(f.icon, color: featureColor(f.id), size: 26),
                   Text(f.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.15)),
                 ]),
               ),

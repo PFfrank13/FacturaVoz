@@ -127,7 +127,7 @@ class SettingsScreen extends StatelessWidget {
           Container(
             width: 42,
             height: 42,
-            decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(Radii.md)),
             child: Icon(icon, color: c, size: 22),
           ),
           const SizedBox(width: 14),
@@ -164,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
           Reveal(
             child: Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28), boxShadow: Brand.softShadow(false, a: 0.3)),
+              decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
               child: Row(children: [
                 Container(
                   width: 52,

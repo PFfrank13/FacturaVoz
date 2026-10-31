@@ -397,14 +397,14 @@ class _Dock extends StatelessWidget {
         height: 84,
         child: Stack(clipBehavior: Clip.none, alignment: Alignment.bottomCenter, children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(Radii.xl),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: Container(
                 height: 68,
                 decoration: BoxDecoration(
                   color: (dark ? Brand.darkCard : Colors.white).withValues(alpha: dark ? 0.78 : 0.82),
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(Radii.xl),
                   border: Border.all(color: (dark ? Colors.white : Brand.indigo).withValues(alpha: 0.08)),
                   boxShadow: Brand.softShadow(dark, a: 0.16),
                 ),
@@ -457,7 +457,7 @@ class _Dock extends StatelessWidget {
                 duration: dur,
                 curve: Motion.shadow,
                 padding: EdgeInsets.symmetric(horizontal: on ? 12 : 6, vertical: 5),
-                decoration: BoxDecoration(color: on ? t.colorScheme.primary.withValues(alpha: 0.14) : Colors.transparent, borderRadius: BorderRadius.circular(99)),
+                decoration: BoxDecoration(color: on ? t.colorScheme.primary.withValues(alpha: 0.14) : Colors.transparent, borderRadius: BorderRadius.circular(Radii.pill)),
                 child: AnimatedScale(scale: on ? 1.08 : 1, duration: dur, curve: Motion.spring, child: Icon(d.icon, size: 23, color: c)),
               ),
             ),

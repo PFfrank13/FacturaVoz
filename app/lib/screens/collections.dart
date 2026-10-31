@@ -284,7 +284,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     const colors = [Color(0xFF9B8CF5), Color(0xFFFFB454), Color(0xFFFF9376), Color(0xFFFF6F8E), Color(0xFFD94A5E)];
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28), boxShadow: Brand.softShadow(false, a: 0.25)),
+      decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.25)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Te deben', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13.5)),
         const SizedBox(height: 4),
@@ -317,7 +317,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(Radii.md)),
             child: Row(children: [
               const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 19),
               const SizedBox(width: 8),

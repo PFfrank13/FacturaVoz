@@ -100,8 +100,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                     Container(
                       width: 96,
                       height: 96,
-                      decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)),
-                      child: _logo == null ? const Icon(Icons.add_photo_alternate_rounded, size: 36) : ClipRRect(borderRadius: BorderRadius.circular(18), child: Image.memory(_logo!, fit: BoxFit.contain)),
+                      decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(Radii.lg)),
+                      child: _logo == null ? const Icon(Icons.add_photo_alternate_rounded, size: 36) : ClipRRect(borderRadius: BorderRadius.circular(Radii.lg), child: Image.memory(_logo!, fit: BoxFit.contain)),
                     ),
                     const SizedBox(width: 14),
                     Expanded(

@@ -15,6 +15,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'client_profile.dart' show shortDateTime;
+import '../logic/tables.dart';
 import 'quotes.dart';
 
 const _flow = ['nuevo', 'preparando', 'listo', 'entregado'];
@@ -34,6 +35,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
   Timer? _debounce;
   int _known = 0;
+  String _view = 'comandas'; // comandas | mesas
 
   @override
   void initState() {
@@ -137,7 +139,12 @@ class _KitchenScreenState extends State<KitchenScreen> {
     final t = Theme.of(context);
     final orders = _orders ?? const <KitchenOrder>[];
     return Scaffold(
-      appBar: AppBar(title: const Text('Comandas'), actions: [
+      appBar: AppBar(title: SegmentedButton<String>(
+        showSelectedIcon: false,
+        segments: const [ButtonSegment(value: 'comandas', label: Text('Comandas')), ButtonSegment(value: 'mesas', label: Text('Mesas'))],
+        selected: {_view},
+        onSelectionChanged: (v) => setState(() => _view = v.first),
+      ), actions: [
         IconButton(tooltip: 'QR de mesas', onPressed: _qrSheet, icon: const Icon(Icons.qr_code_2_rounded)),
         IconButton(tooltip: 'Todos los pedidos', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QuotesScreen())), icon: const Icon(Icons.list_alt_rounded)),
       ]),
@@ -147,7 +154,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
               ? const SkeletonList()
               : orders.isEmpty
                   ? const EmptyState(title: 'Cocina libre', body: 'Los pedidos de la carta QR aparecerán aquí al instante.')
-                  : LayoutBuilder(builder: (context, c) {
+                  : _view == 'mesas'
+                      ? _tablesView(context, orders)
+                      : LayoutBuilder(builder: (context, c) {
                       final wide = c.maxWidth > 700;
                       final cols = [
                         for (final st in const ['nuevo', 'preparando', 'listo'])
@@ -159,6 +168,48 @@ class _KitchenScreenState extends State<KitchenScreen> {
                     }),
       bottomNavigationBar: _orders == null ? null : Padding(padding: const EdgeInsets.all(10), child: Text('En vivo · toca un pedido para pasarlo al siguiente paso', textAlign: TextAlign.center, style: t.textTheme.bodySmall)),
     );
+  }
+
+  Widget _tablesView(BuildContext context, List<KitchenOrder> orders) {
+    final t = Theme.of(context);
+    final tables = summarizeTables(orders);
+    final sin = openWithoutTable(orders);
+    if (tables.isEmpty) {
+      return EmptyState(title: 'Sin mesas ocupadas', body: sin > 0 ? 'Hay $sin pedido(s) para llevar o delivery en Comandas.' : 'Cuando un cliente pida desde el QR de su mesa, la verás aquí.');
+    }
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
+    return ListView(padding: const EdgeInsets.all(Gap.lg), children: [
+      GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 200, mainAxisSpacing: Gap.md, crossAxisSpacing: Gap.md, mainAxisExtent: 128 * scale.clamp(1.0, 1.6)),
+        itemCount: tables.length,
+        itemBuilder: (_, i) {
+          final m = tables[i];
+          final c = _colors[m.stage] ?? Brand.indigo;
+          final atrasada = m.wait.inMinutes >= 20 && m.stage != 'listo';
+          return SoftCard(
+            padding: const EdgeInsets.all(Gap.md),
+            radius: Radii.lg,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                PulseDot(color: c),
+                const SizedBox(width: Gap.sm),
+                Expanded(child: Text('Mesa ${m.label}', maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+              ]),
+              const SizedBox(height: Gap.xs),
+              Text('${m.items} plato${m.items == 1 ? '' : 's'} · ${m.orders} pedido${m.orders == 1 ? '' : 's'}', style: t.textTheme.bodySmall),
+              const Spacer(),
+              Row(children: [
+                Expanded(child: Text(waitText(m.wait), style: t.textTheme.labelMedium?.copyWith(color: atrasada ? Brand.bad : null, fontWeight: atrasada ? FontWeight.w800 : null))),
+                TagChip(_labels[m.stage] ?? m.stage, color: c),
+              ]),
+            ]),
+          );
+        },
+      ),
+      if (sin > 0) Padding(padding: const EdgeInsets.only(top: Gap.lg), child: Text('Además hay $sin pedido(s) para llevar o delivery en Comandas.', style: t.textTheme.bodySmall)),
+    ]);
   }
 
   Widget _column(BuildContext context, String st, List<KitchenOrder> list, double width) {

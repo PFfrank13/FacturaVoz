@@ -197,7 +197,7 @@ class _BankReconScreenState extends State<BankReconScreen> {
                                     const SizedBox(height: 8),
                                     Container(
                                       padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(color: Brand.ok.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
+                                      decoration: BoxDecoration(color: Brand.ok.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(Radii.md)),
                                       child: Row(children: [
                                         const Icon(Icons.auto_awesome_rounded, color: Brand.ok, size: 18),
                                         const SizedBox(width: 8),

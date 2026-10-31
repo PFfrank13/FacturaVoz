@@ -31,3 +31,4 @@ Los bloques entre `\set ON_ERROR_STOP 0` y `\set ON_ERROR_STOP 1` son operacione
 | `test_v3_voz.sql` | Cuotas de voz premium (empresa y global) y de DNI/RUC (persona y empresa). |
 | `test_v3_rls_audit.sql` | Auditoría: un usuario de otra empresa no ve NINGUNA fila de las 50 tablas con `org_id`. |
 | `bench_v3.sql` | 10 000 comprobantes: tiempos antes/después (ver `docs/RENDIMIENTO.md`). |
+| `test_v31_planes.sql` | v3.1: plan × rubro (Básico/Pro/Empresa, complementos del Hub), `my_license` ya resuelto por rubro, tareas del Copiloto agente (estados, aprobación, aislamiento). |

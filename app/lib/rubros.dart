@@ -99,6 +99,22 @@ class RubroSpec {
   Set<String> get featureIds => {for (final a in areas) ...a.features, ...home, signature};
 }
 
+/// Funciones que existen en TODOS los rubros (gastos, caja, ajustes…). El resto solo aparece en su rubro.
+const commonFeatures = <String>{
+  'gastos', 'caja', 'cobranza', 'avisos', 'banco', 'negocio', 'impuestos', 'reportes', 'importar',
+  'ajustes', 'equipo', 'datos', 'sunat', 'marca', 'impresora', 'medios', 'plan', 'seguridad', 'asistente', 'copiloto', 'agente',
+  'me_deben', 'negocio_hub', 'alertas', 'bitacora', 'pin', 'papelera', 'modulos', 'api', 'empresas', 'escanear',
+  'facturar', 'comprobantes', 'clientes',
+};
+
+/// ¿Esta función se muestra en este rubro? Sin rubro elegido (spec nulo) se muestra todo.
+/// 'tipo' (cambiar de rubro) y 'presentacion' nunca: el rubro queda fijo una vez elegido.
+bool rubroShows(RubroSpec? spec, String featureId) {
+  if (featureId == 'tipo' || featureId == 'presentacion') return spec == null;
+  if (spec == null) return true;
+  return commonFeatures.contains(featureId) || spec.featureIds.contains(featureId);
+}
+
 const _defaultVocab = {
   'client': 'Cliente',
   'clients': 'Clientes',
@@ -111,8 +127,8 @@ const _defaultVocab = {
 
 // Áreas comunes al final de todos los menús.
 const _moneyArea = RubroArea('Plata', ['cobranza', 'caja', 'gastos', 'avisos', 'banco']);
-const _businessArea = RubroArea('Mi negocio', ['negocio', 'impuestos', 'reportes', 'comisiones', 'importar']);
-const _settingsArea = RubroArea('Ajustes', ['ajustes', 'equipo', 'datos', 'sunat', 'marca', 'impresora', 'medios', 'tipo', 'plan', 'seguridad']);
+const _businessArea = RubroArea('Mi negocio', ['negocio', 'impuestos', 'reportes', 'comisiones', 'agente', 'importar']);
+const _settingsArea = RubroArea('Ajustes', ['ajustes', 'equipo', 'datos', 'sunat', 'marca', 'impresora', 'medios', 'plan', 'seguridad']);
 
 const rubros = <RubroSpec>[
   RubroSpec(
@@ -376,8 +392,58 @@ RubroSpec? rubroFor(String? id) {
 bool rubroIncludes(String? rubroId, String feature) => rubroFor(rubroId)?.core.contains(feature) ?? false;
 
 /// Plan mínimo que trae [feature] (para "Disponible en el plan X").
-String? minPlanFor(String feature, Map<String, Map<String, dynamic>> plans) {
-  for (final code in const ['BASICO', 'PRO', 'EMPRESA']) {
+// ───────────── Planes × rubro (misma tabla que private.plan_matrix en la base; una prueba exige que coincidan) ─────────────
+// Básico = esenciales del rubro · Pro = Básico + UN módulo estrella + Copiloto · Empresa = todo + Copiloto agente.
+const planCodes = ['BASICO', 'PRO', 'EMPRESA'];
+const _basicCommon = {'facturar', 'clientes', 'cobros', 'voz', 'cotizaciones', 'reportes', 'avisos_pago', 'caja'};
+const _basicExtra = <String, Set<String>>{
+  'bodega': {'stock', 'fiados'},
+  'restaurante': {'carta_qr', 'stock'},
+  'servicios_tecnicos': {'trabajos', 'agenda', 'recurrentes'},
+  'salon': {'agenda'},
+  'consultorio': {'agenda'},
+  'taller': {'trabajos', 'stock'},
+  'mayorista': {'stock', 'precios'},
+  'educacion': {'recurrentes', 'agenda'},
+  'construccion': {'trabajos'},
+};
+
+/// Módulo estrella que desbloquea Pro en cada rubro (además del Copiloto).
+const proStar = <String, String>{
+  'bodega': 'fidelizacion',
+  'restaurante': 'agenda',
+  'servicios_tecnicos': 'portal_cliente',
+  'salon': 'comisiones',
+  'consultorio': 'recurrentes',
+  'taller': 'agenda',
+  'mayorista': 'tienda',
+  'educacion': 'portal_cliente',
+  'construccion': 'agenda',
+};
+
+/// Todas las funciones por plan (Empresa las tiene todas).
+const allFeatureKeys = <String>{
+  'facturar', 'clientes', 'cobros', 'voz', 'cotizaciones', 'tienda', 'stock', 'recurrentes', 'copiloto', 'copiloto_agente', 'trabajos',
+  'agenda', 'reportes', 'multisucursal', 'fiados', 'caja', 'cuaderno_ia', 'portal_cliente', 'precios', 'fidelizacion', 'carta_qr',
+  'conciliacion', 'comisiones', 'avisos_pago', 'multimoneda', 'api_publica', 'encuestas', 'antifraude',
+};
+
+/// Funciones que [plan] desbloquea para [rubro] (acumulativo). Rubro o plan desconocido → null (se usa la licencia tal cual).
+Set<String>? planMatrix(String? rubro, String plan) {
+  if (rubro == null || !_basicExtra.containsKey(rubro) || !planCodes.contains(plan)) return null;
+  if (plan == 'EMPRESA') return allFeatureKeys;
+  return {..._basicCommon, ..._basicExtra[rubro]!, if (plan == 'PRO') ...{'copiloto', proStar[rubro]!}};
+}
+
+/// Plan más bajo que trae [feature]. Con rubro conocido usa la matriz de ese rubro; si no, la lista general.
+String? minPlanFor(String feature, Map<String, Map<String, dynamic>> plans, {String? rubro}) {
+  if (rubro != null && _basicExtra.containsKey(rubro)) {
+    for (final code in planCodes) {
+      if (planMatrix(rubro, code)!.contains(feature)) return code;
+    }
+    return null;
+  }
+  for (final code in planCodes) {
     final v = plans[code]?[feature];
     if (v == true || (v is num && v != 0)) return code;
   }
@@ -395,7 +461,7 @@ const planFeatures = <String, Map<String, dynamic>>{
     'precios': true, 'fidelizacion': true, 'carta_qr': true, 'comisiones': true, 'avisos_pago': true, 'multimoneda': true, 'encuestas': true,
   },
   'EMPRESA': {
-    'facturar': true, 'clientes': true, 'cobros': true, 'voz': true, 'cotizaciones': true, 'tienda': true, 'stock': true, 'recurrentes': true,
+    'copiloto_agente': true, 'facturar': true, 'clientes': true, 'cobros': true, 'voz': true, 'cotizaciones': true, 'tienda': true, 'stock': true, 'recurrentes': true,
     'copiloto': true, 'trabajos': true, 'agenda': true, 'reportes': true, 'multisucursal': true, 'fiados': true, 'caja': true, 'cuaderno_ia': true,
     'portal_cliente': true, 'precios': true, 'fidelizacion': true, 'carta_qr': true, 'conciliacion': true, 'comisiones': true, 'avisos_pago': true,
     'multimoneda': true, 'api_publica': true, 'encuestas': true, 'antifraude': true,

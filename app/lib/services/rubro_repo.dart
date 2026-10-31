@@ -175,6 +175,19 @@ class RubroRepo {
     final e = Map<String, dynamic>.from(extra)
       ..['servicio'] = state
       ..['servicio_fecha'] = todayIso();
+    if (state == 'activo') e.remove('aviso_corte_fecha'); // reconectado: el próximo corte exige un aviso nuevo
+    return _db.from('clients').update({'extra': e}).eq('id', clientId);
+  }
+
+  /// Guarda en `clients.extra[key]` la fecha de hoy (último aviso enviado, p. ej. pensión pendiente).
+  static Future<void> setNoticeDate(String clientId, Map<String, dynamic> extra, String key) {
+    final e = Map<String, dynamic>.from(extra)..[key] = todayIso();
+    return _db.from('clients').update({'extra': e}).eq('id', clientId);
+  }
+
+  /// Guarda que hoy se envió el aviso previo al abonado (requisito para registrar el corte).
+  static Future<void> setCutoffNotice(String clientId, Map<String, dynamic> extra) {
+    final e = Map<String, dynamic>.from(extra)..['aviso_corte_fecha'] = todayIso();
     return _db.from('clients').update({'extra': e}).eq('id', clientId);
   }
 

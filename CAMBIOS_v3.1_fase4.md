@@ -1,0 +1,6 @@
+# FacturaVoz v3.1 — Fase 4 (tienda pública + clientes por rubro)
+- **Tienda pública rediseñada**: portada con degradado, logo grande (si falta, iniciales del negocio), chips de Recojo / Delivery / pedido mínimo / Yape / Plin / cantidad de productos, buscador flotante, categorías pegajosas, tarjetas con foto 4:3 y etiquetas (⭐ destacado, "En tu pedido", "Agotado" sobre la foto), barra de pedido inferior. La carta digital usa "¿Qué se te antoja?".
+- **Imágenes**: la causa principal era la política de seguridad (CSP) que bloqueaba las fotos de Supabase (arreglado en Fase 1). Ahora además: enlaces de foto válidos 24 h (antes 1 h) y, si una foto falla, se muestra un fondo con icono en vez de un cuadro roto (también en el logo).
+- **Cliente según el rubro**: ya tenían palabra propia (Casero, Comensal, Abonado, Paciente, Alumno…). Ahora Bodega (referencia de la casa, día en que suele pagar), Restaurante (preferencias) y Mayorista (zona de reparto, condición de pago) también tienen datos propios.
+- Sin SQL nuevo. Archivos: `components/public/StoreCart.tsx`, `lib/publicdata.ts`, `business_templates.dart`.
+Verificado: tsc OK, 118 pruebas del servidor, y la tienda renderizada en un navegador móvil (390 px) con foto rota, agotado, destacado y carrito. No verificado: con fotos reales de tu Supabase en Vercel; `flutter analyze/test`.

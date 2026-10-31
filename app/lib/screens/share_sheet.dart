@@ -17,7 +17,7 @@ Future<bool> shareLinkSheet(BuildContext context, {required String title, requir
             leading: Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(Radii.md)),
               child: Icon(icon, color: c),
             ),
             title: Text(label, style: t.textTheme.titleSmall),
@@ -36,7 +36,7 @@ Future<bool> shareLinkSheet(BuildContext context, {required String title, requir
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(Radii.md)),
               child: Row(children: [
                 Icon(Icons.link_rounded, size: 18, color: t.colorScheme.primary),
                 const SizedBox(width: 8),

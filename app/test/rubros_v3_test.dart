@@ -116,4 +116,73 @@ void main() {
     const lento = ProductVelocity(id: 'y', name: 'Sal', stock: 1, reorderPoint: 3, units: 0, perDay: 0);
     expect(suggestedOrder(lento), 2); // al menos hasta el punto de pedido
   });
+
+  test('rubro fijo: cada rubro ve solo lo suyo + lo común (gastos siempre); cambiar de rubro no se ofrece', () {
+    for (final r in rubros) {
+      expect(rubroShows(r, 'gastos'), isTrue, reason: '${r.id} gastos');
+      expect(rubroShows(r, r.signature), isTrue, reason: '${r.id} estrella');
+      expect(rubroShows(r, 'tipo'), isFalse);
+      expect(rubroShows(r, 'presentacion'), isFalse);
+    }
+    expect(rubroShows(rubroFor('bodega'), 'placas'), isFalse);
+    expect(rubroShows(rubroFor('taller'), 'fiados'), isFalse);
+    expect(rubroShows(null, 'placas'), isTrue); // sin rubro elegido aún: todo visible
+    expect(rubroShows(null, 'tipo'), isTrue);
+  });
+
+  group('planes por rubro (Básico / Pro con módulo estrella / Empresa todo)', () {
+    LicenseInfo lic(String plan) => LicenseInfo(dev: false, source: 'hub', enforced: true, plan: plan, features: const {'facturar': true});
+
+    test('la matriz de la app y la de la base son la misma (private.plan_matrix)', () {
+      final sql = File('../backend/supabase/migrations/20261118_v31_planes_por_rubro.sql').readAsStringSync();
+      final base = RegExp(r"else array\[([^\]]*)\]\s*\|\|\s*case p_rubro(.*?)else array\[\]::text\[\] end\s*\|\| case when p_plan = 'PRO'", dotAll: true).firstMatch(sql)!;
+      final common = RegExp("'([a-z_]+)'").allMatches(base.group(1)!).map((m) => m.group(1)!).toSet();
+      final basicBlock = base.group(2)!;
+      final proBlock = sql.substring(sql.indexOf("array['copiloto'] || case p_rubro"));
+      for (final r in rubros) {
+        final b = RegExp("when '${r.id}' then array\\[([^\\]]*)\\]").firstMatch(basicBlock)!;
+        final extra = RegExp("'([a-z_]+)'").allMatches(b.group(1)!).map((m) => m.group(1)!).toSet();
+        final p = RegExp("when '${r.id}' then array\\['([a-z_]+)'\\]").firstMatch(proBlock)!.group(1)!;
+        expect(planMatrix(r.id, 'BASICO'), {...common, ...extra}, reason: '${r.id} básico');
+        expect(planMatrix(r.id, 'PRO'), {...common, ...extra, 'copiloto', p}, reason: '${r.id} pro');
+        expect(proStar[r.id], p, reason: '${r.id} estrella');
+      }
+    });
+
+    test('el núcleo de cada rubro está en Básico y cada rubro tiene UNA estrella distinta de lo esencial', () {
+      for (final r in rubros) {
+        final basico = planMatrix(r.id, 'BASICO')!;
+        expect(basico.containsAll(r.core), isTrue, reason: '${r.id} núcleo ⊆ básico');
+        final pro = planMatrix(r.id, 'PRO')!;
+        expect(pro.difference(basico), {'copiloto', proStar[r.id]!}, reason: '${r.id} pro = básico + copiloto + estrella');
+        expect(planMatrix(r.id, 'EMPRESA')!.containsAll(pro), isTrue);
+        expect(planMatrix(r.id, 'EMPRESA')!.contains('copiloto_agente'), isTrue);
+        expect(pro.contains('copiloto_agente'), isFalse, reason: 'el agente es solo de Empresa');
+      }
+    });
+
+    test('mismo plan, distinto rubro: desbloquea cosas distintas', () {
+      expect(planHas(lic('PRO'), 'fidelizacion', rubro: 'bodega'), isTrue);
+      expect(planHas(lic('PRO'), 'fidelizacion', rubro: 'salon'), isFalse);
+      expect(planHas(lic('PRO'), 'comisiones', rubro: 'salon'), isTrue);
+      expect(planHas(lic('BASICO'), 'copiloto', rubro: 'bodega'), isFalse);
+      expect(planHas(lic('PRO'), 'copiloto', rubro: 'taller'), isTrue);
+      expect(planHas(lic('PRO'), 'copiloto_agente', rubro: 'bodega'), isFalse);
+      expect(planHas(lic('EMPRESA'), 'copiloto_agente', rubro: 'bodega'), isTrue);
+    });
+
+    test('complemento (add-on) del Hub: se respeta si no es parte del plan estándar', () {
+      const addon = LicenseInfo(dev: false, source: 'hub', enforced: true, plan: 'BASICO', features: {'tienda': true});
+      expect(planHas(addon, 'tienda', rubro: 'bodega'), isTrue);
+      const noAddon = LicenseInfo(dev: false, source: 'hub', enforced: true, plan: 'PRO', features: {'tienda': true});
+      expect(planHas(noAddon, 'tienda', rubro: 'salon'), isFalse); // tienda es de PRO-mayorista: no es complemento
+    });
+
+    test('los textos de "mejora tu plan" usan la matriz del rubro', () {
+      expect(minPlanFor('fidelizacion', planFeatures, rubro: 'bodega'), 'PRO');
+      expect(minPlanFor('fidelizacion', planFeatures, rubro: 'salon'), 'EMPRESA');
+      expect(minPlanFor('copiloto_agente', planFeatures, rubro: 'taller'), 'EMPRESA');
+      expect(minPlanFor('copiloto', planFeatures, rubro: 'taller'), 'PRO');
+    });
+  });
 }

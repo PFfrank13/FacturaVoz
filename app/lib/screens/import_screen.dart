@@ -321,7 +321,7 @@ class _ImportScreenState extends State<ImportScreen> {
       Reveal(
         child: Container(
           padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28), boxShadow: Brand.softShadow(false, a: 0.3)),
+          decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
           child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 34),
             SizedBox(height: 12),

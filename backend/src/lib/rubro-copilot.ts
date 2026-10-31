@@ -38,6 +38,20 @@ export function redactMoney(snapshot: Record<string, unknown>): Record<string, u
 
 export type Who = { rubro: RubroId | null; role: string; canMoney: boolean; plan: string; features: Record<string, unknown> | null };
 
+/** Nivel del Copiloto según el plan: Pro responde con tus datos; Empresa además es un asesor que se adelanta y puede recibir tareas. */
+export const copilotTier = (features: Record<string, unknown> | null): "empresa" | "pro" => (features && features.copiloto_agente === true ? "empresa" : "pro");
+
+export function copilotTierBlock(features: Record<string, unknown> | null): string {
+  if (copilotTier(features) === "empresa") {
+    return [
+      "Nivel del Copiloto: EMPRESA (asesor completo). Además de responder, te adelantas: en preguntas de negocio cierra con \"Lo que yo haría hoy\" (1 a 3 pasos concretos con nombres y montos reales del resumen),",
+      "señala riesgos (deuda vencida, stock bajo, cliente que se va, tope tributario) y compara contra el mes pasado cuando haya dato.",
+      "Si lo que piden es una TAREA larga (cobrar a varios, armar lista de reposición, programar recordatorios, resumen de la semana), dile que se la encargue a \"Tareas del Copiloto\" (Menú): ahí la preparas y el dueño la aprueba antes de que se haga.",
+    ].join(" ");
+  }
+  return "Nivel del Copiloto: PRO. Respondes y propones acciones con los datos reales del negocio. Si piden que tú hagas una tarea completa por ellos (cobrar a todos, armar la reposición, programar recordatorios), explica con amabilidad que las Tareas del Copiloto son del plan Empresa (Menú → Mi plan).";
+}
+
 /** Bloque del prompt con rubro, rol y plan (va ANTES de las reglas generales). */
 export function rubroPromptBlock(w: Who): string {
   const r = w.rubro ? RUBRO_COPILOT[w.rubro] : null;
@@ -46,6 +60,7 @@ export function rubroPromptBlock(w: Who): string {
     r ? `Rubro: ${r.name}. Eres ${r.role}. Al cliente le dices "${r.client}" y al trabajo "${r.job}".` : "Rubro: no elegido todavía (responde de forma general).",
     `Rol de quien pregunta: ${w.role}.${w.canMoney ? "" : " NO puede ver montos del negocio: si pregunta por ventas, ganancias o deudas, dile con amabilidad que eso lo ve el dueño o finanzas."}`,
     `Plan: ${w.plan || "desconocido"}.${off.length ? ` Funciones NO incluidas en su plan: ${off.join(", ")}. Si pide algo de eso, dile que está disponible en un plan mayor (Menú → Mi plan).` : ""}`,
+    copilotTierBlock(w.features),
     "Acciones: la app SIEMPRE pide confirmación; anular o borrar cobros pide además el PIN del dueño. Tú solo propones.",
     "Datos: responde SOLO con lo que está en <resumen> y <rubro_datos>. Si no está, di exactamente qué no tienes (\"no lo tengo registrado\") y dónde verlo. Nunca inventes nombres, cifras ni fechas.",
   ].join("\n");

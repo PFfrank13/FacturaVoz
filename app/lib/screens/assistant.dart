@@ -538,7 +538,7 @@ class _CopilotSheetState extends State<_CopilotSheet> {
                 for (final h in r.highlights)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: _tone(h.tone).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+                    decoration: BoxDecoration(color: _tone(h.tone).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(Radii.md)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                       Text(h.label, style: t.textTheme.labelSmall),
                       Text(h.value, style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, color: _tone(h.tone), fontFeatures: const [FontFeature.tabularFigures()])),

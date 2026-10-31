@@ -134,7 +134,7 @@ class _StoreScreenState extends State<StoreScreen> {
             : ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                 Reveal(
                   child: Aurora(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(Radii.xl),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

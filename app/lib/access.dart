@@ -82,10 +82,17 @@ bool planHas(LicenseInfo l, String key, {String? rubro}) {
   if (!l.enforced || l.dev || l.source == 'local' || coreFeatures.contains(key)) return true;
   if (rubroIncludes(rubro, key)) return true;
   final v = l.features[key];
-  if (v is bool) return v;
-  if (v is num) return v != 0;
-  return false;
+  final on = v is bool ? v : (v is num ? v != 0 : false);
+  // Planes por rubro (igual que private.plan_allows): lo que el plan da a ESE rubro, o un complemento que el Hub activó
+  // y que no es parte de ningún plan estándar. Plan o rubro desconocidos: se respeta la licencia tal cual.
+  final m = planMatrix(rubro, l.plan);
+  if (m == null) return on;
+  if (m.contains(key)) return true;
+  final inStandard = _rubrosOf().any((r) => planMatrix(r, l.plan)!.contains(key));
+  return on && !inStandard;
 }
+
+Iterable<String> _rubrosOf() => proStar.keys;
 
 /// Límite numérico del plan (-1 = sin límite).
 int planLimit(LicenseInfo l, String key) {

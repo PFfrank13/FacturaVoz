@@ -9,30 +9,44 @@ Lo que una persona ve = **funciones de su rubro ∩ funciones de su plan ∩ per
 - Lo que el rol no permite **no se ve** (y la base de datos igual lo bloquea).
 - **Modo desarrollo** (sin Solvex Hub configurado): todo habilitado y marcado como "desarrollo" en *Mi plan*.
 
-## Siempre incluido (todos los rubros, todos los planes)
-Facturar/boletear por voz, clientes, cobros, reportes, caja, fiados, avisos de Yape/Plin, inventario, cotizaciones,
-libro de Excel (importador) y "Les toca volver". El **Copiloto** (y su voz premium) es de Pro y Empresa.
+## Regla única (v3.1)
+Mismos 3 planes y precios para todos los rubros. Lo que cada plan **desbloquea** cambia según el rubro:
 
-## Matriz
+- **Básico**: lo esencial del rubro. Siempre: facturar/boletear por voz, clientes, cobros, cotizaciones, reportes, caja y avisos de Yape/Plin.
+- **Pro**: Básico + **UN módulo estrella** del rubro (el que más tiempo ahorra) + **Copiloto** (responde y propone con tus datos reales, con voz).
+- **Empresa**: **todo** + **Copiloto agente** ("Tareas del Copiloto": le encargas algo, lo prepara y tú lo apruebas) + equipo grande, antifraude, conciliación, API, sucursales.
 
-| Rubro | Básico (núcleo) | Pro (paquete principal del rubro) | Empresa (todo) |
+| Rubro | Básico (esenciales del rubro) | Pro: módulo estrella | Empresa |
 |---|---|---|---|
-| Bodega | Venta rápida, fiados, caja, inventario, **reposición inteligente**, avisos Yape/Plin | + tienda en línea, puntos, precios y promociones, cuaderno→factura, Copiloto | + equipo hasta 20, PIN/alertas del dueño, conciliación bancaria, API, sucursales |
-| Restaurante | Carta QR y comandas, **cuentas y costo por plato**, caja, inventario | + reservas (agenda), encuestas, puntos, tienda, Copiloto | + equipo, antifraude, conciliación, API |
-| Servicios técnicos | Trabajos, agenda, mensualidades, **corte por mora** | + portal del cliente, cuaderno, Copiloto, comisiones | + equipo de técnicos (hasta 20), antifraude, conciliación, API |
-| Salón | Agenda, caja, **paquetes y no-shows**, recordatorios | + comisiones, puntos, encuestas, tienda, Copiloto | + equipo, antifraude |
-| Consultorio | Agenda, **historial privado**, paquetes | + recurrentes, portal, encuestas, Copiloto | + equipo, antifraude, conciliación |
-| Taller | Órdenes (trabajos), cotizaciones, inventario, **buscar por placa**, recordatorios | + agenda, portal, Copiloto | + equipo, antifraude, conciliación, API |
-| Mayorista | Pedidos, inventario, listas de precios, **crédito con límite** | + tienda, recurrentes, comisiones, multimoneda, Copiloto | + **API y webhooks**, conciliación, antifraude, sucursales |
-| Academia | Mensualidades, horarios (agenda), **pensiones pendientes**, paquetes | + portal de apoderados, encuestas, Copiloto | + equipo, conciliación |
-| Construcción | Obras (trabajos), cotizaciones, **margen por obra** | + agenda, recurrentes, Copiloto | + conciliación, antifraude, equipo |
+| Bodega | stock, fiados | **Puntos y descuentos a caseros** (fidelización) | todo + agente |
+| Restaurante | carta QR, stock | **Reservas y agenda** | todo + agente |
+| Servicios técnicos | trabajos, agenda, mensualidades | **Portal del cliente** | todo + agente |
+| Salón | agenda | **Comisiones del personal** | todo + agente |
+| Consultorio | agenda | **Controles y seguimientos** (recurrentes) | todo + agente |
+| Taller | órdenes (trabajos), stock | **Agenda de citas** | todo + agente |
+| Mayorista | stock, listas de precios | **Tienda en línea de pedidos** | todo + agente |
+| Academia | pensiones (recurrentes), horarios | **Portal de apoderados** | todo + agente |
+| Construcción | obras (trabajos) | **Agenda de visitas y avances** | todo + agente |
+
+La tabla está en la base (`private.plan_matrix`) y en la app (`planMatrix`, `rubros.dart`); una prueba exige que sean idénticas.
+
+## Copiloto: Pro vs Empresa
+| | Pro | Empresa |
+|---|---|---|
+| Responde con TUS datos (ventas, deudas, stock, impuestos) | Sí | Sí |
+| Voz natural, factura/cotiza/gasto/fiado por voz | Sí | Sí |
+| Se adelanta ("Lo que yo haría hoy", riesgos, comparación con el mes pasado) | No | **Sí** |
+| **Tareas del Copiloto**: cobranza, lista de reposición, recordatorios, resumen semanal; tú apruebas | No | **Sí** |
+
+Seguridad del agente: lista cerrada de acciones; cifras y mensajes salen de la base (el modelo solo elige qué hacer);
+**nada se ejecuta sin tu aprobación**; lo único que escribe son recordatorios; no envía mensajes, no cobra, no emite a SUNAT
+y no borra. Cada tarea queda en la bitácora (`agente.proposed/approved/done/rejected`).
+
+## Complementos (add-ons) y Solvex Hub
+Las marcas de `facturavoz-planes.json` son la **unión** de lo que cada plan da a algún rubro. Una función que el Hub active
+en UNA licencia y que no sea parte del plan estándar se respeta como complemento (ej.: "tienda" para una bodega en Básico).
+Pro de un salón con `tienda: true` NO la desbloquea (tienda ya es del Pro de mayoristas, no es un complemento).
+Cambios en el Hub: vuelve a cargar `facturavoz-planes.json` (agrega `copiloto_agente`).
 
 Límites por plan (en la base): usuarios (`max_users` 1 / 5 / 20), sucursales (1 / 1 / 5), voz premium por día
 (300 / 2 000 / 6 000 caracteres), consultas DNI/RUC por día (60 / 200 / 600 por empresa; 40 por persona).
-
-## Complementos (add-ons) por licencia
-El Hub puede encender cualquier función suelta en la licencia de una empresa (`features.<clave> = true`), sin cambiar de
-plan: p. ej. "tienda" para una bodega en Básico. La app y la base leen la misma licencia.
-
-## Qué cambiar en Solvex Hub
-Nada obligatorio: las claves de funciones no cambiaron. El núcleo por rubro se resuelve en FacturaVoz.

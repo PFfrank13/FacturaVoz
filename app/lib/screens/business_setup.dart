@@ -91,7 +91,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
                   margin: const EdgeInsets.only(right: 6),
                   width: i == _page ? 26 : 8,
                   height: 8,
-                  decoration: BoxDecoration(color: i <= _page ? t.colorScheme.primary : t.colorScheme.outline, borderRadius: BorderRadius.circular(99)),
+                  decoration: BoxDecoration(color: i <= _page ? t.colorScheme.primary : t.colorScheme.outline, borderRadius: BorderRadius.circular(Radii.pill)),
                 ),
               const Spacer(),
               TextButton(onPressed: _saving ? null : () => _finish(skipped: !widget.reopened), child: Text(widget.reopened ? 'Cerrar' : 'Saltar')),
@@ -166,7 +166,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
           final cols = c.maxWidth > 560 ? 3 : 2;
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.92),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(190)),
             itemCount: rubros.length,
             itemBuilder: (context, i) {
               final b = templateFor(rubros[i].id);

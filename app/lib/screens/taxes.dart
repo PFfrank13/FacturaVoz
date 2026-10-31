@@ -101,7 +101,7 @@ class _TaxesScreenState extends State<TaxesScreen> {
                 Reveal(
                   child: Container(
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(28)),
+                    decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('Este mes te queda (estimado)', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
                       CountUp(value: real.net, builder: (_, v) => Text(money(v, _cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800))),

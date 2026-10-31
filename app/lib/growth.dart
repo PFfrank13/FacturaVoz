@@ -69,6 +69,21 @@ List<double> dailySeries(Iterable<InvoiceRecord> invoices, {required String curr
   return [for (final v in out) round2(v)];
 }
 
+/// Igual que [dailySeries] pero con las filas que ya calculó el servidor (sales_series): no depende de cuántos
+/// comprobantes se bajaron al teléfono. [rows]: {bucket: 'yyyy-MM-dd', total: número}.
+List<double> fillDailySeries(Iterable<Map<String, dynamic>> rows, {required String today, int days = 14}) {
+  final out = List<double>.filled(days, 0);
+  final start = addDays(today, -(days - 1));
+  for (final r in rows) {
+    final b = '${r['bucket'] ?? ''}';
+    if (b.length < 10) continue;
+    final k = daysBetween(start, b.substring(0, 10));
+    if (k < 0 || k >= days) continue;
+    out[k] += ((r['total'] as num?) ?? 0).toDouble();
+  }
+  return [for (final v in out) round2(v)];
+}
+
 // ───────────────────────── Clientes 360 ─────────────────────────
 
 enum Segment { vip, loyal, atRisk, lost, newcomer, occasional }

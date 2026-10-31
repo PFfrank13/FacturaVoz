@@ -45,7 +45,7 @@
   con página de estado pública.
 
 ## 6. Actualizaciones de la app
-1. Sube `version:` en `app/pubspec.yaml` (ahora `3.0.0+5`) y compila con `--dart-define=APP_VERSION=3.0.0`.
+1. Sube `version:` en `app/pubspec.yaml` (ahora `3.1.0+6`) y compila con `--dart-define=APP_VERSION=3.1.0`.
 2. Primero **migraciones SQL** (en orden), luego **backend** (git push → Vercel), luego **app** (tiendas).
 3. La app soporta un servidor más nuevo (y al revés, un servidor viejo: el Copiloto vuelve al modo sin tiempo real).
 4. Pruebas internas en Play Console (pista interna) antes de producción.
@@ -59,3 +59,15 @@
 - [ ] Emitir el primer comprobante real con monto pequeño y verificarlo en "Consulta de validez del CPE" de SUNAT.
 - [ ] Boletas: hoy se envían una por una; para volumen alto implementar Resumen Diario (Hoja de ruta).
 - [ ] Comprobantes **importados** de otro sistema: la app NO los reenvía a SUNAT (bloqueado en el servidor).
+
+## 8. Cambiar el rubro de un cliente (solo la plataforma)
+Desde v3.1 el cliente elige su rubro una sola vez y queda fijo (la app y la base de datos lo impiden).
+Para cambiarlo sin perder ningún dato (clientes, ventas, productos, trabajos), en Supabase → SQL Editor:
+
+```sql
+select private.admin_set_rubro('<id de la empresa>', 'restaurante');
+```
+Rubros: bodega, restaurante, servicios_tecnicos, salon, consultorio, taller, mayorista, educacion, construccion.
+Limpia solo las personalizaciones de pantalla del rubro anterior (módulos, pasos de trabajo, campos extra); para
+conservarlas, usa un tercer parámetro `false`. Queda registrado en la bitácora (`rubro.cambiado_plataforma`).
+Migración: `20261117_v31_rubro_bloqueado.sql`.

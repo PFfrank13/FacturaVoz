@@ -83,6 +83,16 @@ class _FiadosScreenState extends State<FiadosScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _new,
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Anotar fiado'),
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54), textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(onChanged: (v) => setState(() => _q = v), decoration: const InputDecoration(hintText: 'Buscar cliente', prefixIcon: Icon(Icons.search_rounded), isDense: true)),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -340,24 +350,40 @@ class _FiadoFormState extends State<_FiadoForm> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
-      child: ListView(shrinkWrap: true, children: [
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'cargo', label: Text('Se llevó fiado'), icon: Icon(Icons.add_shopping_cart_rounded)),
-            ButtonSegment(value: 'abono', label: Text('Me pagó'), icon: Icon(Icons.payments_rounded)),
-          ],
-          selected: {_kind},
-          onSelectionChanged: (s) => setState(() => _kind = s.first),
-        ),
-        const SizedBox(height: 14),
+  int _step = 0; // solo para "Se llevó fiado": 0 cliente · 1 monto y qué se llevó · 2 fecha de pago
+
+  bool get _stepped => _kind == 'cargo';
+
+  void _next() {
+    if (_step == 0) {
+      if (_clientId == null && _clientName.trim().isEmpty) {
+        setState(() {
+          _shake++;
+          _msg = 'Elige o escribe el cliente.';
+        });
+        return;
+      }
+    } else if (_step == 1) {
+      if ((parseDecimal(_amount.text) ?? 0) <= 0) {
+        setState(() {
+          _shake++;
+          _msg = 'Escribe el monto.';
+        });
+        return;
+      }
+    }
+    setState(() {
+      _msg = '';
+      _step++;
+    });
+  }
+
+  Widget _clientStep(ThemeData t) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('¿Quién se lo llevó?', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 10),
         if (widget.clientId != null)
           ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.person_rounded), title: Text(_clientName))
-        else
+        else ...[
           Autocomplete<ClientProfile>(
             initialValue: TextEditingValue(text: _clientName),
             optionsBuilder: (v) => v.text.trim().isEmpty ? const Iterable<ClientProfile>.empty() : _clients.where((c) => c.name.toLowerCase().contains(v.text.toLowerCase())).take(8),
@@ -373,40 +399,167 @@ class _FiadoFormState extends State<_FiadoForm> {
                 _clientName = v;
                 _clientId = null;
               },
-              decoration: const InputDecoration(labelText: 'Cliente (si es nuevo, escribe su nombre)', prefixIcon: Icon(Icons.person_search_rounded)),
+              decoration: const InputDecoration(labelText: 'Nombre (si es nuevo, escríbelo)', prefixIcon: Icon(Icons.person_search_rounded)),
             ),
           ),
+          if (_clients.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text('Toca uno de tus clientes', style: t.textTheme.bodySmall),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              for (final c in _clients.take(8))
+                ActionChip(
+                  label: Text(c.name.length > 20 ? '${c.name.substring(0, 20)}…' : c.name),
+                  onPressed: () => setState(() {
+                    _clientId = c.id;
+                    _clientName = c.name;
+                    _step = 1;
+                    _msg = '';
+                  }),
+                ),
+            ]),
+          ],
+        ],
+      ]);
+
+  Widget _amountStep(ThemeData t) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${_clientName.isEmpty ? 'Cliente' : _clientName}: ¿cuánto y qué se llevó?', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 10),
         Shake(
           trigger: _shake,
           child: TextField(
             controller: _amount,
-            autofocus: widget.clientId != null,
+            autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(fontFamily: 'Inter', fontSize: 24, fontWeight: FontWeight.w800),
             decoration: InputDecoration(labelText: 'Monto', prefixText: '${currencySymbols[_cur] ?? _cur} '),
           ),
         ),
         const SizedBox(height: 10),
-        TextField(controller: _desc, decoration: InputDecoration(labelText: _kind == 'cargo' ? '¿Qué se llevó? (opcional)' : 'Nota (opcional)')),
+        TextField(controller: _desc, decoration: const InputDecoration(labelText: '¿Qué se llevó? (opcional)')),
+      ]);
+
+  Widget _dueStep(ThemeData t) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('¿Cuándo te paga?', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 10),
-        if (_kind == 'abono')
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          for (final (label, days) in const [('Sin fecha', 0), ('En 7 días', 7), ('En 15 días', 15), ('Fin de mes', -1)])
+            ChoiceChip(
+              label: Text(label),
+              selected: (days == 0 && _due == null) || (days != 0 && _due == _dueFor(days)),
+              onSelected: (_) => setState(() => _due = days == 0 ? null : _dueFor(days)),
+            ),
+        ]),
+        const SizedBox(height: 12),
+        SoftCard(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            const Icon(Icons.receipt_long_rounded),
+            const SizedBox(width: 10),
+            Expanded(child: Text('$_clientName · ${money(parseDecimal(_amount.text) ?? 0, _cur)}${_desc.text.trim().isEmpty ? '' : '\n${_desc.text.trim()}'}')),
+          ]),
+        ),
+      ]);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    if (_stepped && widget.clientId != null && _step == 0) _step = 1;
+    final last = _step >= 2;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
+      child: ListView(shrinkWrap: true, children: [
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'cargo', label: Text('Se llevó fiado'), icon: Icon(Icons.add_shopping_cart_rounded)),
+            ButtonSegment(value: 'abono', label: Text('Me pagó'), icon: Icon(Icons.payments_rounded)),
+          ],
+          selected: {_kind},
+          onSelectionChanged: (s) => setState(() {
+            _kind = s.first;
+            _msg = '';
+          }),
+        ),
+        const SizedBox(height: 14),
+        if (_stepped) ...[
+          Row(children: [
+            for (var i = 0; i < 3; i++)
+              Expanded(
+                child: Container(
+                  height: 5,
+                  margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
+                  decoration: BoxDecoration(color: i <= _step ? t.colorScheme.primary : t.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(4)),
+                ),
+              ),
+          ]),
+          const SizedBox(height: 14),
+          AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: KeyedSubtree(key: ValueKey(_step), child: switch (_step) { 0 => _clientStep(t), 1 => _amountStep(t), _ => _dueStep(t) })),
+        ] else ...[
+          if (widget.clientId != null)
+            ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.person_rounded), title: Text(_clientName))
+          else
+            Autocomplete<ClientProfile>(
+              initialValue: TextEditingValue(text: _clientName),
+              optionsBuilder: (v) => v.text.trim().isEmpty ? const Iterable<ClientProfile>.empty() : _clients.where((c) => c.name.toLowerCase().contains(v.text.toLowerCase())).take(8),
+              displayStringForOption: (c) => c.name,
+              onSelected: (c) => setState(() {
+                _clientId = c.id;
+                _clientName = c.name;
+              }),
+              fieldViewBuilder: (ctx, ctrl, focus, submit) => TextField(
+                controller: ctrl,
+                focusNode: focus,
+                onChanged: (v) {
+                  _clientName = v;
+                  _clientId = null;
+                },
+                decoration: const InputDecoration(labelText: 'Cliente', prefixIcon: Icon(Icons.person_search_rounded)),
+              ),
+            ),
+          const SizedBox(height: 10),
+          Shake(
+            trigger: _shake,
+            child: TextField(
+              controller: _amount,
+              autofocus: widget.clientId != null,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontFamily: 'Inter', fontSize: 24, fontWeight: FontWeight.w800),
+              decoration: InputDecoration(labelText: 'Monto', prefixText: '${currencySymbols[_cur] ?? _cur} '),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(controller: _desc, decoration: const InputDecoration(labelText: 'Nota (opcional)')),
+          const SizedBox(height: 10),
           Wrap(spacing: 8, children: [
             for (final m in const ['efectivo', 'yape', 'plin', 'transferencia'])
               ChoiceChip(label: Text(paymentMethods[m] ?? m), selected: _method == m, onSelected: (_) => setState(() => _method = m)),
-          ])
-        else
-          Wrap(spacing: 8, children: [
-            for (final (label, days) in const [('Sin fecha', 0), ('En 7 días', 7), ('En 15 días', 15), ('Fin de mes', -1)])
-              ChoiceChip(
-                label: Text(label),
-                selected: (days == 0 && _due == null) || (days != 0 && _due == _dueFor(days)),
-                onSelected: (_) => setState(() => _due = days == 0 ? null : _dueFor(days)),
-              ),
           ]),
+        ],
         if (_msg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_msg, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad))),
         const SizedBox(height: 16),
-        GradientButton(label: _kind == 'abono' ? 'Registrar abono' : 'Anotar fiado', icon: Icons.check_rounded, busy: _busy, onPressed: _busy ? null : _save),
+        if (_stepped && !last)
+          Row(children: [
+            if (_step > 0 && !(widget.clientId != null && _step == 1))
+              TextButton(
+                onPressed: () => setState(() {
+                  _step--;
+                  _msg = '';
+                }),
+                child: const Text('Atrás'),
+              ),
+            const Spacer(),
+            FilledButton.icon(onPressed: _next, icon: const Icon(Icons.arrow_forward_rounded), label: const Text('Siguiente')),
+          ])
+        else
+          Row(children: [
+            if (_stepped)
+              TextButton(
+                onPressed: () => setState(() => _step--),
+                child: const Text('Atrás'),
+              ),
+            if (_stepped) const SizedBox(width: 8),
+            Expanded(child: GradientButton(label: _kind == 'abono' ? 'Registrar abono' : 'Anotar fiado', icon: Icons.check_rounded, busy: _busy, onPressed: _busy ? null : _save)),
+          ]),
       ]),
     );
   }

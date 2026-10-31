@@ -18,12 +18,14 @@ import '../app_state.dart';
 import '../logic/search_score.dart';
 import '../models.dart';
 import '../models_v2.dart';
+import '../rubros.dart';
 import '../services/repo.dart';
 import '../services/v2_api.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'agent.dart';
 import 'api_access.dart';
 import 'bank_recon.dart';
 import 'branding.dart';
@@ -106,13 +108,22 @@ class FeatureEntry {
   bool get allowed => roleOk && planOk;
 
   /// ¿El rol lo permite (y la plataforma)? Si no, no se muestra.
-  bool get roleOk => (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
+  bool get roleOk => rubroShows(rubroFor(Access.instance.rubro), id) && (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
 
   /// ¿El plan lo incluye (con el núcleo del rubro)? Si no, se muestra con candado: "Disponible en el plan X".
   bool get planOk => feature == null || Access.instance.has(feature!);
 }
 
 const groupOrder = ['Vender', 'Clientes y trabajos', 'Cobrar y pagar', 'Mi negocio', 'Control del dueño', 'Ajustes'];
+
+/// Color propio por función (no por grupo): estable, siempre el mismo para la misma función. Paleta: Brand.fnPalette.
+Color featureColor(String id) {
+  var h = 0;
+  for (final u in id.codeUnits) {
+    h = (h * 31 + u) & 0x7fffffff;
+  }
+  return Brand.fnPalette[h % Brand.fnPalette.length];
+}
 
 const groupColors = <String, Color>{
   'Vender': Color(0xFFFF7E9A),
@@ -130,6 +141,7 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'comprobantes', title: 'Comprobantes', subtitle: 'Todas tus boletas y facturas, con búsqueda y filtros', icon: Icons.receipt_long_rounded, group: 'Vender', keywords: const ['boletas', 'facturas', 'lista', 'historial', 'anular', 'sunat'], builder: (_) => const HomeScreen()),
       FeatureEntry(id: 'pos', title: 'Venta rápida (caja)', subtitle: 'Toca productos o escanea su código de barras', icon: Icons.point_of_sale_rounded, group: 'Vender', module: 'pos', feature: 'facturar', perm: 'sell', keywords: const ['caja', 'pos', 'codigo de barras', 'carrito'], builder: (_) => const PosScreen()),
       FeatureEntry(id: 'cotizaciones', title: 'Cotizaciones y pedidos', subtitle: 'Cotiza, comparte y convierte en factura', icon: Icons.request_quote_rounded, group: 'Vender', module: 'cotizaciones', feature: 'cotizaciones', perm: 'sell', keywords: const ['presupuesto', 'proforma', 'pedido web'], builder: (_) => const QuotesScreen()),
+      FeatureEntry(id: 'agente', title: 'Tareas del Copiloto', subtitle: 'Encárgale una tarea: la prepara y tú la apruebas', icon: Icons.smart_toy_rounded, group: 'Control del dueño', feature: 'copiloto_agente', perm: 'settings', keywords: const ['copiloto', 'agente', 'tarea', 'delegar', 'cobrar', 'automatico'], builder: (_) => const AgentScreen()),
       FeatureEntry(id: 'cuaderno', title: 'Del cuaderno a la factura', subtitle: 'Foto de tu cuaderno, nota o WhatsApp → venta', icon: Icons.menu_book_rounded, group: 'Vender', module: 'cuaderno_ia', feature: 'cuaderno_ia', perm: 'sell', keywords: const ['foto', 'nota', 'ia', 'cuaderno'], builder: (_) => const NotebookScreen()),
       FeatureEntry(id: 'recurrentes', title: 'Facturación recurrente', subtitle: 'Mensualidades que se facturan solas', icon: Icons.event_repeat_rounded, group: 'Vender', module: 'recurrentes', feature: 'recurrentes', perm: 'finance', keywords: const ['mensual', 'alquiler', 'suscripcion'], builder: (_) => const RecurringScreen()),
       FeatureEntry(id: 'productos', title: 'Productos e inventario', subtitle: 'Precios, stock, código de barras y fotos', icon: Icons.inventory_2_rounded, group: 'Vender', module: 'stock', keywords: const ['stock', 'catalogo', 'precio', 'inventario'], builder: (_) => const ProductsScreen()),
@@ -304,7 +316,7 @@ class FeatureStrip extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final f = list[i];
-          final c = groupColors[f.group] ?? Brand.indigo;
+          final c = featureColor(f.id);
           return Pressable(
             onTap: () => openFeature(context, f),
             child: Container(

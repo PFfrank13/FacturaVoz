@@ -414,7 +414,7 @@ class _CommissionsScreenState extends State<CommissionsScreen> {
                                     LinearProgressIndicator(
                                       value: r.goal != null && r.goal! > 0 ? (r.total / r.goal!).clamp(0, 1).toDouble() : (r.total / best).clamp(0, 1).toDouble(),
                                       minHeight: 8,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(Radii.sm),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(

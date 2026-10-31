@@ -5,6 +5,24 @@ import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Sistema de diseño de FacturaVoz.
 /// Índigo "tinta" como color de marca, oro "sol" solo para la acción de dictar y el dato clave.
+/// Radios de esquina (usar estos en pantallas nuevas en vez de números sueltos).
+class Radii {
+  static const sm = 8.0; // chips, barras de progreso
+  static const md = 14.0; // iconos en cuadro, campos
+  static const lg = 18.0; // tarjetas pequeñas
+  static const xl = 28.0; // tarjetas grandes y hojas inferiores
+  static const pill = 99.0; // píldoras y botones redondos
+}
+
+/// Espacios (múltiplos de 4). Pantallas nuevas: márgenes laterales de 16, separación entre bloques de 12 o 16.
+class Gap {
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+}
+
 class Brand {
   // Violeta-lavanda sereno (confianza y calma) + coral durazno cálido (invita a actuar).
   static const indigo = Color(0xFF6A62E2);
@@ -40,6 +58,12 @@ class Brand {
     end: Alignment.bottomRight,
     colors: [Color(0xFFFFA77F), Color(0xFFFF7E9A)],
   );
+
+  /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
+  static const fnPalette = <Color>[
+    Color(0xFF4F46E5), Color(0xFF0284C7), Color(0xFF059669), Color(0xFFD97706), Color(0xFFDC2626), Color(0xFFDB2777),
+    Color(0xFF7C3AED), Color(0xFF0D9488), Color(0xFFEA580C), Color(0xFF65A30D), Color(0xFF0891B2), Color(0xFFC026D3),
+  ]; // tonos 600: el texto/icono blanco encima se lee bien
 
   /// Sombra suave y difusa (nunca dura): da sensación de flotar.
   static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => [

@@ -8,6 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
 import '../models.dart';
+import '../finance.dart' show addDays;
+import '../growth.dart' show fillDailySeries;
 import '../models_v2.dart';
 import 'repo.dart';
 
@@ -296,6 +298,17 @@ class V2Repo {
     try {
       final r = await _db.rpc('sales_summary', params: {'p_org': org, 'p_from': from, 'p_to': toExclusive, 'p_currency': currency});
       return r is Map ? Map<String, dynamic>.from(r) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Ventas de los últimos [days] días (último = hoy), calculadas en el servidor con la regla única de ventas.
+  static Future<List<double>?> salesDaily(String today, String currency, {int days = 14}) async {
+    try {
+      final from = addDays(today, -(days - 1));
+      final r = await _db.rpc('sales_series', params: {'p_org': org, 'p_from': from, 'p_to': addDays(today, 1), 'p_currency': currency, 'p_bucket': 'day'});
+      return fillDailySeries(_rows(r), today: today, days: days);
     } catch (_) {
       return null;
     }

@@ -42,10 +42,8 @@ class _RubroPickerScreenState extends State<RubroPickerScreen> {
       Navigator.of(context).pop();
       return;
     }
-    if (!widget.gate) {
-      final ok = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => _Preview(spec: rubroFor(id)!));
-      if (ok != true) return;
-    }
+    final ok = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => _Preview(spec: rubroFor(id)!));
+    if (ok != true) return;
     setState(() {
       _saving = true;
       _error = '';
@@ -93,8 +91,8 @@ class _RubroPickerScreenState extends State<RubroPickerScreen> {
             : ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
                 Text(
                   widget.gate
-                      ? 'Ahora cada rubro tiene su propia app: su barra, sus palabras, sus pantallas y su función estrella. Elige el tuyo (lo puedes cambiar después en Ajustes). Tus datos no se tocan.'
-                      : 'Al cambiar de rubro cambian la barra de abajo, las palabras y los accesos. Tus clientes, ventas y trabajos no se borran.',
+                      ? 'Ahora cada rubro tiene su propia app: su barra, sus palabras, sus pantallas y su función estrella. Elige el tuyo con cuidado: queda fijo para tu negocio (si algún día necesitas cambiarlo, nosotros lo hacemos sin perder tus datos).'
+                      : 'Elige el rubro de tu negocio. Cambian la barra de abajo, las palabras y los accesos. Queda fijo después.',
                   style: t.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
@@ -170,12 +168,12 @@ class _Preview extends StatelessWidget {
         Text('Palabras', style: t.textTheme.labelLarge),
         Text('${spec.word('clients')} · ${spec.word('jobs')} · ${spec.word('products')}'),
         const SizedBox(height: 10),
-        const Text('Tus datos no se borran. Lo que no es de este rubro queda en Menú → Otras funciones.'),
+        const Text('Atención: el rubro queda fijo después de confirmar. Solo nosotros podemos cambiarlo luego, sin perder tus datos.'),
         const SizedBox(height: 16),
         Row(children: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Volver')),
           const Spacer(),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cambiar ahora')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirmar rubro')),
         ]),
       ]),
     );

@@ -125,7 +125,7 @@ class Repo {
   }
 
   static const _invoiceSelect =
-      'id, number, issue_date, status, currency, tax_rate, notes, clients(name, tax_id, doc_type, email), fiscal_documents(status, series, correlative, doc_type), invoice_items(description, quantity, unit_price, position)';
+      'id, number, issue_date, created_at, status, currency, tax_rate, notes, clients(name, tax_id, doc_type, email), fiscal_documents(status, series, correlative, doc_type), invoice_items(description, quantity, unit_price, position)';
 
   // Con cobros (migración 20261030); si aún no existe, se usa la versión anterior.
   static const _invoiceSelectPay = '$_invoiceSelect, due_date, payments(amount)';
