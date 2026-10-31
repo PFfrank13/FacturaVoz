@@ -36,7 +36,6 @@ class _MenuScreenState extends State<MenuScreen> {
     final all = featureCatalog().where((f) => f.roleOk).toList();
     final byId = {for (final f in all) f.id: f};
     final areas = spec?.areas ?? [for (final g in groupOrder) RubroArea(g, [for (final f in all) if (f.group == g) f.id])];
-    final shown = <String>{for (final a in areas) ...a.features};
     final q = _q.trim();
     final hits = q.isEmpty
         ? const <FeatureEntry>[]

@@ -513,7 +513,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           ],
         ),
       );
-      if (go != true) return;
+      if (go != true || !mounted) return;
     }
     final risk = _risk();
     if (risk.level == RiskLevel.high) {

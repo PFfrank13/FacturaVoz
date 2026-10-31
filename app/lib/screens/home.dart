@@ -583,6 +583,7 @@ class _ErrorBox extends StatelessWidget {
 
 class HomeHeader extends StatelessWidget {
   const HomeHeader({
+    super.key,
     required this.name,
     required this.currency,
     required this.total,
@@ -774,7 +775,7 @@ class HomeHeader extends StatelessWidget {
 }
 
 class HomeHeaderPill extends StatelessWidget {
-  const HomeHeaderPill(this.text);
+  const HomeHeaderPill(this.text, {super.key});
   final String text;
 
   @override
@@ -786,7 +787,7 @@ class HomeHeaderPill extends StatelessWidget {
 }
 
 class InvoiceRow extends StatelessWidget {
-  const InvoiceRow({required this.inv, required this.onTap});
+  const InvoiceRow({super.key, required this.inv, required this.onTap});
   final InvoiceRecord inv;
   final VoidCallback onTap;
 
