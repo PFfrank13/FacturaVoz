@@ -136,7 +136,11 @@ class _ProfileGateState extends State<ProfileGate> {
   @override
   void initState() {
     super.initState();
-    AppState.instance.load();
+    // load() notifica a los ListenableBuilder; hacerlo dentro de initState (en plena construcción) lanza
+    // "setState() called during build". Se espera al primer cuadro; mientras tanto se muestra la pantalla de carga.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) AppState.instance.load();
+    });
   }
 
   @override
