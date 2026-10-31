@@ -17,7 +17,7 @@ void main() {
   test('whenText', () {
     expect(whenText(DateTime(2026, 10, 30, 18), now: now), 'hoy');
     expect(whenText(DateTime(2026, 10, 31, 9), now: now), 'mañana');
-    expect(whenText(DateTime(2026, 11, 3, 9), now: now), 'el lunes 3/11');
+    expect(whenText(DateTime(2026, 11, 3, 9), now: now), 'el martes 3/11');
   });
 
   test('mensaje', () {
