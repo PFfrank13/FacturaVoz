@@ -17,6 +17,7 @@ import '../logic/regulars.dart';
 import '../models.dart';
 import '../models_pro.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/location.dart';
 import '../services/pro_repo.dart';
 import '../services/v2_api.dart';
@@ -74,6 +75,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _c = LiveCache.get<ClientProfile>('client.${widget.clientId}');
     _load();
   }
 
@@ -84,6 +86,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         if (mounted) setState(() => _error = 'Este cliente ya no existe (quizá está en la papelera).');
         return;
       }
+      LiveCache.put('client.${widget.clientId}', c);
       if (mounted) setState(() => _c = c);
       final a = Access.instance;
       final results = await Future.wait<Object?>([

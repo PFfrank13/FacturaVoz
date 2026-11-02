@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
+import '../services/live.dart';
 import '../ui/widgets.dart';
 
 /// Clientes de la empresa activa: buscar y corregir nombre, documento, correo y dirección.
@@ -14,7 +15,7 @@ class ClientsScreen extends StatefulWidget {
   State<ClientsScreen> createState() => _ClientsScreenState();
 }
 
-class _ClientsScreenState extends State<ClientsScreen> {
+class _ClientsScreenState extends State<ClientsScreen> with LiveReload<ClientsScreen> {
   List<ClientCard>? _all;
   String? _error;
   String _q = '';
@@ -22,15 +23,30 @@ class _ClientsScreenState extends State<ClientsScreen> {
   static final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
 
   @override
+  List<String> get liveTables => const ['clients'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _all = LiveCache.get<List<ClientCard>>('clients.all');
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _error = null);
     try {
       final r = await Repo.listClients();
+      LiveCache.put('clients.all', r);
       if (mounted) setState(() => _all = r);
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));

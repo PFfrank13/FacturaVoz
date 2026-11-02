@@ -11,6 +11,7 @@ import '../finance.dart';
 import '../growth.dart';
 import '../models.dart';
 import '../models_pro.dart';
+import '../services/live.dart';
 import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
@@ -77,6 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchFocus.addListener(() {
       if (mounted) setState(() {});
     });
+    _items = LiveCache.get<List<InvoiceRecord>>('home.inv'); // lo último que viste, al instante
+    _more = (_items?.length ?? 0) >= _limit;
     _load();
     _subscribe();
   }
@@ -151,6 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSummary();
     try {
       final r = await Repo.listInvoices(limit: _limit);
+      if (_limit == 100) LiveCache.put('home.inv', r);
       if (mounted) {
         setState(() {
           _items = r;
@@ -629,51 +633,36 @@ class HomeHeader extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(24, top + 12, 24, 26),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Reveal(
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_greeting(), style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 13.5)),
-                  const SizedBox(height: 2),
-                  Text(
-                    name.isEmpty ? 'FacturaVoz' : name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
-                  ),
-                ]),
-              ),
-              Pressable(
-                onTap: () => openCopilot(context),
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 19),
-                    SizedBox(width: 6),
-                    Text('Copiloto', style: TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              // Fila 1: saludo (todo el ancho que sobra) + buscar + perfil. Nunca se aprieta el saludo.
+              Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_greeting(), maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 13.5)),
+                    const SizedBox(height: 2),
+                    Text(
+                      name.isEmpty ? 'FacturaVoz' : name,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
+                    ),
                   ]),
                 ),
-              ),
-              if (onMenu != null) ...[
-                const SizedBox(width: 8),
-                Pressable(
-                  onTap: onMenu,
-                  child: Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.menu_rounded, color: Colors.white, size: 19),
-                      SizedBox(width: 5),
-                      Text('Menú', style: TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
-                    ]),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 8),
-              const SearchButton(onDark: true),
-              const SizedBox(width: 8),
-              const AvatarButton(onDark: true),
+                const SizedBox(width: Gap.md),
+                const SearchButton(onDark: true),
+                const SizedBox(width: Gap.sm),
+                const AvatarButton(onDark: true),
+              ]),
+              const SizedBox(height: Gap.md),
+              // Fila 2: accesos grandes, mismo ancho, con el texto centrado.
+              Row(children: [
+                Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
+                if (onMenu != null) ...[
+                  const SizedBox(width: Gap.sm),
+                  Expanded(child: _HeaderAction(icon: Icons.menu_rounded, label: 'Menú', onTap: onMenu!)),
+                ],
+              ]),
             ]),
           ),
           const SizedBox(height: 22),
@@ -772,6 +761,29 @@ class HomeHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Botón del encabezado (Copiloto / Menú): ocupa su mitad del ancho y centra ícono + texto.
+class _HeaderAction extends StatelessWidget {
+  const _HeaderAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+        onTap: onTap,
+        child: Container(
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Radii.pill)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, color: Colors.white, size: 19),
+            const SizedBox(width: 6),
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5))),
+          ]),
+        ),
+      );
 }
 
 class HomeHeaderPill extends StatelessWidget {

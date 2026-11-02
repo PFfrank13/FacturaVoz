@@ -450,6 +450,28 @@ String? minPlanFor(String feature, Map<String, Map<String, dynamic>> plans, {Str
   return null;
 }
 
+/// Precio mensual en soles, IGV incluido. Copia de docs/facturavoz-planes.json (PROPUESTOS): el que cobra de verdad es Solvex Hub,
+/// así que si cambias un precio allá, cámbialo también aquí (una prueba compara con el JSON).
+const planPrices = <String, double>{'BASICO': 29, 'PRO': 59, 'EMPRESA': 119};
+
+String planPriceText(String code) {
+  final p = planPrices[code];
+  if (p == null) return '';
+  return 'S/ ${p == p.roundToDouble() ? p.toStringAsFixed(0) : p.toStringAsFixed(2)} al mes';
+}
+
+/// Herramientas que trae [plan] para [rubro] y que el plan anterior no tenía (Básico: todas las suyas).
+List<String> planNewTools(String? rubro, String plan) {
+  final cur = planMatrix(rubro, plan);
+  if (cur == null) return const [];
+  final i = planCodes.indexOf(plan);
+  final prev = i > 0 ? planMatrix(rubro, planCodes[i - 1]) ?? const <String>{} : const <String>{};
+  return [
+    for (final k in allFeatureKeys)
+      if (cur.contains(k) && !prev.contains(k)) k,
+  ];
+}
+
 String planName(String code) => switch (code) { 'BASICO' => 'Básico', 'PRO' => 'Pro', 'EMPRESA' => 'Empresa', _ => code };
 
 /// Funciones por plan (copia de docs/facturavoz-planes.json; el Hub manda, esto es solo para los textos de "mejora tu plan").

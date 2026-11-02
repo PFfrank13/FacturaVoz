@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -43,20 +44,35 @@ class TrashScreen extends StatefulWidget {
   State<TrashScreen> createState() => _TrashScreenState();
 }
 
-class _TrashScreenState extends State<TrashScreen> {
+class _TrashScreenState extends State<TrashScreen> with LiveReload<TrashScreen> {
   List<TrashItem>? _items;
   String? _error;
   final Set<String> _busy = {};
 
   @override
+  List<String> get liveTables => const ['trash'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _items = LiveCache.get<List<TrashItem>>('trash.all');
+    startLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final r = await V2Repo.trash();
+      LiveCache.put('trash.all', r);
       if (mounted) {
         setState(() {
           _items = r;

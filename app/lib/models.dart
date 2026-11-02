@@ -445,6 +445,9 @@ class Org {
   final String taxId;
   final String role; // owner | admin | member
 
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'tax_id': taxId, 'role': role};
+  factory Org.fromJson(Map<String, dynamic> j) => Org(id: j['id'] as String, name: (j['name'] ?? '') as String, taxId: (j['tax_id'] ?? '') as String, role: (j['role'] ?? 'member') as String);
+
   bool get isAdmin => role == 'owner' || role == 'admin';
   String get roleLabel => switch (role) {
         'owner' => 'Propietario',

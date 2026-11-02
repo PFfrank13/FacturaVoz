@@ -6,6 +6,7 @@ import '../app_state.dart';
 import '../logic/pricing.dart';
 import '../models.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -23,16 +24,32 @@ class PromosScreen extends StatefulWidget {
   State<PromosScreen> createState() => _PromosScreenState();
 }
 
-class _PromosScreenState extends State<PromosScreen> {
+class _PromosScreenState extends State<PromosScreen> with LiveReload<PromosScreen> {
   List<Promo>? _promos;
   List<Coupon> _coupons = const [];
   List<Product> _products = const [];
   String? _error;
 
   @override
+  List<String> get liveTables => const ['promotions', 'coupons', 'products'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _promos = LiveCache.get<List<Promo>>('promos.p');
+    _coupons = LiveCache.get<List<Coupon>>('promos.c') ?? const [];
+    _products = LiveCache.get<List<Product>>('promos.prods') ?? const [];
+    startLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -40,6 +57,9 @@ class _PromosScreenState extends State<PromosScreen> {
       final p = await V2Repo.promotions();
       final c = await V2Repo.coupons();
       final prods = await Repo.listProducts(activeOnly: true).catchError((_) => <Product>[]);
+      LiveCache.put('promos.p', p);
+      LiveCache.put('promos.c', c);
+      LiveCache.put('promos.prods', prods);
       if (mounted) {
         setState(() {
           _promos = p;
@@ -288,15 +308,28 @@ class LoyaltyScreen extends StatefulWidget {
   State<LoyaltyScreen> createState() => _LoyaltyScreenState();
 }
 
-class _LoyaltyScreenState extends State<LoyaltyScreen> {
+class _LoyaltyScreenState extends State<LoyaltyScreen> with LiveReload<LoyaltyScreen> {
   List<LoyaltyBalance>? _list;
   OrgSettings? _s;
   String? _error;
 
   @override
+  List<String> get liveTables => const ['loyalty_ledger', 'org_settings', 'clients'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    startLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {

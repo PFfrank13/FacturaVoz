@@ -15,7 +15,9 @@ import '../logic/appointments.dart';
 import '../models.dart';
 import '../models_v2.dart';
 import '../services/location.dart';
+import '../services/print/kitchen_print.dart';
 import '../services/repo.dart';
+import '../services/live.dart';
 import '../services/v2_repo.dart';
 import '../ui/mini_map.dart';
 import '../ui/motion.dart';
@@ -41,7 +43,7 @@ class JobsScreen extends StatefulWidget {
   State<JobsScreen> createState() => _JobsScreenState();
 }
 
-class _JobsScreenState extends State<JobsScreen> {
+class _JobsScreenState extends State<JobsScreen> with LiveReload<JobsScreen> {
   List<Job>? _jobs;
   OrgSettings? _s;
   String? _error;
@@ -50,15 +52,32 @@ class _JobsScreenState extends State<JobsScreen> {
   bool _showDone = false;
 
   @override
+  List<String> get liveTables => const ['jobs'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _jobs = LiveCache.get<List<Job>>('jobs.open');
+    _s = LiveCache.get<OrgSettings>('jobs.settings');
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final s = await V2Repo.settings();
       final jobs = await V2Repo.jobs(openOnly: !_showDone);
+      if (!_showDone) LiveCache.put('jobs.open', jobs);
+      LiveCache.put('jobs.settings', s);
       if (mounted) {
         setState(() {
           _s = s;
@@ -284,28 +303,38 @@ class AgendaScreen extends StatefulWidget {
   State<AgendaScreen> createState() => _AgendaScreenState();
 }
 
-class _AgendaScreenState extends State<AgendaScreen> {
+class _AgendaScreenState extends State<AgendaScreen> with LiveReload<AgendaScreen> {
   DateTime _day = DateUtils.dateOnly(DateTime.now());
   List<Job>? _jobs;
   String? _error;
   final _strip = ScrollController();
 
   @override
+  List<String> get liveTables => const ['jobs'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
     _load();
+    startLive(); // tiempo real
   }
 
   @override
   void dispose() {
+    stopLive();
     _strip.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() => _jobs = null);
+    final key = 'agenda.${todayIso(_day)}';
+    setState(() => _jobs = LiveCache.get<List<Job>>(key)); // el día ya visto aparece al instante
     try {
       final r = await V2Repo.jobs(from: _day, to: _day.add(const Duration(days: 1)));
+      LiveCache.put(key, r);
       if (mounted) {
         setState(() {
           _jobs = r;
@@ -743,6 +772,38 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
+  /// Imprime el documento de ESTE rubro (orden de trabajo, orden de servicio, orden de obra, cita…). No es comprobante de pago.
+  Future<void> _printDoc(Job j) async {
+    final p = AppState.instance.profile;
+    final spec = jobDocSpec(_s?.businessType);
+    final cur = p?.currency.isNotEmpty == true ? p!.currency : 'PEN';
+    final doc = DocData(
+      title: spec.title,
+      number: 'N° ${(j.id ?? '').replaceAll('-', '').toUpperCase().padRight(6, '0').substring(0, 6)}',
+      date: nowText(),
+      issuer: p == null ? '' : (p.tradeName.trim().isNotEmpty ? p.tradeName : p.businessName),
+      signature: spec.signature,
+      footer: spec.footer,
+      rows: [
+        ('Cliente', j.clientName),
+        ('Teléfono', j.clientPhone.isNotEmpty ? j.clientPhone : j.contactPhone),
+        ('Detalle', j.title),
+        ('Fecha y hora', j.scheduledAt == null ? '' : shortDateTime(j.scheduledAt!)),
+        ('Duración', j.durationMin == null ? '' : '${j.durationMin} min'),
+        ('Dirección', j.address),
+        ('Notas', j.notes),
+        ('Estado', _s?.statusOf(j.status).label ?? j.status),
+        ('Monto estimado', (j.amount ?? 0) <= 0 ? '' : money(j.amount!, cur)),
+      ],
+    );
+    try {
+      await printDoc(doc);
+      if (mounted) showSuccess(context, '${spec.title[0]}${spec.title.substring(1).toLowerCase()} lista', icon: Icons.print_rounded);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is StateError ? e.message : 'No se pudo imprimir. ${friendly(e)}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -754,6 +815,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       appBar: AppBar(
         title: Text(s?.jobWord ?? 'Trabajo'),
         actions: [
+          if (j != null && jobDocSpec(s?.businessType).title != 'ORDEN')
+            IconButton(tooltip: 'Imprimir ${jobDocSpec(s?.businessType).title.toLowerCase()}', onPressed: () => _printDoc(j), icon: const Icon(Icons.print_rounded)),
           if (j != null && a.can('all_jobs'))
             IconButton(
               tooltip: 'Editar',

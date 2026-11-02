@@ -4,10 +4,8 @@
 //  - Lista de comprobantes: el que acabas de crear aparece arriba al instante.
 //  - "Clientes de hoy": quién compró, a qué hora y qué se llevó (solo datos reales).
 // Las cifras vienen del servidor con una sola regla (con IGV, sin anuladas, menos notas de crédito).
-import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
 import '../app_state.dart';
@@ -17,6 +15,7 @@ import '../models.dart';
 import '../models_v2.dart';
 import '../rubros.dart';
 import '../services/growth_repo.dart';
+import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -36,7 +35,7 @@ class InicioScreen extends StatefulWidget {
   State<InicioScreen> createState() => _InicioScreenState();
 }
 
-class _InicioScreenState extends State<InicioScreen> {
+class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScreen> {
   Map<String, dynamic>? _today;
   Map<String, dynamic>? _month;
   List<InvoiceRecord>? _items;
@@ -47,25 +46,33 @@ class _InicioScreenState extends State<InicioScreen> {
   bool _tried = false;
   double? _goal;
   List<DailyAlert> _alerts = const [];
-  RealtimeChannel? _chan;
-  Timer? _debounce;
   String? _org;
+
+  @override
+  List<String> get liveTables => const ['invoices', 'payments'];
+
+  @override
+  Future<void> reloadLive() => _load();
 
   @override
   void initState() {
     super.initState();
     _org = Repo.activeOrgId;
+    // Lo último que se vio de esta empresa aparece YA; los datos nuevos llegan detrás y se actualizan solos.
+    _today = LiveCache.get<Map<String, dynamic>>('inicio.today');
+    _month = LiveCache.get<Map<String, dynamic>>('inicio.month');
+    _items = LiveCache.get<List<InvoiceRecord>>('inicio.items');
+    _goal = LiveCache.get<double>('inicio.goal');
+    _alerts = LiveCache.get<List<DailyAlert>>('inicio.alerts') ?? const [];
+    _tried = _month != null || _items != null;
     _load();
-    _subscribe();
-    AppState.instance.dataVersion.addListener(_now);
+    startLive(); // tiempo real: venta o cobro nuevo = se actualiza sin tocar nada
     AppState.instance.addListener(_onApp);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _chan?.unsubscribe();
-    AppState.instance.dataVersion.removeListener(_now);
+    stopLive();
     AppState.instance.removeListener(_onApp);
     super.dispose();
   }
@@ -77,41 +84,16 @@ class _InicioScreenState extends State<InicioScreen> {
       _today = null;
       _month = null;
       _items = null;
+      _goal = null;
+      _alerts = const [];
       _tried = false;
     });
     _load();
-    _subscribe();
   }
 
-  void _subscribe() {
-    _chan?.unsubscribe();
-    final org = Repo.activeOrgId;
-    if (org == null) return;
-    try {
-      PostgresChangeFilter f() => PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'org_id', value: org);
-      _chan = Supabase.instance.client
-          .channel('inicio-$org')
-          .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'invoices', filter: f(), callback: (_) => _live())
-          .onPostgresChanges(event: PostgresChangeEvent.insert, schema: 'public', table: 'payments', filter: f(), callback: (_) => _live())
-          .subscribe();
-    } catch (_) {}
-  }
-
-  // Una venta nueva se ve al instante (sin esperar).
-  void _now() {
-    _debounce?.cancel();
-    if (mounted) _load();
-  }
-
-  // Varias ventas seguidas = una sola recarga (A3: debounce).
-  void _live() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) _load();
-    });
-  }
-
+  /// Cada pieza se muestra apenas llega (no espera a la más lenta) y se guarda para la próxima vez.
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final now = DateTime.now();
     final today = todayIso(now);
@@ -119,30 +101,41 @@ class _InicioScreenState extends State<InicioScreen> {
     final first = todayIso(DateTime(now.year, now.month, 1));
     final next = todayIso(DateTime(now.year, now.month + 1, 1));
     final seeMoney = Access.instance.can('finance') || Access.instance.can('collect');
+    bool same() => mounted && org == Repo.activeOrgId;
+
+    Future<void> piece<V>(Future<V> f, String key, void Function(V v) apply) async {
+      try {
+        final v = await f;
+        if (!same()) return;
+        LiveCache.put(key, v);
+        setState(() {
+          apply(v);
+          _tried = true;
+        });
+      } catch (_) {}
+    }
+
     // Todo en paralelo y agregado en la base: dos números, no miles de filas.
-    final results = await Future.wait<Object?>([
-      seeMoney ? V2Repo.salesSummary(today, tomorrow, cur) : Future.value(null),
-      seeMoney ? V2Repo.salesSummary(first, next, cur) : Future.value(null),
-      GrowthRepo.monthlyGoal().catchError((Object _) => null),
-      V2Repo.dailyAlerts().catchError((Object _) => const <DailyAlert>[]),
-      Repo.listInvoices(limit: _limit).then<List<InvoiceRecord>?>((v) => v).catchError((Object e) {
-        if (mounted) setState(() => _error = friendly(e));
-        return null;
-      }),
+    await Future.wait<void>([
+      if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(today, tomorrow, cur), 'inicio.today', (v) => _today = v),
+      if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(first, next, cur), 'inicio.month', (v) => _month = v),
+      piece<double?>(GrowthRepo.monthlyGoal().catchError((Object _) => null), 'inicio.goal', (v) => _goal = v),
+      piece<List<DailyAlert>>(V2Repo.dailyAlerts().catchError((Object _) => const <DailyAlert>[]), 'inicio.alerts', (v) => _alerts = v),
+      () async {
+        try {
+          final inv = await Repo.listInvoices(limit: _limit);
+          if (!same()) return;
+          LiveCache.put('inicio.items', inv);
+          setState(() {
+            _items = inv;
+            _error = null;
+            _tried = true;
+          });
+        } catch (e) {
+          if (same()) setState(() => _error = friendly(e));
+        }
+      }(),
     ]);
-    if (!mounted) return;
-    setState(() {
-      _today = results[0] as Map<String, dynamic>?;
-      _month = results[1] as Map<String, dynamic>?;
-      _goal = results[2] as double?;
-      _alerts = (results[3] as List<DailyAlert>?) ?? const [];
-      final inv = results[4] as List<InvoiceRecord>?;
-      if (inv != null) {
-        _items = inv;
-        _error = null;
-      }
-      _tried = true;
-    });
   }
 
   List<InvoiceRecord> _visible() {

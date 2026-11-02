@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../access.dart';
 import '../app_state.dart';
+import '../rubros.dart';
 import '../services/v2_api.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -278,7 +279,23 @@ class _PlanScreenState extends State<PlanScreen> {
                   for (final k in included) TagChip(featureName(k), color: Brand.ok, icon: Icons.check_rounded),
                 ]),
               ),
-              if (missing.isNotEmpty) ...[
+              if (rubroFor(a.rubro) != null) ...[
+                const SizedBox(height: 18),
+                SectionTitle('Planes para ${rubroFor(a.rubro)!.name}'),
+                Text('Cada rubro tiene sus propias herramientas en cada plan. Precios en soles, IGV incluido.', style: t.textTheme.bodySmall),
+                const SizedBox(height: 10),
+                for (final code in planCodes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _RubroPlanCard(
+                      code: code,
+                      rubroName: rubroFor(a.rubro)!.name,
+                      tools: planNewTools(a.rubro, code),
+                      current: !l.dev && l.plan == code,
+                      included: !l.dev && planCodes.indexOf(code) <= planCodes.indexOf(l.plan),
+                    ),
+                  ),
+              ] else if (missing.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 const SectionTitle('Disponible en planes superiores'),
                 SoftCard(
@@ -292,6 +309,46 @@ class _PlanScreenState extends State<PlanScreen> {
             ]),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Un plan del rubro elegido: nombre, precio y las herramientas que trae (las nuevas respecto al plan anterior).
+class _RubroPlanCard extends StatelessWidget {
+  const _RubroPlanCard({required this.code, required this.rubroName, required this.tools, required this.current, required this.included});
+  final String code;
+  final String rubroName;
+  final List<String> tools;
+  final bool current;
+  final bool included;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final intro = switch (code) {
+      'BASICO' => 'Lo esencial para tu negocio',
+      'PRO' => 'Todo lo de Básico, más:',
+      _ => 'Todo lo de Pro, más:',
+    };
+    final color = included ? Brand.ok : t.colorScheme.onSurfaceVariant;
+    return Container(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(Radii.xl), border: Border.all(color: current ? Brand.indigo : Colors.transparent, width: 2)),
+      child: SoftCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(planName(code), style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+            if (current) const TagChip('Tu plan', color: Brand.indigo, icon: Icons.check_circle_rounded),
+          ]),
+          const SizedBox(height: 2),
+          Text(planPriceText(code), style: t.textTheme.titleMedium?.copyWith(color: Brand.indigo, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(intro, style: t.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final k in tools) TagChip(featureName(k), color: color, icon: included ? Icons.check_rounded : Icons.lock_outline_rounded),
+          ]),
+        ]),
       ),
     );
   }

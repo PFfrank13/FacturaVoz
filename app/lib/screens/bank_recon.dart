@@ -12,6 +12,7 @@ import '../import_logic.dart' show decodeImportBytes, detectDelimiter, parseCsv;
 import '../logic/bank_match.dart';
 import '../models.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
@@ -44,6 +45,8 @@ class _BankReconScreenState extends State<BankReconScreen> {
   @override
   void initState() {
     super.initState();
+    _lines = LiveCache.get<List<BankLineRow>>('bank.lines');
+    _open = LiveCache.get<List<InvoiceRecord>>('bank.open') ?? const [];
     _load();
   }
 
@@ -51,6 +54,8 @@ class _BankReconScreenState extends State<BankReconScreen> {
     try {
       final l = await V2Repo.bankLines();
       final o = await ProRepo.listReceivables().catchError((_) => <InvoiceRecord>[]);
+      LiveCache.put('bank.lines', l);
+      LiveCache.put('bank.open', o);
       if (mounted) {
         setState(() {
           _lines = l;

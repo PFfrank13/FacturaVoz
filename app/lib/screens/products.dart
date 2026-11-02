@@ -7,6 +7,7 @@ import '../growth.dart';
 import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import 'package:image_picker/image_picker.dart';
@@ -102,21 +103,36 @@ class ProductsScreen extends StatefulWidget {
   State<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> {
+class _ProductsScreenState extends State<ProductsScreen> with LiveReload<ProductsScreen> {
   List<Product>? _all;
   String? _error;
   String _q = '';
 
   @override
+  List<String> get liveTables => const ['products'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _all = LiveCache.get<List<Product>>('products.all');
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _error = null);
     try {
       final r = await Repo.listProducts();
+      LiveCache.put('products.all', r);
       if (mounted) setState(() => _all = r);
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));

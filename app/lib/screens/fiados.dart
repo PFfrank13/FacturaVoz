@@ -8,6 +8,7 @@ import '../errors.dart';
 import '../models.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
+import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -23,21 +24,36 @@ class FiadosScreen extends StatefulWidget {
   State<FiadosScreen> createState() => _FiadosScreenState();
 }
 
-class _FiadosScreenState extends State<FiadosScreen> {
+class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScreen> {
   List<CreditBalance>? _list;
   String? _error;
   String _q = '';
   bool _all = false;
 
   @override
+  List<String> get liveTables => const ['credit_ledger', 'clients'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _list = LiveCache.get<List<CreditBalance>>('fiados.list');
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final r = await V2Repo.creditBalances();
+      LiveCache.put('fiados.list', r);
       if (mounted) {
         setState(() {
           _list = r;

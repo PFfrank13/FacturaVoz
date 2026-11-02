@@ -240,7 +240,13 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
         _row(Icons.linear_scale_rounded, 'Pasos de tus ${s.jobsWord.toLowerCase()}', s.statuses.map((x) => x.label).join(' → '), () => go(const JobFlowScreen())),
       _row(Icons.animation_rounded, 'Animaciones', rm == null ? 'Automático' : (rm ? 'Reducidas' : 'Completas'), _animations),
       if (a.can('team')) _row(Icons.groups_rounded, 'Equipo y permisos', 'Invita y elige qué ve cada uno', () => go(const TeamScreen())),
-      _row(Icons.workspace_premium_rounded, 'Mi plan', a.license.dev ? 'Modo desarrollo (sin cobros)' : 'Plan ${a.license.plan}', () => go(const PlanScreen())),
+      _row(Icons.workspace_premium_rounded, 'Mi plan', a.license.dev
+              ? 'Modo desarrollo (sin cobros)'
+              : [
+                  'Plan ${planName(a.license.plan)}',
+                  if (planPriceText(a.license.plan).isNotEmpty) planPriceText(a.license.plan),
+                  if (rubroFor(a.rubro) != null) rubroFor(a.rubro)!.name,
+                ].join(' · '), () => go(const PlanScreen())),
       if (admin) _row(Icons.palette_rounded, 'Logo y comprobantes', 'Logo, diseño del PDF y ancho del ticket', () => go(const BrandingScreen())),
       _row(Icons.print_rounded, 'Impresora de tickets', 'Bluetooth o red · 58 u 80 mm', () => go(const PrinterSettingsScreen())),
       if (a.can('team') && a.has('antifraude')) _row(Icons.shield_rounded, 'Dueño a distancia', 'PIN, alertas y bitácora', () => go(const AlertsScreen())),

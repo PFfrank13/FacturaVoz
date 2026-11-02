@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../access.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -18,21 +19,38 @@ class SurveysScreen extends StatefulWidget {
   State<SurveysScreen> createState() => _SurveysScreenState();
 }
 
-class _SurveysScreenState extends State<SurveysScreen> {
+class _SurveysScreenState extends State<SurveysScreen> with LiveReload<SurveysScreen> {
   List<SurveyRow>? _rows;
   OrgSettings? _s;
   String? _error;
 
   @override
+  List<String> get liveTables => const ['surveys', 'org_settings'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _rows = LiveCache.get<List<SurveyRow>>('surveys.rows');
+    _s = LiveCache.get<OrgSettings>('surveys.s');
+    startLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final r = await V2Repo.surveys();
       final s = await V2Repo.settings(refresh: true);
+      LiveCache.put('surveys.rows', r);
+      LiveCache.put('surveys.s', s);
       if (mounted) {
         setState(() {
           _rows = r;

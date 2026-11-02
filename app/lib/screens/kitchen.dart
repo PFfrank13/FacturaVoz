@@ -7,8 +7,11 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../access.dart';
 import '../app_state.dart';
+import '../errors.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/growth_repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -16,6 +19,8 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'client_profile.dart' show shortDateTime;
 import '../logic/tables.dart';
+import '../services/print/kitchen_print.dart';
+import 'pos.dart';
 import 'quotes.dart';
 
 const _flow = ['nuevo', 'preparando', 'listo', 'entregado'];
@@ -40,6 +45,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
   @override
   void initState() {
     super.initState();
+    _orders = LiveCache.get<List<KitchenOrder>>('kitchen.orders');
+    _known = _orders?.where((o) => o.status == 'nuevo').length ?? 0;
     _load();
     try {
       _sub = V2Repo.watchQuotes().listen((_) => _soon(), onError: (_) {});
@@ -61,6 +68,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
   Future<void> _load() async {
     try {
       final r = await V2Repo.kitchen();
+      LiveCache.put('kitchen.orders', r);
       if (!mounted) return;
       final nuevos = r.where((o) => o.status == 'nuevo').length;
       if (_orders != null && nuevos > _known) Haptics.heavy(); // pedido nuevo: vibra
@@ -166,8 +174,33 @@ class _KitchenScreenState extends State<KitchenScreen> {
                           ? Padding(padding: const EdgeInsets.all(8), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: cols))
                           : ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: cols);
                     }),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 92),
+        child: FloatingActionButton.extended(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PosScreen(tableMode: true))),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Tomar pedido'),
+        ),
+      ),
       bottomNavigationBar: _orders == null ? null : Padding(padding: const EdgeInsets.all(10), child: Text('En vivo · toca un pedido para pasarlo al siguiente paso', textAlign: TextAlign.center, style: t.textTheme.bodySmall)),
     );
+  }
+
+  /// Imprime la comanda de un pedido que llegó (carta QR) para pegarla o pasarla a la cocina.
+  Future<void> _printOrder(KitchenOrder o) async {
+    try {
+      await printComanda(ComandaData(
+        table: o.table,
+        waiter: Access.instance.displayName,
+        order: o.number,
+        date: o.createdAt == null ? nowText() : nowText(o.createdAt),
+        note: o.notes,
+        lines: [for (final it in o.items) ComandaLine(it.quantity, it.description)],
+      ));
+      if (mounted) showSuccess(context, 'Comanda impresa', icon: Icons.print_rounded);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is StateError ? e.message : 'No se pudo imprimir. ${friendly(e)}')));
+    }
   }
 
   Widget _tablesView(BuildContext context, List<KitchenOrder> orders) {
@@ -250,6 +283,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                             ),
                           ),
                           if (o.createdAt != null) Text(shortDateTime(o.createdAt!).split(' ').last, style: t.textTheme.labelSmall),
+                          IconButton(tooltip: 'Imprimir comanda', visualDensity: VisualDensity.compact, onPressed: () => _printOrder(o), icon: const Icon(Icons.print_rounded, size: 20)),
                         ]),
                         if (o.client.isNotEmpty) Text(o.client, style: t.textTheme.bodySmall),
                         const Divider(),

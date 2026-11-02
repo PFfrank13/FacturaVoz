@@ -9,6 +9,7 @@ import '../app_state.dart';
 import '../logic/taxes.dart';
 import '../models.dart';
 import '../models_pro.dart';
+import '../services/live.dart';
 import '../services/pro_repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -23,7 +24,7 @@ class TaxesScreen extends StatefulWidget {
   State<TaxesScreen> createState() => _TaxesScreenState();
 }
 
-class _TaxesScreenState extends State<TaxesScreen> {
+class _TaxesScreenState extends State<TaxesScreen> with LiveReload<TaxesScreen> {
   String? _regime;
   double _base = 0, _tax = 0, _expBase = 0, _expTax = 0, _yearBase = 0;
   bool _loading = true;
@@ -32,13 +33,36 @@ class _TaxesScreenState extends State<TaxesScreen> {
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
 
   @override
+  List<String> get liveTables => const ['invoices', 'expenses', 'org_settings'];
+
+  @override
+  Future<void> reloadLive() => _load(quiet: true);
+
+  @override
   void initState() {
     super.initState();
+    final c = LiveCache.get<Map<String, Object?>>('taxes.v');
+    if (c != null) {
+      _regime = c['regime'] as String?;
+      _base = c['base'] as double;
+      _tax = c['tax'] as double;
+      _expBase = c['expBase'] as double;
+      _expTax = c['expTax'] as double;
+      _yearBase = c['yearBase'] as double;
+      _loading = false;
+    }
+    startLive();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
+  }
+
+  Future<void> _load({bool quiet = false}) async {
+    if (!quiet && LiveCache.get<Map<String, Object?>>('taxes.v') == null) setState(() => _loading = true);
     try {
       final now = DateTime.now();
       final from = todayIso(DateTime(now.year, now.month, 1));
@@ -63,6 +87,9 @@ class _TaxesScreenState extends State<TaxesScreen> {
         _loading = false;
         _error = month == null ? 'Ejecuta las migraciones v2.0 en Supabase para ver tus cifras reales.' : null;
       });
+      if (month != null) {
+        LiveCache.put('taxes.v', <String, Object?>{'regime': _regime, 'base': _base, 'tax': _tax, 'expBase': _expBase, 'expTax': _expTax, 'yearBase': _yearBase});
+      }
     } catch (e) {
       if (mounted) {
         setState(() {

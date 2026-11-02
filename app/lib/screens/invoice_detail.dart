@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
+import '../services/live.dart';
 import '../services/pdf_builder.dart';
 import 'emit_sunat.dart';
 import 'fiscal_setup.dart';
@@ -26,11 +27,14 @@ import '../services/v2_repo.dart';
 import 'owner_control.dart' show ensureOwnerPin;
 
 class InvoiceDetailScreen extends StatefulWidget {
-  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false});
+  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false, this.autoPrint = false});
   final String invoiceId;
 
   /// true al venir de crear la factura: envía una copia al correo de la cuenta.
   final bool sendCopy;
+
+  /// Venta rápida: imprime el ticket solo al abrir, si hay una impresora Bluetooth o de red configurada.
+  final bool autoPrint;
 
   @override
   State<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
@@ -43,11 +47,17 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   FiscalCompany? _company;
   String? _error;
   bool _copySent = false;
+  bool _autoPrinted = false;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
+    final k = 'invoice.${widget.invoiceId}';
+    _inv = LiveCache.get<InvoiceRecord>(k);
+    _fiscal = LiveCache.get<FiscalDoc>('$k.fiscal');
+    _note = LiveCache.get<FiscalDoc>('$k.note');
+    _company = LiveCache.get<FiscalCompany>('invoice.company');
     _load();
   }
 
@@ -57,6 +67,11 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       final f = await Repo.getFiscalDoc(widget.invoiceId);
       final c = await Repo.loadFiscalCompany();
       final n = f == null ? null : await Repo.getCreditNote(widget.invoiceId, f.legend);
+      final k = 'invoice.${widget.invoiceId}';
+      LiveCache.put(k, r);
+      LiveCache.put('$k.fiscal', f);
+      LiveCache.put('$k.note', n);
+      LiveCache.put('invoice.company', c);
       if (mounted) {
         setState(() {
           _inv = r;
@@ -64,6 +79,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           _note = n;
           _company = c;
         });
+        if (widget.autoPrint && !_autoPrinted) {
+          _autoPrinted = true;
+          _autoPrintTicket();
+        }
         if (widget.sendCopy && !_copySent) {
           _copySent = true;
           _sendOwnCopy();
@@ -72,6 +91,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));
     }
+  }
+
+  Future<void> _autoPrintTicket() async {
+    final cfg = await PrinterStore.load();
+    if (cfg.kind == 'pdf' || !mounted) return; // sin impresora configurada no se abre el diálogo de PDF en cada venta
+    await _printTicket();
   }
 
   void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));

@@ -6,6 +6,7 @@ import '../finance.dart';
 import '../models.dart';
 import '../models_pro.dart';
 import '../reports.dart' show monthNames, monthRange;
+import '../services/live.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
@@ -29,7 +30,7 @@ class ProfitScreen extends StatefulWidget {
   State<ProfitScreen> createState() => _ProfitScreenState();
 }
 
-class _ProfitScreenState extends State<ProfitScreen> {
+class _ProfitScreenState extends State<ProfitScreen> with LiveReload<ProfitScreen> {
   late int _year = DateTime.now().year;
   late int _month = DateTime.now().month;
   bool _loading = true;
@@ -45,29 +46,47 @@ class _ProfitScreenState extends State<ProfitScreen> {
   Map<String, ClientPayStats> _stats = const {};
   List<ProductVelocity> _stock = const [];
   String? _orgSeen;
-  final _debounce = Debouncer(500);
+
+  String get _cacheKey => 'profit.$_year-$_month';
+
+  /// Pone en pantalla lo último que se vio de este mes (si existe) y dice si lo había.
+  bool _applyCache() {
+    final c = LiveCache.get<Map<String, Object?>>(_cacheKey);
+    if (c == null) return false;
+    _invoices = c['invoices'] as List<InvoiceRecord>;
+    _server = c['server'] as Map<String, dynamic>?;
+    _expenses = c['expenses'] as List<Expense>;
+    _payments = c['payments'] as List<DatedPayment>;
+    _receivables = c['receivables'] as List<InvoiceRecord>;
+    _stats = c['stats'] as Map<String, ClientPayStats>;
+    _stock = c['stock'] as List<ProductVelocity>;
+    _missing = c['missing'] as bool;
+    _loading = false;
+    return true;
+  }
+
+  @override
+  List<String> get liveTables => const ['invoices', 'payments', 'expenses', 'clients', 'products'];
+
+  @override
+  Future<void> reloadLive() => _load(quiet: true);
 
   @override
   void initState() {
     super.initState();
     _orgSeen = Repo.activeOrgId;
     AppState.instance.addListener(_onApp);
-    AppState.instance.dataVersion.addListener(_reloadSoon);
+    startLive();
+    _applyCache();
     _load();
   }
 
   @override
   void dispose() {
+    stopLive();
     AppState.instance.removeListener(_onApp);
-    AppState.instance.dataVersion.removeListener(_reloadSoon);
-    _debounce.dispose();
     super.dispose();
   }
-
-  /// Agrupa varios cambios seguidos en una sola recarga.
-  void _reloadSoon() => _debounce(() {
-        if (mounted) _load();
-      });
 
   void _onApp() {
     if (_orgSeen != Repo.activeOrgId) {
@@ -80,12 +99,15 @@ class _ProfitScreenState extends State<ProfitScreen> {
   String get _monthKey => '$_year-${_month.toString().padLeft(2, '0')}';
   bool get _isCurrent => _year == DateTime.now().year && _month == DateTime.now().month;
 
-  Future<void> _load() async {
+  Future<void> _load({bool quiet = false}) async {
     final token = ++_token;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!quiet) {
+      final had = _applyCache(); // lo último de ese mes, al instante
+      setState(() {
+        _loading = !had;
+        _error = null;
+      });
+    }
     try {
       final first = monthRange(DateTime(_year, _month - 5, 1).year, DateTime(_year, _month - 5, 1).month).from;
       final r = monthRange(_year, _month);
@@ -111,6 +133,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
         if (!ProRepo.isMissingMigration(e)) rethrow;
         missing = true;
       }
+      LiveCache.put(_cacheKey, <String, Object?>{'invoices': invoices, 'server': server, 'expenses': expenses, 'payments': payments, 'receivables': receivables, 'stats': stats, 'stock': stock, 'missing': missing});
       if (!mounted || token != _token) return;
       setState(() {
         _invoices = invoices;
@@ -125,6 +148,7 @@ class _ProfitScreenState extends State<ProfitScreen> {
       });
     } catch (e) {
       if (!mounted || token != _token) return;
+      if (quiet && _invoices.isNotEmpty) return; // refresco en segundo plano: se conserva lo que ya se ve
       setState(() {
         _error = friendly(e);
         _loading = false;

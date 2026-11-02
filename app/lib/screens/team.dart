@@ -9,6 +9,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../models_v2.dart';
+import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -28,21 +29,38 @@ class TeamScreen extends StatefulWidget {
   State<TeamScreen> createState() => _TeamScreenState();
 }
 
-class _TeamScreenState extends State<TeamScreen> {
+class _TeamScreenState extends State<TeamScreen> with LiveReload<TeamScreen> {
   List<TeamMember>? _members;
   List<TeamInvite> _invites = const [];
   String? _error;
 
   @override
+  List<String> get liveTables => const ['organization_members', 'org_invites'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _members = LiveCache.get<List<TeamMember>>('team.m');
+    _invites = LiveCache.get<List<TeamInvite>>('team.i') ?? const [];
+    startLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final m = await V2Repo.team();
       final i = await V2Repo.invites().catchError((_) => <TeamInvite>[]);
+      LiveCache.put('team.m', m);
+      LiveCache.put('team.i', i);
       if (mounted) {
         setState(() {
           _members = m;

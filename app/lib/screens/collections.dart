@@ -9,6 +9,7 @@ import '../errors.dart';
 import '../finance.dart';
 import '../models.dart';
 import '../models_pro.dart';
+import '../services/live.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
@@ -46,6 +47,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     _orgSeen = Repo.activeOrgId;
     AppState.instance.addListener(_onApp);
     AppState.instance.dataVersion.addListener(_reload);
+    _items = LiveCache.get<List<InvoiceRecord>>('collections.items');
     _load();
     _subscribe();
   }
@@ -112,6 +114,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       } catch (e) {
         if (!ProRepo.isMissingMigration(e)) rethrow;
       }
+      LiveCache.put('collections.items', items);
       if (!mounted) return;
       setState(() {
         _items = items;

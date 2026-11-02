@@ -11,6 +11,7 @@ import '../models.dart';
 import '../finance.dart' show addDays;
 import '../growth.dart' show fillDailySeries;
 import '../models_v2.dart';
+import 'boot_cache.dart';
 import 'repo.dart';
 
 class V2Repo {
@@ -52,6 +53,7 @@ class V2Repo {
       final r = await _db.from('org_settings').select().eq('org_id', org).maybeSingle();
       _settingsCache = r == null ? OrgSettings() : OrgSettings.fromJson(Map<String, dynamic>.from(r));
       ready = true;
+      if (r != null && Repo.activeOrgId != null) BootCache.putSettings(Repo.activeOrgId!, Map<String, dynamic>.from(r));
     } catch (_) {
       _settingsCache = OrgSettings();
       ready = false;
@@ -75,6 +77,18 @@ class V2Repo {
   }
 
   static void forgetSettings() => _settingsCache = null;
+
+  /// Configuración ya cargada de la empresa activa (null si no hay): permite abrir sin esperar a la red.
+  static OrgSettings? get cachedSettings => _settingsCache != null && _settingsFor == Repo.activeOrgId ? _settingsCache : null;
+
+  /// Arranque instantáneo: deja lista la última configuración guardada.
+  static void seedSettings(String org, Map<String, dynamic> raw) {
+    try {
+      _settingsCache = OrgSettings.fromJson(raw);
+      _settingsFor = org;
+      ready = true;
+    } catch (_) {}
+  }
 
   // ═══════════ Clientes (ficha 360) ═══════════
   static Future<List<ClientProfile>> clients({String q = ''}) async {

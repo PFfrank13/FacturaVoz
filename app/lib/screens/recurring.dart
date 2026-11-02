@@ -7,6 +7,7 @@ import '../growth.dart';
 import '../models.dart';
 import '../models_growth.dart';
 import '../services/growth_repo.dart';
+import '../services/live.dart';
 import '../services/pro_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -20,15 +21,29 @@ class RecurringScreen extends StatefulWidget {
   State<RecurringScreen> createState() => _RecurringScreenState();
 }
 
-class _RecurringScreenState extends State<RecurringScreen> {
+class _RecurringScreenState extends State<RecurringScreen> with LiveReload<RecurringScreen> {
   List<RecurringTemplate>? _items;
   String? _error;
   bool _running = false;
 
   @override
+  List<String> get liveTables => const ['recurring_invoices', 'invoices'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _items = LiveCache.get<List<RecurringTemplate>>('recurring.list');
     _load(generate: true);
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   /// Al abrir, genera lo que toque hoy (por si pg_cron no está activo) y luego lista.
@@ -44,6 +59,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         } catch (_) {}
       }
       final r = await GrowthRepo.listRecurring();
+      LiveCache.put('recurring.list', r);
       if (mounted) {
         setState(() {
           _items = r;

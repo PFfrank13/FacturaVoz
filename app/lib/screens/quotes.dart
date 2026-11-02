@@ -6,6 +6,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../models_pro.dart';
+import '../services/live.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
@@ -45,6 +46,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
     super.initState();
     _orgSeen = Repo.activeOrgId;
     AppState.instance.addListener(_onApp);
+    _items = LiveCache.get<List<QuoteRecord>>('quotes.all');
     _load();
     _subscribe();
   }
@@ -103,6 +105,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
   Future<void> _load() async {
     try {
       final r = await ProRepo.listQuotes();
+      LiveCache.put('quotes.all', r);
       if (mounted) {
         setState(() {
           _items = r;

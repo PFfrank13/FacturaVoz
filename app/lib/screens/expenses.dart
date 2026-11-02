@@ -8,6 +8,7 @@ import '../models_pro.dart';
 import '../logic/scan_checks.dart';
 import '../reports.dart' show monthNames, monthRange;
 import '../services/pro_repo.dart';
+import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -200,26 +201,41 @@ class ExpensesScreen extends StatefulWidget {
   State<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
-class _ExpensesScreenState extends State<ExpensesScreen> {
+class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<ExpensesScreen> {
   late int _year = DateTime.now().year;
   late int _month = DateTime.now().month;
   List<Expense>? _items;
   String? _error;
 
   @override
+  List<String> get liveTables => const ['expenses'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
+    final key = 'expenses.$_year-$_month';
     setState(() {
-      _items = null;
+      _items = LiveCache.get<List<Expense>>(key); // lo último que se vio de ese mes, al instante
       _error = null;
     });
     try {
       final r = monthRange(_year, _month);
       final list = await ProRepo.listExpenses(r.from, r.toExclusive);
+      LiveCache.put(key, list);
       if (mounted) setState(() => _items = list);
     } catch (e) {
       if (mounted) setState(() => _error = ProRepo.isMissingMigration(e) ? 'Falta ejecutar la migración 20261101_negocio_pro.sql en Supabase.' : friendly(e));

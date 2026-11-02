@@ -14,6 +14,7 @@ import 'ui/motion.dart';
 import 'config.dart';
 import 'screens/lock_screen.dart';
 import 'services/app_lock.dart';
+import 'services/boot_cache.dart';
 import 'screens/shell.dart';
 import 'screens/login.dart';
 import 'screens/onboarding.dart';
@@ -43,11 +44,61 @@ Future<void> main() async {
     runApp(const _ConfigError());
     return;
   }
-  await Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey);
-  AppLock.instance.bind();
-  runApp(const FacturaVozApp());
+  // La primera pantalla (logo) se dibuja YA; Supabase se inicia detrás, sin dejar la pantalla en blanco.
+  runApp(const _Boot());
   // Mide los primeros cuadros: en teléfonos lentos reduce efectos solo (si el usuario no eligió otra cosa).
   PerfGuard.start();
+}
+
+/// Muestra el logo al instante y arranca Supabase en segundo plano; cuando está listo, entra la app.
+class _Boot extends StatefulWidget {
+  const _Boot();
+
+  @override
+  State<_Boot> createState() => _BootState();
+}
+
+class _BootState extends State<_Boot> {
+  bool _ready = false;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    try {
+      // El archivo cifrado se lee a la vez que Supabase arranca: no suma tiempo.
+      await Future.wait([Supabase.initialize(url: Config.supabaseUrl, publishableKey: Config.supabaseAnonKey), BootCache.preload()]);
+      AppLock.instance.bind();
+      if (mounted) setState(() => _ready = true);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const FacturaVozApp();
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
+      home: Scaffold(
+        body: Center(
+          child: _failed
+              ? const Padding(
+                  padding: EdgeInsets.all(28),
+                  child: Text('No se pudo iniciar la app.\nRevisa tu conexión y ábrela de nuevo.', textAlign: TextAlign.center),
+                )
+              : const _Splash(),
+        ),
+      ),
+    );
+  }
 }
 
 class FacturaVozApp extends StatelessWidget {
@@ -238,7 +289,7 @@ class V2Gate extends StatefulWidget {
 }
 
 class _V2GateState extends State<V2Gate> {
-  OrgSettings? _settings;
+  OrgSettings? _settings = V2Repo.cachedSettings; // si ya hay configuración guardada, no se espera a la red
   String? _for;
   bool _setupClosed = false;
 

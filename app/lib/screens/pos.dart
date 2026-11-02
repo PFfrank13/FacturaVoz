@@ -6,7 +6,11 @@ import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
+import '../logic/sample_catalog.dart';
 import '../models.dart';
+import '../services/live.dart';
+import '../services/print/kitchen_print.dart';
+import '../services/print/ticket_printer.dart' show TicketLine;
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
@@ -19,7 +23,11 @@ import 'new_invoice.dart';
 import 'team.dart' show dbMessage;
 
 class PosScreen extends StatefulWidget {
-  const PosScreen({super.key});
+  /// `embedded`: va dentro de la pestaña Vender (sin barra propia, deja espacio para el dock).
+  /// `tableMode`: restaurante: pide la mesa e imprime comanda y precuenta.
+  const PosScreen({super.key, this.embedded = false, this.tableMode = false});
+  final bool embedded;
+  final bool tableMode;
 
   @override
   State<PosScreen> createState() => _PosScreenState();
@@ -36,6 +44,10 @@ class _PosScreenState extends State<PosScreen> {
   String? _error;
   ({String code, String kind, double value})? _coupon;
   int _shake = 0;
+  final Map<String, String> _notes = {}; // nota por producto ("sin cebolla")
+  final _table = TextEditingController();
+  bool _charging = false;
+  bool _seeding = false;
 
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
   double get _rate => AppState.instance.profile?.taxRate ?? 18;
@@ -43,6 +55,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
+    _products = LiveCache.get<List<Product>>('pos.products') ?? _products;
     _load();
   }
 
@@ -50,12 +63,14 @@ class _PosScreenState extends State<PosScreen> {
   void dispose() {
     _q.dispose();
     _focus.dispose();
+    _table.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final p = await Repo.listProducts(activeOnly: true);
+      LiveCache.put('pos.products', p);
       final e = await V2Repo.productExtras();
       List<Promo> promos = const [];
       if (Access.instance.has('precios')) {
@@ -168,6 +183,209 @@ class _PosScreenState extends State<PosScreen> {
     return out;
   }
 
+
+  bool get _restaurant => widget.tableMode;
+
+  /// Productos de ejemplo del rubro (solo si el usuario lo pide). Precios referenciales, editables en Productos.
+  Future<void> _seedSample() async {
+    final rubro = Access.instance.rubro;
+    final items = sampleCatalog[rubro];
+    if (items == null || _seeding) return;
+    setState(() => _seeding = true);
+    try {
+      for (final it in items) {
+        final id = await Repo.saveProduct(name: it.name, unitPrice: it.price, unit: 'NIU');
+        await V2Repo.saveProductExtra(id, {'category': it.category}).catchError((_) {});
+      }
+      AppState.instance.bump();
+      await _load();
+      if (mounted) showSuccess(context, 'Productos de ejemplo cargados. Edita precios y sube tus fotos en Productos.', icon: Icons.inventory_2_rounded);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : dbMessage(e))));
+    } finally {
+      if (mounted) setState(() => _seeding = false);
+    }
+  }
+
+  List<ComandaLine> _comandaLines() => [
+        for (final e in _cart.entries)
+          if (_products?.where((x) => x.id == e.key).firstOrNull case final p?) ComandaLine(e.value, p.name, _notes[p.id] ?? ''),
+      ];
+
+  Future<void> _printComanda() async {
+    if (_cart.isEmpty) return;
+    try {
+      await printComanda(ComandaData(table: _table.text, waiter: Access.instance.displayName, date: nowText(), lines: _comandaLines()));
+      if (mounted) showSuccess(context, 'Comanda enviada a cocina', icon: Icons.restaurant_rounded);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is StateError ? e.message : 'No se pudo imprimir la comanda. ${friendly(e)}')));
+    }
+  }
+
+  Future<void> _printPrecuenta() async {
+    final p = AppState.instance.profile;
+    final lines = _lines();
+    if (p == null || lines.isEmpty) return;
+    final t = computeTotals(lines, _rate);
+    try {
+      await printPrecuenta(precuentaData(
+        profile: p,
+        table: _table.text,
+        waiter: Access.instance.displayName,
+        currency: _cur,
+        lines: [for (final l in lines) TicketLine(l.quantity, l.description, l.unitPrice, l.amount)],
+        totals: [('Subtotal', t.subtotal, false), (p.taxLabel.isEmpty ? 'IGV' : p.taxLabel, t.tax, false), ('TOTAL', t.total, true)],
+      ));
+      if (mounted) showSuccess(context, 'Precuenta impresa', icon: Icons.receipt_long_rounded);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is StateError ? e.message : 'No se pudo imprimir la precuenta. ${friendly(e)}')));
+    }
+  }
+
+  /// Detalle del pedido: cantidades, nota por producto y (restaurante) comanda y precuenta.
+  Future<void> _cartSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) {
+        final t = Theme.of(ctx);
+        final lines = _lines();
+        final totals = computeTotals(lines, _rate);
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(ctx).bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(_restaurant ? 'Pedido' : 'Venta', style: t.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                for (final e in _cart.entries)
+                  if (_products?.where((x) => x.id == e.key).firstOrNull case final p?)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Expanded(child: Text(p.name, style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700))),
+                          IconButton(tooltip: 'Quitar uno', onPressed: () { _add(p, -1); setS(() {}); if (_cart.isEmpty) Navigator.pop(ctx); }, icon: const Icon(Icons.remove_circle_outline_rounded)),
+                          Text(qtyText(e.value), style: t.textTheme.titleMedium),
+                          IconButton(tooltip: 'Agregar uno', onPressed: () { _add(p); setS(() {}); }, icon: const Icon(Icons.add_circle_outline_rounded)),
+                        ]),
+                        TextFormField(
+                          initialValue: _notes[p.id] ?? '',
+                          onChanged: (v) => _notes[p.id] = v,
+                          decoration: const InputDecoration(isDense: true, hintText: 'Nota (ej. sin cebolla, con arroz)', prefixIcon: Icon(Icons.edit_note_rounded)),
+                        ),
+                      ]),
+                    ),
+              ]),
+            ),
+            const Divider(),
+            Row(children: [const Expanded(child: Text('Total')), Money(money(totals.total, _cur), size: 20, weight: FontWeight.w800)]),
+            const SizedBox(height: 12),
+            if (_restaurant)
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(onPressed: _printComanda, icon: const Icon(Icons.restaurant_rounded), label: const Text('Comanda'))),
+                const SizedBox(width: 8),
+                Expanded(child: OutlinedButton.icon(onPressed: _printPrecuenta, icon: const Icon(Icons.receipt_long_rounded), label: const Text('Precuenta'))),
+              ]),
+            if (_restaurant) const SizedBox(height: 8),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _chargeSheet();
+              },
+              icon: const Icon(Icons.point_of_sale_rounded),
+              label: const Text('Cobrar'),
+            ),
+          ]),
+        );
+      }),
+    );
+  }
+
+  /// Cobro en un toque: elige cómo paga el cliente y listo (se registra la venta, el cobro y se imprime el ticket).
+  Future<void> _chargeSheet() async {
+    final lines = _lines();
+    if (lines.isEmpty) return;
+    final total = computeTotals(lines, _rate).total;
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final t = Theme.of(ctx);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Cobrar', style: t.textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Money(money(total, _cur), size: 30, weight: FontWeight.w800),
+            const SizedBox(height: 12),
+            Text('¿Cómo paga?', style: t.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final k in const ['efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'])
+                ActionChip(
+                  label: Text(paymentMethods[k]!),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _fastCharge(k);
+                  },
+                ),
+            ]),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _checkout();
+              },
+              icon: const Icon(Icons.tune_rounded),
+              label: const Text('Más opciones (cliente, factura, crédito)'),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+
+  Future<void> _fastCharge(String method) async {
+    if (_charging) return;
+    final lines = _lines();
+    if (lines.isEmpty) return;
+    setState(() => _charging = true);
+    try {
+      final table = _table.text.trim();
+      final draft = InvoiceDraft(
+        taxRate: _rate,
+        currency: _cur,
+        items: lines,
+        notes: [if (table.isNotEmpty) 'Mesa $table', if (_coupon != null) 'Cupón ${_coupon!.code}'].join(' · '),
+        transcript: 'Venta rápida',
+      );
+      final id = await Repo.createInvoice(draft);
+      final total = computeTotals(lines, _rate).total;
+      // La base solo acepta cobros sobre una nota "enviada" y la marca "pagada" sola al saldarse.
+      await Repo.setStatus(id, 'sent');
+      await Repo.addPayment(invoiceId: id, amount: total, method: method);
+      AppState.instance.bump();
+      if (!mounted) return;
+      setState(() {
+        _cart.clear();
+        _notes.clear();
+        _coupon = null;
+      });
+      // Se abre la venta con el ticket listo para imprimir (y desde ahí se emite la boleta o factura electrónica).
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
+      _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'No se pudo cobrar. ${friendly(e)}')));
+    } finally {
+      if (mounted) setState(() => _charging = false);
+    }
+  }
+
   Future<void> _checkout() async {
     final lines = _lines();
     if (lines.isEmpty) return;
@@ -201,16 +419,27 @@ class _PosScreenState extends State<PosScreen> {
     final lines = _lines();
     final totals = computeTotals(lines, _rate);
     final count = _cart.values.fold(0.0, (a, b) => a + b);
+    final actions = <Widget>[
+      IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
+      if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
+    ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Venta rápida'), actions: [
-        IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
-        if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
-      ]),
+      appBar: widget.embedded ? null : AppBar(title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'), actions: actions),
       body: _error != null
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : _products == null
               ? const SkeletonList()
               : Column(children: [
+                  if (widget.embedded)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 8, 8, 0),
+                      child: Row(children: [Expanded(child: Text(_restaurant ? 'Tomar pedido' : 'Vender', style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), ...actions]),
+                    ),
+                  if (_restaurant)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: TextField(controller: _table, decoration: const InputDecoration(isDense: true, labelText: 'Mesa (vacío = para llevar)', prefixIcon: Icon(Icons.table_restaurant_rounded))),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                     child: Shake(
@@ -235,17 +464,29 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   Expanded(
                     child: all.isEmpty
-                        ? const EmptyState(title: 'Sin productos', body: 'Agrega tus productos (con precio y, si quieres, código de barras y foto) en Productos.')
+                        ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            const EmptyState(title: 'Sin productos', body: 'Agrega tus productos (con precio y, si quieres, código de barras y foto) en Productos.'),
+                            if (sampleCatalog.containsKey(Access.instance.rubro))
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: FilledButton.icon(
+                                  onPressed: _seeding ? null : _seedSample,
+                                  icon: _seeding ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome_rounded),
+                                  label: const Text('Cargar productos de ejemplo'),
+                                ),
+                              ),
+                          ])
                         : LayoutBuilder(builder: (context, c) {
                             final cols = (c.maxWidth / 150).floor().clamp(2, 6);
                             return GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 120),
+                              padding: EdgeInsets.fromLTRB(12, 8, 12, widget.embedded ? 210 : 120),
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(200)),
                               itemCount: list.length,
                               itemBuilder: (context, i) {
                                 final p = list[i];
                                 final n = _cart[p.id] ?? 0;
                                 final img = _extra[p.id]?['image_path'] as String?;
+                                final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
                                 final pr = _price(p, n == 0 ? 1 : n);
                                 return Pressable(
                                   onTap: () => _add(p),
@@ -264,7 +505,10 @@ class _PosScreenState extends State<PosScreen> {
                                             child: img == null || img.isEmpty
                                                 ? Container(
                                                     decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: 0.08), borderRadius: const BorderRadius.vertical(top: Radius.circular(17))),
-                                                    child: Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34),
+                                                    alignment: Alignment.center,
+                                                    child: em == null
+                                                        ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
+                                                        : Text(em, style: const TextStyle(fontSize: 40)),
                                                   )
                                                 : ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(17)), child: StorageImage(path: img)),
                                           ),
@@ -307,19 +551,25 @@ class _PosScreenState extends State<PosScreen> {
             ? const SizedBox(width: double.infinity)
             : SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: Row(children: [
                     Expanded(
-                      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${qtyText(count)} ${count == 1 ? 'producto' : 'productos'}${_coupon != null ? ' · cupón ${_coupon!.code}' : ''}', style: t.textTheme.bodySmall),
-                        Money(money(totals.total, _cur), size: 22, weight: FontWeight.w800),
-                      ]),
+                      child: InkWell(
+                        onTap: _cartSheet,
+                        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('${qtyText(count)} ${count == 1 ? 'producto' : 'productos'}${_coupon != null ? ' · cupón ${_coupon!.code}' : ''} · ver detalle', style: t.textTheme.bodySmall),
+                          Money(money(totals.total, _cur), size: 22, weight: FontWeight.w800),
+                        ]),
+                      ),
                     ),
-                    TextButton(onPressed: () => setState(() => _cart.clear()), child: const Text('Vaciar')),
+                    TextButton(onPressed: () => setState(() {
+                      _cart.clear();
+                      _notes.clear();
+                    }), child: const Text('Vaciar')),
                     const SizedBox(width: 6),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                      onPressed: _checkout,
+                      onPressed: _charging ? null : _chargeSheet,
                       icon: const Icon(Icons.point_of_sale_rounded),
                       label: const Text('Cobrar'),
                     ),

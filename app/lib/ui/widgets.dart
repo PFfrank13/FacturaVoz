@@ -319,7 +319,7 @@ class _EmptyStateState extends State<EmptyState> with SingleTickerProviderStateM
 
 /// Entrada escalonada: aparece desde abajo con fundido. `index` define el retraso en cascada.
 class Reveal extends StatefulWidget {
-  const Reveal({super.key, required this.child, this.index = 0, this.dy = 18});
+  const Reveal({super.key, required this.child, this.index = 0, this.dy = 8});
   final Widget child;
   final int index;
   final double dy;
@@ -329,16 +329,21 @@ class Reveal extends StatefulWidget {
 }
 
 class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 550));
+  // Entrada corta: el contenido nunca debe quedar invisible esperando una animación (máx. ~50 ms de espera + 180 ms).
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 180));
   Timer? _t;
 
   @override
   void initState() {
     super.initState();
-    final delay = Duration(milliseconds: 60 * widget.index.clamp(0, 12));
-    _t = Timer(delay, () {
-      if (mounted) _c.forward();
-    });
+    final ms = 12 * widget.index.clamp(0, 4);
+    if (ms == 0) {
+      _c.forward();
+    } else {
+      _t = Timer(Duration(milliseconds: ms), () {
+        if (mounted) _c.forward();
+      });
+    }
   }
 
   @override
@@ -363,7 +368,7 @@ class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Cifra que "cuenta" hasta su valor (se anima al cambiar).
+/// Cifra que se muestra al instante y se desliza suavemente cuando cambia (venta nueva en tiempo real).
 class CountUp extends StatelessWidget {
   const CountUp({super.key, required this.value, required this.builder});
   final double value;
@@ -372,9 +377,10 @@ class CountUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (MediaQuery.of(context).disableAnimations) return builder(context, value);
+    // Al aparecer muestra el valor YA (sin contar desde cero); si luego cambia, la cifra se desliza al nuevo valor.
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: value),
-      duration: const Duration(milliseconds: 900),
+      tween: Tween<double>(begin: value, end: value),
+      duration: const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
       builder: (c, v, _) => builder(c, v),
     );

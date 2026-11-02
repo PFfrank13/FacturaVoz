@@ -25,6 +25,7 @@ import '../models_v2.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../services/rubro_repo.dart';
+import '../services/live.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -704,19 +705,34 @@ class RemindersScreen extends StatefulWidget {
   State<RemindersScreen> createState() => _RemindersScreenState();
 }
 
-class _RemindersScreenState extends State<RemindersScreen> {
+class _RemindersScreenState extends State<RemindersScreen> with LiveReload<RemindersScreen> {
   List<Reminder>? _rows;
   String? _error;
 
   @override
+  List<String> get liveTables => const ['service_reminders'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _rows = LiveCache.get<List<Reminder>>('reminders.30');
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
     try {
       final r = await RubroRepo.reminders(days: 30);
+      LiveCache.put('reminders.30', r);
       if (mounted) setState(() => _rows = r);
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));

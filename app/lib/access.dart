@@ -143,30 +143,56 @@ class Access extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    // Permisos y licencia no dependen entre sí: se piden a la vez (una espera de red en vez de dos).
+    await Future.wait([_loadAccess(org), _loadLicense(org)]);
+    loaded = true;
+    notifyListeners();
+  }
+
+  /// Últimas respuestas crudas de la base (para el arranque instantáneo).
+  Map<String, dynamic>? rawAccess, rawLicense;
+
+  void _applyAccess(Map<String, dynamic> m) {
+    rawAccess = m;
+    role = (m['role'] ?? 'owner') as String;
+    isAdmin = m['is_admin'] == true;
+    displayName = (m['display_name'] ?? '') as String;
+    welcomed = m['welcomed'] == true || isAdmin;
+    _can = m['can'] is Map ? Map<String, dynamic>.from(m['can'] as Map).map((k, v) => MapEntry(k, v == true)) : const {};
+  }
+
+  void _applyLicense(Map<String, dynamic> m) {
+    rawLicense = m;
+    license = LicenseInfo.fromJson(m);
+  }
+
+  /// Arranque instantáneo: usa lo último guardado mientras la red confirma.
+  void applyCached(Map<String, dynamic>? access, Map<String, dynamic>? lic) {
+    if (access != null) _applyAccess(access);
+    if (lic != null) _applyLicense(lic);
+    loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> _loadAccess(String org) async {
     try {
       final a = await _db.rpc('my_access', params: {'p_org': org});
-      if (a is Map) {
-        final m = Map<String, dynamic>.from(a);
-        role = (m['role'] ?? 'owner') as String;
-        isAdmin = m['is_admin'] == true;
-        displayName = (m['display_name'] ?? '') as String;
-        welcomed = m['welcomed'] == true || isAdmin;
-        _can = m['can'] is Map ? Map<String, dynamic>.from(m['can'] as Map).map((k, v) => MapEntry(k, v == true)) : const {};
-      }
+      if (a is Map) _applyAccess(Map<String, dynamic>.from(a));
     } catch (_) {
       role = 'owner';
       isAdmin = true;
       welcomed = true;
       _can = const {};
     }
+  }
+
+  Future<void> _loadLicense(String org) async {
     try {
       final l = await _db.rpc('my_license', params: {'p_org': org});
-      if (l is Map) license = LicenseInfo.fromJson(Map<String, dynamic>.from(l));
+      if (l is Map) _applyLicense(Map<String, dynamic>.from(l));
     } catch (_) {
       license = const LicenseInfo();
     }
-    loaded = true;
-    notifyListeners();
   }
 
   Future<void> markWelcomed() async {
@@ -185,6 +211,8 @@ class Access extends ChangeNotifier {
     welcomed = true;
     _can = const {};
     license = const LicenseInfo();
+    rawAccess = null;
+    rawLicense = null;
     loaded = false;
     notifyListeners();
   }

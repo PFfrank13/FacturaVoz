@@ -8,6 +8,7 @@ import '../models.dart';
 import '../models_v2.dart';
 import '../services/v2_api.dart';
 import '../services/v2_repo.dart';
+import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -20,7 +21,7 @@ class CashDayScreen extends StatefulWidget {
   State<CashDayScreen> createState() => _CashDayScreenState();
 }
 
-class _CashDayScreenState extends State<CashDayScreen> {
+class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDayScreen> {
   String _day = todayIso();
   DaySummary? _sum;
   List<CashMove> _moves = const [];
@@ -31,9 +32,25 @@ class _CashDayScreenState extends State<CashDayScreen> {
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
 
   @override
+  List<String> get liveTables => const ['cash_movements', 'payments', 'invoices'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _sum = LiveCache.get<DaySummary>('cash.$_day.sum');
+    _moves = LiveCache.get<List<CashMove>>('cash.$_day.moves') ?? const [];
+    _closing = LiveCache.get<Map<String, dynamic>>('cash.$_day.closing');
     _load();
+    startLive(); // tiempo real
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -41,6 +58,9 @@ class _CashDayScreenState extends State<CashDayScreen> {
       final s = await V2Repo.daySummary(_day);
       final m = await V2Repo.cashMoves(_day);
       final c = await V2Repo.dayClosing(_day);
+      LiveCache.put('cash.$_day.sum', s);
+      LiveCache.put('cash.$_day.moves', m);
+      LiveCache.put('cash.$_day.closing', c);
       if (mounted) {
         setState(() {
           _sum = s;

@@ -27,10 +27,10 @@ import 'jobs.dart';
 import 'kitchen.dart';
 import 'license_gate.dart';
 import 'new_invoice.dart';
+import 'pos.dart';
 import 'profit.dart';
 import 'quotes.dart';
 import 'rubro_picker.dart';
-import 'sell_hub.dart';
 import 'settings.dart';
 
 /// Estructura principal v2.0 (Fase 7): máximo 5 destinos + micrófono central en un dock de cristal flotante.
@@ -89,7 +89,7 @@ bool _destAllowed(String id, Access a) => switch (id) {
     };
 
 class _MainShellState extends State<MainShell> {
-  String _tab = 'home';
+  String _tab = ''; // se resuelve al construir: la app abre donde se vende
   final Set<String> _built = {};
   OrgSettings? _settings;
   RealtimeChannel? _licChan;
@@ -209,6 +209,10 @@ class _MainShellState extends State<MainShell> {
     return out.take(5).toList();
   }
 
+  /// Pantalla con la que abre la app: cada rubro abre en SU primera pestaña (la que definió su barra). Solo si la barra
+  /// incluye Vender (p. ej. Bodega) abre ahí, para vender sin pasos. Restaurante, servicios, etc. NO se saltan a nada.
+  String _landing(List<_Dest> d) => d.any((x) => x.id == 'sell') ? 'sell' : d.first.id;
+
   void _go(String id) {
     if (id == _tab) return;
     if (!_dests().any((d) => d.id == id)) {
@@ -254,7 +258,7 @@ class _MainShellState extends State<MainShell> {
 
   Widget _pageV2(String id) => switch (id) {
         'home' => HomeScreen(embedded: true, onNavigate: (i) => _go(const ['home', 'sell', 'collect', 'business'][i.clamp(0, 3)])),
-        'sell' => SellHubScreen(embedded: true, settings: _settings),
+        'sell' => const PosScreen(embedded: true),
         'clients' => const ClientsHubScreen(embedded: true),
         'collect' => const CollectionsScreen(embedded: true),
         'business' => const ProfitScreen(embedded: true),
@@ -274,9 +278,9 @@ class _MainShellState extends State<MainShell> {
       listenable: Access.instance,
       builder: (context, _) {
         final dests = _dests();
-        if (!dests.any((d) => d.id == _tab)) _tab = dests.first.id;
+        if (!dests.any((d) => d.id == _tab)) _tab = _landing(dests);
         _built.add(_tab);
-        final first = dests.first.id;
+        final first = _landing(dests);
         return PopScope(
           canPop: _tab == first,
           onPopInvokedWithResult: (didPop, _) {

@@ -67,31 +67,35 @@ class Repo {
 
   /// Datos del emisor = los de la empresa activa (si la migración multi-empresa está aplicada).
   static Future<Profile> loadProfile() async {
-    final row = await _db.from('profiles').select().eq('id', _uid).maybeSingle();
-    final base = row == null ? Profile() : Profile.fromJson(row);
+    // Normalmente basta la fila de la empresa activa (1 llamada). El perfil de usuario solo se pide si no hay empresa
+    // o si la migración multi-empresa no está aplicada.
     final org = activeOrgId;
-    if (org == null) return base;
-    try {
-      final o = await _db.from('organizations').select(_orgIssuerCols).eq('id', org).maybeSingle();
-      if (o == null) return base;
-      return Profile.fromJson({
-        'business_name': o['name'],
-        'tax_id': o['tax_id'],
-        'address': o['address'],
-        'trade_name': o['trade_name'],
-        'ubigeo': o['ubigeo'],
-        'department': o['department'],
-        'province': o['province'],
-        'district': o['district'],
-        'series_factura': o['series_factura'],
-        'series_boleta': o['series_boleta'],
-        'currency': o['currency'],
-        'tax_label': o['tax_label'],
-        'default_tax_rate': o['default_tax_rate'],
-      });
-    } on PostgrestException {
-      return base;
+    if (org != null) {
+      try {
+        final o = await _db.from('organizations').select(_orgIssuerCols).eq('id', org).maybeSingle();
+        if (o != null) {
+          return Profile.fromJson({
+            'business_name': o['name'],
+            'tax_id': o['tax_id'],
+            'address': o['address'],
+            'trade_name': o['trade_name'],
+            'ubigeo': o['ubigeo'],
+            'department': o['department'],
+            'province': o['province'],
+            'district': o['district'],
+            'series_factura': o['series_factura'],
+            'series_boleta': o['series_boleta'],
+            'currency': o['currency'],
+            'tax_label': o['tax_label'],
+            'default_tax_rate': o['default_tax_rate'],
+          });
+        }
+      } on PostgrestException {
+        // cae al perfil de usuario
+      }
     }
+    final row = await _db.from('profiles').select().eq('id', _uid).maybeSingle();
+    return row == null ? Profile() : Profile.fromJson(row);
   }
 
   static Future<void> saveProfile(Profile p) async {

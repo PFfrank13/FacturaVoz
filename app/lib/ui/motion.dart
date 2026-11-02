@@ -696,7 +696,7 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
             child: RepaintBoundary(
               child: AnimatedBuilder(
                 animation: _c,
-                builder: (context, _) => CustomPaint(painter: _AuroraPainter(still ? 0.15 : _c.value)),
+                builder: (context, _) => CustomPaint(painter: _AuroraPainter(still ? 0.15 : (_c.value * 150).floorToDouble() / 150)), // ~11 repintados/s: el movimiento es lento y así se ahorran cuadros
               ),
             ),
           ),
@@ -746,7 +746,7 @@ class Sparkline extends StatelessWidget {
     if (values.length < 2) return SizedBox(height: height);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 1300),
+      duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
       builder: (context, k, _) => SizedBox(height: height, width: double.infinity, child: CustomPaint(painter: _SparkPainter(values, k, color))),
     );

@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../growth.dart';
 import '../models.dart';
+import '../services/live.dart';
 import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../ui/motion.dart';
@@ -48,6 +49,7 @@ class _Clients360ScreenState extends State<Clients360Screen> {
   @override
   void initState() {
     super.initState();
+    _all = LiveCache.get<List<ClientInsight>>('clients360.all');
     _load();
   }
 
@@ -56,6 +58,7 @@ class _Clients360ScreenState extends State<Clients360Screen> {
       final rows = await GrowthRepo.clientActivity();
       if (!mounted) return;
       final list = segmentClients(rows, todayIso());
+      LiveCache.put('clients360.all', list);
       setState(() {
         _all = list;
         _error = null;

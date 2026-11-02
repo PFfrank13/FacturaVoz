@@ -99,6 +99,38 @@ void android() {
     }
   }
 
+  // Pantalla de arranque nativa (la que se ve ANTES de que Flutter dibuje): del mismo color que la app, claro u oscuro,
+  // para que no aparezca el fondo gris/blanco y el paso a la app sea continuo.
+  final res = Directory('android/app/src/main/res');
+  if (res.existsSync()) {
+    const light = '#FFF8F6FD';
+    const dark = '#FF14132B';
+    String colors(String c) => '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="fv_launch_bg">$c</color>\n</resources>\n';
+    const launchDrawable = '<?xml version="1.0" encoding="utf-8"?>\n<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <item android:drawable="@color/fv_launch_bg" />\n</layer-list>\n';
+    String v31(String parent) => '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+        '    <style name="LaunchTheme" parent="$parent">\n'
+        '        <item name="android:windowBackground">@drawable/launch_background</item>\n'
+        '        <item name="android:windowSplashScreenBackground">@color/fv_launch_bg</item>\n'
+        '        <item name="android:windowSplashScreenAnimationDuration">0</item>\n'
+        '    </style>\n</resources>\n';
+    void put(String rel, String text) {
+      final f = File('${res.path}/$rel');
+      f.parent.createSync(recursive: true);
+      f.writeAsStringSync(text);
+    }
+
+    put('values/fv_colors.xml', colors(light));
+    put('values-night/fv_colors.xml', colors(dark));
+    for (final d in ['drawable', 'drawable-v21']) {
+      put('$d/launch_background.xml', launchDrawable);
+    }
+    // Android 12+ dibuja su propia pantalla de arranque: se le pone el mismo fondo.
+    put('values-v31/fv_launch.xml', v31('Theme.AppCompat.DayNight.NoActionBar'));
+    put('values-night-v31/fv_launch.xml', v31('Theme.AppCompat.DayNight.NoActionBar'));
+    stdout.writeln('OK  pantalla de arranque nativa (claro/oscuro)');
+  }
+
   // record exige minSdk 23 o superior
   for (final p in ['android/app/build.gradle.kts', 'android/app/build.gradle']) {
     var g = read(p);

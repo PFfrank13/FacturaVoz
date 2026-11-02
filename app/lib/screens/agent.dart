@@ -9,6 +9,7 @@ import '../errors.dart';
 import '../models.dart';
 import '../services/pro_api.dart';
 import '../services/repo.dart';
+import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -20,7 +21,7 @@ class AgentScreen extends StatefulWidget {
   State<AgentScreen> createState() => _AgentScreenState();
 }
 
-class _AgentScreenState extends State<AgentScreen> {
+class _AgentScreenState extends State<AgentScreen> with LiveReload<AgentScreen> {
   final _text = TextEditingController();
   List<Map<String, dynamic>>? _tasks;
   String _error = '';
@@ -35,13 +36,22 @@ class _AgentScreenState extends State<AgentScreen> {
   ];
 
   @override
+  List<String> get liveTables => const ['agent_tasks'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _tasks = LiveCache.get<List<Map<String, dynamic>>>('agent.tasks');
     _load();
+    startLive(); // tiempo real
   }
 
   @override
   void dispose() {
+    stopLive();
     _text.dispose();
     super.dispose();
   }
@@ -52,7 +62,9 @@ class _AgentScreenState extends State<AgentScreen> {
       final org = Repo.activeOrgId;
       if (org != null) q = q.eq('org_id', org);
       final rows = await q.order('created_at', ascending: false).limit(30);
-      if (mounted) setState(() => _tasks = [for (final r in rows as List) Map<String, dynamic>.from(r as Map)]);
+      final list = [for (final r in rows as List) Map<String, dynamic>.from(r as Map)];
+      LiveCache.put('agent.tasks', list);
+      if (mounted) setState(() => _tasks = list);
     } catch (_) {
       if (mounted) setState(() => _tasks = const []);
     }

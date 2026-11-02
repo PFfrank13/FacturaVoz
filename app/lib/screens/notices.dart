@@ -13,6 +13,7 @@ import '../models.dart';
 import '../models_v2.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
+import '../services/live.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -26,7 +27,7 @@ class PaymentNoticesScreen extends StatefulWidget {
   State<PaymentNoticesScreen> createState() => _PaymentNoticesScreenState();
 }
 
-class _PaymentNoticesScreenState extends State<PaymentNoticesScreen> {
+class _PaymentNoticesScreenState extends State<PaymentNoticesScreen> with LiveReload<PaymentNoticesScreen> {
   final _text = TextEditingController();
   List<NoticeRow>? _notices;
   List<InvoiceRecord> _open = const [];
@@ -36,13 +37,23 @@ class _PaymentNoticesScreenState extends State<PaymentNoticesScreen> {
   int _shake = 0;
 
   @override
+  List<String> get liveTables => const ['payment_notices', 'invoices', 'payments'];
+
+  @override
+  Future<void> reloadLive() => _load();
+
+  @override
   void initState() {
     super.initState();
+    _notices = LiveCache.get<List<NoticeRow>>('notices.list');
+    _open = LiveCache.get<List<InvoiceRecord>>('notices.open') ?? const [];
     _load();
+    startLive(); // tiempo real
   }
 
   @override
   void dispose() {
+    stopLive();
     _text.dispose();
     super.dispose();
   }
@@ -51,6 +62,8 @@ class _PaymentNoticesScreenState extends State<PaymentNoticesScreen> {
     try {
       final n = await V2Repo.notices();
       final o = await ProRepo.listReceivables().catchError((_) => <InvoiceRecord>[]);
+      LiveCache.put('notices.list', n);
+      LiveCache.put('notices.open', o);
       if (mounted) {
         setState(() {
           _notices = n;

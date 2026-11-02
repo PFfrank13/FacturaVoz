@@ -9,6 +9,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../reports.dart';
+import '../services/live.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -21,7 +22,7 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
+class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsScreen> {
   late int _year = DateTime.now().year;
   late int _month = DateTime.now().month;
   List<InvoiceRecord>? _rows;
@@ -31,26 +32,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _token = 0; // descarta respuestas de meses ya abandonados
 
   @override
+  List<String> get liveTables => const ['invoices'];
+
+  @override
+  Future<void> reloadLive() => _load(quiet: true);
+
+  @override
   void initState() {
     super.initState();
+    startLive();
     _load();
+  }
+
+  @override
+  void dispose() {
+    stopLive();
+    super.dispose();
   }
 
   bool get _isCurrentMonth => _year == DateTime.now().year && _month == DateTime.now().month;
 
-  Future<void> _load() async {
+  Future<void> _load({bool quiet = false}) async {
     final token = ++_token;
-    setState(() {
-      _rows = null;
-      _error = null;
-    });
+    final key = 'reports.$_year-$_month';
+    if (!quiet) {
+      setState(() {
+        _rows = LiveCache.get<List<InvoiceRecord>>(key); // lo último de ese mes, al instante
+        _error = null;
+      });
+    }
     try {
       final r = monthRange(_year, _month);
       final rows = await Repo.listInvoicesBetween(r.from, r.toExclusive);
+      LiveCache.put(key, rows);
       if (!mounted || token != _token) return;
-      setState(() => _rows = rows);
+      setState(() {
+        _rows = rows;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted || token != _token) return;
+      if (quiet && _rows != null) return; // refresco en segundo plano: se conserva lo que ya se ve
       setState(() => _error = friendly(e));
     }
   }
