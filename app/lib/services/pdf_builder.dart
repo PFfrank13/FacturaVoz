@@ -6,11 +6,11 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models.dart';
 
-const _ink = PdfColor.fromInt(0xFF111827);
-const _muted = PdfColor.fromInt(0xFF6B7280);
-const _brand = PdfColor.fromInt(0xFF1E3A8A);
-const _line = PdfColor.fromInt(0xFFD1D5DB);
-const _soft = PdfColor.fromInt(0xFFF3F4F6);
+const _ink = PdfColor.fromInt(0xFF201C36);
+const _muted = PdfColor.fromInt(0xFF687186);
+const _brand = PdfColor.fromInt(0xFF5141C1);
+const _line = PdfColor.fromInt(0xFFE3E4EC);
+const _soft = PdfColor.fromInt(0xFFF5F5FA);
 
 double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
 Map<String, dynamic> _m(dynamic v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
@@ -75,11 +75,12 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
         child: pw.Text(text, textAlign: pw.TextAlign.center, style: st(8.5, b: true, color: PdfColors.white)),
       );
 
-  pw.Widget totalRow(String k, String v, {bool strong = false}) => pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+  pw.Widget totalRow(String k, String v, {bool strong = false}) => pw.Container(
+        padding: pw.EdgeInsets.symmetric(vertical: strong ? 8 : 3, horizontal: strong ? 12 : 0),
+        decoration: strong ? pw.BoxDecoration(color: _soft, borderRadius: pw.BorderRadius.circular(7)) : null,
         child: pw.Row(children: [
-          pw.Expanded(child: pw.Text(k, style: st(strong ? 10.5 : 9, b: strong, color: strong ? _ink : _muted))),
-          pw.Text(v, style: st(strong ? 11 : 9.5, b: strong)),
+          pw.Expanded(child: pw.Text(k, style: st(strong ? 11.5 : 9, b: strong, color: strong ? _ink : _muted))),
+          pw.Text(v, style: st(strong ? 14 : 9.5, b: strong, color: strong ? accent : _ink)),
         ]),
       );
 
@@ -97,6 +98,9 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
         pw.Text('Página ${c.pageNumber} de ${c.pagesCount}', style: st(7, color: _muted)),
       ]),
       build: (c) => [
+        // Color de marca del emisor, sin imágenes decorativas que interfieran con SUNAT.
+        pw.Container(height: minimal ? 2 : 5, decoration: pw.BoxDecoration(color: accent, borderRadius: pw.BorderRadius.circular(8))),
+        pw.SizedBox(height: 17),
         for (final b in view.banners) banner(b.$1, b.$2),
         // ---- Cabecera: emisor + recuadro del comprobante
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
@@ -106,9 +110,9 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
           ],
           pw.Expanded(
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text(view.issuerName, style: st(15, b: true, color: accent)),
+              pw.Text(view.issuerName, style: st(17, b: true, color: _ink)),
               if (view.issuerTrade.isNotEmpty && view.issuerTrade != view.issuerName) pw.Text(view.issuerTrade, style: st(9.5)),
-              pw.SizedBox(height: 3),
+              pw.SizedBox(height: 6),
               for (final l in view.issuerLines) pw.Text(l, style: st(8.5, color: _muted)),
             ]),
           ),
@@ -118,8 +122,8 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
             padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             decoration: pw.BoxDecoration(
               color: modern ? accent : null,
-              border: pw.Border.all(color: accent, width: minimal ? 0.8 : 1.4),
-              borderRadius: pw.BorderRadius.circular(modern ? 8 : 4),
+              border: pw.Border.all(color: accent, width: minimal ? 0.8 : 1.1),
+              borderRadius: pw.BorderRadius.circular(modern ? 12 : 7),
             ),
             child: pw.Column(children: [
               if (view.issuerRuc.isNotEmpty) pw.Text('R.U.C. ${view.issuerRuc}', style: st(11, b: true, color: modern ? PdfColors.white : _ink)),
@@ -130,16 +134,18 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
             ]),
           ),
         ]),
-        pw.SizedBox(height: 14),
-        // ---- Cliente y datos
+        pw.SizedBox(height: 18),
+        // ---- Cliente y datos: bloque editorial legible y compacto.
         pw.Container(
-          padding: const pw.EdgeInsets.all(9),
+          padding: const pw.EdgeInsets.all(14),
           decoration: pw.BoxDecoration(
-            color: minimal ? null : _soft,
-            border: minimal ? pw.Border.all(color: _line, width: 0.6) : null,
-            borderRadius: pw.BorderRadius.circular(4),
+            color: minimal ? PdfColors.white : _soft,
+            border: pw.Border.all(color: _line, width: 0.8),
+            borderRadius: pw.BorderRadius.circular(9),
           ),
-          child: pw.Column(children: [
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('DATOS DEL CLIENTE', style: st(8, b: true, color: accent)),
+            pw.SizedBox(height: 8),
             _kv('Señor(es)', view.clientName, st),
             if (view.clientDoc.isNotEmpty) _kv(view.clientDocLabel, view.clientDoc, st),
             if (view.clientAddress.isNotEmpty) _kv('Dirección', view.clientAddress, st),
@@ -148,7 +154,7 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
             if (view.paymentLine.isNotEmpty) _kv('Condición de pago', view.paymentLine, st),
           ]),
         ),
-        pw.SizedBox(height: 12),
+        pw.SizedBox(height: 17),
         // ---- Detalle
         pw.Table(
           border: pw.TableBorder(horizontalInside: pw.BorderSide(color: _line, width: 0.5), bottom: pw.BorderSide(color: _line, width: 0.8)),
@@ -166,7 +172,9 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
               children: [cell('#', head: true), cell('Cant.', head: true, right: true), cell('Unid.', head: true), cell('Descripción', head: true), cell('V. Unit.', head: true, right: true), cell('Importe', head: true, right: true)],
             ),
             for (var k = 0; k < view.rows.length; k++)
-              pw.TableRow(children: [
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: k.isEven && !minimal ? _soft : PdfColors.white),
+                children: [
                 cell('${k + 1}'),
                 cell(qtyText(view.rows[k].qty), right: true),
                 cell(view.rows[k].unit),
@@ -208,7 +216,7 @@ Future<Uint8List> buildInvoicePdf(InvoiceRecord inv, Profile issuer, {FiscalDoc?
               pw.SizedBox(width: 12),
               pw.Expanded(
                 child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                  pw.Text(view.statusLine, style: st(9, b: true)),
+                  pw.Text(view.statusLine, style: st(10, b: true, color: accent)),
                   if (view.hash.isNotEmpty) pw.Padding(padding: const pw.EdgeInsets.only(top: 3), child: pw.Text('Valor resumen: ${view.hash}', style: st(7.5, color: _muted))),
                   pw.SizedBox(height: 4),
                   pw.Text(view.legalNote, style: st(7.5, color: _muted)),

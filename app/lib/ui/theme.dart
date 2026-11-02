@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Sistema de diseño de FacturaVoz.
-/// Índigo "tinta" como color de marca, oro "sol" solo para la acción de dictar y el dato clave.
+/// Púrpura profundo + turquesa editorial y coral sutil. Nada de dorados decorativos.
 /// Radios de esquina (usar estos en pantallas nuevas en vez de números sueltos).
 class Radii {
   static const sm = 8.0; // chips, barras de progreso
@@ -25,33 +25,33 @@ class Gap {
 
 class Brand {
   // Violeta-lavanda sereno (confianza y calma) + coral durazno cálido (invita a actuar).
-  static const indigo = Color(0xFF6A62E2);
-  static const indigoDeep = Color(0xFF5048C8);
-  static const indigoSoft = Color(0xFFB9B4FF);
-  static const lilac = Color(0xFF9B8CF5);
-  static const gold = Color(0xFFFF9376); // coral durazno (acción de dictar)
-  static const goldDeep = Color(0xFFFF6F8E);
+  static const indigo = Color(0xFF6551E9);
+  static const indigoDeep = Color(0xFF4635BA);
+  static const indigoSoft = Color(0xFFBEB4FF);
+  static const lilac = Color(0xFF9888F3);
+  static const gold = Color(0xFFFF867D); // coral durazno (acción de dictar)
+  static const goldDeep = Color(0xFFFF658C);
   static const onGold = Color(0xFF3B1D2E);
 
   static const ok = Color(0xFF23956F);
   static const warn = Color(0xFFC57A12);
   static const bad = Color(0xFFD94A5E);
 
-  static const lightBg = Color(0xFFF8F6FD);
-  static const lightInk = Color(0xFF26254B);
-  static const lightMuted = Color(0xFF77799B);
-  static const lightLine = Color(0xFFECE9F7);
+  static const lightBg = Color(0xFFF7F8FC);
+  static const lightInk = Color(0xFF1A1835);
+  static const lightMuted = Color(0xFF74758D);
+  static const lightLine = Color(0xFFE8E9F2);
 
-  static const darkBg = Color(0xFF14132B);
-  static const darkCard = Color(0xFF1E1D3F);
-  static const darkInk = Color(0xFFEFEEFB);
-  static const darkMuted = Color(0xFFA2A3C6);
-  static const darkLine = Color(0xFF2F2E57);
+  static const darkBg = Color(0xFF101126);
+  static const darkCard = Color(0xFF1A1D36);
+  static const darkInk = Color(0xFFF5F6FF);
+  static const darkMuted = Color(0xFFB1B5D0);
+  static const darkLine = Color(0xFF30334D);
 
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF6A62E2), Color(0xFF8E7CF2), Color(0xFFB58BF5)],
+    colors: [Color(0xFF27265F), Color(0xFF5141C1), Color(0xFF785DE6)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -68,7 +68,7 @@ class Brand {
   /// Sombra suave y difusa (nunca dura): da sensación de flotar.
   static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => [
         BoxShadow(
-          color: (dark ? Colors.black : const Color(0xFF6A62E2)).withValues(alpha: dark ? 0.35 : a),
+          color: (dark ? Colors.black : const Color(0xFF6551E9)).withValues(alpha: dark ? 0.35 : a),
           blurRadius: 28,
           offset: const Offset(0, 10),
         ),

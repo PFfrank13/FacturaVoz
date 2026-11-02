@@ -161,7 +161,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
           : _orders == null
               ? const SkeletonList()
               : orders.isEmpty
-                  ? const EmptyState(title: 'Cocina libre', body: 'Los pedidos de la carta QR aparecerán aquí al instante.')
+                  ? const EmptyState(title: 'Cocina libre', body: 'Los pedidos de caja y carta QR aparecerán aquí al instante.')
                   : _view == 'mesas'
                       ? _tablesView(context, orders)
                       : LayoutBuilder(builder: (context, c) {
@@ -177,7 +177,10 @@ class _KitchenScreenState extends State<KitchenScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 92),
         child: FloatingActionButton.extended(
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PosScreen(tableMode: true))),
+          onPressed: () async {
+            await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PosScreen(tableMode: true)));
+            if (mounted) _load();
+          },
           icon: const Icon(Icons.add_rounded),
           label: const Text('Tomar pedido'),
         ),
@@ -195,7 +198,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
         order: o.number,
         date: o.createdAt == null ? nowText() : nowText(o.createdAt),
         note: o.notes,
-        lines: [for (final it in o.items) ComandaLine(it.quantity, it.description)],
+        lines: [for (final it in o.items) ComandaLine(it.quantity, it.description, it.note)],
       ));
       if (mounted) showSuccess(context, 'Comanda impresa', icon: Icons.print_rounded);
     } catch (e) {
@@ -287,7 +290,13 @@ class _KitchenScreenState extends State<KitchenScreen> {
                         ]),
                         if (o.client.isNotEmpty) Text(o.client, style: t.textTheme.bodySmall),
                         const Divider(),
-                        for (final it in o.items) Text('${it.quantity == it.quantity.roundToDouble() ? it.quantity.toInt() : it.quantity} × ${it.description}', style: t.textTheme.bodyLarge),
+                        for (final it in o.items) Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${it.quantity == it.quantity.roundToDouble() ? it.quantity.toInt() : it.quantity} × ${it.description}', style: t.textTheme.bodyLarge),
+                            if (it.note.isNotEmpty) Padding(padding: const EdgeInsets.only(left: 12, bottom: 4), child: Text('Nota: ${it.note}', style: t.textTheme.bodySmall)),
+                          ],
+                        ),
                         if (o.notes.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('📝 ${o.notes}', style: t.textTheme.bodySmall)),
                         const SizedBox(height: 6),
                         Align(

@@ -715,9 +715,10 @@ class SurveyRow {
 }
 
 class KitchenItem {
-  const KitchenItem(this.description, this.quantity);
+  const KitchenItem(this.description, this.quantity, [this.note = '']);
   final String description;
   final double quantity;
+  final String note;
 }
 
 class KitchenOrder {
@@ -742,7 +743,7 @@ class KitchenOrder {
         createdAt: _d(j['created_at']),
         items: ((j['quote_items'] ?? const []) as List).map((e) {
           final m = _m(e);
-          return KitchenItem(_s(m['description']), _n(m['quantity']));
+          return KitchenItem(_s(m['description']), _n(m['quantity']), _s(m['kitchen_note']));
         }).toList(),
       );
 }

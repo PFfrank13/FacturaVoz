@@ -83,3 +83,14 @@ Después de instalar: `dart run tool/post_create.dart`, `flutter clean`, `flutte
 7. Cotizaciones, Cuaderno, Tienda y demás siguen en Menú → Otras funciones.
 8. **Documento de cada rubro**: Taller → abre una orden → ícono de impresora → *Orden de trabajo* con firma. Servicios técnicos → *Orden de servicio*. Construcción → *Orden de obra*. Salón/Consultorio → abre una cita → *Cita*. Educación → *Horario / clase*. Bodega: no muestra ese botón (usa el ticket de venta).
 9. **Aislamiento**: crea un producto en una empresa Bodega, cambia a una empresa de otro rubro (Ajustes → Empresas): ese producto NO aparece.
+
+## Fase 33+ (corrección) — persistencia de comandas desde caja
+
+**Antes:** ejecutar `20261122_v31_comandas_caja_persistentes.sql` en Supabase, tras `20261121`.
+
+1. Restaurante → Mesas → Tomar pedido → Mesa 4 → dos platos con nota → **Guardar y comanda**: persiste con `nuevo` en Comandas aun si falla la impresión.
+2. Volver a Comandas: muestra mesa, productos y notas. Avanza a Preparando → Listo → Entregado.
+3. **Reimprimir** y **Precuenta** no crean nuevos pedidos. **Nuevo pedido** crea otra ronda.
+4. Pedido sin mesa aparece como Para llevar. Cambiar de empresa no muestra los datos de la otra.
+5. Cobro vincula factura interna con pedido; una precuenta continúa indicando NO ES COMPROBANTE DE PAGO.
+6. Simular desconexión: reintentar sin duplicar. Si falta la RPC, muestra indicación para ejecutar migración 20261122.

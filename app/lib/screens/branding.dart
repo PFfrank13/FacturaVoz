@@ -15,7 +15,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
-const pdfTemplates = {'clasico': ('Clásico', 'Recuadros y encabezado de color'), 'moderno': ('Moderno', 'Número en bloque de color'), 'minimal': ('Minimal', 'Blanco y negro, líneas finas')};
+const pdfTemplates = {'clasico': ('Clásico', 'Encabezado editorial, jerarquía limpia y datos claros'), 'moderno': ('Moderno', 'Diseño contemporáneo, contraste y total destacado'), 'minimal': ('Minimal', 'Elegante y sobrio, óptimo para impresión económica')};
 const brandColors = ['#1E3A8A', '#6A62E2', '#0F766E', '#B91C1C', '#C2410C', '#111827'];
 
 Color _hex(String h) => Color(int.parse('FF${h.replaceAll('#', '')}', radix: 16));
@@ -125,7 +125,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                   ]),
                 ),
                 const SizedBox(height: 16),
-                const SectionTitle('Diseño del PDF (A4)'),
+                const SectionTitle('Plantilla profesional del comprobante (A4)'),
                 for (final e in pdfTemplates.entries)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),

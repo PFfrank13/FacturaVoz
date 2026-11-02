@@ -223,6 +223,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               onMenu: () => pushPremium(context, const MenuScreen()),
             ),
           ),
+          if (spec?.id == 'bodega')
+            const SliverToBoxAdapter(
+              child: Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 0), child: MarketPhotoBanner()),
+            ),
           if (a.can('sell') || shortcuts.isNotEmpty)
             SliverToBoxAdapter(
               child: Reveal(

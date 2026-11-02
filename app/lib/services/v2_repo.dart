@@ -487,10 +487,38 @@ class V2Repo {
   static Future<void> setWebhookActive(String id, bool active) => _db.from('org_webhooks').update({'active': active}).eq('id', id);
   static Future<void> deleteWebhook(String id) => _db.from('org_webhooks').delete().eq('id', id);
 
+  // ═══════════ Comandas persistentes desde caja (migración 20261122) ═══════════
+  /// RPC transaccional con idempotencia por requestId. No registrar como venta
+  /// ni asumir éxito hasta recibir un identificador válido del servidor.
+  static Future<({String id, String number})> createPosKitchenOrder({
+    required String requestId,
+    required String table,
+    required double taxRate,
+    required String currency,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final r = await _db.rpc('create_pos_kitchen_order', params: {
+      'p_org': org,
+      'p_request_id': requestId,
+      'p_table': table.trim().isEmpty ? null : table.trim(),
+      'p_tax_rate': taxRate,
+      'p_currency': currency,
+      'p_items': items,
+    });
+    final rows = _rows(r);
+    if (rows.isEmpty || rows.first['quote_id'] == null) {
+      throw AppException('Supabase no devolvió el pedido de cocina.');
+    }
+    return (id: rows.first['quote_id'] as String, number: rows.first['quote_number'] as String);
+  }
+
+  static Future<void> linkPosKitchenInvoice(String quoteId, String invoiceId) =>
+      _db.rpc('link_pos_kitchen_invoice', params: {'p_quote': quoteId, 'p_invoice': invoiceId});
+
   // ═══════════ Comandas (carta digital / pedidos web) ═══════════
   static Future<List<KitchenOrder>> kitchen() async => _rows(await _db
           .from('quotes')
-          .select('id, number, table_label, fulfillment, kitchen_status, notes, created_at, clients(name), quote_items(description, quantity, position)')
+          .select('id, number, table_label, fulfillment, kitchen_status, notes, created_at, clients(name), quote_items(description, quantity, kitchen_note, position)')
           .eq('org_id', org)
           .inFilter('kitchen_status', ['nuevo', 'preparando', 'listo'])
           .order('created_at')

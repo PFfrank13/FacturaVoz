@@ -53,6 +53,8 @@ flutter:
     - assets/fonts/DejaVuSans.ttf
     - assets/fonts/DejaVuSans-Bold.ttf
     - assets/fonts/Inter-LICENSE.txt
+    - assets/branding/
+    - assets/photos/
   fonts:
     - family: Inter
       fonts:

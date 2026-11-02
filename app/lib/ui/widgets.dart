@@ -83,21 +83,59 @@ class StatusPill extends StatelessWidget {
   }
 }
 
-/// Marca: micrófono blanco sobre degradado lavanda.
+/// Identidad visual de FacturaVoz. Ícono propio en PNG, con forma reconocible también a 44 px.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 44});
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          gradient: Brand.heroGradient,
-          borderRadius: BorderRadius.circular(size * 0.34),
-          boxShadow: Brand.softShadow(false, a: 0.25),
+  Widget build(BuildContext context) => Semantics(
+        label: 'FacturaVoz',
+        image: true,
+        child: Image.asset(
+          'assets/branding/facturavoz_mark.png',
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
         ),
-        child: Icon(Icons.mic_rounded, color: Colors.white, size: size * 0.52),
+      );
+}
+
+/// Fotografía ambiental realista: solo usa imágenes empaquetadas, nunca la de otra empresa.
+/// El catálogo POS conserva exclusivamente las fotos aportadas por el negocio.
+class MarketPhotoBanner extends StatelessWidget {
+  const MarketPhotoBanner({super.key, this.title = 'Más control. Más tiempo para vender.', this.subtitle = 'Tu negocio se mueve contigo.'});
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: '$title. $subtitle',
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: SizedBox(
+            height: 166,
+            child: Stack(fit: StackFit.expand, children: [
+              Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover),
+              const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+                begin: Alignment.centerLeft, end: Alignment.centerRight,
+                colors: [Color(0xEC14122F), Color(0xC0151339), Color(0x05171339)],
+                stops: [0, .55, 1],
+              ))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Text('FACTURAVOZ  /  TU BODEGA', style: TextStyle(fontFamily: 'Inter', fontSize: 10, letterSpacing: 1.3, color: Color(0xFF93F4E8), fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(constraints: const BoxConstraints(maxWidth: 240), child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', fontSize: 19, height: 1.15, color: Colors.white, fontWeight: FontWeight.w800))),
+                  const SizedBox(height: 6),
+                  Text(subtitle, style: const TextStyle(fontFamily: 'Inter', color: Color(0xFFE8E6FF), fontSize: 11.5)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
       );
 }
 

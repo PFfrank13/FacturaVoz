@@ -8,7 +8,7 @@ Pedido de Frank tras ver la demo de otro sistema: abrir en Vender, comanda y pre
 
 Honestidad / límites:
 - No pude compilar ni probar en teléfono; revisión estática (sintaxis, importaciones). La impresión real depende de tu impresora.
-- La comanda de la tomada en caja NO se guarda en la base (solo se imprime); no aparece en Comandas de la pantalla. Los pedidos de la carta QR sí.
+- Actualización Fase 33+: **la comanda tomada en caja ahora SÍ se guarda en la base** (quotes y quote_items), aparece en Comandas y tiene notas por plato. Requiere ejecutar la nueva migración `20261122_v31_comandas_caja_persistentes.sql`. La impresión sigue requiriendo configuración; un error de impresora ya no elimina el pedido.
 - Cobrar rápido marca la nota como "enviada" (la base solo acepta cobros así); queda registrada como venta pagada.
 - Las fotos de ejemplo no se incluyen (no hay imágenes con licencia en el proyecto).
 
@@ -23,3 +23,10 @@ Ejecutar: flutter pub get && flutter analyze && flutter test
 - Salón y Consultorio: **Cita** · Educación: **Horario / clase**.
 - Se imprimen desde el detalle de la orden/cita (ícono de impresora). Son documentos internos, NO comprobantes de pago. Sin impresora configurada salen en PDF de rollo.
 - Bodega usa el ticket de venta; Mayorista, sus pedidos/cotizaciones en PDF (ya existían).
+
+## Corrección adicional: comanda persistente
+- Guardado transaccional de pedido de caja antes de imprimir, con idempotencia por UUID para reintentos y sin duplicados por reimpresión.
+- La mesa y las notas quedan guardadas, la cocina recibe el pedido por el mismo canal que QR. Pedido congelado hasta tocar Nuevo pedido.
+- El cobro puede vincular la factura interna con el pedido; el estado de cocina es independiente.
+- Guía: `docs/LYCET_BETA_Y_COMANDAS_FASE33.md`.
+- **No probado en Supabase real, Flutter o impresora**; es obligatorio aplicar la migración y probar antes de producción.

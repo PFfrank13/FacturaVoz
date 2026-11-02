@@ -6,6 +6,7 @@ import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
+import '../logic/pos_kitchen.dart';
 import '../logic/sample_catalog.dart';
 import '../models.dart';
 import '../services/live.dart';
@@ -48,6 +49,10 @@ class _PosScreenState extends State<PosScreen> {
   final _table = TextEditingController();
   bool _charging = false;
   bool _seeding = false;
+  bool _savingOrder = false;
+  String? _kitchenRequestId; // Se conserva si la red falla para no duplicar pedidos.
+  String? _savedOrderId;
+  String? _savedOrderNumber;
 
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
   double get _rate => AppState.instance.profile?.taxRate ?? 18;
@@ -104,6 +109,10 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _add(Product p, [double n = 1]) {
+    if (_restaurant && (_kitchenRequestId != null || _savingOrder)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este pedido ya se guardó en Comandas. Pulsa Nuevo pedido para agregar más platos.')));
+      return;
+    }
     Haptics.tap();
     setState(() {
       final q = (_cart[p.id] ?? 0) + n;
@@ -138,6 +147,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _applyCoupon() async {
+    if (_restaurant && (_kitchenRequestId != null || _savingOrder)) return;
     final c = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -212,17 +222,94 @@ class _PosScreenState extends State<PosScreen> {
           if (_products?.where((x) => x.id == e.key).firstOrNull case final p?) ComandaLine(e.value, p.name, _notes[p.id] ?? ''),
       ];
 
-  Future<void> _printComanda() async {
-    if (_cart.isEmpty) return;
+  /// Guardado real en Supabase ANTES de imprimir. La misma requestId se reusa
+  /// en reintentos para que una caída de red no duplique la comanda.
+  Future<bool> _persistKitchenOrder() async {
+    if (!_restaurant || _cart.isEmpty) return false;
+    if (_savedOrderId != null) return true;
+    if (_savingOrder) return false;
+    setState(() => _savingOrder = true);
     try {
-      await printComanda(ComandaData(table: _table.text, waiter: Access.instance.displayName, date: nowText(), lines: _comandaLines()));
-      if (mounted) showSuccess(context, 'Comanda enviada a cocina', icon: Icons.restaurant_rounded);
+      final lines = _lines();
+      final items = <KitchenDraftItem>[];
+      var index = 0;
+      for (final e in _cart.entries) {
+        final p = _products?.where((x) => x.id == e.key).firstOrNull;
+        if (p == null) continue;
+        final line = lines[index++];
+        items.add(KitchenDraftItem(
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          note: _notes[p.id] ?? '',
+        ));
+      }
+      if (items.isEmpty) throw AppException('No hay productos para guardar.');
+      final requestId = _kitchenRequestId ??= newKitchenRequestId();
+      final saved = await V2Repo.createPosKitchenOrder(
+        requestId: requestId,
+        table: _table.text,
+        taxRate: _rate,
+        currency: _cur,
+        items: items.map((it) => it.toJson()).toList(),
+      );
+      if (!mounted) return false;
+      setState(() {
+        _savedOrderId = saved.id;
+        _savedOrderNumber = saved.number;
+      });
+      AppState.instance.bump();
+      showSuccess(context, 'Pedido ${saved.number} guardado en Comandas', icon: Icons.check_circle_rounded);
+      return true;
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is StateError ? e.message : 'No se pudo imprimir la comanda. ${friendly(e)}')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          V2Repo.missing(e) ? 'Falta ejecutar 20261122_v31_comandas_caja_persistentes.sql en Supabase.' : 'No se guardó el pedido: ${friendly(e)}',
+        )));
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _savingOrder = false);
+    }
+  }
+
+  void _newKitchenOrder() {
+    if (_savingOrder) return;
+    // Si hubo timeout, el servidor pudo guardar la comanda aunque no llegara
+    // la respuesta. Obliga a reintentar la MISMA requestId antes de empezar otra.
+    if (_kitchenRequestId != null && _savedOrderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Confirma este pedido reintentando Comanda. No crees otro pedido: podría duplicarse.')));
+      return;
+    }
+    setState(() {
+      _cart.clear();
+      _notes.clear();
+      _coupon = null;
+      _table.clear();
+      _kitchenRequestId = null;
+      _savedOrderId = null;
+      _savedOrderNumber = null;
+    });
+  }
+
+  Future<void> _printComanda() async {
+    if (!await _persistKitchenOrder()) return;
+    try {
+      await printComanda(ComandaData(
+        table: _table.text,
+        waiter: Access.instance.displayName,
+        date: nowText(),
+        order: _savedOrderNumber ?? '',
+        lines: _comandaLines(),
+      ));
+      if (mounted) showSuccess(context, 'Comanda impresa · ${_savedOrderNumber ?? ''}', icon: Icons.restaurant_rounded);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pedido guardado en Comandas; impresión fallida: ${friendly(e)}')));
     }
   }
 
   Future<void> _printPrecuenta() async {
+    if (!await _persistKitchenOrder()) return;
     final p = AppState.instance.profile;
     final lines = _lines();
     if (p == null || lines.isEmpty) return;
@@ -236,9 +323,9 @@ class _PosScreenState extends State<PosScreen> {
         lines: [for (final l in lines) TicketLine(l.quantity, l.description, l.unitPrice, l.amount)],
         totals: [('Subtotal', t.subtotal, false), (p.taxLabel.isEmpty ? 'IGV' : p.taxLabel, t.tax, false), ('TOTAL', t.total, true)],
       ));
-      if (mounted) showSuccess(context, 'Precuenta impresa', icon: Icons.receipt_long_rounded);
+      if (mounted) showSuccess(context, 'Precuenta impresa · ${_savedOrderNumber ?? ''}', icon: Icons.receipt_long_rounded);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is StateError ? e.message : 'No se pudo imprimir la precuenta. ${friendly(e)}')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pedido guardado en Comandas; precuenta no impresa: ${friendly(e)}')));
     }
   }
 
@@ -258,6 +345,8 @@ class _PosScreenState extends State<PosScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(_restaurant ? 'Pedido' : 'Venta', style: t.textTheme.titleLarge),
             const SizedBox(height: 8),
+            if (_restaurant && _savedOrderId != null)
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Guardado en Comandas: ${_savedOrderNumber ?? ''}. Para agregar platos, inicia un pedido nuevo.', style: t.textTheme.bodySmall)),
             Flexible(
               child: ListView(shrinkWrap: true, children: [
                 for (final e in _cart.entries)
@@ -267,12 +356,14 @@ class _PosScreenState extends State<PosScreen> {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
                           Expanded(child: Text(p.name, style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700))),
-                          IconButton(tooltip: 'Quitar uno', onPressed: () { _add(p, -1); setS(() {}); if (_cart.isEmpty) Navigator.pop(ctx); }, icon: const Icon(Icons.remove_circle_outline_rounded)),
+                          IconButton(tooltip: 'Quitar uno', onPressed: _kitchenRequestId != null || _savingOrder ? null : () { _add(p, -1); setS(() {}); if (_cart.isEmpty) Navigator.pop(ctx); }, icon: const Icon(Icons.remove_circle_outline_rounded)),
                           Text(qtyText(e.value), style: t.textTheme.titleMedium),
-                          IconButton(tooltip: 'Agregar uno', onPressed: () { _add(p); setS(() {}); }, icon: const Icon(Icons.add_circle_outline_rounded)),
+                          IconButton(tooltip: 'Agregar uno', onPressed: _kitchenRequestId != null || _savingOrder ? null : () { _add(p); setS(() {}); }, icon: const Icon(Icons.add_circle_outline_rounded)),
                         ]),
                         TextFormField(
                           initialValue: _notes[p.id] ?? '',
+                          enabled: _kitchenRequestId == null && !_savingOrder,
+                          maxLength: 200,
                           onChanged: (v) => _notes[p.id] = v,
                           decoration: const InputDecoration(isDense: true, hintText: 'Nota (ej. sin cebolla, con arroz)', prefixIcon: Icon(Icons.edit_note_rounded)),
                         ),
@@ -285,14 +376,14 @@ class _PosScreenState extends State<PosScreen> {
             const SizedBox(height: 12),
             if (_restaurant)
               Row(children: [
-                Expanded(child: OutlinedButton.icon(onPressed: _printComanda, icon: const Icon(Icons.restaurant_rounded), label: const Text('Comanda'))),
+                Expanded(child: OutlinedButton.icon(onPressed: _savingOrder ? null : () async { await _printComanda(); if (ctx.mounted) setS(() {}); }, icon: const Icon(Icons.restaurant_rounded), label: Text(_savedOrderId == null ? 'Comanda' : 'Reimprimir'))),
                 const SizedBox(width: 8),
-                Expanded(child: OutlinedButton.icon(onPressed: _printPrecuenta, icon: const Icon(Icons.receipt_long_rounded), label: const Text('Precuenta'))),
+                Expanded(child: OutlinedButton.icon(onPressed: _savingOrder ? null : () async { await _printPrecuenta(); if (ctx.mounted) setS(() {}); }, icon: const Icon(Icons.receipt_long_rounded), label: const Text('Precuenta'))),
               ]),
             if (_restaurant) const SizedBox(height: 8),
             FilledButton.icon(
               style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-              onPressed: () {
+              onPressed: _savingOrder ? null : () {
                 Navigator.pop(ctx);
                 _chargeSheet();
               },
@@ -352,6 +443,7 @@ class _PosScreenState extends State<PosScreen> {
 
   Future<void> _fastCharge(String method) async {
     if (_charging) return;
+    if (_restaurant && !await _persistKitchenOrder()) return;
     final lines = _lines();
     if (lines.isEmpty) return;
     setState(() => _charging = true);
@@ -369,13 +461,30 @@ class _PosScreenState extends State<PosScreen> {
       // La base solo acepta cobros sobre una nota "enviada" y la marca "pagada" sola al saldarse.
       await Repo.setStatus(id, 'sent');
       await Repo.addPayment(invoiceId: id, amount: total, method: method);
+      String? kitchenLinkError;
+      if (_restaurant && _savedOrderId != null) {
+        try {
+          await V2Repo.linkPosKitchenInvoice(_savedOrderId!, id);
+        } catch (e) {
+          kitchenLinkError = friendly(e);
+        }
+      }
       AppState.instance.bump();
       if (!mounted) return;
       setState(() {
         _cart.clear();
         _notes.clear();
         _coupon = null;
+        if (_restaurant) {
+          _table.clear();
+          _savedOrderId = null;
+          _savedOrderNumber = null;
+          _kitchenRequestId = null;
+        }
       });
+      if (kitchenLinkError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Venta cobrada, pero no se pudo vincular a la comanda: $kitchenLinkError')));
+      }
       // Se abre la venta con el ticket listo para imprimir (y desde ahí se emite la boleta o factura electrónica).
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
       _load();
@@ -387,6 +496,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _checkout() async {
+    if (_restaurant && !await _persistKitchenOrder()) return;
     final lines = _lines();
     if (lines.isEmpty) return;
     final p = AppState.instance.profile;
@@ -400,9 +510,24 @@ class _PosScreenState extends State<PosScreen> {
     final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft)));
     AppState.instance.bump();
     if (id != null && mounted) {
+      if (_restaurant && _savedOrderId != null) {
+        try {
+          await V2Repo.linkPosKitchenInvoice(_savedOrderId!, id);
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Venta creada; fallo al vincular la comanda: ${friendly(e)}')));
+        }
+      }
+      if (!mounted) return;
       setState(() {
         _cart.clear();
         _coupon = null;
+        _notes.clear();
+        if (_restaurant) {
+          _table.clear();
+          _savedOrderId = null;
+          _savedOrderNumber = null;
+          _kitchenRequestId = null;
+        }
       });
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true)));
       _load();
@@ -438,7 +563,7 @@ class _PosScreenState extends State<PosScreen> {
                   if (_restaurant)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: TextField(controller: _table, decoration: const InputDecoration(isDense: true, labelText: 'Mesa (vacío = para llevar)', prefixIcon: Icon(Icons.table_restaurant_rounded))),
+                      child: TextField(controller: _table, enabled: _kitchenRequestId == null && !_savingOrder, decoration: const InputDecoration(isDense: true, labelText: 'Mesa (vacío = para llevar)', prefixIcon: Icon(Icons.table_restaurant_rounded))),
                     ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -464,8 +589,10 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   Expanded(
                     child: all.isEmpty
-                        ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            const EmptyState(title: 'Sin productos', body: 'Agrega tus productos (con precio y, si quieres, código de barras y foto) en Productos.'),
+                        ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
+                            if (Access.instance.rubro == 'bodega')
+                              const MarketPhotoBanner(title: 'Tu tienda, con identidad propia.', subtitle: 'Añade tus productos con fotos reales.'),
+                            const EmptyState(title: 'Tu catálogo empieza aquí', body: 'Agrega tus productos con sus precios y fotos auténticas. Así tus clientes podrán reconocerlos fácilmente.'),
                             if (sampleCatalog.containsKey(Access.instance.rubro))
                               Padding(
                                 padding: const EdgeInsets.only(top: 12),
@@ -562,14 +689,17 @@ class _PosScreenState extends State<PosScreen> {
                         ]),
                       ),
                     ),
-                    TextButton(onPressed: () => setState(() {
-                      _cart.clear();
-                      _notes.clear();
-                    }), child: const Text('Vaciar')),
+                    TextButton(
+                      onPressed: _savingOrder ? null : (_restaurant ? _newKitchenOrder : () => setState(() {
+                        _cart.clear();
+                        _notes.clear();
+                      })),
+                      child: Text(_restaurant && _savedOrderId != null ? 'Nuevo pedido' : (_restaurant && _kitchenRequestId != null ? 'Pendiente' : 'Vaciar')),
+                    ),
                     const SizedBox(width: 6),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                      onPressed: _charging ? null : _chargeSheet,
+                      onPressed: _charging || _savingOrder ? null : _chargeSheet,
                       icon: const Icon(Icons.point_of_sale_rounded),
                       label: const Text('Cobrar'),
                     ),

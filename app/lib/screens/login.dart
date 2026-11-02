@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -19,7 +18,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _email = TextEditingController();
   final _code = TextEditingController();
   final _password = TextEditingController();
@@ -33,7 +32,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   int _cooldown = 0;
   Timer? _timer;
   late final AnimationController _intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
-  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(seconds: 9))..repeat();
   bool _started = false;
 
   static const _offlineMsg = 'No hay conexión a internet. Revisa tus datos móviles o el Wi‑Fi e inténtalo de nuevo.';
@@ -50,7 +48,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _started = true;
     if (MediaQuery.of(context).disableAnimations) {
       _intro.value = 1;
-      _loop.stop();
     } else {
       _intro.forward();
     }
@@ -65,7 +62,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   @override
   void dispose() {
     _intro.dispose();
-    _loop.dispose();
     _timer?.cancel();
     _email.dispose();
     _code.dispose();
@@ -271,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       body: LayoutBuilder(builder: (context, c) {
         final h = c.maxHeight;
         return Stack(children: [
-          Positioned.fill(child: RepaintBoundary(child: _HeroBackdrop(loop: _loop))),
+          Positioned.fill(child: RepaintBoundary(child: const _HeroBackdrop())),
           // Marca: nace en el centro y sube al hacer sitio a la hoja.
           Positioned.fill(
             child: AnimatedBuilder(
@@ -533,7 +529,7 @@ class _BrandIntro extends StatelessWidget {
             border: Border.all(color: Colors.white.withValues(alpha: .5), width: 1.5),
             boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: .25), blurRadius: 30 * pop)],
           ),
-          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 42),
+          child: const BrandMark(size: 74),
         ),
       ),
       const SizedBox(height: 14),
@@ -553,82 +549,27 @@ class _BrandIntro extends StatelessWidget {
       const SizedBox(height: 6),
       Opacity(
         opacity: Curves.easeOut.transform(const Interval(0.45, 0.62).transform(t.value)),
-        child: Text('Factura hablando.', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: .88), fontSize: 16)),
+        child: Text('Tu negocio en movimiento.', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: .88), fontSize: 16)),
       ),
     ]);
   }
 }
 
 /// Fondo ilustrado y animado: degradado, orbes que flotan y comprobantes translúcidos que se mecen.
+/// Fotografía editorial de un minimarket realista. Sin caricaturas ni interfaces inventadas.
 class _HeroBackdrop extends StatelessWidget {
-  const _HeroBackdrop({required this.loop});
-  final Animation<double> loop;
+  const _HeroBackdrop();
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: loop,
-      builder: (context, _) {
-        final a = loop.value * 2 * math.pi;
-        Widget orb(double size, double x, double y, double ph, double alpha, {Gradient? g}) => Positioned(
-              left: x + 18 * math.sin(a + ph),
-              top: y + 22 * math.cos(a + ph),
-              child: Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: g == null ? Colors.white.withValues(alpha: alpha) : null, gradient: g),
-              ),
-            );
-        Widget ticket(double x, double y, double rot, double ph, double scale) => Positioned(
-              left: x,
-              top: y + 10 * math.sin(a + ph),
-              child: Transform.rotate(
-                angle: rot + .05 * math.sin(a + ph),
-                child: Transform.scale(scale: scale, child: const _MiniTicket()),
-              ),
-            );
-        final w = MediaQuery.sizeOf(context).width;
-        return DecoratedBox(
-          decoration: const BoxDecoration(gradient: Brand.heroGradient),
-          child: Stack(clipBehavior: Clip.hardEdge, children: [
-            orb(260, -90, -60, 0, .10),
-            orb(180, w - 110, 120, 2, .08),
-            orb(120, w * .45, 20, 4, .12, g: Brand.coralGradient),
-            ticket(-18, 70, -.28, 1, .8),
-            ticket(w - 110, 40, .22, 3, .9),
-            ticket(w * .5 - 40, 210, -.08, 5, .62),
-          ]),
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => Stack(fit: StackFit.expand, children: [
+        Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover, alignment: Alignment.center),
+        const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          colors: [Color(0xDA131028), Color(0xB726225E), Color(0xE8141230)],
+          stops: [0, 0.55, 1],
+        ))),
+      ]);
 }
-
-class _MiniTicket extends StatelessWidget {
-  const _MiniTicket();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget line(double w, {double a = .55}) => Container(width: w, height: 6, margin: const EdgeInsets.only(bottom: 7), decoration: BoxDecoration(color: Colors.white.withValues(alpha: a), borderRadius: BorderRadius.circular(3)));
-    return Container(
-      width: 96,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: .35)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        line(40, a: .8),
-        line(70),
-        line(56),
-        const SizedBox(height: 4),
-        Align(alignment: Alignment.centerRight, child: line(34, a: .8)),
-      ]),
-    );
-  }
-}
-
 
 /// Medidor de seguridad de la contraseña con barra animada.
 class _StrengthBar extends StatelessWidget {

@@ -106,14 +106,23 @@ class _RubroPickerScreenState extends State<RubroPickerScreen> {
                       },
                       child: AnimatedContainer(
                         duration: Motion.d(context, Motion.fast),
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: _sel == r.id ? t.colorScheme.primary.withValues(alpha: 0.10) : t.colorScheme.surface,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: _sel == r.id ? t.colorScheme.primary : t.colorScheme.outline, width: _sel == r.id ? 2 : 1),
                         ),
                         child: Row(children: [
-                          Icon(templateFor(r.id).icon, color: t.colorScheme.primary, size: 30),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: SizedBox(width: 72, height: 72, child: r.id == 'bodega'
+                              ? Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover)
+                              : DecoratedBox(
+                                  decoration: BoxDecoration(gradient: Brand.heroGradient),
+                                  child: Icon(templateFor(r.id).icon, color: Colors.white, size: 30),
+                                ),
+                            ),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
