@@ -165,7 +165,7 @@ class SettingsScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                image: DecorationImage(image: AssetImage('assets/photos/${sectorPhotoFor(a.rubro ?? 'bodega')}.webp'), fit: BoxFit.cover, colorFilter: const ColorFilter.mode(Color(0xDD082737), BlendMode.multiply)),
+                image: DecorationImage(image: AssetImage('assets/photos/${sectorPhotoFor(a.rubro ?? 'bodega')}.webp'), fit: BoxFit.cover, colorFilter: const ColorFilter.mode(Color(0xA5082737), BlendMode.multiply)),
                 gradient: Brand.heroGradient,
                 borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
               child: Row(children: [

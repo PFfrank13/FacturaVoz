@@ -703,7 +703,7 @@ class SectorPhotoBanner extends StatelessWidget {
         errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: Brand.heroGradient))),
       const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
         begin: Alignment.centerLeft, end: Alignment.centerRight,
-        colors: [Color(0xF50B1034), Color(0xCB202566), Color(0x17203463)],
+        colors: [Color(0xD80B1034), Color(0x80202566), Color(0x09203463)],
         stops: [0, .55, 1],
       ))),
       Padding(padding: const EdgeInsets.all(18), child: Column(

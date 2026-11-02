@@ -33,7 +33,7 @@ class _LaunchWelcomeState extends State<LaunchWelcome> with SingleTickerProvider
             alignment: Alignment.center),
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          colors: [Color(0xCB0A1132), Color(0x650B1238), Color(0xF50A1132)],
+          colors: [Color(0x8C0A1132), Color(0x300B1238), Color(0xDA0A1132)],
           stops: [0, .48, 1]))),
         SafeArea(child: Padding(padding: const EdgeInsets.all(26), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
