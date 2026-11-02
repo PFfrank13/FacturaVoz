@@ -632,7 +632,7 @@ class _ConfettiPainter extends CustomPainter {
 
 /// Fotografías editoriales integradas por rubro; no pertenecen a ningún catálogo de empresa.
 /// Las fotos reales que suba cada comerciante tienen prioridad sobre estos recursos.
-String sectorPhotoFor(String rubro) => switch (rubro) {
+String sectorPhotoFor(String? rubro) => switch (rubro) {
   'bodega' => 'bodega', 'restaurante' => 'restaurante',
   'servicios_tecnicos' => 'servicios_tecnicos', 'taller' => 'taller',
   'consultorio' => 'consultorio', 'salon' => 'salon',
@@ -640,7 +640,7 @@ String sectorPhotoFor(String rubro) => switch (rubro) {
   'mayorista' => 'mayorista', _ => 'bodega',
 };
 
-Color sectorAccent(String rubro) => switch (rubro) {
+Color sectorAccent(String? rubro) => switch (rubro) {
   'bodega' => const Color(0xFF12B88A),
   'restaurante' => const Color(0xFFFF894D),
   'servicios_tecnicos' => const Color(0xFF00B6D9),
@@ -653,7 +653,7 @@ Color sectorAccent(String rubro) => switch (rubro) {
   _ => const Color(0xFF6B51E6),
 };
 
-IconData sectorIcon(String rubro) => switch (rubro) {
+IconData sectorIcon(String? rubro) => switch (rubro) {
   'bodega' => Icons.storefront_rounded,
   'restaurante' => Icons.restaurant_rounded,
   'servicios_tecnicos' => Icons.build_circle_rounded,
@@ -666,7 +666,7 @@ IconData sectorIcon(String rubro) => switch (rubro) {
   _ => Icons.storefront_rounded,
 };
 
-String sectorShortName(String rubro) => switch (rubro) {
+String sectorShortName(String? rubro) => switch (rubro) {
   'bodega' => 'Bodega / Minimarket', 'restaurante' => 'Restaurante / Cafetería',
   'servicios_tecnicos' => 'Servicios técnicos', 'taller' => 'Taller automotriz',
   'consultorio' => 'Consultorio / Salud', 'salon' => 'Salón / Barbería',
@@ -674,7 +674,7 @@ String sectorShortName(String rubro) => switch (rubro) {
   'mayorista' => 'Mayorista / Distribución', _ => 'Tu negocio',
 };
 
-String sectorTagline(String rubro) => switch (rubro) {
+String sectorTagline(String? rubro) => switch (rubro) {
   'bodega' => 'Vende más, controla tu stock y factura en segundos.',
   'restaurante' => 'Mesas, cocina, carta y cobros conectados.',
   'servicios_tecnicos' => 'Diagnósticos, órdenes de servicio y entregas.',
@@ -690,7 +690,8 @@ String sectorTagline(String rubro) => switch (rubro) {
 /// Cabecera editorial específica: la imagen ambienta y nunca sustituye datos comerciales.
 class SectorPhotoBanner extends StatelessWidget {
   const SectorPhotoBanner({super.key, required this.rubro, required this.title, required this.subtitle, this.height = 148});
-  final String rubro, title, subtitle;
+  final String? rubro;
+  final String title, subtitle;
   final double height;
 
   @override
