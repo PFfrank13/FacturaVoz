@@ -165,7 +165,7 @@ class SettingsScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                image: DecorationImage(image: AssetImage('assets/photos/${sectorPhotoFor(a.rubro)}.webp'), fit: BoxFit.cover, colorFilter: const ColorFilter.mode(Color(0xDD082737), BlendMode.multiply)),
+                image: DecorationImage(image: AssetImage('assets/photos/${sectorPhotoFor(a.rubro ?? 'bodega')}.webp'), fit: BoxFit.cover, colorFilter: const ColorFilter.mode(Color(0xDD082737), BlendMode.multiply)),
                 gradient: Brand.heroGradient,
                 borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
               child: Row(children: [
@@ -183,6 +183,9 @@ class SettingsScreen extends StatelessWidget {
                     Text(org?.name ?? 'Mi cuenta',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
                     Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Text(sectorShortName(a.rubro), maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFFD9DEFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ]),

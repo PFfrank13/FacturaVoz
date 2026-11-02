@@ -101,6 +101,9 @@ class _SellHubScreenState extends State<SellHubScreen> {
               ]),
             ),
           const SizedBox(height: 14),
+          SectorPhotoBanner(rubro: Access.instance.rubro,
+            title: 'Vende a tu manera', subtitle: sectorTagline(Access.instance.rubro), height: 140),
+          const SizedBox(height: 14),
           Reveal(
             index: 1,
             child: Pressable(

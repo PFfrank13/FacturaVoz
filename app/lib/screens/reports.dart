@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../access.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../reports.dart';
@@ -129,6 +130,9 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
           children: [
+            SectorPhotoBanner(rubro: Access.instance.rubro,
+              title: 'Tu negocio, en números', subtitle: sectorTagline(Access.instance.rubro), height: 142),
+            const SizedBox(height: 16),
             if (org != null) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(org, style: t.textTheme.bodySmall)),
             _monthBar(t),
             const SizedBox(height: 16),

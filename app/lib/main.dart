@@ -28,7 +28,7 @@ Future<void> main() async {
   if (kReleaseMode) {
     // En producción nunca se muestra un error técnico crudo al usuario.
     ErrorWidget.builder = (details) => const Material(
-          color: Color(0xFF071B28),
+          color: Color(0xFF0A1132),
           child: Center(
             child: Padding(
               padding: EdgeInsets.all(28),
@@ -99,7 +99,7 @@ class _BootState extends State<_Boot> {
                   Image.asset('assets/photos/welcome_scene.webp', fit: BoxFit.cover),
                   const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
                     begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [Color(0xD0071B28), Color(0xB5093548), Color(0xE5071B28)],
+                    colors: [Color(0xD00A1132), Color(0xAA251B62), Color(0xE50A1132)],
                   ))),
                   const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                     BrandMark(size: 78), SizedBox(height: 18),
@@ -107,7 +107,7 @@ class _BootState extends State<_Boot> {
                         fontWeight: FontWeight.w800, fontSize: 26)),
                     SizedBox(height: 20),
                     SizedBox(width: 26, height: 26,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF52DDCE))),
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF74CFFF))),
                   ])),
                 ]),
         ),

@@ -528,6 +528,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
+            SectorPhotoBanner(rubro: Access.instance.rubro,
+              title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
+            const SizedBox(height: 16),
             TextField(
               onChanged: (v) => setState(() => _q = v),
               decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded), isDense: true),

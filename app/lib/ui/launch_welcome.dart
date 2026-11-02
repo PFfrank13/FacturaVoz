@@ -33,7 +33,7 @@ class _LaunchWelcomeState extends State<LaunchWelcome> with SingleTickerProvider
             alignment: Alignment.center),
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          colors: [Color(0xC3071B28), Color(0x60071B28), Color(0xF5092334)],
+          colors: [Color(0xCB0A1132), Color(0x650B1238), Color(0xF50A1132)],
           stops: [0, .48, 1]))),
         SafeArea(child: Padding(padding: const EdgeInsets.all(26), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -47,7 +47,7 @@ class _LaunchWelcomeState extends State<LaunchWelcome> with SingleTickerProvider
               position: Tween<Offset>(begin: const Offset(0, .12), end: Offset.zero)
                   .animate(CurvedAnimation(parent: _intro, curve: Curves.easeOutCubic)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(width: 44, height: 4, decoration: BoxDecoration(color: const Color(0xFF52DDCE), borderRadius: BorderRadius.circular(8))),
+                Container(width: 44, height: 4, decoration: BoxDecoration(color: const Color(0xFF47D9FF), borderRadius: BorderRadius.circular(8))),
                 const SizedBox(height: 18),
                 const Text('Bienvenido a\nFacturaVoz', style: TextStyle(fontSize: 39, fontWeight: FontWeight.w800,
                     height: 1.09, color: Colors.white, letterSpacing: -1.2)),
@@ -59,7 +59,7 @@ class _LaunchWelcomeState extends State<LaunchWelcome> with SingleTickerProvider
             Padding(padding: EdgeInsets.only(bottom: bottom > 0 ? 0 : 8), child: SizedBox(width: double.infinity,
               child: FilledButton.icon(onPressed: _finish, icon: const Icon(Icons.arrow_forward_rounded),
                 label: const Text('Comenzar'), style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF17A49F), foregroundColor: Colors.white)))),
+                  backgroundColor: const Color(0xFF6348EA), foregroundColor: Colors.white)))),
           ],
         ))),
       ]),

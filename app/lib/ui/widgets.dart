@@ -630,50 +630,138 @@ class _ConfettiPainter extends CustomPainter {
 }
 
 
-/// Visual assets for the nine independent business categories. This imagery is decorative;
-/// actual catalog photos always come from each organization's private storage.
+/// Fotografías editoriales integradas por rubro; no pertenecen a ningún catálogo de empresa.
+/// Las fotos reales que suba cada comerciante tienen prioridad sobre estos recursos.
 String sectorPhotoFor(String rubro) => switch (rubro) {
-  'bodega' => 'bodega',
-  'restaurante' => 'restaurante',
-  'servicios_tecnicos' => 'servicios_tecnicos',
-  'taller' => 'taller',
-  'consultorio' => 'consultorio',
-  'salon' => 'salon',
-  'educacion' => 'educacion',
-  'construccion' => 'construccion',
-  'mayorista' => 'mayorista',
-  _ => 'bodega',
+  'bodega' => 'bodega', 'restaurante' => 'restaurante',
+  'servicios_tecnicos' => 'servicios_tecnicos', 'taller' => 'taller',
+  'consultorio' => 'consultorio', 'salon' => 'salon',
+  'educacion' => 'educacion', 'construccion' => 'construccion',
+  'mayorista' => 'mayorista', _ => 'bodega',
 };
 
-/// Non-clickable branded sector header: never pretends to be a real business product.
+Color sectorAccent(String rubro) => switch (rubro) {
+  'bodega' => const Color(0xFF12B88A),
+  'restaurante' => const Color(0xFFFF894D),
+  'servicios_tecnicos' => const Color(0xFF00B6D9),
+  'taller' => const Color(0xFF328EFC),
+  'consultorio' => const Color(0xFF34B7BC),
+  'salon' => const Color(0xFFEB5AA5),
+  'educacion' => const Color(0xFF8367EF),
+  'construccion' => const Color(0xFFFFA64E),
+  'mayorista' => const Color(0xFF7455EE),
+  _ => const Color(0xFF6B51E6),
+};
+
+IconData sectorIcon(String rubro) => switch (rubro) {
+  'bodega' => Icons.storefront_rounded,
+  'restaurante' => Icons.restaurant_rounded,
+  'servicios_tecnicos' => Icons.build_circle_rounded,
+  'taller' => Icons.car_repair_rounded,
+  'consultorio' => Icons.health_and_safety_rounded,
+  'salon' => Icons.content_cut_rounded,
+  'educacion' => Icons.school_rounded,
+  'construccion' => Icons.construction_rounded,
+  'mayorista' => Icons.local_shipping_rounded,
+  _ => Icons.storefront_rounded,
+};
+
+String sectorShortName(String rubro) => switch (rubro) {
+  'bodega' => 'Bodega / Minimarket', 'restaurante' => 'Restaurante / Cafetería',
+  'servicios_tecnicos' => 'Servicios técnicos', 'taller' => 'Taller automotriz',
+  'consultorio' => 'Consultorio / Salud', 'salon' => 'Salón / Barbería',
+  'educacion' => 'Educación / Academia', 'construccion' => 'Construcción / Obras',
+  'mayorista' => 'Mayorista / Distribución', _ => 'Tu negocio',
+};
+
+String sectorTagline(String rubro) => switch (rubro) {
+  'bodega' => 'Vende más, controla tu stock y factura en segundos.',
+  'restaurante' => 'Mesas, cocina, carta y cobros conectados.',
+  'servicios_tecnicos' => 'Diagnósticos, órdenes de servicio y entregas.',
+  'taller' => 'Vehículos, citas, repuestos y órdenes de trabajo.',
+  'consultorio' => 'Agenda y atención organizada para tus pacientes.',
+  'salon' => 'Citas, servicios, clientes y tu equipo en un lugar.',
+  'educacion' => 'Cursos, matrículas, horarios y pagos.',
+  'construccion' => 'Obras, materiales, presupuestos y avances.',
+  'mayorista' => 'Pedidos, distribución, clientes y precios por volumen.',
+  _ => 'Todo tu negocio, en un solo lugar.',
+};
+
+/// Cabecera editorial específica: la imagen ambienta y nunca sustituye datos comerciales.
 class SectorPhotoBanner extends StatelessWidget {
-  const SectorPhotoBanner({super.key, required this.rubro, required this.title, required this.subtitle});
-  final String rubro;
-  final String title;
-  final String subtitle;
+  const SectorPhotoBanner({super.key, required this.rubro, required this.title, required this.subtitle, this.height = 148});
+  final String rubro, title, subtitle;
+  final double height;
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(24),
-    child: SizedBox(height: 130, child: Stack(fit: StackFit.expand, children: [
+    borderRadius: BorderRadius.circular(25),
+    child: SizedBox(height: height, child: Stack(fit: StackFit.expand, children: [
       Image.asset('assets/photos/${sectorPhotoFor(rubro)}.webp', fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: Brand.heroGradient))),
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: Brand.heroGradient))),
       const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
         begin: Alignment.centerLeft, end: Alignment.centerRight,
-        colors: [Color(0xF5082130), Color(0xC20D3447), Color(0x2C0E4350)],
+        colors: [Color(0xF50B1034), Color(0xCB202566), Color(0x17203463)],
+        stops: [0, .55, 1],
       ))),
-      Padding(padding: const EdgeInsets.all(18), child: Row(children: [
-        Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 20,
-              letterSpacing: -.4, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 7),
-          Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFFE5F7F6), fontSize: 12.5, height: 1.3)),
-        ])),
-        const SizedBox(width: 70),
+      Padding(padding: const EdgeInsets.all(18), child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(color: sectorAccent(rubro).withValues(alpha: .92), borderRadius: BorderRadius.circular(99)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(sectorIcon(rubro), color: Colors.white, size: 13), const SizedBox(width: 5),
+            Flexible(child: Text(sectorShortName(rubro), maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)))
+          ])),
+        const SizedBox(height: 8),
+        Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white, fontSize: 20, letterSpacing: -.5, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 5),
+        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 270),
+          child: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFFE9E7FF), fontSize: 12, height: 1.28))),
       ])),
     ])),
   );
+}
+
+/// Tarjeta fotográfica para seleccionar el rubro durante el alta.
+/// Evita iconos arbitrarios y mantiene controles Flutter accesibles.
+class SectorPhotoTile extends StatelessWidget {
+  const SectorPhotoTile({super.key, required this.rubro, required this.label, required this.selected, this.height = 172});
+  final String rubro, label;
+  final bool selected;
+  final double height;
+  @override
+  Widget build(BuildContext context) {
+    final accent = sectorAccent(rubro);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: selected ? accent : Theme.of(context).colorScheme.outline, width: selected ? 2.5 : 1),
+        boxShadow: selected ? [BoxShadow(color: accent.withValues(alpha: .24), blurRadius: 18, offset: const Offset(0, 6))] : null),
+      child: ClipRRect(borderRadius: BorderRadius.circular(17), child: SizedBox(height: height,
+        child: Stack(fit: StackFit.expand, children: [
+          Image.asset('assets/photos/${sectorPhotoFor(rubro)}.webp', fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: Brand.heroGradient))),
+          const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [Color(0x050C1237), Color(0x360C1237), Color(0xEA101537)]))),
+          Positioned(left: 11, right: 9, bottom: 12, child: Row(children: [
+            Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(9)),
+              child: Icon(sectorIcon(rubro), color: Colors.white, size: 17)),
+            const SizedBox(width: 7),
+            Expanded(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.2))),
+          ])),
+          if (selected) Positioned(top: 9, right: 9, child: Container(padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+            child: Icon(Icons.check_circle_rounded, color: accent, size: 23))),
+        ])),
+      ),
+    );
+  }
 }

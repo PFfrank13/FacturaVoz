@@ -113,16 +113,9 @@ class _RubroPickerScreenState extends State<RubroPickerScreen> {
                           border: Border.all(color: _sel == r.id ? t.colorScheme.primary : t.colorScheme.outline, width: _sel == r.id ? 2 : 1),
                         ),
                         child: Row(children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: SizedBox(width: 72, height: 72, child: Image.asset('assets/photos/${_photoFor(r.id)}.webp',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => DecoratedBox(
-                                decoration: const BoxDecoration(gradient: Brand.heroGradient),
-                                child: Icon(templateFor(r.id).icon, color: Colors.white, size: 30),
-                              )),
-                            ),
-                          ),
+                          SizedBox(width: 88, child: SectorPhotoTile(
+                            rubro: r.id, label: '', selected: _sel == r.id, height: 86,
+                          )),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -157,11 +150,13 @@ class _Preview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    return Padding(
+    return SafeArea(child: SingleChildScrollView(child: Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Así queda: ${spec.name}', style: t.textTheme.titleLarge),
         const SizedBox(height: 12),
+        SectorPhotoBanner(rubro: spec.id, title: spec.name, subtitle: spec.pitch, height: 138),
+        const SizedBox(height: 14),
         Text('Barra de abajo', style: t.textTheme.labelLarge),
         const SizedBox(height: 6),
         Wrap(spacing: 6, runSpacing: 6, children: [
@@ -185,21 +180,7 @@ class _Preview extends StatelessWidget {
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirmar rubro')),
         ]),
       ]),
-    );
+    )));
   }
 }
 
-// Fotos editoriales de categorías. Nunca se mezclan con las imágenes que sube cada empresa.
-String _photoFor(String id) {
-  switch (id) {
-    case 'servicios': case 'servicios_tecnicos': return 'servicios_tecnicos';
-    case 'salon_belleza': case 'salon': return 'salon';
-    case 'educacion': return 'educacion';
-    case 'construccion': return 'construccion';
-    case 'mayorista': return 'mayorista';
-    case 'taller': return 'taller';
-    case 'consultorio': return 'consultorio';
-    case 'restaurante': return 'restaurante';
-    default: return 'bodega';
-  }
-}

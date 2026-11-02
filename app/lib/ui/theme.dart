@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Sistema de diseño de FacturaVoz.
-/// Azul petróleo + menta editorial, fotografía contextual y coral sutil. Nada de dorados decorativos.
+/// Índigo nocturno, violeta eléctrico y cian suave. Fotografía contextual realista; sin dorados decorativos.
 /// Radios de esquina (usar estos en pantallas nuevas en vez de números sueltos).
 class Radii {
   static const sm = 8.0; // chips, barras de progreso
@@ -24,39 +24,39 @@ class Gap {
 }
 
 class Brand {
-  // Violeta-lavanda sereno (confianza y calma) + coral durazno cálido (invita a actuar).
-  static const indigo = Color(0xFF087E94);
-  static const indigoDeep = Color(0xFF0D5268);
-  static const indigoSoft = Color(0xFF7CE1D7);
-  static const lilac = Color(0xFF51B9C3);
-  static const gold = Color(0xFFEF8872); // coral durazno (acción de dictar)
-  static const goldDeep = Color(0xFFE96E75);
-  static const onGold = Color(0xFF2B2434);
+  // Índigo + violeta profesional, con cian reservado para voz y acciones rápidas.
+  static const indigo = Color(0xFF5948DB);
+  static const indigoDeep = Color(0xFF302A85);
+  static const indigoSoft = Color(0xFFA9A1FF);
+  static const lilac = Color(0xFF8064F2);
+  static const gold = Color(0xFF00BAD8); // cian para dictado y accesos esenciales
+  static const goldDeep = Color(0xFF3386FF);
+  static const onGold = Color(0xFF071A34);
 
   static const ok = Color(0xFF23956F);
   static const warn = Color(0xFFC57A12);
   static const bad = Color(0xFFD94A5E);
 
-  static const lightBg = Color(0xFFF4F8F8);
-  static const lightInk = Color(0xFF122A39);
-  static const lightMuted = Color(0xFF667B86);
-  static const lightLine = Color(0xFFDCE8EA);
+  static const lightBg = Color(0xFFF6F7FD);
+  static const lightInk = Color(0xFF17183C);
+  static const lightMuted = Color(0xFF737996);
+  static const lightLine = Color(0xFFE4E7F7);
 
-  static const darkBg = Color(0xFF071B28);
-  static const darkCard = Color(0xFF102A39);
-  static const darkInk = Color(0xFFEFF8F8);
-  static const darkMuted = Color(0xFFB0D1D4);
-  static const darkLine = Color(0xFF234351);
+  static const darkBg = Color(0xFF0A1132);
+  static const darkCard = Color(0xFF171C40);
+  static const darkInk = Color(0xFFF4F5FF);
+  static const darkMuted = Color(0xFFB5B9D8);
+  static const darkLine = Color(0xFF333A68);
 
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF09283D), Color(0xFF0C6075), Color(0xFF17A49F)],
+    colors: [Color(0xFF101C58), Color(0xFF4631B7), Color(0xFF8048F5)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFFA77F), Color(0xFFFF7E9A)],
+    colors: [Color(0xFF6445F5), Color(0xFF2F8CFC)],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
@@ -68,7 +68,7 @@ class Brand {
   /// Sombra suave y difusa (nunca dura): da sensación de flotar.
   static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => [
         BoxShadow(
-          color: (dark ? Colors.black : const Color(0xFF087E94)).withValues(alpha: dark ? 0.35 : a),
+          color: (dark ? Colors.black : const Color(0xFF5948DB)).withValues(alpha: dark ? 0.35 : a),
           blurRadius: 28,
           offset: const Offset(0, 10),
         ),
@@ -118,12 +118,12 @@ ThemeData buildTheme(Brightness b) {
     onSurfaceVariant: muted,
     outline: line,
     outlineVariant: line,
-    surfaceContainerHighest: dark ? const Color(0xFF204354) : const Color(0xFFE3F2F1),
-    surfaceContainerHigh: dark ? const Color(0xFF19394A) : const Color(0xFFECF5F5),
+    surfaceContainerHighest: dark ? const Color(0xFF292D5B) : const Color(0xFFE9E9FC),
+    surfaceContainerHigh: dark ? const Color(0xFF21264B) : const Color(0xFFF0F0FC),
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF174D59) : const Color(0xFFE0F6F2),
+    primaryContainer: dark ? const Color(0xFF343270) : const Color(0xFFEBE7FF),
     onPrimaryContainer: dark ? Brand.indigoSoft : Brand.indigoDeep,
   );
 
@@ -184,7 +184,8 @@ ThemeData buildTheme(Brightness b) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 54),
-        shape: RoundedRectangleBorder(borderRadius: radius),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         textStyle: const TextStyle(fontFamily: _font, fontSize: 15.5, fontWeight: FontWeight.w600),
       ),
     ),
@@ -205,7 +206,7 @@ ThemeData buildTheme(Brightness b) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: dark ? const Color(0xFF174D59) : Brand.lightInk,
+      backgroundColor: dark ? const Color(0xFF343270) : Brand.lightInk,
       contentTextStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
@@ -246,7 +247,7 @@ ThemeData buildTheme(Brightness b) {
     ),
     textSelectionTheme: TextSelectionThemeData(cursorColor: primary, selectionColor: primary.withValues(alpha: 0.25), selectionHandleColor: primary),
     tooltipTheme: TooltipThemeData(
-      decoration: BoxDecoration(color: dark ? const Color(0xFF174D59) : Brand.lightInk, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: dark ? const Color(0xFF343270) : Brand.lightInk, borderRadius: BorderRadius.circular(10)),
       textStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12.5),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),

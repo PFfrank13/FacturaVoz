@@ -113,8 +113,18 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
     final t = Theme.of(context);
     return ListView(padding: const EdgeInsets.all(24), children: [
       const SizedBox(height: 12),
-      const Reveal(child: Center(child: BrandMark(size: 76))),
-      const SizedBox(height: 26),
+      const Reveal(child: ClipRRect(
+        borderRadius: BorderRadius.all(Radius.circular(26)),
+        child: SizedBox(height: 188, child: Stack(fit: StackFit.expand, children: [
+          Image(image: AssetImage('assets/photos/welcome_scene.webp'), fit: BoxFit.cover),
+          DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+            colors: [Color(0xC9101746), Color(0x25101746)],
+            begin: Alignment.centerLeft, end: Alignment.centerRight))),
+          Align(alignment: Alignment.centerLeft, child: Padding(
+            padding: EdgeInsets.all(22), child: BrandMark(size: 72))),
+        ])),
+      )),
+      const SizedBox(height: 22),
       Reveal(index: 1, child: Text('Tu negocio, ordenado a tu manera', textAlign: TextAlign.center, style: t.textTheme.headlineSmall)),
       const SizedBox(height: 10),
       Reveal(
@@ -158,7 +168,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('¿Qué tipo de negocio tienes?', style: t.textTheme.headlineSmall),
           const SizedBox(height: 4),
-          Text('Puedes cambiarlo cuando quieras en Ajustes.', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+          Text('Cada negocio tendrá sus propias funciones y datos, sin mezclarse con otros rubros.', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ]),
       ),
       Expanded(
@@ -166,7 +176,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
           final cols = c.maxWidth > 560 ? 3 : 2;
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(190)),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(178)),
             itemCount: rubros.length,
             itemBuilder: (context, i) {
               final b = templateFor(rubros[i].id);
@@ -178,31 +188,11 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
                     Haptics.select();
                     setState(() => _type = b.id);
                   },
-                  child: AnimatedContainer(
-                    duration: Motion.d(context, Motion.fast),
-                    curve: Motion.shadow,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: on ? t.colorScheme.primary.withValues(alpha: 0.10) : t.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: on ? t.colorScheme.primary : t.colorScheme.outline, width: on ? 2 : 1),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Icon(b.icon, color: t.colorScheme.primary, size: 28),
-                        const Spacer(),
-                        AnimatedScale(
-                          scale: on ? 1 : 0,
-                          duration: Motion.d(context, Motion.medium),
-                          curve: Motion.spring,
-                          child: Icon(Icons.check_circle_rounded, color: t.colorScheme.primary),
-                        ),
-                      ]),
-                      const SizedBox(height: 10),
-                      Text(b.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Expanded(child: Text(b.pitch, maxLines: 4, overflow: TextOverflow.ellipsis, style: t.textTheme.bodySmall)),
-                    ]),
+                  child: SectorPhotoTile(
+                    rubro: b.id,
+                    label: b.name,
+                    selected: on,
+                    height: MediaQuery.textScalerOf(context).scale(174),
                   ),
                 ),
               );

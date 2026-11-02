@@ -169,6 +169,11 @@ class _ClientsHubScreenState extends State<ClientsHubScreen> {
               ]),
             ),
           ),
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: SectorPhotoBanner(rubro: a.rubro,
+              title: 'Tus clientes, bien atendidos',
+              subtitle: 'Historial y seguimiento independientes para cada negocio.', height: 132))),
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
           SliverToBoxAdapter(child: FeatureStrip(ids: const ['trabajos', 'agenda', 'fiados', 'encuestas', 'clientes360'])),
           if (_alerts.isNotEmpty && q.isEmpty) ...[

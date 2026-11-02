@@ -607,8 +607,11 @@ class _PosScreenState extends State<PosScreen> {
                   Expanded(
                     child: all.isEmpty
                         ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
-                            if (Access.instance.rubro == 'bodega')
-                              const MarketPhotoBanner(title: 'Tu tienda, con identidad propia.', subtitle: 'Añade tus productos con fotos reales.'),
+                            SectorPhotoBanner(
+                              rubro: Access.instance.rubro,
+                              title: _restaurant ? 'Tu carta, con personalidad' : 'Tu catálogo, con identidad',
+                              subtitle: _restaurant ? 'Agrega platos y fotos de tu propia cocina.' : 'Añade productos con fotos reales y precios de tu negocio.',
+                            ),
                             const EmptyState(title: 'Tu catálogo empieza aquí', body: 'Agrega tus productos con sus precios y fotos auténticas. Así tus clientes podrán reconocerlos fácilmente.'),
                             if (sampleCatalog.containsKey(Access.instance.rubro))
                               Padding(
