@@ -39,22 +39,25 @@ String displayDate(String iso) {
 }
 
 class LineItem {
-  LineItem({this.description = '', this.quantity = 1, this.unitPrice = 0});
+  LineItem({this.description = '', this.quantity = 1, this.unitPrice = 0, this.productId});
 
   String description;
   double quantity;
   double unitPrice;
+  String? productId; // SKU identity for stock; descriptions may repeat.
 
   factory LineItem.fromJson(Map<String, dynamic> j) => LineItem(
         description: (j['description'] ?? '') as String,
         quantity: _num(j['quantity']),
         unitPrice: _num(j['unit_price']),
+        productId: j['product_id'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
         'description': description.trim(),
         'quantity': round2(quantity),
         'unit_price': round2(unitPrice),
+        if (productId != null) 'product_id': productId,
       };
 
   /// Mismo redondeo que se guarda en la base de datos (2 decimales).

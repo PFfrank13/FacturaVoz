@@ -48,6 +48,8 @@ class _PosScreenState extends State<PosScreen> {
   final Map<String, String> _notes = {}; // nota por producto ("sin cebolla")
   final _table = TextEditingController();
   bool _charging = false;
+  String? _chargeRequestId; // Preserve across timeout/retry to avoid duplicate invoice/payment.
+  String? _chargeMethod;
   bool _seeding = false;
   bool _savingOrder = false;
   String? _kitchenRequestId; // Se conserva si la red falla para no duplicar pedidos.
@@ -147,6 +149,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _applyCoupon() async {
+    if (_chargeRequestId != null) return; // No changes while a checkout may have committed.
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) return;
     final c = TextEditingController();
     final ok = await showDialog<bool>(
@@ -179,7 +182,7 @@ class _PosScreenState extends State<PosScreen> {
       final p = _products?.where((x) => x.id == e.key).firstOrNull;
       if (p == null) continue;
       final pr = _price(p, e.value);
-      out.add(LineItem(description: pr.reason.isEmpty ? p.name : '${p.name} (${pr.reason})', quantity: e.value, unitPrice: pr.unitPrice));
+      out.add(LineItem(description: pr.reason.isEmpty ? p.name : '${p.name} (${pr.reason})', quantity: e.value, unitPrice: pr.unitPrice, productId: p.id));
     }
     final c = _coupon;
     if (c != null && out.isNotEmpty) {
@@ -331,6 +334,10 @@ class _PosScreenState extends State<PosScreen> {
 
   /// Detalle del pedido: cantidades, nota por producto y (restaurante) comanda y precuenta.
   Future<void> _cartSheet() async {
+    if (_chargeRequestId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cobro pendiente de confirmación. Reintenta antes de editar el pedido.')));
+      return;
+    }
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -443,9 +450,15 @@ class _PosScreenState extends State<PosScreen> {
 
   Future<void> _fastCharge(String method) async {
     if (_charging) return;
+    if (_chargeMethod != null && _chargeMethod != method) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reintenta con el mismo método del primer cobro para evitar diferencias.')));
+      return;
+    }
     if (_restaurant && !await _persistKitchenOrder()) return;
     final lines = _lines();
     if (lines.isEmpty) return;
+    _chargeRequestId ??= Repo.newRequestId();
+    _chargeMethod ??= method;
     setState(() => _charging = true);
     try {
       final table = _table.text.trim();
@@ -456,11 +469,9 @@ class _PosScreenState extends State<PosScreen> {
         notes: [if (table.isNotEmpty) 'Mesa $table', if (_coupon != null) 'Cupón ${_coupon!.code}'].join(' · '),
         transcript: 'Venta rápida',
       );
-      final id = await Repo.createInvoice(draft);
-      final total = computeTotals(lines, _rate).total;
-      // La base solo acepta cobros sobre una nota "enviada" y la marca "pagada" sola al saldarse.
-      await Repo.setStatus(id, 'sent');
-      await Repo.addPayment(invoiceId: id, amount: total, method: method);
+      final id = await Repo.fastCheckoutAtomic(
+        draft: draft, method: method, requestId: _chargeRequestId!);
+      // Transaction confirmed by PostgreSQL; only then show success and print.
       String? kitchenLinkError;
       if (_restaurant && _savedOrderId != null) {
         try {
@@ -475,6 +486,8 @@ class _PosScreenState extends State<PosScreen> {
         _cart.clear();
         _notes.clear();
         _coupon = null;
+        _chargeRequestId = null;
+        _chargeMethod = null;
         if (_restaurant) {
           _table.clear();
           _savedOrderId = null;
@@ -489,13 +502,17 @@ class _PosScreenState extends State<PosScreen> {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'No se pudo cobrar. ${friendly(e)}')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; no se creará una venta duplicada si ya fue registrada. ${friendly(e)}')));
     } finally {
       if (mounted) setState(() => _charging = false);
     }
   }
 
   Future<void> _checkout() async {
+    if (_chargeRequestId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Primero confirma o recupera el cobro rápido pendiente.')));
+      return;
+    }
     if (_restaurant && !await _persistKitchenOrder()) return;
     final lines = _lines();
     if (lines.isEmpty) return;

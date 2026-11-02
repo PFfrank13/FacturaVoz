@@ -20,6 +20,7 @@ import 'screens/login.dart';
 import 'screens/onboarding.dart';
 import 'screens/profile_form.dart';
 import 'ui/theme.dart';
+import 'ui/launch_welcome.dart';
 import 'ui/widgets.dart';
 
 Future<void> main() async {
@@ -27,7 +28,7 @@ Future<void> main() async {
   if (kReleaseMode) {
     // En producción nunca se muestra un error técnico crudo al usuario.
     ErrorWidget.builder = (details) => const Material(
-          color: Color(0xFF14132B),
+          color: Color(0xFF071B28),
           child: Center(
             child: Padding(
               padding: EdgeInsets.all(28),
@@ -94,7 +95,21 @@ class _BootState extends State<_Boot> {
                   padding: EdgeInsets.all(28),
                   child: Text('No se pudo iniciar la app.\nRevisa tu conexión y ábrela de nuevo.', textAlign: TextAlign.center),
                 )
-              : const _Splash(),
+              : Stack(fit: StackFit.expand, children: [
+                  Image.asset('assets/photos/welcome_scene.webp', fit: BoxFit.cover),
+                  const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [Color(0xD0071B28), Color(0xB5093548), Color(0xE5071B28)],
+                  ))),
+                  const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    BrandMark(size: 78), SizedBox(height: 18),
+                    Text('FacturaVoz', style: TextStyle(color: Colors.white,
+                        fontWeight: FontWeight.w800, fontSize: 26)),
+                    SizedBox(height: 20),
+                    SizedBox(width: 26, height: 26,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF52DDCE))),
+                  ])),
+                ]),
         ),
       ),
     );
@@ -143,7 +158,7 @@ class FacturaVozApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: const AuthGate(),
+        home: const LaunchWelcome(child: AuthGate()),
       ),
     );
   }

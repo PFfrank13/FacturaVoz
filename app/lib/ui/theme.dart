@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Sistema de diseño de FacturaVoz.
-/// Púrpura profundo + turquesa editorial y coral sutil. Nada de dorados decorativos.
+/// Azul petróleo + menta editorial, fotografía contextual y coral sutil. Nada de dorados decorativos.
 /// Radios de esquina (usar estos en pantallas nuevas en vez de números sueltos).
 class Radii {
   static const sm = 8.0; // chips, barras de progreso
@@ -25,33 +25,33 @@ class Gap {
 
 class Brand {
   // Violeta-lavanda sereno (confianza y calma) + coral durazno cálido (invita a actuar).
-  static const indigo = Color(0xFF6551E9);
-  static const indigoDeep = Color(0xFF4635BA);
-  static const indigoSoft = Color(0xFFBEB4FF);
-  static const lilac = Color(0xFF9888F3);
-  static const gold = Color(0xFFFF867D); // coral durazno (acción de dictar)
-  static const goldDeep = Color(0xFFFF658C);
-  static const onGold = Color(0xFF3B1D2E);
+  static const indigo = Color(0xFF087E94);
+  static const indigoDeep = Color(0xFF0D5268);
+  static const indigoSoft = Color(0xFF7CE1D7);
+  static const lilac = Color(0xFF51B9C3);
+  static const gold = Color(0xFFEF8872); // coral durazno (acción de dictar)
+  static const goldDeep = Color(0xFFE96E75);
+  static const onGold = Color(0xFF2B2434);
 
   static const ok = Color(0xFF23956F);
   static const warn = Color(0xFFC57A12);
   static const bad = Color(0xFFD94A5E);
 
-  static const lightBg = Color(0xFFF7F8FC);
-  static const lightInk = Color(0xFF1A1835);
-  static const lightMuted = Color(0xFF74758D);
-  static const lightLine = Color(0xFFE8E9F2);
+  static const lightBg = Color(0xFFF4F8F8);
+  static const lightInk = Color(0xFF122A39);
+  static const lightMuted = Color(0xFF667B86);
+  static const lightLine = Color(0xFFDCE8EA);
 
-  static const darkBg = Color(0xFF101126);
-  static const darkCard = Color(0xFF1A1D36);
-  static const darkInk = Color(0xFFF5F6FF);
-  static const darkMuted = Color(0xFFB1B5D0);
-  static const darkLine = Color(0xFF30334D);
+  static const darkBg = Color(0xFF071B28);
+  static const darkCard = Color(0xFF102A39);
+  static const darkInk = Color(0xFFEFF8F8);
+  static const darkMuted = Color(0xFFB0D1D4);
+  static const darkLine = Color(0xFF234351);
 
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF27265F), Color(0xFF5141C1), Color(0xFF785DE6)],
+    colors: [Color(0xFF09283D), Color(0xFF0C6075), Color(0xFF17A49F)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -68,7 +68,7 @@ class Brand {
   /// Sombra suave y difusa (nunca dura): da sensación de flotar.
   static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => [
         BoxShadow(
-          color: (dark ? Colors.black : const Color(0xFF6551E9)).withValues(alpha: dark ? 0.35 : a),
+          color: (dark ? Colors.black : const Color(0xFF087E94)).withValues(alpha: dark ? 0.35 : a),
           blurRadius: 28,
           offset: const Offset(0, 10),
         ),
@@ -118,12 +118,12 @@ ThemeData buildTheme(Brightness b) {
     onSurfaceVariant: muted,
     outline: line,
     outlineVariant: line,
-    surfaceContainerHighest: dark ? const Color(0xFF2A2954) : const Color(0xFFEFEDFA),
-    surfaceContainerHigh: dark ? const Color(0xFF25244A) : const Color(0xFFF3F1FC),
+    surfaceContainerHighest: dark ? const Color(0xFF204354) : const Color(0xFFE3F2F1),
+    surfaceContainerHigh: dark ? const Color(0xFF19394A) : const Color(0xFFECF5F5),
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF34336F) : const Color(0xFFEBE9FF),
+    primaryContainer: dark ? const Color(0xFF174D59) : const Color(0xFFE0F6F2),
     onPrimaryContainer: dark ? Brand.indigoSoft : Brand.indigoDeep,
   );
 
@@ -167,7 +167,7 @@ ThemeData buildTheme(Brightness b) {
       color: card,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: line)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: line.withValues(alpha: 0.58))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -205,7 +205,7 @@ ThemeData buildTheme(Brightness b) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: dark ? const Color(0xFF34336F) : Brand.lightInk,
+      backgroundColor: dark ? const Color(0xFF174D59) : Brand.lightInk,
       contentTextStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
@@ -246,7 +246,7 @@ ThemeData buildTheme(Brightness b) {
     ),
     textSelectionTheme: TextSelectionThemeData(cursorColor: primary, selectionColor: primary.withValues(alpha: 0.25), selectionHandleColor: primary),
     tooltipTheme: TooltipThemeData(
-      decoration: BoxDecoration(color: dark ? const Color(0xFF34336F) : Brand.lightInk, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: dark ? const Color(0xFF174D59) : Brand.lightInk, borderRadius: BorderRadius.circular(10)),
       textStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12.5),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),

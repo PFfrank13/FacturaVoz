@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../errors.dart';
@@ -226,6 +227,39 @@ class Repo {
         }
       }
     }
+    return id;
+  }
+
+
+  /// UUIDv4 generated with a cryptographic source. Reuse this ID on every retry.
+  static String newRequestId() {
+    final random = math.Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    final h = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+  }
+
+  /// Creates invoice, issues it, decrements SKU stock and registers payment in ONE DB transaction.
+  /// Requires migration 20261123. Never fall back to three separate requests.
+  static Future<String> fastCheckoutAtomic({
+    required InvoiceDraft draft, required String method, required String requestId,
+  }) async {
+    final org = activeOrgId;
+    if (org == null) throw AppException('Selecciona una empresa antes de vender.');
+    final result = await _db.rpc('fast_checkout_atomic', params: {
+      'p_org_id': org, 'p_request_id': requestId,
+      'p_items': draft.items.map((e) => e.toJson()).toList(),
+      'p_tax_rate': round2(draft.taxRate), 'p_currency': draft.currency,
+      'p_method': method, 'p_notes': draft.notes,
+    });
+    if (result is! List || result.isEmpty || result.first is! Map) {
+      throw AppException('El servidor no confirmó el cobro. Comprueba el estado antes de repetirlo.');
+    }
+    final data = Map<String, dynamic>.from(result.first as Map);
+    final id = data['invoice_id'] as String?;
+    if (id == null) throw AppException('No se recibió un identificador de venta.');
     return id;
   }
 

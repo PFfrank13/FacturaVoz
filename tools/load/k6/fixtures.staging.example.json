@@ -1,0 +1,9 @@
+[
+  {
+    "org_id": "00000000-0000-4000-8000-000000000001",
+    "product_id": "00000000-0000-4000-8000-000000000002",
+    "product_name": "Producto de prueba",
+    "price": 10,
+    "token": "JWT_AUTENTICADO_DE_USUARIO_FICTICIO"
+  }
+]

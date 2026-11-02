@@ -6,11 +6,11 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models.dart';
 
-const _ink = PdfColor.fromInt(0xFF201C36);
-const _muted = PdfColor.fromInt(0xFF687186);
-const _brand = PdfColor.fromInt(0xFF5141C1);
-const _line = PdfColor.fromInt(0xFFE3E4EC);
-const _soft = PdfColor.fromInt(0xFFF5F5FA);
+const _ink = PdfColor.fromInt(0xFF142B39);
+const _muted = PdfColor.fromInt(0xFF627986);
+const _brand = PdfColor.fromInt(0xFF0A7D91);
+const _line = PdfColor.fromInt(0xFFDBE8E8);
+const _soft = PdfColor.fromInt(0xFFF2F8F8);
 
 double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
 Map<String, dynamic> _m(dynamic v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};

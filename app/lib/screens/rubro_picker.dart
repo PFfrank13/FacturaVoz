@@ -115,12 +115,12 @@ class _RubroPickerScreenState extends State<RubroPickerScreen> {
                         child: Row(children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(14),
-                            child: SizedBox(width: 72, height: 72, child: r.id == 'bodega'
-                              ? Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover)
-                              : DecoratedBox(
-                                  decoration: BoxDecoration(gradient: Brand.heroGradient),
-                                  child: Icon(templateFor(r.id).icon, color: Colors.white, size: 30),
-                                ),
+                            child: SizedBox(width: 72, height: 72, child: Image.asset('assets/photos/${_photoFor(r.id)}.webp',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => DecoratedBox(
+                                decoration: const BoxDecoration(gradient: Brand.heroGradient),
+                                child: Icon(templateFor(r.id).icon, color: Colors.white, size: 30),
+                              )),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -186,5 +186,20 @@ class _Preview extends StatelessWidget {
         ]),
       ]),
     );
+  }
+}
+
+// Fotos editoriales de categorías. Nunca se mezclan con las imágenes que sube cada empresa.
+String _photoFor(String id) {
+  switch (id) {
+    case 'servicios': case 'servicios_tecnicos': return 'servicios_tecnicos';
+    case 'salon_belleza': case 'salon': return 'salon';
+    case 'educacion': return 'educacion';
+    case 'construccion': return 'construccion';
+    case 'mayorista': return 'mayorista';
+    case 'taller': return 'taller';
+    case 'consultorio': return 'consultorio';
+    case 'restaurante': return 'restaurante';
+    default: return 'bodega';
   }
 }

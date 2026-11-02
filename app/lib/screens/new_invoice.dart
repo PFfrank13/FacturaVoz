@@ -34,7 +34,11 @@ class _Row {
   _Row(LineItem i)
       : desc = TextEditingController(text: i.description),
         qty = TextEditingController(text: qtyText(i.quantity)),
-        price = TextEditingController(text: i.unitPrice == 0 ? '' : qtyText(i.unitPrice));
+        price = TextEditingController(text: i.unitPrice == 0 ? '' : qtyText(i.unitPrice)),
+        productId = i.productId,
+        initialDescription = i.description;
+  final String? productId;
+  final String initialDescription;
   final TextEditingController desc;
   final TextEditingController qty;
   final TextEditingController price;
@@ -243,7 +247,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       // Reemplaza la línea vacía si es la única; si no, agrega una nueva.
       final empty = _rows.length == 1 && _rows.first.desc.text.trim().isEmpty && _rows.first.price.text.trim().isEmpty;
       if (empty) _rows.removeAt(0).dispose();
-      _rows.add(_Row(LineItem(description: p.name, quantity: 1, unitPrice: p.unitPrice)));
+      _rows.add(_Row(LineItem(description: p.name, quantity: 1, unitPrice: p.unitPrice, productId: p.id)));
       _dirty = true;
     });
   }
@@ -426,6 +430,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
             description: r.desc.text,
             quantity: parseDecimal(r.qty.text) ?? 0,
             unitPrice: parseDecimal(r.price.text) ?? 0,
+            productId: r.desc.text.trim() == r.initialDescription.trim() ? r.productId : null,
           ))
       .toList();
 

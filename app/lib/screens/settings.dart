@@ -164,7 +164,10 @@ class SettingsScreen extends StatelessWidget {
           Reveal(
             child: Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
+              decoration: BoxDecoration(
+                image: DecorationImage(image: AssetImage('assets/photos/${sectorPhotoFor(a.rubro)}.webp'), fit: BoxFit.cover, colorFilter: const ColorFilter.mode(Color(0xDD082737), BlendMode.multiply)),
+                gradient: Brand.heroGradient,
+                borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
               child: Row(children: [
                 Container(
                   width: 52,

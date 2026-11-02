@@ -89,53 +89,11 @@ class BrandMark extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        label: 'FacturaVoz',
-        image: true,
-        child: Image.asset(
-          'assets/branding/facturavoz_mark.png',
-          width: size,
-          height: size,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
-        ),
-      );
-}
-
-/// Fotografía ambiental realista: solo usa imágenes empaquetadas, nunca la de otra empresa.
-/// El catálogo POS conserva exclusivamente las fotos aportadas por el negocio.
-class MarketPhotoBanner extends StatelessWidget {
-  const MarketPhotoBanner({super.key, this.title = 'Más control. Más tiempo para vender.', this.subtitle = 'Tu negocio se mueve contigo.'});
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-        label: '$title. $subtitle',
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: SizedBox(
-            height: 166,
-            child: Stack(fit: StackFit.expand, children: [
-              Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover),
-              const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
-                begin: Alignment.centerLeft, end: Alignment.centerRight,
-                colors: [Color(0xEC14122F), Color(0xC0151339), Color(0x05171339)],
-                stops: [0, .55, 1],
-              ))),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Text('FACTURAVOZ  /  TU BODEGA', style: TextStyle(fontFamily: 'Inter', fontSize: 10, letterSpacing: 1.3, color: Color(0xFF93F4E8), fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  ConstrainedBox(constraints: const BoxConstraints(maxWidth: 240), child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', fontSize: 19, height: 1.15, color: Colors.white, fontWeight: FontWeight.w800))),
-                  const SizedBox(height: 6),
-                  Text(subtitle, style: const TextStyle(fontFamily: 'Inter', color: Color(0xFFE8E6FF), fontSize: 11.5)),
-                ]),
-              ),
-            ]),
-          ),
-        ),
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(size * .29),
+        child: Image.asset('assets/branding/facturavoz_icon.png',
+            width: size, height: size, fit: BoxFit.contain,
+            filterQuality: FilterQuality.high),
       );
 }
 
@@ -478,7 +436,8 @@ class SoftCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? Theme.of(context).colorScheme.surface,
         borderRadius: shape,
-        boxShadow: Brand.softShadow(dark, a: 0.07),
+        boxShadow: Brand.softShadow(dark, a: 0.075),
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.34)),
       ),
       // Material transparente ENCIMA del color: los ListTile/InkWell de adentro dibujan su efecto de toque aquí
       // (si no, el color de la tarjeta lo tapa y Flutter muestra "EXCEPTION CAUGHT BY FLUTTER FRAMEWORK" en depuración).
@@ -668,4 +627,53 @@ class _ConfettiPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ConfettiPainter old) => old.t != t;
+}
+
+
+/// Visual assets for the nine independent business categories. This imagery is decorative;
+/// actual catalog photos always come from each organization's private storage.
+String sectorPhotoFor(String rubro) => switch (rubro) {
+  'bodega' => 'bodega',
+  'restaurante' => 'restaurante',
+  'servicios_tecnicos' => 'servicios_tecnicos',
+  'taller' => 'taller',
+  'consultorio' => 'consultorio',
+  'salon' => 'salon',
+  'educacion' => 'educacion',
+  'construccion' => 'construccion',
+  'mayorista' => 'mayorista',
+  _ => 'bodega',
+};
+
+/// Non-clickable branded sector header: never pretends to be a real business product.
+class SectorPhotoBanner extends StatelessWidget {
+  const SectorPhotoBanner({super.key, required this.rubro, required this.title, required this.subtitle});
+  final String rubro;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(24),
+    child: SizedBox(height: 130, child: Stack(fit: StackFit.expand, children: [
+      Image.asset('assets/photos/${sectorPhotoFor(rubro)}.webp', fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: Brand.heroGradient))),
+      const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+        begin: Alignment.centerLeft, end: Alignment.centerRight,
+        colors: [Color(0xF5082130), Color(0xC20D3447), Color(0x2C0E4350)],
+      ))),
+      Padding(padding: const EdgeInsets.all(18), child: Row(children: [
+        Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 20,
+              letterSpacing: -.4, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 7),
+          Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFFE5F7F6), fontSize: 12.5, height: 1.3)),
+        ])),
+        const SizedBox(width: 70),
+      ])),
+    ])),
+  );
 }
