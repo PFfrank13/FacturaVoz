@@ -18,7 +18,7 @@ class Config {
   static const googleLogin = bool.fromEnvironment('GOOGLE_LOGIN');
 
   /// Esquema de retorno del inicio de sesión con navegador (debe coincidir con el manifest y con Supabase).
-  static const authRedirect = 'com.facturavoz.app://login-callback';
+  static const authRedirect = 'dev.solvexsoftware.facturavoz://login-callback';
 
   static bool _secure(String u) =>
       u.startsWith('https://') ||
