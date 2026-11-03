@@ -212,7 +212,7 @@ class _ProfileGateState extends State<ProfileGate> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: AppState.instance,
+      listenable: Listenable.merge([AppState.instance, Access.instance]),
       builder: (context, _) {
         final s = AppState.instance;
         if (s.loading || (s.profile == null && s.error == null)) {
@@ -238,6 +238,16 @@ class _ProfileGateState extends State<ProfileGate> {
               ),
             ),
           );
+        }
+        // Después de iniciar sesión exigimos validación de Solvex antes de
+        // abrir la empresa. Los empleados heredan su licencia, no introducen código.
+        if (s.activeOrg != null && Access.instance.loaded) {
+          if (!Access.instance.licenseCheckedOnline) {
+            return Access.instance.licenseChecking
+                ? const Scaffold(body: Center(child: _Splash()))
+                : const LicenseVerificationScreen();
+          }
+          if (!Access.instance.canEnter) return const LicenseGateScreen();
         }
         if (!s.profile!.isComplete) {
           return _intro ? OnboardingScreen(onDone: _finishIntro) : const ProfileFormScreen(onboarding: true);
@@ -346,7 +356,12 @@ class _V2GateState extends State<V2Gate> {
         final a = Access.instance;
         // Bloqueado: nadie entra. Solo lectura: entra el dueño/administrador (para pagar o exportar); el personal ve
         // la pantalla de pago (la base de datos igual no le muestra nada).
-        if (a.loaded && (a.license.mode == 'blocked' || (a.license.mode == 'restricted' && !a.isAdmin))) return const LicenseGateScreen();
+        if (a.loaded && !a.licenseCheckedOnline) {
+          return a.licenseChecking
+              ? const Scaffold(body: Center(child: _Splash()))
+              : const LicenseVerificationScreen();
+        }
+        if (a.loaded && !a.canEnter) return const LicenseGateScreen();
         if (a.loaded && !a.welcomed) return const EmployeeWelcomeScreen();
         final s = _settings;
         if (s == null) return const Scaffold(body: Center(child: _Splash()));

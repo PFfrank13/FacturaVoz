@@ -12,12 +12,12 @@ import 'services/repo.dart';
 /// Estado de la licencia tal como lo devuelve my_license().
 class LicenseInfo {
   const LicenseInfo({
-    this.mode = 'full',
-    this.plan = 'EMPRESA',
-    this.status = 'prueba',
-    this.source = 'dev',
-    this.dev = true,
-    this.enforced = false,
+    this.mode = 'blocked',
+    this.plan = 'BASICO',
+    this.status = 'pendiente',
+    this.source = 'none',
+    this.dev = false,
+    this.enforced = true,
     this.features = const {},
     this.message = '',
     this.payUrl = '',
@@ -56,10 +56,10 @@ class LicenseInfo {
   static DateTime? _date(Object? v) => v is String && v.isNotEmpty ? DateTime.tryParse(v)?.toLocal() : null;
 
   factory LicenseInfo.fromJson(Map<String, dynamic> j) => LicenseInfo(
-        mode: (j['mode'] ?? 'full') as String,
-        plan: (j['plan'] ?? 'EMPRESA') as String,
+        mode: (j['mode'] ?? 'blocked') as String,
+        plan: (j['plan'] ?? 'BASICO') as String,
         status: (j['status'] ?? '') as String,
-        source: (j['source'] ?? 'dev') as String,
+        source: (j['source'] ?? 'none') as String,
         dev: j['dev'] == true,
         enforced: j['enforced'] == true,
         features: j['features'] is Map ? Map<String, dynamic>.from(j['features'] as Map) : const {},
@@ -78,27 +78,19 @@ const coreFeatures = {'facturar', 'clientes', 'cobros', 'voz'};
 
 /// ¿El plan incluye [key]? Puro (se prueba con flutter test). El núcleo del rubro va en todos los planes
 /// (igual que private.has_feature + private.rubro_core en la base).
+/// El Hub define las funciones de cada plan. Nunca confiamos en un plan
+/// predeterminado ni en el caché para desbloquear funciones.
 bool planHas(LicenseInfo l, String key, {String? rubro}) {
-  if (!l.enforced || l.dev || l.source == 'local' || coreFeatures.contains(key)) return true;
-  if (rubroIncludes(rubro, key)) return true;
+  if (!l.enforced || l.dev || l.source != 'hub' || !l.usable) return false;
   final v = l.features[key];
-  final on = v is bool ? v : (v is num ? v != 0 : false);
-  // Planes por rubro (igual que private.plan_allows): lo que el plan da a ESE rubro, o un complemento que el Hub activó
-  // y que no es parte de ningún plan estándar. Plan o rubro desconocidos: se respeta la licencia tal cual.
-  final m = planMatrix(rubro, l.plan);
-  if (m == null) return on;
-  if (m.contains(key)) return true;
-  final inStandard = _rubrosOf().any((r) => planMatrix(r, l.plan)!.contains(key));
-  return on && !inStandard;
+  return v == true || (v is num && v != 0);
 }
-
-Iterable<String> _rubrosOf() => proStar.keys;
 
 /// Límite numérico del plan (-1 = sin límite).
 int planLimit(LicenseInfo l, String key) {
-  if (!l.enforced || l.source != 'hub') return -1;
+  if (!l.enforced || l.source != 'hub' || !l.usable) return 0;
   final v = l.features[key];
-  return v is num ? v.toInt() : -1;
+  return v is num ? v.toInt() : 0;
 }
 
 class Access extends ChangeNotifier {
@@ -112,6 +104,14 @@ class Access extends ChangeNotifier {
   Map<String, bool> _can = const {};
   LicenseInfo license = const LicenseInfo();
   bool loaded = false;
+  /// No se entra con una licencia cacheada sin validar la sesión ante Supabase.
+  bool licenseCheckedOnline = false;
+  bool licenseChecking = true;
+  bool get licenseReady => licenseCheckedOnline && license.enforced && !license.dev &&
+      license.source == 'hub' && license.usable;
+  bool get canEnter => licenseReady || (licenseCheckedOnline && license.enforced &&
+      !license.dev && license.source == 'hub' && license.mode == 'restricted' && isAdmin);
+
 
   bool can(String what) => _can[what] ?? isAdmin;
   /// Rubro de la empresa activa (lo fija la estructura principal al leer los ajustes).
@@ -134,17 +134,26 @@ class Access extends ChangeNotifier {
 
   static SupabaseClient get _db => Supabase.instance.client;
 
-  /// Carga rol y licencia de la empresa activa. Si las migraciones v2 aún no corrieron, todo queda habilitado
-  /// como antes (nada se rompe).
+  /// Carga rol y licencia de la empresa activa. Si Supabase no responde, nunca habilita módulos por defecto.
+  void invalidateLicenseCheck() {
+    licenseCheckedOnline = false;
+    licenseChecking = true;
+    notifyListeners();
+  }
+
   Future<void> load() async {
+    licenseCheckedOnline = false;
+    licenseChecking = true;
     final org = Repo.activeOrgId;
     if (org == null) {
+      licenseChecking = false;
       loaded = true;
       notifyListeners();
       return;
     }
     // Permisos y licencia no dependen entre sí: se piden a la vez (una espera de red en vez de dos).
     await Future.wait([_loadAccess(org), _loadLicense(org)]);
+    licenseChecking = false;
     loaded = true;
     notifyListeners();
   }
@@ -170,6 +179,8 @@ class Access extends ChangeNotifier {
   void applyCached(Map<String, dynamic>? access, Map<String, dynamic>? lic) {
     if (access != null) _applyAccess(access);
     if (lic != null) _applyLicense(lic);
+    licenseCheckedOnline = false;
+    licenseChecking = true;
     loaded = true;
     notifyListeners();
   }
@@ -179,8 +190,8 @@ class Access extends ChangeNotifier {
       final a = await _db.rpc('my_access', params: {'p_org': org});
       if (a is Map) _applyAccess(Map<String, dynamic>.from(a));
     } catch (_) {
-      role = 'owner';
-      isAdmin = true;
+      role = 'member';
+      isAdmin = false;
       welcomed = true;
       _can = const {};
     }
@@ -189,9 +200,18 @@ class Access extends ChangeNotifier {
   Future<void> _loadLicense(String org) async {
     try {
       final l = await _db.rpc('my_license', params: {'p_org': org});
-      if (l is Map) _applyLicense(Map<String, dynamic>.from(l));
+      if (l is Map) {
+        _applyLicense(Map<String, dynamic>.from(l));
+        licenseCheckedOnline = true;
+      } else {
+        license = const LicenseInfo();
+        rawLicense = null;
+      }
     } catch (_) {
+      // Fallar cerrado: no se permite operar con una licencia inventada.
+      licenseCheckedOnline = false;
       license = const LicenseInfo();
+      rawLicense = null;
     }
   }
 
@@ -214,6 +234,8 @@ class Access extends ChangeNotifier {
     rawAccess = null;
     rawLicense = null;
     loaded = false;
+    licenseCheckedOnline = false;
+    licenseChecking = true;
     notifyListeners();
   }
 }

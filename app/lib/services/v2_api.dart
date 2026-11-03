@@ -73,7 +73,7 @@ class V2Api {
   /// Tipo de cambio del día (null si no hay proveedor: la app pide escribirlo).
   static Future<({double? buy, double? sell, String message})> fx(String date, {String currency = 'USD'}) async {
     try {
-      final (_, body) = await _post('/api/fx', {'date': date, 'currency': currency}, seconds: 15);
+      final (_, body) = await _post('/api/fx', {'date': date, 'currency': currency, if (Repo.activeOrgId != null) 'org_id': Repo.activeOrgId}, seconds: 15);
       if (body['ok'] == true) {
         return (buy: (body['buy'] as num?)?.toDouble(), sell: (body['sell'] as num?)?.toDouble(), message: '');
       }
@@ -105,6 +105,7 @@ class V2Api {
   static Future<String> transcribe(Uint8List bytes, {required String filename, required String mimeType}) async {
     final req = http.MultipartRequest('POST', Uri.parse('${Config.apiBase}/api/transcribe'))
       ..headers['Authorization'] = 'Bearer ${await _token()}'
+      ..fields.addAll({if (Repo.activeOrgId != null) 'org_id': Repo.activeOrgId!})
       ..files.add(http.MultipartFile.fromBytes('audio', bytes, filename: filename, contentType: MediaType.parse(mimeType)));
     final http.Response r;
     try {
@@ -117,10 +118,17 @@ class V2Api {
     throw AppException((body['error'] ?? 'No se entendió el audio.') as String);
   }
 
-  /// Activa la prueba gratis de 3 días en Solvex Hub (necesita el RUC de la empresa).
-  static Future<({String status, String message})> requestTrial() async {
-    final (_, body) = await _post('/api/license/trial', {'org_id': Repo.activeOrgId}, seconds: 25);
-    return (status: (body['status'] ?? 'error') as String, message: (body['message'] ?? body['error'] ?? '') as String);
+  /// Valida contra Solvex Hub el código ligado al ID de esta empresa.
+  /// La app no decide el plan ni guarda la clave.
+  static Future<({String plan, String mode})> activateLicense(String code) async {
+    final org = Repo.activeOrgId;
+    if (org == null) throw AppException('Primero crea o selecciona tu empresa.');
+    final (status, body) = await _post('/api/license/activate',
+      {'org_id': org, 'license_key': code.trim()}, seconds: 35);
+    if (status != 200 || body['ok'] != true) {
+      throw AppException((body['error'] ?? 'No se pudo activar la licencia.') as String);
+    }
+    return (plan: (body['plan'] ?? '') as String, mode: (body['mode'] ?? '') as String);
   }
 
   /// Cierre del día: guarda y envía el reporte al dueño por correo.

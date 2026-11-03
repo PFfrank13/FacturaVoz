@@ -21,6 +21,7 @@ import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ux/rubro_experience.dart';
 import 'catalog.dart';
 import 'goal_sheet.dart';
 import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
@@ -190,6 +191,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final t = Theme.of(context);
     final a = Access.instance;
     final spec = rubroFor(a.rubro);
+    final guide = experienceFor(spec?.id);
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final seeMoney = a.can('finance') || a.can('collect');
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
@@ -198,7 +200,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final monthCount = ((_month?['sales_count'] as num?) ?? 0).toInt();
     final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
     final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
-    final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (featureById(id) case final f? when f.roleOk) f];
+    final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (!(a.can('sell') && id == 'pos')) if (featureById(id) case final f? when f.roleOk) f];
     final list = _visible();
     final buyers = _todayBuyers();
     return Scaffold(
@@ -228,8 +230,8 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: SectorPhotoBanner(
                   rubro: spec.id,
-                  title: 'Todo tu negocio, en orden',
-                  subtitle: 'Ventas, clientes y documentos propios de ${spec.name}.',
+                  title: guide.homeTitle,
+                  subtitle: guide.homeSubtitle,
                 )),
             ),
           if (a.can('sell') || shortcuts.isNotEmpty)
@@ -246,14 +248,14 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                         QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => showNewSaleSheet(context).then((_) {
                               if (mounted) _load();
                             })),
-                      for (final f in shortcuts)
+                      for (final f in shortcuts.take(3))
                         QuickAction(
                           icon: f.planOk ? f.icon : Icons.lock_rounded,
-                          label: f.title.length > 14 ? f.title.split(' ').first : f.title,
+                          label: shortActionLabel(f.id, f.title),
                           colors: [featureColor(f.id).withValues(alpha: 0.8), featureColor(f.id)],
                           onTap: f.planOk ? () => openFeature(context, f) : () => pushPremium(context, const MenuScreen()),
                         ),
-                      QuickAction(icon: Icons.menu_rounded, label: 'Menú', colors: const [Brand.lightInk, Brand.indigoDeep], onTap: () => pushPremium(context, const MenuScreen())),
+                      QuickAction(icon: Icons.menu_rounded, label: 'Ver todas', colors: const [Brand.lightInk, Brand.indigoDeep], onTap: () => pushPremium(context, const MenuScreen())),
                     ],
                   ),
                 ),
@@ -306,7 +308,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
             )
           else if (_items!.isEmpty)
             const SliverToBoxAdapter(
-              child: Reveal(child: EmptyState(title: 'Tu primera venta está a un toque', body: 'Toca "Nueva venta" o el micrófono y di el cliente, lo que se llevó y el importe.')),
+              child: Reveal(child: EmptyState(title: 'Aún no hay comprobantes', body: 'Cuando emitas una boleta o factura, aparecerá aquí. Las citas, pedidos y trabajos siguen en sus propias secciones.')),
             )
           else ...[
             SliverToBoxAdapter(

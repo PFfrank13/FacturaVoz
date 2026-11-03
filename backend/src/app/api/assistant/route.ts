@@ -60,7 +60,11 @@ export async function POST(req: Request) {
   ]);
   // Membresía: el Copiloto es función del plan (en modo desarrollo o prueba, todo está habilitado)
   const features = ((lic as { features?: Record<string, unknown> } | null)?.features ?? null) as Record<string, unknown> | null;
-  if (features && features.copiloto === false) return json({ error: "Tu plan no incluye el Copiloto. Mejora tu plan para usarlo.", code: "feature" }, 402);
+  const status = lic as { enforced?: boolean; dev?: boolean; source?: string; mode?: string } | null;
+  if (status?.enforced !== true || status.dev === true || status.source !== "hub"
+      || (status.mode !== "full" && status.mode !== "warning") || features?.copiloto !== true) {
+    return json({ error: "Activa una licencia de Solvex que incluya el Copiloto.", code: "license" }, 402);
+  }
   if (quota.error) return json({ error: "Falta ejecutar la migración de cuotas en Supabase", code: "quota_rpc" }, 500);
   if (quota.data !== true) return json({ error: "Demasiadas consultas seguidas. Espera un minuto." }, 429);
 

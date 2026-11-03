@@ -127,6 +127,7 @@ class AppState extends ChangeNotifier {
 
   /// Cambia de empresa y lo recuerda en la cuenta (user_metadata).
   Future<void> switchOrg(Org o) async {
+    Access.instance.invalidateLicenseCheck();
     Repo.activeOrgId = o.id;
     V2Repo.forgetSettings();
     LiveCache.clear();

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasCronSecret } from "@/lib/cron";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { heartbeat, hubConfig, isOrgId, requestTrial, syncAll } from "@/lib/solvex";
+import { heartbeat, hubConfig, isOrgId, syncAll } from "@/lib/solvex";
 
 export const maxDuration = 60;
 
@@ -17,8 +17,8 @@ export async function GET(req: Request) {
   const admin = createAdminClient();
   const cfg = hubConfig();
   if (!cfg) {
-    await admin.rpc("license_set_enforced", { p_on: false });
-    return NextResponse.json({ mode: "desarrollo", message: "Solvex Hub no configurado: licencias simuladas (todo habilitado)." });
+    // Nunca se desactiva el control de licencias por una configuración ausente.
+    return NextResponse.json({ error: "Solvex Hub no configurado; activación obligatoria" }, { status: 503 });
   }
   await admin.rpc("license_set_enforced", { p_on: true });
 
@@ -40,25 +40,6 @@ export async function GET(req: Request) {
     out.error = e instanceof Error ? e.message.slice(0, 120) : "sync";
   }
 
-  const { data: pending } = await admin.rpc("license_pending_trials", { p_limit: 25 });
-  for (const p of (pending ?? []) as { org_id: string; ruc: string; name: string; owner_email: string | null }[]) {
-    try {
-      const r = await requestTrial(cfg, { tenant: p.org_id, ruc: p.ruc, businessName: p.name, email: p.owner_email });
-      if (r.status === "ok") {
-        await admin.rpc("license_apply", { p_org: p.org_id, p_payload: r.data.payload, p_token: r.data.token });
-        await admin.rpc("license_mark", { p_org: p.org_id, p_trial_requested: true, p_error: null });
-        out.trials++;
-      } else if (r.status === "used") {
-        await admin.rpc("license_mark", { p_org: p.org_id, p_trial_requested: true, p_error: "Este RUC ya usó su prueba gratis" });
-        out.trials_used++;
-      } else {
-        await admin.rpc("license_mark", { p_org: p.org_id, p_trial_requested: false, p_error: r.message });
-        out.trial_errors++;
-      }
-    } catch {
-      out.trial_errors++;
-    }
-  }
   const { count } = await admin.from("organizations").select("id", { count: "exact", head: true });
   await heartbeat(cfg, count ?? 0);
   return NextResponse.json(out);

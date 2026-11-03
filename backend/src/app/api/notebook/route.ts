@@ -2,6 +2,7 @@ import { authenticateBearer, jsonWith, preflight } from "@/lib/api-auth";
 import { GroqError, sniffImage, visionJson } from "@/lib/groq";
 import { NOTEBOOK_SYSTEM, sanitizeNotebook } from "@/lib/notebook";
 import { UUID } from "@/lib/publicbase";
+import { licenseAllows } from "@/lib/license-check";
 
 export const maxDuration = 45;
 export const OPTIONS = preflight;
@@ -29,6 +30,9 @@ export async function POST(req: Request) {
   if (!bytes) return json({ error: "Imagen no válida" }, 400);
   const type = sniffImage(bytes);
   if (!type) return json({ error: "Usa una foto JPG, PNG o WEBP" }, 400);
+  if (!await licenseAllows(auth.supabase, orgId, "cuaderno_ia")) {
+    return json({ error: "Tu licencia no incluye el cuaderno inteligente.", code: "license" }, 402);
+  }
   const { data: allowed } = await auth.supabase.rpc("consume_api_quota", { p_per_minute: 5, p_per_day: 100 });
   if (allowed !== true) return json({ error: "Demasiadas lecturas seguidas. Espera un minuto." }, 429);
 

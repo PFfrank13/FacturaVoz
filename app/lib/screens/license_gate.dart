@@ -1,12 +1,13 @@
 // Licencia de Solvex Hub en la app (Fase 5). La app solo MUESTRA el estado: quien bloquea de verdad es la base de datos
 // (license_guard + políticas restrictivas). Aquí: pantalla de bloqueo, aviso de pago y detalle del plan.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../access.dart';
 import '../app_state.dart';
-import '../rubros.dart';
+import '../services/repo.dart';
 import '../services/v2_api.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -58,85 +59,173 @@ Future<void> openPayUrl(BuildContext context, String url) async {
   }
 }
 
-/// Pantalla completa cuando la licencia está BLOQUEADA (no se puede usar la empresa).
-class LicenseGateScreen extends StatelessWidget {
+/// Tras iniciar sesión, el propietario introduce la licencia entregada por Solvex.
+/// La pantalla nunca confía en la clave: el backend valida firma, empresa y plan.
+class LicenseGateScreen extends StatefulWidget {
   const LicenseGateScreen({super.key});
+  @override
+  State<LicenseGateScreen> createState() => _LicenseGateScreenState();
+}
+
+class _LicenseGateScreenState extends State<LicenseGateScreen> {
+  final _key = TextEditingController();
+  bool _busy = false;
+  bool _hide = true;
+  String _error = '';
+  @override
+  void dispose() { _key.dispose(); super.dispose(); }
+
+  Future<void> _activate() async {
+    final code = _key.text.trim();
+    if (code.length < 6) {
+      setState(() => _error = 'Escribe la licencia que te entregó Solvex.');
+      return;
+    }
+    setState(() { _busy = true; _error = ''; });
+    try {
+      await V2Api.activateLicense(code);
+      _key.clear(); // no conservamos el código en el teléfono
+      await Access.instance.load();
+      if (!mounted) return;
+      if (!Access.instance.licenseReady) {
+        setState(() => _error = 'Licencia recibida, pero aún no está activa. Verifica su estado en Solvex Hub.');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('AppException: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() { _busy = true; _error = ''; });
+    try {
+      await Access.instance.load();
+      if (mounted && !Access.instance.canEnter) {
+        setState(() => _error = 'Todavía no vemos una licencia activa para esta empresa.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final a = Access.instance;
     final l = a.license;
+    final org = Repo.activeOrgId;
+    final pending = !l.enforced || l.dev || l.source != 'hub' || l.status == 'pendiente';
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Reveal(
-                  child: Center(
-                    child: Container(
-                      width: 92,
-                      height: 92,
-                      decoration: BoxDecoration(color: Brand.warn.withValues(alpha: 0.14), shape: BoxShape.circle),
-                      child: const Icon(Icons.lock_clock_rounded, size: 46, color: Brand.warn),
-                    ),
+      body: SafeArea(child: Center(child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Center(child: Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(25)),
+              child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 48),
+            )),
+            const SizedBox(height: 20),
+            Text(pending ? 'Activa tu FacturaVoz' : 'Tu licencia requiere atención',
+              style: t.textTheme.headlineSmall, textAlign: TextAlign.center),
+            const SizedBox(height: 9),
+            Text(pending
+              ? 'Cuenta creada correctamente. Para empezar a vender, introduce la licencia que Solvex te entregó para tu negocio.'
+              : (l.message.isNotEmpty ? l.message : 'Tu plan no está activo. Puedes renovarlo o introducir un código actualizado.'),
+              style: t.textTheme.bodyMedium, textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            if (org != null) ...[
+              Text('Identificador de tu empresa', style: t.textTheme.labelLarge),
+              const SizedBox(height: 7),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: org));
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ID de empresa copiado. Compártelo con Solvex, no tu contraseña.')));
+                },
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                label: Text(org, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(height: 10),
+              Text('Solvex debe asignar tu plan a este ID antes de enviarte el código.',
+                style: t.textTheme.bodySmall),
+            ],
+            const SizedBox(height: 20),
+            if (a.isAdmin) ...[
+              TextField(
+                controller: _key, enabled: !_busy, obscureText: _hide,
+                autocorrect: false, enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                decoration: InputDecoration(
+                  labelText: 'Código de licencia Solvex',
+                  hintText: 'Código que recibiste de Solvex',
+                  prefixIcon: const Icon(Icons.key_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: _hide ? 'Mostrar código' : 'Ocultar código',
+                    onPressed: () => setState(() => _hide = !_hide),
+                    icon: Icon(_hide ? Icons.visibility_rounded : Icons.visibility_off_rounded),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Reveal(
-                  index: 1,
-                  child: Text(l.isTrial ? 'Tu prueba gratis terminó' : 'Tu plan está pausado', textAlign: TextAlign.center, style: t.textTheme.headlineSmall),
-                ),
-                const SizedBox(height: 10),
-                Reveal(
-                  index: 2,
-                  child: Text(
-                    l.message.isNotEmpty
-                        ? l.message
-                        : 'Tus datos están a salvo y nada se borró. Para seguir vendiendo con ${AppState.instance.activeOrg?.name ?? 'tu empresa'}, renueva tu plan.',
-                    textAlign: TextAlign.center,
-                    style: t.textTheme.bodyLarge,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                if (a.isAdmin && l.payUrl.isNotEmpty)
-                  Reveal(index: 3, child: GradientButton(label: 'Renovar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)))
-                else if (!a.isAdmin)
-                  Reveal(index: 3, child: SoftCard(child: Text('Avísale al dueño de la empresa para que renueve el plan.', textAlign: TextAlign.center, style: t.textTheme.bodyMedium))),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await Access.instance.load();
-                    if (context.mounted && Access.instance.license.mode == 'blocked') {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Aún no vemos el pago. Puede tardar unos minutos.')));
-                    }
-                  },
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Ya pagué: revisar de nuevo'),
-                ),
-                if (AppState.instance.orgs.length > 1)
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrgsScreen())),
-                    icon: const Icon(Icons.swap_horiz_rounded),
-                    label: const Text('Cambiar de empresa'),
-                  ),
-                TextButton(
-                  onPressed: () async {
-                    AppState.instance.clear();
-                    await Supabase.instance.client.auth.signOut();
-                  },
-                  child: const Text('Cerrar sesión'),
-                ),
-              ]),
-            ),
-          ),
+                onSubmitted: (_) { if (!_busy) _activate(); },
+              ),
+              const SizedBox(height: 16),
+              GradientButton(label: 'Activar mi licencia', icon: Icons.check_circle_rounded,
+                busy: _busy, onPressed: _busy ? null : _activate),
+              if (l.payUrl.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                TextButton.icon(onPressed: () => openPayUrl(context, l.payUrl),
+                  icon: const Icon(Icons.payments_rounded), label: const Text('Renovar mi plan')),
+              ],
+            ] else
+              const SoftCard(child: Text('Pídele al propietario o administrador de esta empresa que active la licencia.')),
+            if (_error.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(_error, style: const TextStyle(color: Brand.bad), textAlign: TextAlign.center),
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(onPressed: _busy ? null : _refresh,
+              icon: const Icon(Icons.refresh_rounded), label: const Text('Ya activé: comprobar licencia')),
+            if (AppState.instance.orgs.length > 1)
+              TextButton.icon(onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const OrgsScreen())),
+                icon: const Icon(Icons.swap_horiz_rounded), label: const Text('Cambiar de empresa')),
+            TextButton(onPressed: () async {
+              AppState.instance.clear();
+              await Supabase.instance.client.auth.signOut();
+            }, child: const Text('Cerrar sesión')),
+          ]),
         ),
-      ),
+      ))),
     );
   }
+}
+
+/// La red es indispensable para comprobar la licencia tras iniciar sesión.
+class LicenseVerificationScreen extends StatelessWidget {
+  const LicenseVerificationScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(body: SafeArea(child: Center(
+    child: Padding(padding: const EdgeInsets.all(24), child: Column(
+      mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.cloud_off_rounded, size: 52),
+        const SizedBox(height: 18),
+        const Text('No pudimos verificar tu licencia', textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        const Text('Comprueba tu conexión con Supabase. No se registrarán ventas sin confirmar el plan.',
+          textAlign: TextAlign.center),
+        const SizedBox(height: 20),
+        FilledButton.icon(onPressed: Access.instance.load,
+          icon: const Icon(Icons.refresh_rounded), label: const Text('Volver a comprobar')),
+        TextButton(onPressed: () async {
+          AppState.instance.clear();
+          await Supabase.instance.client.auth.signOut();
+        }, child: const Text('Cerrar sesión')),
+      ],
+    )),
+  )));
 }
 
 /// Texto y color del aviso de licencia, o null si no hay que mostrar nada.
@@ -188,7 +277,7 @@ class LicenseBanner extends StatelessWidget {
       );
 }
 
-/// Detalle del plan: qué incluye, hasta cuándo, botón de pago y activar la prueba en Solvex Hub.
+/// Detalle verificado del plan entregado por Solvex Hub.
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
 
@@ -197,25 +286,6 @@ class PlanScreen extends StatefulWidget {
 }
 
 class _PlanScreenState extends State<PlanScreen> {
-  bool _busy = false;
-
-  Future<void> _trial() async {
-    setState(() => _busy = true);
-    try {
-      final r = await V2Api.requestTrial();
-      await Access.instance.load();
-      if (!mounted) return;
-      final msg = switch (r.status) {
-        'ok' => '¡Listo! Tu prueba de 3 días está activa.',
-        'used' => r.message.isNotEmpty ? r.message : 'Este RUC ya usó su prueba gratis. Elige un plan para continuar.',
-        _ => r.message.isNotEmpty ? r.message : 'No se pudo activar la prueba ahora. Inténtalo más tarde.',
-      };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
-    if (mounted) setState(() => _busy = false);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +302,6 @@ class _PlanScreenState extends State<PlanScreen> {
             for (final k in _featureNames.keys)
               if (a.has(k)) k,
           ];
-          final missing = _featureNames.keys.where((k) => !included.contains(k)).toList();
           final users = a.limit('max_users');
           return RefreshIndicator(
             onRefresh: Access.instance.load,
@@ -242,11 +311,11 @@ class _PlanScreenState extends State<PlanScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(l.dev ? 'Modo desarrollo' : 'Plan ${l.plan}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text(l.dev ? 'Pendiente de activación' : 'Plan ${l.plan}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(
                       l.dev
-                          ? 'Solvex Hub aún no está conectado: todo está habilitado sin cobros.'
+                          ? 'Solvex Hub todavía no ha verificado tu licencia.'
                           : [
                               if (l.isTrial) 'Prueba gratis' else 'Estado: ${l.status}',
                               if (days != null) (days == 0 ? 'vence hoy' : 'quedan $days días'),
@@ -262,16 +331,6 @@ class _PlanScreenState extends State<PlanScreen> {
               ),
               const SizedBox(height: 14),
               if (a.isAdmin && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
-              if (a.isAdmin && l.source == 'local' && !l.trialRequested) ...[
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _trial,
-                  icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.rocket_launch_rounded),
-                  label: const Text('Activar mi prueba de 3 días con mi RUC'),
-                ),
-                const SizedBox(height: 4),
-                Text('Una prueba por RUC. Necesitas haber guardado el RUC de la empresa en Datos del negocio.', style: t.textTheme.bodySmall, textAlign: TextAlign.center),
-              ],
               const SizedBox(height: 18),
               const SectionTitle('Incluido en tu plan'),
               SoftCard(
@@ -279,31 +338,13 @@ class _PlanScreenState extends State<PlanScreen> {
                   for (final k in included) TagChip(featureName(k), color: Brand.ok, icon: Icons.check_rounded),
                 ]),
               ),
-              if (rubroFor(a.rubro) != null) ...[
-                const SizedBox(height: 18),
-                SectionTitle('Planes para ${rubroFor(a.rubro)!.name}'),
-                Text('Cada rubro tiene sus propias herramientas en cada plan. Precios en soles, IGV incluido.', style: t.textTheme.bodySmall),
-                const SizedBox(height: 10),
-                for (final code in planCodes)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _RubroPlanCard(
-                      code: code,
-                      rubroName: rubroFor(a.rubro)!.name,
-                      tools: planNewTools(a.rubro, code),
-                      current: !l.dev && l.plan == code,
-                      included: !l.dev && planCodes.indexOf(code) <= planCodes.indexOf(l.plan),
-                    ),
-                  ),
-              ] else if (missing.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                const SectionTitle('Disponible en planes superiores'),
-                SoftCard(
-                  child: Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final k in missing) TagChip(featureName(k), color: t.colorScheme.onSurfaceVariant, icon: Icons.lock_outline_rounded),
-                  ]),
-                ),
-              ],
+              const SizedBox(height: 18),
+              const SectionTitle('Gestión de tu suscripción'),
+              const SoftCard(child: Text(
+                'El plan, su precio, los límites y las funciones activas los administra Solvex Hub. '
+                'Los módulos marcados arriba son los autorizados por tu licencia; '
+                'si necesitas más herramientas, solicita el cambio a Solvex.',
+              )),
               const SizedBox(height: 14),
               Text('Tu rol en esta empresa: ${a.roleLabel}.', style: t.textTheme.bodySmall, textAlign: TextAlign.center),
             ]),
@@ -314,42 +355,3 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 }
 
-/// Un plan del rubro elegido: nombre, precio y las herramientas que trae (las nuevas respecto al plan anterior).
-class _RubroPlanCard extends StatelessWidget {
-  const _RubroPlanCard({required this.code, required this.rubroName, required this.tools, required this.current, required this.included});
-  final String code;
-  final String rubroName;
-  final List<String> tools;
-  final bool current;
-  final bool included;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final intro = switch (code) {
-      'BASICO' => 'Lo esencial para tu negocio',
-      'PRO' => 'Todo lo de Básico, más:',
-      _ => 'Todo lo de Pro, más:',
-    };
-    final color = included ? Brand.ok : t.colorScheme.onSurfaceVariant;
-    return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(Radii.xl), border: Border.all(color: current ? Brand.indigo : Colors.transparent, width: 2)),
-      child: SoftCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: Text(planName(code), style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
-            if (current) const TagChip('Tu plan', color: Brand.indigo, icon: Icons.check_circle_rounded),
-          ]),
-          const SizedBox(height: 2),
-          Text(planPriceText(code), style: t.textTheme.titleMedium?.copyWith(color: Brand.indigo, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text(intro, style: t.textTheme.bodySmall),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final k in tools) TagChip(featureName(k), color: color, icon: included ? Icons.check_rounded : Icons.lock_outline_rounded),
-          ]),
-        ]),
-      ),
-    );
-  }
-}

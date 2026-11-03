@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../access.dart';
+import '../rubros.dart';
 import '../app_state.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -30,8 +31,21 @@ Future<void> showNewSaleSheet(BuildContext context) {
     }
   }
 
+  final spec = rubroFor(Access.instance.rubro);
+  final example = switch (spec?.id) {
+    'bodega' => '2 gaseosas a 3 soles',
+    'restaurante' => '1 menú y 2 jugos',
+    'servicios_tecnicos' => 'reparación de laptop',
+    'salon' => 'corte de cabello para Ana',
+    'consultorio' => 'consulta para Ana',
+    'taller' => 'servicio de frenos',
+    'mayorista' => '10 cajas de leche',
+    'educacion' => 'matrícula del curso',
+    'construccion' => 'adelanto de obra',
+    _ => 'venta para Ana',
+  };
   final options = <(IconData, String, String, Future<void> Function())>[
-    (Icons.mic_rounded, 'Por voz o escrita', 'Dicta: "boleta para Ana, 2 cortes a 25"', voice),
+    (Icons.mic_rounded, 'Dictar o escribir', 'Por ejemplo: "$example"', voice),
     if (featureById('pos') case final f? when f.allowed) (Icons.point_of_sale_rounded, 'Caja rápida', 'Toca productos o escanea el código de barras', () => openFeature(context, f)),
     if (featureById('cuaderno') case final f? when f.allowed) (Icons.menu_book_rounded, 'Foto del cuaderno', 'Tu nota o cuaderno → venta', () => openFeature(context, f)),
     if (featureById('cotizaciones') case final f? when f.allowed) (Icons.request_quote_rounded, 'Cotización o pedido', 'Cotiza, comparte y conviértela en venta', () => openFeature(context, f)),

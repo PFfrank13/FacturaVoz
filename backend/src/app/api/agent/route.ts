@@ -30,7 +30,9 @@ export async function POST(req: Request) {
     supabase.rpc("consume_api_quota", { p_per_minute: 4, p_per_day: 40 }),
   ]);
   const features = ((lic as { features?: Record<string, unknown> } | null)?.features ?? null) as Record<string, unknown> | null;
-  if (!features || features.copiloto_agente !== true) {
+  const status = lic as { enforced?: boolean; dev?: boolean; source?: string; mode?: string } | null;
+  if (status?.enforced !== true || status.dev === true || status.source !== "hub"
+      || (status.mode !== "full" && status.mode !== "warning") || features?.copiloto_agente !== true) {
     return json({ error: "Las Tareas del Copiloto son del plan Empresa. Mejora tu plan en Menú → Mi plan.", code: "feature" }, 402);
   }
   if (quota.error) return json({ error: "Falta ejecutar la migración de cuotas en Supabase", code: "quota_rpc" }, 500);

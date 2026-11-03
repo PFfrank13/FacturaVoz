@@ -2,6 +2,7 @@ import { authenticateBearer, jsonWith, preflight, readJson } from "@/lib/api-aut
 import { fetchDoc, kindOf, rucWarning, type DocResult } from "@/lib/doclookup";
 import { UUID } from "@/lib/publicbase";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { licenseAllows } from "@/lib/license-check";
 
 export const maxDuration = 15;
 export const OPTIONS = preflight;
@@ -30,6 +31,9 @@ export async function POST(req: Request) {
       reason: "invalid",
       message: number.length === 11 ? "Ese RUC no es válido: el último dígito no cuadra. Revisa los números." : "Escribe un DNI (8 dígitos) o RUC (11).",
     });
+  }
+  if (!await licenseAllows(auth.supabase, orgId, "facturar")) {
+    return json({ ok: false, reason: "license", message: "Activa la licencia de tu empresa para consultar DNI/RUC." }, 402);
   }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return json({ ok: false, reason: "not_configured", message: "Consulta automática no disponible: escribe los datos." });
 
