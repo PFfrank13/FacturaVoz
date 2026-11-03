@@ -168,7 +168,11 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                     icon: Icon(_hide ? Icons.visibility_rounded : Icons.visibility_off_rounded),
                   ),
                 ),
-                onSubmitted: (_) { if (!_busy) _activate(); },
+                onSubmitted: (_) {
+                  if (!_busy) {
+                    _activate();
+                  }
+                },
               ),
               const SizedBox(height: 16),
               GradientButton(label: 'Activar mi licencia', icon: Icons.check_circle_rounded,

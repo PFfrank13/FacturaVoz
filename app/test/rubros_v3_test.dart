@@ -60,10 +60,19 @@ void main() {
           expect(low.contains('contador') || low.contains('asesor') || low.contains('ley') || low.contains('sunat') || low.contains('dni'), isTrue, reason: n);
         }
       });
-      test('el núcleo del rubro va en TODOS los planes', () {
-        const basicOnly = LicenseInfo(dev: false, source: 'hub', enforced: true, features: {'facturar': true});
+      test('el núcleo del rubro requiere licencia activa con concesiones del Hub', () {
+        final explicitCore = LicenseInfo(mode: 'full', dev: false, source: 'hub',
+          enforced: true, plan: 'BASICO',
+          features: {for (final f in r.core) f: true},
+        );
+        final inactiveCore = LicenseInfo(mode: 'blocked', dev: false, source: 'hub',
+          enforced: true, plan: 'BASICO',
+          features: {for (final f in r.core) f: true},
+        );
         for (final f in r.core) {
-          expect(planHas(basicOnly, f, rubro: r.id), isTrue, reason: f);
+          expect(planHas(explicitCore, f, rubro: r.id), isTrue, reason: f);
+          expect(planHas(inactiveCore, f, rubro: r.id), isFalse,
+              reason: 'sin licencia activa: $f');
         }
       });
     });
@@ -131,7 +140,12 @@ void main() {
   });
 
   group('planes por rubro (Básico / Pro con módulo estrella / Empresa todo)', () {
-    LicenseInfo lic(String plan) => LicenseInfo(dev: false, source: 'hub', enforced: true, plan: plan, features: const {'facturar': true});
+    // Simula la lista explícita de funciones devuelta por el Hub.
+    // La aplicación NUNCA completa permisos basándose solo en el nombre del plan.
+    LicenseInfo lic(String plan, String rubro) => LicenseInfo(
+      mode: 'full', dev: false, source: 'hub', enforced: true, plan: plan,
+      features: {for (final f in planMatrix(rubro, plan)!) f: true},
+    );
 
     test('la matriz de la app y la de la base son la misma (private.plan_matrix)', () {
       final sql = File('../backend/supabase/migrations/20261118_v31_planes_por_rubro.sql').readAsStringSync();
@@ -161,21 +175,39 @@ void main() {
       }
     });
 
-    test('mismo plan, distinto rubro: desbloquea cosas distintas', () {
-      expect(planHas(lic('PRO'), 'fidelizacion', rubro: 'bodega'), isTrue);
-      expect(planHas(lic('PRO'), 'fidelizacion', rubro: 'salon'), isFalse);
-      expect(planHas(lic('PRO'), 'comisiones', rubro: 'salon'), isTrue);
-      expect(planHas(lic('BASICO'), 'copiloto', rubro: 'bodega'), isFalse);
-      expect(planHas(lic('PRO'), 'copiloto', rubro: 'taller'), isTrue);
-      expect(planHas(lic('PRO'), 'copiloto_agente', rubro: 'bodega'), isFalse);
-      expect(planHas(lic('EMPRESA'), 'copiloto_agente', rubro: 'bodega'), isTrue);
+    test('cada rubro recibe las concesiones especificas de su plan desde el Hub', () {
+      expect(planHas(lic('PRO', 'bodega'), 'fidelizacion', rubro: 'bodega'), isTrue);
+      expect(planHas(lic('PRO', 'salon'), 'fidelizacion', rubro: 'salon'), isFalse);
+      expect(planHas(lic('PRO', 'salon'), 'comisiones', rubro: 'salon'), isTrue);
+      expect(planHas(lic('BASICO', 'bodega'), 'copiloto', rubro: 'bodega'), isFalse);
+      expect(planHas(lic('PRO', 'taller'), 'copiloto', rubro: 'taller'), isTrue);
+      expect(planHas(lic('PRO', 'bodega'), 'copiloto_agente', rubro: 'bodega'), isFalse);
+      expect(planHas(lic('EMPRESA', 'bodega'), 'copiloto_agente', rubro: 'bodega'), isTrue);
     });
 
-    test('complemento (add-on) del Hub: se respeta si no es parte del plan estándar', () {
-      const addon = LicenseInfo(dev: false, source: 'hub', enforced: true, plan: 'BASICO', features: {'tienda': true});
+    test('add-on: solo el Hub habilita la función en una licencia activa', () {
+      const addon = LicenseInfo(mode: 'full', dev: false, source: 'hub',
+        enforced: true, plan: 'BASICO', features: {'tienda': true});
       expect(planHas(addon, 'tienda', rubro: 'bodega'), isTrue);
-      const noAddon = LicenseInfo(dev: false, source: 'hub', enforced: true, plan: 'PRO', features: {'tienda': true});
-      expect(planHas(noAddon, 'tienda', rubro: 'salon'), isFalse); // tienda es de PRO-mayorista: no es complemento
+      const noAddon = LicenseInfo(mode: 'full', dev: false, source: 'hub',
+        enforced: true, plan: 'PRO', features: {'tienda': false});
+      expect(planHas(noAddon, 'tienda', rubro: 'salon'), isFalse);
+      const revoked = LicenseInfo(mode: 'blocked', dev: false, source: 'hub',
+        enforced: true, plan: 'BASICO', features: {'tienda': true});
+      expect(planHas(revoked, 'tienda', rubro: 'bodega'), isFalse);
+    });
+
+    test('sin función explícita del Hub, ningún plan desbloquea módulos', () {
+      for (final r in rubros) {
+        for (final plan in planCodes) {
+          final empty = LicenseInfo(mode: 'full', source: 'hub',
+            enforced: true, plan: plan);
+          for (final feature in planMatrix(r.id, plan)!) {
+            expect(planHas(empty, feature, rubro: r.id), isFalse,
+                reason: '$plan / ${r.id} / $feature');
+          }
+        }
+      }
     });
 
     test('los textos de "mejora tu plan" usan la matriz del rubro', () {

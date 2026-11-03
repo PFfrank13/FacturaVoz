@@ -455,6 +455,7 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     if (_restaurant && !await _persistKitchenOrder()) return;
+    if (!mounted) return;
     final lines = _lines();
     if (lines.isEmpty) return;
     _chargeRequestId ??= Repo.newRequestId();
@@ -514,6 +515,7 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     if (_restaurant && !await _persistKitchenOrder()) return;
+    if (!mounted) return;
     final lines = _lines();
     if (lines.isEmpty) return;
     final p = AppState.instance.profile;

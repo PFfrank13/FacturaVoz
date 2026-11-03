@@ -206,17 +206,19 @@ void main() {
   });
 
   group('Licencia y plantillas', () {
-    test('el plan oculta lo no contratado; lo básico siempre está', () {
-      const l = LicenseInfo(enforced: true, dev: false, source: 'hub', features: {'tienda': false, 'trabajos': true, 'max_users': 3});
+    test('el Hub habilita solo las funciones concedidas en una licencia activa', () {
+      const l = LicenseInfo(mode: 'full', enforced: true, dev: false, source: 'hub',
+          features: {'tienda': false, 'trabajos': true, 'facturar': true, 'max_users': 3});
       expect(planHas(l, 'tienda'), isFalse);
       expect(planHas(l, 'trabajos'), isTrue);
       expect(planHas(l, 'facturar'), isTrue);
       expect(planLimit(l, 'max_users'), 3);
     });
-    test('modo desarrollo (Hub sin configurar): todo habilitado', () {
+    test('sin Hub configurado: ninguna funcion comercial queda desbloqueada', () {
       const l = LicenseInfo();
-      expect(planHas(l, 'tienda'), isTrue);
-      expect(planLimit(l, 'max_users'), -1);
+      expect(planHas(l, 'tienda'), isFalse);
+      expect(planHas(l, 'facturar'), isFalse);
+      expect(planLimit(l, 'max_users'), 0);
     });
     test('servicio técnico WiFi: flujo completo y pasos terminados', () {
       final t = templateFor('servicios_tecnicos');

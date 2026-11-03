@@ -6,7 +6,6 @@
 import 'package:flutter/material.dart';
 
 import '../access.dart';
-import '../business_templates.dart';
 import '../errors.dart';
 import '../rubros.dart';
 import '../services/rubro_apply.dart';

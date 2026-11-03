@@ -6,7 +6,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'rubros.dart';
 import 'services/repo.dart';
 
 /// Estado de la licencia tal como lo devuelve my_license().
