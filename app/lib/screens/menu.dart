@@ -82,7 +82,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final spec = rubroFor(Access.instance.rubro);
     final guide = experienceFor(spec?.id);
     // roleOk ya revisa rubro y rol: la búsqueda no ofrece herramientas de otro sector.
-    final all = featureCatalog().where((f) => f.roleOk).toList();
+    final all = featureCatalog().where((f) => f.allowed).toList();
     final byId = {for (final f in all) f.id: f};
     final areas = spec?.areas ?? [
       for (final g in groupOrder) RubroArea(g, [for (final f in all) if (f.group == g) f.id]),

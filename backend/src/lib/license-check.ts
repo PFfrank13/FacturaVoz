@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasFeature } from "./erp/access";
 
 /** Verificación de licencia + función por empresa, antes de invocar proveedores de pago. */
 export async function licenseAllows(client: SupabaseClient, orgId: string | null, feature: string): Promise<boolean> {
@@ -9,6 +10,5 @@ export async function licenseAllows(client: SupabaseClient, orgId: string | null
     source?: string; enforced?: boolean; dev?: boolean; mode?: string;
     features?: Record<string, unknown>;
   };
-  return l.enforced === true && l.dev !== true && l.source === "hub"
-    && (l.mode === "full" || l.mode === "warning") && l.features?.[feature] === true;
+  return hasFeature(l, feature);
 }

@@ -1,40 +1,21 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import NewInvoice from "@/components/NewInvoice";
 
 export default async function Home() {
-  const supabase = await createClient();
-  // Defensa en profundidad: no depender solo del middleware
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select("id, number, issue_date, status, clients(name)")
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  return (
-    <main className="mx-auto max-w-xl space-y-10 p-6">
-      <h1 className="text-2xl font-bold">FacturaVoz</h1>
-      <NewInvoice />
-      <section>
-        <h2 className="mb-2 font-semibold">Últimas facturas</h2>
-        <ul className="divide-y">
-          {(invoices ?? []).map((i) => (
-            <li key={i.id} className="flex justify-between py-2 text-sm">
-              <span>
-                {i.number} · {(i.clients as unknown as { name: string } | null)?.name ?? "—"}
-              </span>
-              <span className="text-gray-500">
-                {i.issue_date} · {i.status}
-              </span>
-            </li>
-          ))}
-          {!invoices?.length && <li className="py-2 text-sm text-gray-500">Aún no hay facturas.</li>}
-        </ul>
-      </section>
-    </main>
-  );
+  const { data, error } = await db.from("organization_members").select("org_id,organizations(id,name)").eq("user_id", user.id);
+  return <main className="fv-welcome">
+    <p className="fv-eyebrow">FACTURAVOZ / ESPACIO DE TRABAJO</p>
+    <h1>Tu negocio.<br /><span>Con voz propia.</span></h1>
+    <p>Elige la empresa con la que vas a trabajar. Tus datos y permisos son los mismos que en la aplicación móvil.</p>
+    {error ? <p role="alert">No pudimos consultar tus empresas. Actualiza la página para reintentar.</p> :
+      <div className="fv-company-list">{data?.map(row => {
+        const organization = row.organizations as unknown as { id: string; name: string } | null;
+        return organization && <Link key={row.org_id} href={`/erp/${row.org_id}`}><span>{organization.name}</span><span aria-hidden="true">↗</span></Link>;
+      })}{!data?.length && <p>Aún no tienes empresas asignadas. Tu administrador puede incorporarte desde Equipo.</p>}</div>}
+    <p className="fv-caption">Una empresa · Una licencia · Todos tus dispositivos</p>
+  </main>;
 }

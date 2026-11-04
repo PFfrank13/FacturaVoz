@@ -19,8 +19,8 @@ export type ActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-export const money = (n: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
+export const money = (n: number, currency = "EUR") =>
+  new Intl.NumberFormat("es-PE", { style: "currency", currency }).format(n);
 
 const cents = (n: number) => Math.round(n * 100) / 100;
 

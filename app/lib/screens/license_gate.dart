@@ -141,8 +141,10 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
               OutlinedButton.icon(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: org));
-                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ID de empresa copiado. Compártelo con Solvex, no tu contraseña.')));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('ID de empresa copiado. Compártelo con Solvex, no tu contraseña.')));
+                  }
                 },
                 icon: const Icon(Icons.copy_rounded, size: 18),
                 label: Text(org, maxLines: 1, overflow: TextOverflow.ellipsis,

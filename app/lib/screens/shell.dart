@@ -80,11 +80,16 @@ const _rubroIcons = <String, IconData>{
 
 /// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
 bool _destAllowed(String id, Access a) => switch (id) {
-      'sell' || 'quotes' => a.can('sell'),
-      'collect' || 'fiados' || 'cash' => a.can('collect'),
-      'business' => a.can('finance'),
-      'jobs' || 'agenda' => a.can('jobs'),
-      'clients' => a.can('clients'),
+      'sell' => a.can('sell') && a.has('facturar'),
+      'quotes' => a.can('sell') && a.has('cotizaciones'),
+      'collect' => a.can('collect') && a.has('cobros'),
+      'fiados' => a.can('collect') && a.has('fiados'),
+      'cash' => a.can('collect') && a.has('caja'),
+      'business' => a.can('finance') && a.has('reportes'),
+      'jobs' => a.can('jobs') && a.has('trabajos'),
+      'agenda' => a.can('jobs') && a.has('agenda'),
+      'clients' => a.can('clients') && a.has('clientes'),
+      'tables' => a.has('carta_qr'),
       _ => true,
     };
 
@@ -182,7 +187,7 @@ class _MainShellState extends State<MainShell> {
   List<_Dest> _dests() {
     final a = Access.instance;
     final simple = _settings?.simpleMode ?? false;
-    if (a.role == 'tecnico') return const [_dJobs, _dAgenda, _dClients, _dSettings];
+    if (a.role == 'tecnico') return [for (final d in const [_dJobs, _dAgenda, _dClients, _dSettings]) if (_destAllowed(d.id, a)) d];
     // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
     final spec = rubroFor(_settings?.businessType);
     if (spec != null) {
@@ -190,18 +195,18 @@ class _MainShellState extends State<MainShell> {
         for (final n in spec.nav)
           if (_destAllowed(n.id, a)) _Dest(n.id, _rubroIcons[n.id] ?? Icons.circle_outlined, n.label, n.label),
       ];
-      if (out.length < 4 && !out.any((d) => d.id == 'clients') && a.can('clients')) out.add(_Dest('clients', _rubroIcons['clients']!, spec.word('clients'), spec.word('clients')));
+      if (out.length < 4 && !out.any((d) => d.id == 'clients') && _destAllowed('clients', a)) out.add(_Dest('clients', _rubroIcons['clients']!, spec.word('clients'), spec.word('clients')));
       if (out.length < 4) out.add(_dSettings);
       return out.take(4).toList();
     }
     final out = <_Dest>[];
     if (!simple) out.add(_dHome);
-    if (a.can('sell')) out.add(_dSell);
-    out.add(_dClients);
-    if (a.can('collect')) out.add(_dCollect);
+    if (_destAllowed('sell', a)) out.add(_dSell);
+    if (_destAllowed('clients', a)) out.add(_dClients);
+    if (_destAllowed('collect', a)) out.add(_dCollect);
     if (simple) {
       out.add(_dSettings);
-    } else if (a.can('finance')) {
+    } else if (_destAllowed('business', a)) {
       out.add(_dBusiness);
     } else {
       out.add(_dSettings);
@@ -229,6 +234,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _newInvoice() async {
+    if (!Access.instance.has('facturar') || !Access.instance.has('voz')) return;
     if (!Access.instance.can('sell')) {
       openCopilot(context);
       return;
@@ -415,13 +421,13 @@ class _Dock extends StatelessWidget {
                 // Dos mitades iguales: el hueco del micrófono queda SIEMPRE al centro, aunque haya 3 a un lado y 2 al otro.
                 child: Row(children: [
                   Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
-                  const SizedBox(width: 72),
+                  if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
                   Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
                 ]),
               ),
             ),
           ),
-          Positioned(
+          if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) Positioned(
             top: 0,
             child: Semantics(
               button: true,
@@ -429,7 +435,7 @@ class _Dock extends StatelessWidget {
               child: GestureDetector(
                 onLongPress: () {
                   Haptics.heavy();
-                  onMicLong();
+                  if (Access.instance.has('copiloto')) onMicLong();
                 },
                 child: DictateMini(onPressed: onMic),
               ),

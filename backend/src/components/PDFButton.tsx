@@ -3,7 +3,7 @@
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from "@react-pdf/renderer";
 import { money, totals, type InvoiceInput } from "@/lib/schemas";
 
-export type PdfData = InvoiceInput & { number: string; date: string };
+export type PdfData = InvoiceInput & { number: string; date: string; currency?: string };
 
 const s = StyleSheet.create({
   page: { padding: 40, fontSize: 11, fontFamily: "Helvetica" },
@@ -21,7 +21,8 @@ function InvoiceDoc({ d }: { d: PdfData }) {
   return (
     <Document title={`Factura ${d.number}`}>
       <Page size="A4" style={s.page}>
-        <Text style={s.h1}>Factura {d.number}</Text>
+        <Text style={s.h1}>Borrador {d.number}</Text>
+        <Text>Documento interno. No es un comprobante electrónico emitido.</Text>
         <Text>Fecha: {d.date}</Text>
         <Text style={{ marginTop: 12, marginBottom: 20 }}>Cliente: {d.client_name}</Text>
         <View style={s.row}>
@@ -34,14 +35,14 @@ function InvoiceDoc({ d }: { d: PdfData }) {
           <View key={k} style={s.row}>
             <Text style={s.c1}>{i.description}</Text>
             <Text style={s.c2}>{i.quantity}</Text>
-            <Text style={s.c3}>{money(i.unit_price)}</Text>
-            <Text style={s.c4}>{money(i.quantity * i.unit_price)}</Text>
+            <Text style={s.c3}>{money(i.unit_price, d.currency ?? "EUR")}</Text>
+            <Text style={s.c4}>{money(i.quantity * i.unit_price, d.currency ?? "EUR")}</Text>
           </View>
         ))}
         <View style={s.tot}>
-          <Text>Base imponible: {money(t.subtotal)}</Text>
-          <Text>IVA ({d.tax_rate}%): {money(t.tax)}</Text>
-          <Text style={{ fontSize: 14, marginTop: 4 }}>Total: {money(t.total)}</Text>
+          <Text>Base imponible: {money(t.subtotal, d.currency ?? "EUR")}</Text>
+          <Text>Impuesto ({d.tax_rate}%): {money(t.tax, d.currency ?? "EUR")}</Text>
+          <Text style={{ fontSize: 14, marginTop: 4 }}>Total: {money(t.total, d.currency ?? "EUR")}</Text>
         </View>
         {d.notes ? <Text style={{ marginTop: 24 }}>{d.notes}</Text> : null}
       </Page>

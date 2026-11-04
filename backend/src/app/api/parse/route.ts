@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
+import { licenseAllows } from "@/lib/license-check";
 
 export const maxDuration = 30;
 
@@ -120,6 +121,11 @@ export async function POST(req: Request) {
   const bytes = new Uint8Array(await audio.arrayBuffer());
   const kind = sniffAudio(bytes);
   if (!kind) return json({ error: "Formato de audio no válido" }, 400);
+
+  if (!await licenseAllows(supabase, orgId, "voz")) return json({ error: "Tu licencia no permite usar voz en esta empresa." }, 403);
+  if (!await licenseAllows(supabase, orgId, "facturar")) return json({ error: "Tu licencia no permite preparar comprobantes." }, 403);
+  const access = await supabase.rpc("my_access", { p_org: orgId });
+  if (access.error || access.data?.can?.sell !== true) return json({ error: "No tienes permiso para preparar ventas." }, 403);
 
   // ---------- Cuota atómica por usuario ----------
   const { data: allowed, error: quotaErr } = await supabase.rpc("consume_api_quota", {

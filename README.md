@@ -2,11 +2,15 @@
 
 ```
 app/      Flutter (Android, iOS, Web): login por código, dictado, revisión, PDF en el dispositivo
-backend/  Next.js en Vercel: SOLO la API /api/parse (guarda la clave de Groq) + web heredada
+backend/  Next.js: APIs y espacio ERP web /erp/[org], con Supabase Auth, RLS y licencia compartida
           backend/supabase/schema.sql + migrations/20261023_mobile_prod.sql  (base de datos)
 infra/    lycet/ → Lycet (SUNAT) en tu VPS Oracle con Docker + Caddy
 docs/     DESPLIEGUE.md · SEGURIDAD.md · FISCAL.md
 ```
+
+**Implementación ERP local (4 noviembre 2026):** [auditoría, matriz de rubros y pendientes](docs/ERP_AUDITORIA_Y_ALCANCE.md),
+[sistema visual](docs/ERP_DESIGN_SYSTEM.md) y [pruebas y límites de verificación](docs/ERP_VERIFICACION.md).
+La transformación integral sigue en desarrollo. La nueva migración está preparada para revisión y no se ha aplicado en producción.
 
 Flujo: la app graba (≤60 s) → `POST /api/parse` con el token de sesión → Groq (Whisper + Llama) →
 JSON de factura → el usuario revisa → RPC `create_invoice` (atómica, RLS) → PDF generado en el teléfono.

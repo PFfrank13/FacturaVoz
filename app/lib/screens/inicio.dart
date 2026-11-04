@@ -21,6 +21,7 @@ import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/work_queue.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
 import 'goal_sheet.dart';
@@ -28,6 +29,7 @@ import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'hubs_v3.dart' show showNewSaleSheet;
 import 'invoice_detail.dart';
 import 'menu.dart';
+import 'jobs.dart' show JobDetailScreen;
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
@@ -48,9 +50,17 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
   double? _goal;
   List<DailyAlert> _alerts = const [];
   String? _org;
+  List<Job> _work = const [];
+  String? _workError;
+  bool _workLoading = true;
+
+  bool get _appointmentHome => const ['salon', 'consultorio', 'educacion'].contains(Access.instance.rubro);
+  bool get _showWork => Access.instance.can('jobs') && (_appointmentHome
+      ? Access.instance.has('agenda')
+      : const ['servicios_tecnicos', 'taller', 'construccion'].contains(Access.instance.rubro) && Access.instance.has('trabajos'));
 
   @override
-  List<String> get liveTables => const ['invoices', 'payments'];
+  List<String> get liveTables => const ['invoices', 'payments', 'jobs'];
 
   @override
   Future<void> reloadLive() => _load();
@@ -88,6 +98,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
       _goal = null;
       _alerts = const [];
       _tried = false;
+      _work = const [];
+      _workError = null;
+      _workLoading = true;
     });
     _load();
   }
@@ -118,6 +131,24 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
 
     // Todo en paralelo y agregado en la base: dos números, no miles de filas.
     await Future.wait<void>([
+      if (_showWork) () async {
+        try {
+          final jobs = await V2Repo.jobs(openOnly: true, limit: 100,
+            from: _appointmentHome ? DateTime(now.year, now.month, now.day) : null,
+            to: _appointmentHome ? DateTime(now.year, now.month, now.day + 1) : null);
+          if (same()) {
+            setState(() {
+            _work = jobs.where((j) => _appointmentHome ? j.kind == 'cita' : j.kind != 'cita').take(4).toList();
+            _workLoading = false;
+            _workError = null;
+            });
+          }
+        } catch (_) {
+          if (same()) {
+            setState(() { _workError = 'No pudimos cargar tus actividades.'; _workLoading = false; });
+          }
+        }
+      }(),
       if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(today, tomorrow, cur), 'inicio.today', (v) => _today = v),
       if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(first, next, cur), 'inicio.month', (v) => _month = v),
       piece<double?>(GrowthRepo.monthlyGoal().catchError((Object _) => null), 'inicio.goal', (v) => _goal = v),
@@ -200,7 +231,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final monthCount = ((_month?['sales_count'] as num?) ?? 0).toInt();
     final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
     final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
-    final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (!(a.can('sell') && id == 'pos')) if (featureById(id) case final f? when f.roleOk) f];
+    final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (!(a.can('sell') && a.has('facturar') && id == 'pos')) if (featureById(id) case final f? when f.allowed) f];
     final list = _visible();
     final buyers = _todayBuyers();
     return Scaffold(
@@ -244,16 +275,16 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
                     children: [
-                      if (a.can('sell'))
+                      if (a.can('sell') && a.has('facturar'))
                         QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => showNewSaleSheet(context).then((_) {
                               if (mounted) _load();
                             })),
                       for (final f in shortcuts.take(3))
                         QuickAction(
-                          icon: f.planOk ? f.icon : Icons.lock_rounded,
+                          icon: f.icon,
                           label: shortActionLabel(f.id, f.title),
                           colors: [featureColor(f.id).withValues(alpha: 0.8), featureColor(f.id)],
-                          onTap: f.planOk ? () => openFeature(context, f) : () => pushPremium(context, const MenuScreen()),
+                          onTap: () => openFeature(context, f),
                         ),
                       QuickAction(icon: Icons.menu_rounded, label: 'Ver todas', colors: const [Brand.lightInk, Brand.indigoDeep], onTap: () => pushPremium(context, const MenuScreen())),
                     ],
@@ -261,7 +292,16 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
             ),
-          SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load, max: AppState.instance.easyMode.value ? 1 : 2)),
+          if (_showWork) SliverToBoxAdapter(child: WorkQueue(
+            title: _appointmentHome ? 'Tus citas de hoy' : 'Trabajos por avanzar', jobs: _work,
+            loading: _workLoading, error: _workError, onRetry: _load,
+            onOpen: (job) async {
+              if (!_showWork || job.id == null) return;
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => JobDetailScreen(jobId: job.id!)));
+              if (mounted) _load();
+            },
+          )),
+          if (a.has('copiloto')) SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load, max: AppState.instance.easyMode.value ? 1 : 2)),
           if (buyers.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(

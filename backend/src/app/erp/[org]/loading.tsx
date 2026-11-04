@@ -1,0 +1,1 @@
+export default function Loading() { return <section className="fv-loading" role="status" aria-label="Cargando espacio de trabajo"><div /><div /><div /><p>Preparando tu espacio de trabajo…</p></section>; }

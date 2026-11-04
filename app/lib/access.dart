@@ -75,29 +75,27 @@ class LicenseInfo {
 /// Funciones básicas que todo plan incluye.
 const coreFeatures = {'facturar', 'clientes', 'cobros', 'voz'};
 
-/// ¿El plan incluye [key]? Puro (se prueba con flutter test). El núcleo del rubro va en todos los planes
-/// (igual que private.has_feature + private.rubro_core en la base).
+/// ¿Hub concede [key]? Puro (se prueba con flutter test). Ningún rubro o plan añade derechos.
 /// El Hub define las funciones de cada plan. Nunca confiamos en un plan
 /// predeterminado ni en el caché para desbloquear funciones.
 bool planHas(LicenseInfo l, String key, {String? rubro}) {
-  if (!l.enforced || l.dev || l.source != 'hub' || !l.usable) return false;
-  final v = l.features[key];
-  return v == true || (v is num && v != 0);
+  if (!l.enforced || l.dev || l.stale || l.source != 'hub' || !l.usable) return false;
+  return l.features[key] == true;
 }
 
 /// Límite numérico del plan (-1 = sin límite).
 int planLimit(LicenseInfo l, String key) {
-  if (!l.enforced || l.source != 'hub' || !l.usable) return 0;
+  if (!l.enforced || l.dev || l.stale || l.source != 'hub' || !l.usable) return 0;
   final v = l.features[key];
-  return v is num ? v.toInt() : 0;
+  return v is num && v.isFinite && v == v.truncateToDouble() && v >= -1 ? v.toInt() : 0;
 }
 
 class Access extends ChangeNotifier {
   Access._();
   static final Access instance = Access._();
 
-  String role = 'owner'; // owner | admin | finanzas | cajero | tecnico | vendedor
-  bool isAdmin = true;
+  String role = 'member'; // owner | admin | finanzas | cajero | tecnico | vendedor
+  bool isAdmin = false;
   String displayName = '';
   bool welcomed = true;
   Map<String, bool> _can = const {};
@@ -107,7 +105,7 @@ class Access extends ChangeNotifier {
   bool licenseCheckedOnline = false;
   bool licenseChecking = true;
   bool get licenseReady => licenseCheckedOnline && license.enforced && !license.dev &&
-      license.source == 'hub' && license.usable;
+      !license.stale && license.source == 'hub' && license.usable;
   bool get canEnter => licenseReady || (licenseCheckedOnline && license.enforced &&
       !license.dev && license.source == 'hub' && license.mode == 'restricted' && isAdmin);
 
@@ -116,8 +114,9 @@ class Access extends ChangeNotifier {
   /// Rubro de la empresa activa (lo fija la estructura principal al leer los ajustes).
   String? rubro;
 
-  bool has(String feature) => planHas(license, feature, rubro: rubro);
-  int limit(String feature) => planLimit(license, feature);
+  bool has(String feature) => licenseReady && planHas(license, feature, rubro: rubro);
+  int limit(String feature) => licenseReady ? planLimit(license, feature) : 0;
+  int _generation = 0;
 
   String get roleLabel => roleName(role);
 
@@ -141,8 +140,16 @@ class Access extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    final generation = ++_generation;
     licenseCheckedOnline = false;
     licenseChecking = true;
+    isAdmin = false;
+    role = 'member';
+    _can = const {};
+    license = const LicenseInfo();
+    rawAccess = null;
+    rawLicense = null;
+    notifyListeners();
     final org = Repo.activeOrgId;
     if (org == null) {
       licenseChecking = false;
@@ -151,7 +158,8 @@ class Access extends ChangeNotifier {
       return;
     }
     // Permisos y licencia no dependen entre sí: se piden a la vez (una espera de red en vez de dos).
-    await Future.wait([_loadAccess(org), _loadLicense(org)]);
+    await Future.wait([_loadAccess(org, generation), _loadLicense(org, generation)]);
+    if (generation != _generation || org != Repo.activeOrgId) return;
     licenseChecking = false;
     loaded = true;
     notifyListeners();
@@ -162,7 +170,7 @@ class Access extends ChangeNotifier {
 
   void _applyAccess(Map<String, dynamic> m) {
     rawAccess = m;
-    role = (m['role'] ?? 'owner') as String;
+    role = (m['role'] ?? 'member') as String;
     isAdmin = m['is_admin'] == true;
     displayName = (m['display_name'] ?? '') as String;
     welcomed = m['welcomed'] == true || isAdmin;
@@ -184,11 +192,13 @@ class Access extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadAccess(String org) async {
+  Future<void> _loadAccess(String org, int generation) async {
     try {
       final a = await _db.rpc('my_access', params: {'p_org': org});
+      if (generation != _generation || org != Repo.activeOrgId) return;
       if (a is Map) _applyAccess(Map<String, dynamic>.from(a));
     } catch (_) {
+      if (generation != _generation || org != Repo.activeOrgId) return;
       role = 'member';
       isAdmin = false;
       welcomed = true;
@@ -196,9 +206,10 @@ class Access extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadLicense(String org) async {
+  Future<void> _loadLicense(String org, int generation) async {
     try {
       final l = await _db.rpc('my_license', params: {'p_org': org});
+      if (generation != _generation || org != Repo.activeOrgId) return;
       if (l is Map) {
         _applyLicense(Map<String, dynamic>.from(l));
         licenseCheckedOnline = true;
@@ -207,6 +218,7 @@ class Access extends ChangeNotifier {
         rawLicense = null;
       }
     } catch (_) {
+      if (generation != _generation || org != Repo.activeOrgId) return;
       // Fallar cerrado: no se permite operar con una licencia inventada.
       licenseCheckedOnline = false;
       license = const LicenseInfo();
@@ -225,8 +237,9 @@ class Access extends ChangeNotifier {
   }
 
   void clear() {
-    role = 'owner';
-    isAdmin = true;
+    _generation++;
+    role = 'member';
+    isAdmin = false;
     welcomed = true;
     _can = const {};
     license = const LicenseInfo();
