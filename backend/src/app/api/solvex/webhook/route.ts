@@ -51,7 +51,6 @@ export async function POST(req: Request) {
     const payload = verifyToken(evt.data.token, await publicKeys(cfg), { audience: cfg.instanceId });
     const tenant = payload.tenant ?? (typeof evt.data.tenant_ref === "string" ? evt.data.tenant_ref : null);
     if (!isOrgId(tenant)) return json({ ok: true, ignored: "tenant" });
-    await admin.rpc("license_set_enforced", { p_on: true });
     const { data, error } = await admin.rpc("license_apply", { p_org: tenant, p_payload: payload, p_token: evt.data.token });
     if (error) throw new Error(error.code ?? "rpc");
     return json({ ok: true, result: data });
