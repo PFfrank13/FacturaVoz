@@ -20,7 +20,6 @@ export async function GET(req: Request) {
     // Nunca se desactiva el control de licencias por una configuración ausente.
     return NextResponse.json({ error: "Solvex Hub no configurado; activación obligatoria" }, { status: 503 });
   }
-  await admin.rpc("license_set_enforced", { p_on: true });
 
   const out = { applied: 0, stale: 0, unknown: 0, bad_tokens: 0, trials: 0, trials_used: 0, trial_errors: 0, error: "" };
   try {
