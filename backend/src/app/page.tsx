@@ -8,7 +8,7 @@ export default async function Home() {
   if (!user) redirect("/login");
   const { data, error } = await db.from("organization_members").select("org_id,organizations(id,name)").eq("user_id", user.id);
   return <main className="fv-welcome">
-    <p className="fv-eyebrow">SOLVEX RETAIL CONTROL</p>
+    <p className="fv-eyebrow">FACTURAVOZ</p>
     <h1>Tu negocio.<br /><span>Bajo tu control.</span></h1>
     <p>Elige la empresa con la que vas a trabajar. Tus datos y permisos son los mismos que en la aplicación móvil.</p>
     {error ? <p role="alert">No pudimos consultar tus empresas. Actualiza la página para reintentar.</p> :

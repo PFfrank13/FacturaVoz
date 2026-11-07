@@ -31,7 +31,6 @@ import 'new_invoice.dart';
 import 'pos.dart';
 import 'profit.dart';
 import 'quotes.dart';
-import 'rubro_picker.dart';
 import 'settings.dart';
 
 /// Estructura principal v2.0 (Fase 7): máximo 5 destinos + micrófono central en un dock de cristal flotante.
@@ -57,28 +56,9 @@ class _Dest {
 
 const _dHome = _Dest('home', Icons.space_dashboard_rounded, 'Inicio', 'Inicio');
 const _dSell = _Dest('sell', Icons.point_of_sale_rounded, 'Vender', 'Vender');
-const _dClients = _Dest('clients', Icons.people_alt_rounded, 'Clientes', 'Clientes');
-const _dCollect = _Dest('collect', Icons.account_balance_wallet_rounded, 'Cobrar', 'Cobrar y pagar');
-const _dBusiness = _Dest('business', Icons.insights_rounded, 'Negocio', 'Mi negocio');
 const _dTools = _Dest('tools', Icons.grid_view_rounded, 'Herramientas', 'Herramientas de la tienda');
-const _dSettings = _Dest('settings', Icons.settings_rounded, 'Ajustes', 'Ajustes');
-const _dJobs = _Dest('jobs', Icons.assignment_rounded, 'Trabajos', 'Mis trabajos');
-const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda');
 
 /// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
-const _rubroIcons = <String, IconData>{
-  'home': Icons.space_dashboard_rounded,
-  'sell': Icons.point_of_sale_rounded,
-  'clients': Icons.people_alt_rounded,
-  'collect': Icons.account_balance_wallet_rounded,
-  'business': Icons.insights_rounded,
-  'jobs': Icons.assignment_rounded,
-  'agenda': Icons.calendar_month_rounded,
-  'quotes': Icons.request_quote_rounded,
-  'fiados': Icons.menu_book_rounded,
-  'tables': Icons.table_restaurant_rounded,
-  'cash': Icons.lock_clock_rounded,
-};
 
 /// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
 bool _destAllowed(String id, Access a) => switch (id) {
@@ -129,26 +109,10 @@ class _MainShellState extends State<MainShell> {
     _watchLicense();
   }
 
-  bool _gateShown = false;
-
   Future<void> _reloadSettings() async {
     final s = await V2Repo.settings();
-    Access.instance.rubro = s.businessType;
+    Access.instance.rubro = s.businessType; // preserve historical license context
     if (mounted) setState(() => _settings = s);
-    _maybeGate(s);
-  }
-
-  /// "Otro / personalizado" ya no existe: el dueño elige su rubro una vez (nada se pierde mientras tanto).
-  void _maybeGate(OrgSettings s) {
-    if (_gateShown || !V2Repo.ready || !s.onboardingDone || rubroFor(s.businessType) != null) return;
-    _gateShown = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (ctx) => RubroPickerScreen(current: s.businessType, gate: true, onDone: () => Navigator.of(ctx).pop()),
-      ));
-    });
   }
 
   /// Si el Hub cambia la licencia (pago, corte), la app se entera al instante.
@@ -188,40 +152,12 @@ class _MainShellState extends State<MainShell> {
 
   List<_Dest> _dests() {
     final a = Access.instance;
-    final simple = _settings?.simpleMode ?? false;
-    if (a.rubro == 'bodega' || a.rubro == 'mayorista') {
-      return [
-        if (_destAllowed('sell', a)) _dSell,
-        _dHome,
-        if (_destAllowed('cash', a)) const _Dest('cash', Icons.account_balance_wallet_outlined, 'Caja', 'Caja y cierre'),
-        _dTools,
-      ];
-    }
-    if (a.role == 'tecnico') return [for (final d in const [_dJobs, _dAgenda, _dClients, _dSettings]) if (_destAllowed(d.id, a)) d];
-    // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
-    final spec = rubroFor(_settings?.businessType);
-    if (spec != null) {
-      final out = [
-        for (final n in spec.nav)
-          if (_destAllowed(n.id, a)) _Dest(n.id, _rubroIcons[n.id] ?? Icons.circle_outlined, n.label, n.label),
-      ];
-      if (out.length < 4 && !out.any((d) => d.id == 'clients') && _destAllowed('clients', a)) out.add(_Dest('clients', _rubroIcons['clients']!, spec.word('clients'), spec.word('clients')));
-      if (out.length < 4) out.add(_dSettings);
-      return out.take(4).toList();
-    }
-    final out = <_Dest>[];
-    if (!simple) out.add(_dHome);
-    if (_destAllowed('sell', a)) out.add(_dSell);
-    if (_destAllowed('clients', a)) out.add(_dClients);
-    if (_destAllowed('collect', a)) out.add(_dCollect);
-    if (simple) {
-      out.add(_dSettings);
-    } else if (_destAllowed('business', a)) {
-      out.add(_dBusiness);
-    } else {
-      out.add(_dSettings);
-    }
-    return out.take(5).toList();
+    return [
+      _dHome,
+      if (_destAllowed('sell', a)) _dSell,
+      if (_destAllowed('cash', a)) const _Dest('cash', Icons.account_balance_wallet_outlined, 'Caja', 'Caja y cierre'),
+      _dTools,
+    ];
   }
 
   /// Pantalla con la que abre la app: cada rubro abre en SU primera pestaña (la que definió su barra). Solo si la barra

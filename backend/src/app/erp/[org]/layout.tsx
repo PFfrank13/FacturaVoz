@@ -1,7 +1,7 @@
 import Brand from "@/components/retail/Brand";
 import Link from "next/link";
 import { workspaceContext } from "@/lib/erp/context";
-import { sectors, visibleModules } from "@/lib/erp/access";
+import { visibleModules } from "@/lib/erp/access";
 import RefreshAccess from "@/components/erp/RefreshAccess";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +12,18 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     <a className="fv-skip" href="#workspace-content">Saltar al contenido</a>
     <aside className="fv-rail">
       <Link className="fv-wordmark" href="/"><Brand /></Link>
-      <p className="fv-eyebrow">{c.sector ? sectors[c.sector].name : "TU EMPRESA"}</p>
+      <p className="fv-eyebrow">TU EMPRESA</p>
       <strong className="fv-org-name">{c.organization.name}</strong>
       <nav aria-label="Navegación de la empresa">
         <Link href={`/erp/${org}`}>Centro de control</Link>
-        {visibleModules(c.license, c.access, c.sector).map(m => <Link key={m.id} href={`/erp/${org}/${m.id}`}>{m.id === "clientes" && c.sector === "consultorio" ? "Pacientes" : m.id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title}</Link>)}
+        {[
+          ["Ventas y clientes", ["vender", "comprobantes", "clientes", "cotizaciones", "cobros"]],
+          ["Productos y abastecimiento", ["productos", "inventario", "kardex", "compras", "proveedores"]],
+          ["Administración", ["equipo", "reportes", "plan", "configuracion"]],
+        ].map(([title, ids]) => {
+          const entries = visibleModules(c.license, c.access, c.sector).filter(m => (ids as string[]).includes(m.id));
+          return entries.length ? <details key={title as string} open={title === "Ventas y clientes"}><summary>{title}</summary>{entries.map(m => <Link key={m.id} href={`/erp/${org}/${m.id}`}>{m.id === "vender" ? "Punto de venta" : m.title}</Link>)}</details> : null;
+        })}
       </nav>
       <Link className="fv-switch" href="/">⇄ Cambiar empresa</Link>
     </aside>

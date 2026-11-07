@@ -3,7 +3,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
-/// Sistema de diseño Solvex Retail.
+/// Sistema de diseño FacturaVoz.
 /// Tinta petróleo, verde de acción y lima de señal. Los nombres de tokens legacy conservan compatibilidad.
 /// Radios de esquina (usar estos en pantallas nuevas en vez de números sueltos).
 class Radii {

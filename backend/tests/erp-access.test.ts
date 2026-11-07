@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { hasFeature, featureLimit, moduleAllowed, modules, sectors, visibleModules, type License, type Sector } from "../src/lib/erp/access";
 const active: License = { enforced: true, source: "hub", mode: "full", features: { stock: true, facturar: true, clientes: true, cobros: true, agenda: true, trabajos: true, cotizaciones: true, max_users: 5 } };
-describe("ERP: Hub is authoritative across all nine sectors", () => {
+describe("ERP: Hub remains authoritative for historical companies", () => {
   for (const sector of Object.keys(sectors) as Sector[]) {
     it(`${sector}: false and missing flags stay hidden for every role and plan`, () => {
       for (const plan of ["BASICO", "PRO", "EMPRESA"]) {
@@ -15,10 +15,12 @@ describe("ERP: Hub is authoritative across all nine sectors", () => {
         }
       }
     });
-    it(`${sector}: navigation and direct route use the same policy`, () => {
+    it(`${sector}: commercial navigation preserves authorization and hides historical verticals`, () => {
       const access = { is_admin: true };
       const ids = visibleModules(active, access, sector).map(m => m.id);
-      for (const entry of modules) expect(ids.includes(entry.id)).toBe(moduleAllowed(entry, active, access, sector));
+      for (const entry of modules) expect(ids.includes(entry.id)).toBe(!["trabajos", "agenda"].includes(entry.id) && moduleAllowed(entry, active, access, sector));
+      expect(ids).toContain("vender");
+      expect(ids).toContain("inventario");
     });
   }
   it("closed modes, stale cache, dev and absent verification cannot grant rights", () => {

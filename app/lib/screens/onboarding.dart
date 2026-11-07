@@ -18,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _i = 0;
 
   static const _pages = [
-    (Icons.shopping_basket_outlined, 'Una tienda, un mismo equipo', 'Bienvenido a Solvex Retail POS. Organiza tus productos y prepara la venta desde un solo lugar.'),
+    (Icons.shopping_basket_outlined, 'Una tienda, un mismo equipo', 'Bienvenido a FacturaVoz. Organiza tus productos y prepara la venta desde un solo lugar.'),
     (Icons.point_of_sale_rounded, 'Selecciona. Revisa. Cobra.', 'Agrega productos, ajusta cantidades y revisa el total antes de registrar el cobro. El pago digital manual no equivale a una confirmación del banco.'),
     (Icons.receipt_long_outlined, 'Cada operación, con su estado', 'Comprueba que la venta quedó registrada. Un borrador o un cobro pendiente todavía no son una venta confirmada.'),
   ];

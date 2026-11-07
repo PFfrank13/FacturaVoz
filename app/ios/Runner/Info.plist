@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Solvex Retail POS</string>
+	<string>FacturaVoz</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -67,19 +67,19 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Solvex Retail POS usa el micrófono solo para dictar tus facturas.</string>
+	<string>FacturaVoz usa el micrófono solo para dictar tus facturas.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Solvex Retail POS usa Face ID para desbloquear la app.</string>
+	<string>FacturaVoz usa Face ID para desbloquear la app.</string>
 	<key>CFBundleURLTypes</key>
 	<array><dict><key>CFBundleURLSchemes</key>
 	<array><string>com.facturavoz.app</string></array></dict></array>
 	<key>NSCameraUsageDescription</key>
-	<string>Solvex Retail POS usa la cámara para leer tus comprobantes y constancias de pago.</string>
+	<string>FacturaVoz usa la cámara para leer tus comprobantes y constancias de pago.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Solvex Retail POS lee las fotos y capturas que elijas (comprobantes y pagos de Yape o Plin).</string>
+	<string>FacturaVoz lee las fotos y capturas que elijas (comprobantes y pagos de Yape o Plin).</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Solvex Retail POS usa Bluetooth solo para imprimir tus tickets en tu ticketera.</string>
+	<string>FacturaVoz usa Bluetooth solo para imprimir tus tickets en tu ticketera.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Solvex Retail POS guarda la ubicación de tu cliente o trabajo solo cuando tocas "Estoy aquí".</string>
+	<string>FacturaVoz guarda la ubicación de tu cliente o trabajo solo cuando tocas "Estoy aquí".</string>
 </dict>
 </plist>

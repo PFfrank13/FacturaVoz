@@ -16,7 +16,7 @@ void main() {
         child: const LoginScreen(),
       )));
       await tester.pumpAndSettle();
-      expect(find.text('Solvex Retail'), findsOneWidget);
+      expect(find.text('FacturaVoz'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
     testWidgets('onboarding retail permite terminar sin desbordar a $width', (tester) async {

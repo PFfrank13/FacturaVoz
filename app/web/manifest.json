@@ -1,6 +1,6 @@
 {
-    "name": "Solvex Retail POS",
-    "short_name": "Retail POS",
+    "name": "FacturaVoz",
+    "short_name": "FacturaVoz",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

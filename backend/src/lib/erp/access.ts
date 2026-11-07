@@ -48,11 +48,11 @@ export const modules: readonly Module[] = [
 export function moduleAllowed(m: Module, l: License, a: Access, sector: Sector | null): boolean {
   if (m.permission && !can(a, m.permission)) return false;
   if (m.id === "plan") return true;
-  return licenseReady(l) && (!m.feature || hasFeature(l, m.feature)) && (!m.sectors || (sector !== null && m.sectors.includes(sector)));
+  return licenseReady(l) && (!m.feature || hasFeature(l, m.feature)) && (!m.sectors || !["trabajos", "agenda"].includes(m.id) || (sector !== null && m.sectors.includes(sector)));
 }
 export function visibleModules(l: License, a: Access, sector: Sector | null): Module[] {
-  const visible = modules.filter(m => moduleAllowed(m, l, a, sector));
-  const priority: readonly string[] = sector ? sectors[sector].priority : [];
+  const visible = modules.filter(m => !["trabajos", "agenda"].includes(m.id) && moduleAllowed(m, l, a, sector));
+  const priority: readonly string[] = ["vender", "comprobantes", "clientes", "productos", "cobros"];
   return [...visible].sort((a, b) => {
     const rank = (id: string) => priority.includes(id) ? priority.indexOf(id) : priority.length;
     return rank(a.id) - rank(b.id);

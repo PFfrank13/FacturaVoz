@@ -103,7 +103,7 @@ class _BootState extends State<_Boot> {
                   ))),
                   const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                     BrandMark(size: 78), SizedBox(height: 18),
-                    Text('Solvex Retail POS', style: TextStyle(color: Colors.white,
+                    Text('FacturaVoz', style: TextStyle(color: Colors.white,
                         fontWeight: FontWeight.w800, fontSize: 26)),
                     SizedBox(height: 20),
                     SizedBox(width: 26, height: 26,
@@ -124,7 +124,7 @@ class FacturaVozApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: AppState.instance.themeMode,
       builder: (context, mode, _) => MaterialApp(
-        title: 'Solvex Retail POS',
+        title: 'FacturaVoz',
         navigatorKey: appNavigatorKey,
         scrollBehavior: const PremiumScrollBehavior(),
         debugShowCheckedModeBanner: false,

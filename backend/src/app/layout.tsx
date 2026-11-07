@@ -9,8 +9,8 @@ const retailFont = localFont({ variable: "--font-retail", display: "swap", src: 
 ] });
 
 export const metadata: Metadata = {
-  title: "Solvex Retail Control",
-  description: "Administración de tienda de Solvex Retail, por Solvex Software Labs.",
+  title: "FacturaVoz",
+  description: "Administración de tienda de FacturaVoz, por Solvex Software Labs.",
 };
 
 export default function RootLayout({
