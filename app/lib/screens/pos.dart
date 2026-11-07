@@ -493,6 +493,11 @@ class _PosScreenState extends State<PosScreen> {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
       _load();
     } catch (e) {
+      if (mounted && e is CheckoutRejected) {
+        setState(() { _chargeRequestId = null; _chargeMethod = null; });
+        // A known rollback permits review. Timeouts retain the UUID and ticket.
+        await _load();
+      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; no se creará una venta duplicada si ya fue registrada. ${friendly(e)}')));
     } finally {
       if (mounted) setState(() => _charging = false);

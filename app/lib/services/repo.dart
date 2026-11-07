@@ -257,13 +257,19 @@ class Repo {
         .eq('request_id', requestId).eq('user_id', user.id).maybeSingle();
     final confirmedId = previous?['invoice_id'] as String?;
     if (confirmedId != null) return confirmedId;
-    final result = await _db.rpc('fast_checkout_atomic', params: {
+      dynamic result;
+      try {
+        result = await _db.rpc('fast_checkout_atomic', params: {
       'p_org_id': org, 'p_request_id': requestId,
       'p_items': draft.items.map((e) => e.toJson()).toList(),
       'p_tax_rate': round2(draft.taxRate), 'p_currency': draft.currency,
       'p_method': method, 'p_notes': draft.notes,
-    });
-    if (result is! List || result.isEmpty || result.first is! Map) {
+        });
+      } on PostgrestException catch (e) {
+        if (e.code == 'P2001') throw CheckoutRejected();
+        rethrow;
+      }
+      if (result is! List || result.isEmpty || result.first is! Map) {
       throw AppException('El servidor no confirmó el cobro. Comprueba el estado antes de repetirlo.');
     }
     final data = Map<String, dynamic>.from(result.first as Map);

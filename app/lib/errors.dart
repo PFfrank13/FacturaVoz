@@ -1,5 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Only emitted after the checkout RPC reports its explicit rollback contract.
+class CheckoutRejected extends AppException {
+  CheckoutRejected() : super('El servidor rechazó el ticket sin registrar la venta. Revisa precios, cantidades e impuesto antes de cobrar.', code: 'P2001');
+}
+
 class AppException implements Exception {
   AppException(this.message, {this.code, this.transcript});
   final String message;

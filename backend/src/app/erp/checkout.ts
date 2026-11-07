@@ -29,6 +29,10 @@ export async function checkout(org: string, input: unknown): Promise<CheckoutRes
       p_currency: c.organization.currency || "PEN", p_tax_rate: Number(c.organization.default_tax_rate ?? 18),
       p_notes: null, p_items: lines,
     });
+    if (error?.code === "P2001") {
+      revalidatePath(`/erp/${org}`, "layout");
+      return { ok: false, uncertain: false, message: "El servidor rechazó el ticket sin registrar la venta. Revisa precios, cantidades e impuesto antes de cobrar." };
+    }
     if (error || !data?.[0]?.invoice_id)
       return { ok: false, uncertain: true, message: "Cobro sin confirmar. Reintenta la misma operación para evitar duplicados. Si persiste, solicita revisar el servicio de ventas." };
     revalidatePath(`/erp/${org}`, "layout");

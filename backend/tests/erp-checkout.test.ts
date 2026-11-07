@@ -37,6 +37,12 @@ it("preserves uncertainty after an RPC error", async () => {
   m.rpc.mockResolvedValue({ error: { message: "timeout" } });
   expect(await checkout("org", input)).toMatchObject({ ok: false, uncertain: true });
 });
+it("unlocks review only on the explicit SQL rollback contract", async () => {
+  m.rpc.mockResolvedValue({ error: { code: "P2001" } });
+  expect(await checkout("org", input)).toMatchObject({ ok: false, uncertain: false });
+  m.rpc.mockResolvedValue({ error: { code: "42501" } });
+  expect(await checkout("org", input)).toMatchObject({ ok: false, uncertain: true });
+});
 it("recovers committed receipt even after a product price changes", async () => {
   m.previous.mockResolvedValue({ data: { invoice_id: id } });
   expect((await checkout("org", input)).ok).toBe(true);
