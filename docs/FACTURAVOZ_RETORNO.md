@@ -56,3 +56,18 @@ No se verificaron transacciones del producto de referencia ni se analizó su aud
   no se elimina ni se crea otro. Los Preview pertenecen al proyecto factura-voz.
 
 Esta es una fase de recuperación, no la conclusión de los cinco recorridos.
+
+## Verificación y continuación del onboarding
+
+Backend: 173 pruebas aprobadas, ESLint y build Next aprobados. Flutter: analyze
+sin incidencias y 6 pruebas de identidad/layout POS aprobadas.
+Onboarding comercial implementado: productos/servicios/ambos, guardado aditivo
+en labels.commercial_offer, sin modificar business_type. Error de persistencia
+visible; no se anuncia finalización si el guardado falla. Prueba adicional de
+serialización/conservación de contexto histórico aprobada.
+Faltan integrar datos comerciales, moneda e impuestos en ese recorrido y retirar
+las presentaciones sectoriales restantes de herramientas/configuración.
+
+Commit web `7e51b07` publicado en codex/facturavoz-evolucion. Preview solicitado
+en el proyecto original: https://factura-2tyg8lcb4-portafolio-frank.vercel.app.
+No se certifica sesión autenticada ni verificación visual por compilar.

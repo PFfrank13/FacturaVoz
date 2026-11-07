@@ -1,12 +1,9 @@
 // Presentación v2.0 (Fase 1): animada, saltable y se puede volver a abrir desde Ajustes.
-// v3: pregunta el RUBRO (9 rubros; "Otro / personalizado" ya no existe) y si prefiere el modo FÁCIL (letras grandes).
-// El rubro define la barra, las palabras y los accesos; ninguna función se borra (todo sigue en Menú → Otras funciones).
+// Preferencia comercial aditiva; no altera el rubro histórico de licencia.
+// Los permisos siguen procediendo de los contratos existentes del Hub.
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../business_templates.dart';
-import '../rubros.dart';
-import '../services/rubro_apply.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -39,7 +36,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
       if (!mounted) return;
       setState(() {
         _settings = s;
-        _type = rubroFor(s.businessType)?.id ?? '';
+        _type = s.labels['commercial_offer'] ?? 'both';
       });
     });
   }
@@ -60,15 +57,17 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
     setState(() => _saving = true);
     final s = _settings ?? OrgSettings();
     try {
-      if (!skipped && rubroFor(_type) != null) {
-        await applyRubro(_type, firstTime: true);
-        await AppState.instance.setEasyMode(_easy);
-      } else {
-        s.onboardingDone = true; // sin rubro: la app lo pedirá después (no se bloquea nada)
-        await V2Repo.saveSettings(s);
-      }
+      if (!skipped) s.labels['commercial_offer'] = _type;
+      s.onboardingDone = true;
+      await V2Repo.saveSettings(s);
+      await AppState.instance.setEasyMode(_easy);
     } catch (_) {
-      // Sin la migración (o sin permiso de administrador) la presentación igual se cierra.
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:
+          Text('No se guardó la configuración. Revisa la conexión y vuelve a intentarlo.')));
+      }
+      return;
     }
     if (!mounted) return;
     Haptics.success();
@@ -160,61 +159,25 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
     ]);
   }
 
-  Widget _types(BuildContext context) {
-    final t = Theme.of(context);
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('¿Qué tipo de negocio tienes?', style: t.textTheme.headlineSmall),
-          const SizedBox(height: 4),
-          Text('Cada negocio tendrá sus propias funciones y datos, sin mezclarse con otros rubros.', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-        ]),
-      ),
-      Expanded(
-        child: LayoutBuilder(builder: (context, c) {
-          final cols = c.maxWidth > 560 ? 3 : 2;
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(178)),
-            itemCount: rubros.length,
-            itemBuilder: (context, i) {
-              final b = templateFor(rubros[i].id);
-              final on = b.id == _type;
-              return Reveal(
-                index: i < 8 ? i : 8,
-                child: Pressable(
-                  onTap: () {
-                    Haptics.select();
-                    setState(() => _type = b.id);
-                  },
-                  child: SectorPhotoTile(
-                    rubro: b.id,
-                    label: b.name,
-                    selected: on,
-                    height: MediaQuery.textScalerOf(context).scale(174),
-                  ),
-                ),
-              );
-            },
-          );
-        }),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Row(children: [
-          TextButton(onPressed: () => _go(0), child: const Text('Atrás')),
-          const SizedBox(width: 8),
-          Expanded(child: GradientButton(label: 'Continuar', icon: Icons.arrow_forward_rounded, onPressed: _type.isEmpty ? null : () => _go(2))),
-        ]),
-      ),
-    ]);
-  }
+  Widget _types(BuildContext context) => ListView(padding: const EdgeInsets.all(24), children: [
+    Text('¿Qué vende tu negocio?', style: Theme.of(context).textTheme.headlineSmall),
+    const SizedBox(height: 8),
+    const Text('Productos, servicios o ambos. Esta preferencia no modifica tu licencia ni tus registros anteriores.'),
+    const SizedBox(height: 16),
+    for (final entry in const [('products', 'Productos', Icons.inventory_2_outlined),
+      ('services', 'Servicios', Icons.handyman_outlined), ('both', 'Productos y servicios', Icons.storefront_outlined)])
+      Card(child: ListTile(leading: Icon(entry.$3), title: Text(entry.$2),
+        trailing: Icon(_type == entry.$1 ? Icons.radio_button_checked : Icons.radio_button_off),
+        onTap: () => setState(() => _type = entry.$1))),
+    const SizedBox(height: 16),
+    GradientButton(label: 'Continuar', icon: Icons.arrow_forward_rounded,
+      onPressed: _type.isEmpty ? null : () => _go(2)),
+    TextButton(onPressed: () => _go(0), child: const Text('Atrás')),
+  ]);
 
   Widget _mode(BuildContext context) {
     final t = Theme.of(context);
-    final tpl = templateFor(_type);
-    final tips = rubroFor(_type)?.notes ?? tpl.tips;
+    const tips = ['Un servicio no necesita existencias físicas.', 'Revisa los datos comerciales, moneda e impuestos en Configuración antes de emitir.'];
     Widget option(bool easy, String title, String body, IconData icon) {
       final on = _easy == easy;
       return Pressable(
@@ -250,11 +213,11 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
     return ListView(padding: const EdgeInsets.all(24), children: [
       Text('¿Cómo quieres ver la app?', style: t.textTheme.headlineSmall),
       const SizedBox(height: 16),
-      option(false, 'Normal', 'Tu barra de ${rubroFor(_type)?.name.toLowerCase() ?? 'negocio'}: ${rubroFor(_type)?.nav.map((n) => n.label).join(', ') ?? ''} y el micrófono al centro.', Icons.dashboard_rounded),
+      option(false, 'Normal', 'Inicio, ventas, caja y herramientas. Conserva el dictado de comprobantes.', Icons.dashboard_rounded),
       option(true, 'Fácil', 'Lo mismo, con letras y botones más grandes. Lo puedes cambiar en Ajustes.', Icons.text_increase_rounded),
       if (tips.isNotEmpty) ...[
         const SizedBox(height: 8),
-        Text('Para ${tpl.name.toLowerCase()}:', style: t.textTheme.titleSmall),
+        Text('Antes de empezar:', style: t.textTheme.titleSmall),
         const SizedBox(height: 8),
         for (final tip in tips)
           Padding(
