@@ -109,7 +109,6 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   List<Product>? _all;
   String? _error;
   String _q = '';
-  String _filter = 'Activos';
 
   @override
   List<String> get liveTables => const ['products'];
@@ -525,19 +524,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final t = Theme.of(context);
     final all = _all;
     final q = _q.trim().toLowerCase();
-    final stockAllowed = Access.instance.has('stock');
-    final list = (all ?? const <Product>[]).where((p) {
-      final matches = q.isEmpty || p.name.toLowerCase().contains(q);
-      final status = switch (_filter) {
-        'Activos' => p.active,
-        'Archivados' => !p.active,
-        'Por reponer' => stockAllowed && p.active && p.lowStock,
-        _ => true,
-      };
-      return matches && status;
-    }).toList();
+    final list = (all ?? const <Product>[]).where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Catálogo'), actions: [IconButton(tooltip: 'Actualizar catálogo', onPressed: _load, icon: const Icon(Icons.refresh_rounded))]),
+      appBar: AppBar(title: const Text('Productos y servicios')),
       floatingActionButton: Access.instance.can('products_edit') ? FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')) : null,
       body: RefreshIndicator(
         onRefresh: _load,
@@ -546,28 +535,13 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
-            Text('Cada producto, listo para vender.', style: t.textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            Text('Busca, revisa precios y mantén tu surtido al día.', style: t.textTheme.bodyMedium),
-            if (all != null) Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Wrap(spacing: 8, runSpacing: 8, children: [
-                StatusPill('${all.where((p) => p.active).length} activos', tone: PillTone.ok),
-                if (stockAllowed) StatusPill('${all.where((p) => p.active && p.lowStock).length} por reponer', tone: PillTone.warn),
-                StatusPill('${all.where((p) => !p.active).length} archivados'),
-              ]),
-            ),
+            SectorPhotoBanner(rubro: Access.instance.rubro,
+              title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
             const SizedBox(height: 16),
             TextField(
               onChanged: (v) => setState(() => _q = v),
-              decoration: const InputDecoration(labelText: 'Buscar producto', hintText: 'Ej.: arroz, leche, aceite', prefixIcon: Icon(Icons.search_rounded)),
+              decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded), isDense: true),
             ),
-            const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final filter in ['Activos', if (stockAllowed) 'Por reponer', 'Archivados', 'Todos'])
-                ChoiceChip(label: Text(filter), selected: _filter == filter, onSelected: (_) => setState(() => _filter = filter)),
-            ]),
-            Padding(padding: const EdgeInsets.only(top: 12), child: Text('${list.length} resultados · toca un producto para ver sus acciones', style: t.textTheme.bodySmall)),
             const SizedBox(height: 14),
             if (_error != null)
               SoftCard(
@@ -618,11 +592,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                               ]),
                             ),
                             const SizedBox(width: 8),
-                            Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                              Text('Precio', style: t.textTheme.bodySmall),
-                              Text(p.unitPrice.toStringAsFixed(2), style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                              if (Access.instance.can('products_edit')) const Icon(Icons.chevron_right_rounded, size: 20),
-                            ])),
+                            Text(p.unitPrice.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w700)),
                           ]),
                         ),
                       ),

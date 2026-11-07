@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   for (final width in [320.0, 768.0]) {
-    testWidgets('acceso retail legible a $width con texto ampliado', (tester) async {
+    testWidgets('acceso original legible a $width con texto ampliado', (tester) async {
       tester.view.physicalSize = Size(width, 700);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -16,10 +16,10 @@ void main() {
         child: const LoginScreen(),
       )));
       await tester.pumpAndSettle();
-      expect(find.text('FacturaVoz'), findsOneWidget);
+      expect(find.text('Tu negocio en movimiento.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
-    testWidgets('onboarding retail permite terminar sin desbordar a $width', (tester) async {
+    testWidgets('onboarding original permite terminar sin desbordar a $width', (tester) async {
       tester.view.physicalSize = Size(width, 700);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);

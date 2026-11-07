@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
+import '../growth.dart';
 import '../models.dart';
 import '../models_v2.dart';
 import '../rubros.dart';
@@ -18,13 +19,13 @@ import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
+import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/work_queue.dart';
-import '../ui/business_header.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
 import 'goal_sheet.dart';
-import 'home.dart' show CopilotCards, InvoiceRow;
+import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'hubs_v3.dart' show showNewSaleSheet;
 import 'invoice_detail.dart';
 import 'menu.dart';
@@ -45,6 +46,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
   String _filter = 'all';
   String _query = '';
   int _limit = 100;
+  bool _tried = false;
   double? _goal;
   List<DailyAlert> _alerts = const [];
   String? _org;
@@ -73,6 +75,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     _items = LiveCache.get<List<InvoiceRecord>>('inicio.items');
     _goal = LiveCache.get<double>('inicio.goal');
     _alerts = LiveCache.get<List<DailyAlert>>('inicio.alerts') ?? const [];
+    _tried = _month != null || _items != null;
     _load();
     startLive(); // tiempo real: venta o cobro nuevo = se actualiza sin tocar nada
     AppState.instance.addListener(_onApp);
@@ -94,6 +97,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
       _items = null;
       _goal = null;
       _alerts = const [];
+      _tried = false;
       _work = const [];
       _workError = null;
       _workLoading = true;
@@ -120,6 +124,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
         LiveCache.put(key, v);
         setState(() {
           apply(v);
+          _tried = true;
         });
       } catch (_) {}
     }
@@ -156,6 +161,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
           setState(() {
             _items = inv;
             _error = null;
+            _tried = true;
           });
         } catch (e) {
           if (same()) setState(() => _error = friendly(e));
@@ -222,6 +228,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
     final todayCount = ((_today?['sales_count'] as num?) ?? 0).toInt();
     final monthTotal = ((_month?['sales_total'] as num?) ?? 0).toDouble();
+    final monthCount = ((_month?['sales_count'] as num?) ?? 0).toInt();
+    final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
+    final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
     final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (!(a.can('sell') && a.has('facturar') && id == 'pos')) if (featureById(id) case final f? when f.allowed) f];
     final list = _visible();
     final buyers = _todayBuyers();
@@ -230,25 +239,59 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
         onRefresh: _load,
         edgeOffset: 140,
         child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
-          SliverToBoxAdapter(child: BusinessHeader(
-            name: AppState.instance.activeOrg?.name ?? '', rubro: spec?.id,
-            title: guide.homeTitle, subtitle: guide.homeSubtitle,
-            currency: cur, total: seeMoney && _today != null ? todayTotal : null,
-            count: seeMoney && _today != null ? todayCount : null,
-            onGoal: seeMoney && _month != null ? () => _setGoal(monthTotal) : null,
-            onMenu: () => pushPremium(context, const MenuScreen()),
-          )),
-          SliverPadding(padding: const EdgeInsets.fromLTRB(24, 12, 24, 8), sliver: SliverToBoxAdapter(
-            child: LayoutBuilder(builder: (context, constraints) {
-              final actions = <Widget>[
-                if (a.can('sell') && a.has('facturar')) TaskAction(label: 'Nueva venta', icon: Icons.add_rounded, primary: true,
-                  onTap: () => showNewSaleSheet(context).then((_) { if (mounted) _load(); })),
-                for (final f in shortcuts.take(3)) TaskAction(label: shortActionLabel(f.id, f.title), icon: f.icon, onTap: () => openFeature(context, f)),
-              ];
-              final columns = constraints.maxWidth >= 340 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
-              return Wrap(spacing: 12, runSpacing: 12, children: [for (final action in actions) SizedBox(width: (constraints.maxWidth - 12 * (columns - 1)) / columns, child: action)]);
-            }),
-          )),
+          SliverToBoxAdapter(
+            child: HomeHeader(
+              name: AppState.instance.activeOrg?.name ?? '',
+              currency: cur,
+              total: seeMoney ? monthTotal : 0,
+              count: monthCount,
+              drafts: drafts,
+              draftsTotal: draftsTotal,
+              loaded: seeMoney && _tried && _month != null,
+              goal: seeMoney ? _goal : null,
+              series: seeMoney ? dailySeries(_items ?? const <InvoiceRecord>[], currency: cur, today: todayIso()) : const <double>[],
+              onGoal: () => _setGoal(monthTotal),
+              todayTotal: seeMoney && _today != null ? todayTotal : null,
+              todayCount: todayCount,
+              onMenu: () => pushPremium(context, const MenuScreen()),
+            ),
+          ),
+          if (spec != null)
+            SliverToBoxAdapter(
+              child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: SectorPhotoBanner(
+                  rubro: spec.id,
+                  title: guide.homeTitle,
+                  subtitle: guide.homeSubtitle,
+                )),
+            ),
+          if (a.can('sell') || shortcuts.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Reveal(
+                index: 1,
+                child: SizedBox(
+                  height: MediaQuery.textScalerOf(context).scale(104),
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
+                    children: [
+                      if (a.can('sell') && a.has('facturar'))
+                        QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => showNewSaleSheet(context).then((_) {
+                              if (mounted) _load();
+                            })),
+                      for (final f in shortcuts.take(3))
+                        QuickAction(
+                          icon: f.icon,
+                          label: shortActionLabel(f.id, f.title),
+                          colors: [featureColor(f.id).withValues(alpha: 0.8), featureColor(f.id)],
+                          onTap: () => openFeature(context, f),
+                        ),
+                      QuickAction(icon: Icons.menu_rounded, label: 'Ver todas', colors: const [Brand.lightInk, Brand.indigoDeep], onTap: () => pushPremium(context, const MenuScreen())),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (_showWork) SliverToBoxAdapter(child: WorkQueue(
             title: _appointmentHome ? 'Tus citas de hoy' : 'Trabajos por avanzar', jobs: _work,
             loading: _workLoading, error: _workError, onRetry: _load,

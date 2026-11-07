@@ -1,4 +1,3 @@
-import 'retail_identity.dart';
 import 'dart:math' as math;
 import 'dart:async';
 
@@ -90,7 +89,12 @@ class BrandMark extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => RetailMark(size: size);
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(size * .29),
+        child: Image.asset('assets/branding/facturavoz_icon.png',
+            width: size, height: size, fit: BoxFit.contain,
+            filterQuality: FilterQuality.high),
+      );
 }
 
 /// Botón de dictado: el momento central de la app. Los anillos solo se animan mientras graba.
@@ -693,7 +697,7 @@ class SectorPhotoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(25),
-    child: SizedBox(height: height, child: Stack(fit: StackFit.expand, children: [
+    child: SizedBox(height: height * math.max(1.0, MediaQuery.textScalerOf(context).scale(14) / 14), child: Stack(fit: StackFit.expand, children: [
       Image.asset('assets/photos/${sectorPhotoFor(rubro)}.webp', fit: BoxFit.cover,
         filterQuality: FilterQuality.medium,
         errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: Brand.heroGradient))),

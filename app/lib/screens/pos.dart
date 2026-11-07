@@ -15,8 +15,6 @@ import '../services/print/ticket_printer.dart' show TicketLine;
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
-import '../ui/checkout_sheet.dart';
-import '../ui/pos_checkout_bar.dart';
 import 'products.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -424,13 +422,39 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) => CheckoutSheet(
-        total: total, currency: _cur, pendingMethod: _chargeMethod,
-        canCollect: Access.instance.can('collect'),
-        onConfirm: (method) { Navigator.pop(ctx); _fastCharge(method); },
-        onMore: () { Navigator.pop(ctx); _checkout(); },
-      ),
+      builder: (ctx) {
+        final t = Theme.of(ctx);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Cobrar', style: t.textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Money(money(total, _cur), size: 30, weight: FontWeight.w800),
+            const SizedBox(height: 12),
+            Text('¿Cómo paga?', style: t.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final k in const ['efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'])
+                ActionChip(
+                  label: Text(paymentMethods[k]!),
+                  onPressed: !Access.instance.can('collect') || (_chargeMethod != null && _chargeMethod != k) ? null : () {
+                    Navigator.pop(ctx);
+                    _fastCharge(k);
+                  },
+                ),
+            ]),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _checkout();
+              },
+              icon: const Icon(Icons.tune_rounded),
+              label: const Text('Más opciones (cliente, factura, crédito)'),
+            ),
+          ]),
+        );
+      },
     );
   }
 
@@ -698,14 +722,35 @@ class _PosScreenState extends State<PosScreen> {
         curve: Motion.standard,
         child: lines.isEmpty
             ? const SizedBox(width: double.infinity)
-            : PosCheckoutBar(
-                count: count, total: totals.total, currency: _cur,
-                pending: _chargeRequestId != null,
-                onDetails: _cartSheet,
-                onCharge: _charging || _savingOrder ? null : _chargeSheet,
-                onClear: _savingOrder || _charging || _chargeRequestId != null ? null :
-                  (_restaurant ? _newKitchenOrder : () => setState(() { _cart.clear(); _notes.clear(); })),
-                clearLabel: _restaurant && _savedOrderId != null ? 'Nuevo pedido' : 'Vaciar',
+            : SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Row(children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _cartSheet,
+                        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('${qtyText(count)} ${count == 1 ? 'producto' : 'productos'}${_coupon != null ? ' · cupón ${_coupon!.code}' : ''} · ver detalle', style: t.textTheme.bodySmall),
+                          Money(money(totals.total, _cur), size: 22, weight: FontWeight.w800),
+                        ]),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _savingOrder || _charging || _chargeRequestId != null ? null : (_restaurant ? _newKitchenOrder : () => setState(() {
+                        _cart.clear();
+                        _notes.clear();
+                      })),
+                      child: Text(_restaurant && _savedOrderId != null ? 'Nuevo pedido' : (_restaurant && _kitchenRequestId != null ? 'Pendiente' : 'Vaciar')),
+                    ),
+                    const SizedBox(width: 6),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+                      onPressed: _charging || _savingOrder ? null : _chargeSheet,
+                      icon: const Icon(Icons.point_of_sale_rounded),
+                      label: const Text('Cobrar'),
+                    ),
+                  ]),
+                ),
               ),
       ),
     );

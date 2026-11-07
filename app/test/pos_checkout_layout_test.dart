@@ -1,7 +1,6 @@
 import 'package:facturavoz/models.dart';
 import 'package:facturavoz/access.dart';
 import 'package:facturavoz/screens/pos.dart';
-import 'package:facturavoz/ui/checkout_sheet.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,13 +28,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Arroz de prueba'));
       await tester.pumpAndSettle();
-      final charge = find.textContaining('Cobrar ·');
+      final charge = find.text('Cobrar');
       expect(charge.hitTestable(), findsOneWidget);
       expect(tester.getBottomLeft(charge).dy, lessThan(806));
       await tester.tap(charge);
       await tester.pumpAndSettle();
-      expect(find.byType(CheckoutSheet), findsOneWidget);
-      expect(find.text('Completar venta'), findsOneWidget);
+      expect(find.text('¿Cómo paga?'), findsOneWidget);
+      expect(find.text('Más opciones (cliente, factura, crédito)'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

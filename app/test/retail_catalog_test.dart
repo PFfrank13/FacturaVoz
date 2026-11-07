@@ -17,7 +17,7 @@ void main() {
     await icons.load();
   });
   for (final width in [320.0, 768.0]) {
-    testWidgets('catálogo filtra y busca con texto ampliado a $width', (tester) async {
+    testWidgets('catálogo original busca con texto ampliado a $width', (tester) async {
       Access.instance.isAdmin = true;
       Access.instance.licenseCheckedOnline = true;
       Access.instance.license = const LicenseInfo(source: 'hub', mode: 'full', features: {'facturar': true, 'stock': false});
@@ -34,13 +34,9 @@ void main() {
         ])));
       await tester.pumpAndSettle();
       expect(find.text('Arroz superior'), findsOneWidget);
-      expect(find.text('Leche archivada'), findsNothing);
+      expect(find.text('Leche archivada'), findsOneWidget);
       expect(find.text('Por reponer'), findsNothing);
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/catalog-$width.png'));
-      await tester.tap(find.text('Archivados')); await tester.pumpAndSettle();
-      expect(find.text('Leche archivada'), findsOneWidget);
-      expect(find.text('Arroz superior'), findsNothing);
-      await tester.tap(find.text('Todos')); await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'arroz'); await tester.pumpAndSettle();
       expect(find.text('Arroz superior'), findsOneWidget);
       expect(find.text('Leche archivada'), findsNothing);
