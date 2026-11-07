@@ -69,3 +69,25 @@ timeouts, errores de autorización o respuestas inciertas.
    servicios sigue sin certificar una eliminación; no se plantea borrar recursos.
 
 Sin cambios a Hub, AWS, Caddy, web corporativa, main ni promoción a producción.
+
+## Acceso Preview y cambio reversible Auth
+
+Código publicado: `d3d76ce`, rama `codex/solvex-retail-preview`.
+Preview: `https://factura-hrlqvj96b-portafolio-frank.vercel.app/login`.
+
+La allowlist Auth impedía volver al Preview mediante enlace de correo.
+Se añadió exclusivamente
+`https://factura-hrlqvj96b-portafolio-frank.vercel.app/auth/callback` a
+`auth.additional_redirect_urls` de `qzcpeipjlskyazrrelqu`.
+Antes: cuatro entradas. Después: las mismas cuatro más ese callback exacto.
+Se conserva site_url, callbacks móviles, origen productivo y todos los demás
+ajustes. Diff previo: una propiedad. Diff posterior: cero diferencias.
+Es una configuración aditiva reversible, no DDL ni prueba de escritura comercial.
+No se enviaron códigos ni se inició sesión en nombre del propietario.
+
+Referencia oficial consultada:
+https://supabase.com/docs/guides/auth/redirect-urls
+
+Reversión específica si se retira este Preview: quitar únicamente la URL añadida,
+comparando antes la configuración actual para conservar cambios posteriores.
+No restaurar ciegamente todo config.toml desde el respaldo.
