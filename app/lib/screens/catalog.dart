@@ -20,6 +20,7 @@ import '../models.dart';
 import '../models_v2.dart';
 import '../rubros.dart';
 import '../services/repo.dart';
+import 'receiving.dart';
 import '../services/v2_api.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -144,12 +145,13 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'agente', title: 'Tareas del Copiloto', subtitle: 'Encárgale una tarea: la prepara y tú la apruebas', icon: Icons.smart_toy_rounded, group: 'Control del dueño', feature: 'copiloto_agente', perm: 'settings', keywords: const ['copiloto', 'agente', 'tarea', 'delegar', 'cobrar', 'automatico'], builder: (_) => const AgentScreen()),
       FeatureEntry(id: 'cuaderno', title: 'Del cuaderno a la factura', subtitle: 'Foto de tu cuaderno, nota o WhatsApp → venta', icon: Icons.menu_book_rounded, group: 'Vender', module: 'cuaderno_ia', feature: 'cuaderno_ia', perm: 'sell', keywords: const ['foto', 'nota', 'ia', 'cuaderno'], builder: (_) => const NotebookScreen()),
       FeatureEntry(id: 'recurrentes', title: 'Facturación recurrente', subtitle: 'Mensualidades que se facturan solas', icon: Icons.event_repeat_rounded, group: 'Vender', module: 'recurrentes', feature: 'recurrentes', perm: 'finance', keywords: const ['mensual', 'alquiler', 'suscripcion'], builder: (_) => const RecurringScreen()),
-      FeatureEntry(id: 'productos', feature: 'stock', title: 'Productos e inventario', subtitle: 'Precios, stock, código de barras y fotos', icon: Icons.inventory_2_rounded, group: 'Vender', module: 'stock', keywords: const ['stock', 'catalogo', 'precio', 'inventario'], builder: (_) => const ProductsScreen()),
+      FeatureEntry(id: 'productos', feature: 'facturar', title: 'Catálogo comercial', subtitle: 'Productos y servicios para vender', perm: 'sell', icon: Icons.inventory_2_rounded, group: 'Vender', module: 'stock', keywords: const ['stock', 'catalogo', 'precio', 'inventario'], builder: (_) => const ProductsScreen()),
       FeatureEntry(id: 'tienda', title: 'Tienda en línea', subtitle: 'Tu catálogo con carrito y pedidos por WhatsApp', icon: Icons.storefront_rounded, group: 'Vender', module: 'tienda', feature: 'tienda', perm: 'settings', keywords: const ['web', 'catalogo', 'whatsapp', 'pedidos'], builder: (_) => const StoreScreen()),
       FeatureEntry(id: 'carta', title: 'Carta QR y comandas', subtitle: 'Pedidos por mesa directo a cocina', icon: Icons.restaurant_menu_rounded, group: 'Vender', module: 'carta_qr', feature: 'carta_qr', keywords: const ['restaurante', 'mesa', 'cocina', 'comanda', 'menu'], builder: (_) => const KitchenScreen()),
       FeatureEntry(id: 'precios', title: 'Precios y promociones', subtitle: 'Mayorista, "lleva 3 paga 2" y cupones', icon: Icons.local_offer_rounded, group: 'Vender', module: 'precios', feature: 'precios', perm: 'products_edit', keywords: const ['descuento', 'promocion', 'cupon', 'mayorista'], builder: (_) => const PromosScreen()),
       FeatureEntry(id: 'puntos', title: 'Puntos y fidelización', subtitle: 'Premia a tus clientes frecuentes', icon: Icons.loyalty_rounded, group: 'Vender', module: 'fidelizacion', feature: 'fidelizacion', keywords: const ['puntos', 'cumpleanos', 'premio'], builder: (_) => const LoyaltyScreen()),
       FeatureEntry(id: 'reponer', title: 'Reposición inteligente', subtitle: 'Qué se te acaba y el pedido para tu proveedor', icon: Icons.shopping_cart_checkout_rounded, group: 'Vender', feature: 'stock', keywords: const ['reponer', 'comprar', 'proveedor', 'se acaba', 'pedido'], builder: (_) => const ReorderScreen()),
+      FeatureEntry(id: 'compras', title: 'Compras y recepción', subtitle: 'Proveedor, mercadería recibida y existencias', icon: Icons.move_to_inbox_outlined, group: 'Cobrar y pagar', feature: 'stock', perm: 'finance', keywords: const ['compra', 'proveedor', 'recibir', 'inventario'], builder: (_) => const ReceivingScreen()),
       FeatureEntry(id: 'platos', title: 'Cuentas y costo por plato', subtitle: 'Divide la cuenta, propina y margen de cada plato', icon: Icons.restaurant_rounded, group: 'Vender', feature: 'carta_qr', keywords: const ['dividir', 'cuenta', 'propina', 'plato', 'costo', 'margen'], builder: (_) => const DishesScreen()),
       // ───── Clientes y trabajos ─────
       FeatureEntry(id: 'clientes', feature: 'clientes', title: 'Clientes', subtitle: 'Ficha 360: deuda, historial, fotos y WhatsApp', icon: Icons.people_alt_rounded, group: 'Clientes y trabajos', perm: 'clients', keywords: const ['contacto', 'ruc', 'dni', 'ficha'], builder: (_) => const ClientsHubScreen()),

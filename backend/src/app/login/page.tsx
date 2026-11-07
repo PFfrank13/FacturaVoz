@@ -1,4 +1,5 @@
 "use client";
+import Brand from "@/components/retail/Brand";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -31,8 +32,10 @@ export default function Login() {
     finally { setPending(false); }
   }
   return <main className="fv-welcome fv-login">
-    <section><p className="fv-eyebrow">FACTURAVOZ / TU ESPACIO DE TRABAJO</p><h1>Menos pasos.<br /><span>Más negocio.</span></h1><p>Las personas, los productos y el trabajo de cada día. Con la misma empresa y los mismos permisos que en tu móvil.</p><p className="fv-caption">FacturaVoz · Solvex Software Labs</p></section>
-    <section className="fv-login-panel" aria-labelledby="login-title"><p className="fv-eyebrow">BIENVENIDO DE NUEVO</p><h2 id="login-title">Entra a tu empresa</h2><p>Usa el correo de tu cuenta de FacturaVoz.</p>
+    <section className="sr-login-story"><Brand /><p className="fv-eyebrow">EL CONTROL EMPIEZA AQUÍ</p><h1>Una tienda.<br /><span>Mil cosas menos<br />en la cabeza.</span></h1><p>Organiza el catálogo, consulta tus ventas y encuentra el siguiente paso de tu jornada.</p>
+      <div className="sr-principles"><span>01 / Productos claros</span><span>02 / Operaciones trazables</span><span>03 / Acceso por permisos</span></div>
+      <p className="fv-caption">Solvex Software Labs</p></section>
+    <section className="fv-login-panel" aria-labelledby="login-title"><p className="fv-eyebrow">SOLVEX RETAIL CONTROL</p><h2 id="login-title">Tu negocio te espera</h2><p>Entra con el correo de tu cuenta. Conservas tu empresa y tus permisos.</p>
       <form className="fv-form" onSubmit={e => { e.preventDefault(); void send(); }}><label>Correo electrónico<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={e => { setEmail(e.target.value); setSent(false); setCode(""); }} placeholder="tu@empresa.com" /></label><button className="fv-button" disabled={pending}>{pending ? "Un momento…" : sent ? "Reenviar acceso" : "Recibir acceso seguro"}</button></form>
       {sent && <form className="fv-form" onSubmit={e => { e.preventDefault(); void verify(); }}><label>Código de acceso<input inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={12} pattern="[0-9]+" value={code} onChange={e => setCode(e.target.value)} /></label><button className="fv-button secondary" disabled={pending}>Verificar código</button></form>}
       {msg && <p role="status" aria-live="polite">{msg}</p>}

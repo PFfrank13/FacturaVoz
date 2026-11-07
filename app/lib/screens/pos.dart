@@ -15,6 +15,9 @@ import '../services/print/ticket_printer.dart' show TicketLine;
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
+import '../ui/checkout_sheet.dart';
+import '../ui/pos_checkout_bar.dart';
+import 'products.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -26,9 +29,12 @@ import 'team.dart' show dbMessage;
 class PosScreen extends StatefulWidget {
   /// `embedded`: va dentro de la pestaña Vender (sin barra propia, deja espacio para el dock).
   /// `tableMode`: restaurante: pide la mesa e imprime comanda y precuenta.
-  const PosScreen({super.key, this.embedded = false, this.tableMode = false});
+  const PosScreen({super.key, this.embedded = false, this.tableMode = false,
+    this.loadProducts, this.loadExtras});
   final bool embedded;
   final bool tableMode;
+  final Future<List<Product>> Function()? loadProducts;
+  final Future<Map<String, Map<String, dynamic>>> Function()? loadExtras;
 
   @override
   State<PosScreen> createState() => _PosScreenState();
@@ -76,9 +82,9 @@ class _PosScreenState extends State<PosScreen> {
 
   Future<void> _load() async {
     try {
-      final p = await Repo.listProducts(activeOnly: true);
+      final p = await (widget.loadProducts?.call() ?? Repo.listProducts(activeOnly: true));
       LiveCache.put('pos.products', p);
-      final e = await V2Repo.productExtras();
+      final e = await (widget.loadExtras?.call() ?? V2Repo.productExtras());
       List<Promo> promos = const [];
       if (Access.instance.has('precios')) {
         try {
@@ -87,6 +93,7 @@ class _PosScreenState extends State<PosScreen> {
       }
       if (mounted) {
         setState(() {
+          _error = null;
           _products = p;
           _extra = e;
           _promos = promos;
@@ -111,6 +118,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _add(Product p, [double n = 1]) {
+    if (_charging || _chargeRequestId != null) return;
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este pedido ya se guardó en Comandas. Pulsa Nuevo pedido para agregar más platos.')));
       return;
@@ -405,6 +413,10 @@ class _PosScreenState extends State<PosScreen> {
 
   /// Cobro en un toque: elige cómo paga el cliente y listo (se registra la venta, el cobro y se imprime el ticket).
   Future<void> _chargeSheet() async {
+    if (!Access.instance.has('facturar') || !Access.instance.can('sell')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tus permisos cambiaron. Actualiza el acceso antes de vender.')));
+      return;
+    }
     final lines = _lines();
     if (lines.isEmpty) return;
     final total = computeTotals(lines, _rate).total;
@@ -412,43 +424,21 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (ctx) {
-        final t = Theme.of(ctx);
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Cobrar', style: t.textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Money(money(total, _cur), size: 30, weight: FontWeight.w800),
-            const SizedBox(height: 12),
-            Text('¿Cómo paga?', style: t.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final k in const ['efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'])
-                ActionChip(
-                  label: Text(paymentMethods[k]!),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _fastCharge(k);
-                  },
-                ),
-            ]),
-            const SizedBox(height: 14),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _checkout();
-              },
-              icon: const Icon(Icons.tune_rounded),
-              label: const Text('Más opciones (cliente, factura, crédito)'),
-            ),
-          ]),
-        );
-      },
+      isScrollControlled: true,
+      builder: (ctx) => CheckoutSheet(
+        total: total, currency: _cur, pendingMethod: _chargeMethod,
+        canCollect: Access.instance.can('collect'),
+        onConfirm: (method) { Navigator.pop(ctx); _fastCharge(method); },
+        onMore: () { Navigator.pop(ctx); _checkout(); },
+      ),
     );
   }
 
   Future<void> _fastCharge(String method) async {
+    if (!Access.instance.has('facturar') || !Access.instance.can('sell') || !Access.instance.can('collect')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No tienes permiso para registrar este cobro.')));
+      return;
+    }
     if (_charging) return;
     if (_chargeMethod != null && _chargeMethod != method) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reintenta con el mismo método del primer cobro para evitar diferencias.')));
@@ -614,8 +604,13 @@ class _PosScreenState extends State<PosScreen> {
                               title: _restaurant ? 'Tu carta, con personalidad' : 'Tu catálogo, con identidad',
                               subtitle: _restaurant ? 'Agrega platos y fotos de tu propia cocina.' : 'Añade productos con fotos reales y precios de tu negocio.',
                             ),
-                            const EmptyState(title: 'Tu catálogo empieza aquí', body: 'Agrega tus productos con sus precios y fotos auténticas. Así tus clientes podrán reconocerlos fácilmente.'),
-                            if (sampleCatalog.containsKey(Access.instance.rubro))
+                            const EmptyState(title: 'Todavía no tienes productos', body: 'Agrega el primero para comenzar a vender.'),
+                            if (Access.instance.can('products_edit'))
+                              FilledButton.icon(onPressed: () async {
+                                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProductsScreen()));
+                                await _load();
+                              }, icon: const Icon(Icons.add), label: const Text('Agregar productos')),
+                            if (Access.instance.can('products_edit') && sampleCatalog.containsKey(Access.instance.rubro))
                               Padding(
                                 padding: const EdgeInsets.only(top: 12),
                                 child: FilledButton.icon(
@@ -698,35 +693,14 @@ class _PosScreenState extends State<PosScreen> {
         curve: Motion.standard,
         child: lines.isEmpty
             ? const SizedBox(width: double.infinity)
-            : SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Row(children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: _cartSheet,
-                        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('${qtyText(count)} ${count == 1 ? 'producto' : 'productos'}${_coupon != null ? ' · cupón ${_coupon!.code}' : ''} · ver detalle', style: t.textTheme.bodySmall),
-                          Money(money(totals.total, _cur), size: 22, weight: FontWeight.w800),
-                        ]),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _savingOrder ? null : (_restaurant ? _newKitchenOrder : () => setState(() {
-                        _cart.clear();
-                        _notes.clear();
-                      })),
-                      child: Text(_restaurant && _savedOrderId != null ? 'Nuevo pedido' : (_restaurant && _kitchenRequestId != null ? 'Pendiente' : 'Vaciar')),
-                    ),
-                    const SizedBox(width: 6),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                      onPressed: _charging || _savingOrder ? null : _chargeSheet,
-                      icon: const Icon(Icons.point_of_sale_rounded),
-                      label: const Text('Cobrar'),
-                    ),
-                  ]),
-                ),
+            : PosCheckoutBar(
+                count: count, total: totals.total, currency: _cur,
+                pending: _chargeRequestId != null,
+                onDetails: _cartSheet,
+                onCharge: _charging || _savingOrder ? null : _chargeSheet,
+                onClear: _savingOrder || _charging || _chargeRequestId != null ? null :
+                  (_restaurant ? _newKitchenOrder : () => setState(() { _cart.clear(); _notes.clear(); })),
+                clearLabel: _restaurant && _savedOrderId != null ? 'Nuevo pedido' : 'Vaciar',
               ),
       ),
     );

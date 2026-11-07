@@ -139,7 +139,8 @@ const rubros = <RubroSpec>[
     vocab: {'client': 'Casero', 'clients': 'Caseros', 'job': 'Pedido', 'jobs': 'Pedidos'},
     home: ['pos', 'fiados', 'reponer', 'caja'],
     areas: [
-      RubroArea('Tu bodega', ['pos', 'facturar', 'fiados', 'reponer', 'productos', 'caja']),
+      RubroArea('Tu bodega', ['pos', 'facturar', 'fiados', 'caja']),
+      RubroArea('Abastecimiento', ['compras', 'productos', 'reponer']),
       RubroArea('Vender más', ['tienda', 'puntos', 'precios', 'cuaderno', 'avisos']),
       _moneyArea,
       _businessArea,
@@ -306,6 +307,7 @@ const rubros = <RubroSpec>[
     home: ['cotizaciones', 'credito', 'cobranza', 'precios'],
     areas: [
       RubroArea('Tu distribuidora', ['cotizaciones', 'credito', 'precios', 'productos', 'recurrentes', 'cobranza']),
+      RubroArea('Abastecimiento', ['compras']),
       RubroArea('Vender', ['facturar', 'tienda', 'comisiones']),
       _moneyArea,
       _businessArea,

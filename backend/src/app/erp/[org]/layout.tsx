@@ -1,3 +1,4 @@
+import Brand from "@/components/retail/Brand";
 import Link from "next/link";
 import { workspaceContext } from "@/lib/erp/context";
 import { sectors, visibleModules } from "@/lib/erp/access";
@@ -10,11 +11,11 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   return <div className="fv-workspace">
     <a className="fv-skip" href="#workspace-content">Saltar al contenido</a>
     <aside className="fv-rail">
-      <Link className="fv-wordmark" href="/">Factura<span>Voz</span><i aria-hidden="true">▂▅▃▇</i></Link>
+      <Link className="fv-wordmark" href="/"><Brand /></Link>
       <p className="fv-eyebrow">{c.sector ? sectors[c.sector].name : "TU EMPRESA"}</p>
       <strong className="fv-org-name">{c.organization.name}</strong>
       <nav aria-label="Navegación de la empresa">
-        <Link href={`/erp/${org}`}>Inicio</Link>
+        <Link href={`/erp/${org}`}>Centro de control</Link>
         {visibleModules(c.license, c.access, c.sector).map(m => <Link key={m.id} href={`/erp/${org}/${m.id}`}>{m.id === "clientes" && c.sector === "consultorio" ? "Pacientes" : m.id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title}</Link>)}
       </nav>
       <Link className="fv-switch" href="/">⇄ Cambiar empresa</Link>

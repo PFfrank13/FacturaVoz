@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { workspaceContext } from "@/lib/erp/context";
-import { modules, moduleAllowed, can } from "@/lib/erp/access";
+import { modules, moduleAllowed, can, hasFeature } from "@/lib/erp/access";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
@@ -25,7 +25,9 @@ export async function createRecord(org: string, moduleId: string, _previous: For
     if (!can(c.access, "products_edit")) return { ok: false, message: "No tienes permiso para editar productos." };
     const parsed = productSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Indica un nombre y un precio válido." };
-    row = { ...parsed.data, user_id: c.user.id, active: true };
+    const track = form.get('track_stock') === 'on';
+    if (track && !hasFeature(c.license,'stock')) return {ok:false,message:'Tu licencia no permite controlar inventario.'};
+    row = { ...parsed.data, user_id: c.user.id, active: true, stock: track ? 0 : null, in_store: false };
   } else if (moduleId === "trabajos" || moduleId === "agenda") {
     const parsed = jobSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Indica un título de hasta 140 caracteres." };

@@ -18,9 +18,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _i = 0;
 
   static const _pages = [
-    (Icons.mic_rounded, 'Dicta tu venta', 'Di el cliente, lo que vendiste y el precio. FacturaVoz arma la factura por ti en segundos.'),
-    (Icons.fact_check_rounded, 'Revisa antes de guardar', 'Ves todo lo que entendió, lo corriges si hace falta y te avisamos si algo se ve raro, como un monto muy alto o un cliente sin documento.'),
-    (Icons.mark_email_read_rounded, 'Envía y emite', 'Comparte el PDF, recibe una copia en tu correo y, con tu RUC configurado, emite el comprobante electrónico a SUNAT.'),
+    (Icons.shopping_basket_outlined, 'Una tienda, un mismo equipo', 'Bienvenido a Solvex Retail POS. Organiza tus productos y prepara la venta desde un solo lugar.'),
+    (Icons.point_of_sale_rounded, 'Selecciona. Revisa. Cobra.', 'Agrega productos, ajusta cantidades y revisa el total antes de registrar el cobro. El pago digital manual no equivale a una confirmación del banco.'),
+    (Icons.receipt_long_outlined, 'Cada operación, con su estado', 'Comprueba que la venta quedó registrada. Un borrador o un cobro pendiente todavía no son una venta confirmada.'),
   ];
 
   @override
@@ -60,8 +60,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onPageChanged: (v) => setState(() => _i = v),
               itemBuilder: (context, i) {
                 final p = _pages[i];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Reveal(
                       key: ValueKey('icon$i'),

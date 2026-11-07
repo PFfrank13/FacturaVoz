@@ -1,5 +1,7 @@
 # Verificación de la entrega local
 
+Continuación del 7 de noviembre: [avance de reconstrucción y pruebas de Bodega](ERP_AVANCE_2026-11-07.md). Los resultados siguientes corresponden a la entrega del día 4; no certifican los nuevos recorridos completos.
+
 4 de noviembre de 2026. Sin credenciales productivas en las pruebas.
 
 ## Resultados
@@ -38,6 +40,10 @@ El contenedor `facturavoz-erp-local-sql-20261104` se creó sin red, sin puertos 
 El harness comprueba que el contenedor objetivo no tenga red ni montajes. Usa stubs para `org_mode` y `license_enforced`: **no valida autenticación Supabase, activación real, RLS multiempresa completa ni el ciclo de expiración**. Las pruebas de pertenencia web también son unitarias con mocks. Debe completarse la integración sobre una copia local del esquema antes de aprobar la migración.
 
 Para repetirlo, crear un contenedor aislado nuevo (nombre distinto al detenido), con la imagen PostgreSQL local, sin puertos ni montajes; indicar su nombre en `FV_SQL_CONTAINER` y ejecutar `node backend/scripts/test-erp-sql.mjs`. Nunca apuntar esta prueba a Supabase Production ni reutilizar una base con datos reales.
+
+## Continuación Solvex Retail (2026-11-07)
+
+El alcance actual y la evidencia posterior están en [REGISTRO_AVANCES.md](../REGISTRO_AVANCES.md). La prioridad retail sustituye el desarrollo de nueve rubros descrito en este informe histórico. La etapa 1 sigue pendiente; consultar sus límites antes de interpretar pruebas o compilaciones anteriores como certificación del producto actual.
 
 ## Limitaciones observadas
 

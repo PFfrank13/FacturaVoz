@@ -248,6 +248,15 @@ class Repo {
   }) async {
     final org = activeOrgId;
     if (org == null) throw AppException('Selecciona una empresa antes de vender.');
+    final user = _db.auth.currentUser;
+    if (user == null) throw AppException('Inicia sesión para confirmar la venta.');
+    // Read the same operation before any retry. A failed lookup must not fall
+    // through to another write; the caller retains requestId and the ticket.
+    final previous = await _db.from('fast_checkout_requests')
+        .select('invoice_id').eq('org_id', org)
+        .eq('request_id', requestId).eq('user_id', user.id).maybeSingle();
+    final confirmedId = previous?['invoice_id'] as String?;
+    if (confirmedId != null) return confirmedId;
     final result = await _db.rpc('fast_checkout_atomic', params: {
       'p_org_id': org, 'p_request_id': requestId,
       'p_items': draft.items.map((e) => e.toJson()).toList(),

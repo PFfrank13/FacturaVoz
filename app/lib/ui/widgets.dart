@@ -1,3 +1,4 @@
+import 'retail_identity.dart';
 import 'dart:math' as math;
 import 'dart:async';
 
@@ -89,12 +90,7 @@ class BrandMark extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-        borderRadius: BorderRadius.circular(size * .29),
-        child: Image.asset('assets/branding/facturavoz_icon.png',
-            width: size, height: size, fit: BoxFit.contain,
-            filterQuality: FilterQuality.high),
-      );
+  Widget build(BuildContext context) => RetailMark(size: size);
 }
 
 /// Botón de dictado: el momento central de la app. Los anillos solo se animan mientras graba.

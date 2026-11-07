@@ -12,7 +12,7 @@ export function featureLimit(l: License, key: string): number {
 export function can(a: Access, permission: string): boolean { return a.can?.[permission] ?? a.is_admin === true; }
 
 export const sectors = {
-  bodega: { name: "Bodega / minimarket", title: "El ritmo de tu tienda", detail: "Ventas, productos y clientes para tu jornada.", priority: ["comprobantes", "inventario", "clientes", "cobros"] },
+  bodega: { name: "Bodega / minimarket", title: "El ritmo de tu tienda", detail: "Ventas, productos y clientes para tu jornada.", priority: ["vender", "productos", "comprobantes", "cobros"] },
   restaurante: { name: "Restaurante", title: "Tu servicio, en orden", detail: "Consulta la operación comercial y los productos de tu carta.", priority: ["comprobantes", "productos", "cobros", "clientes"] },
   servicios_tecnicos: { name: "Servicios técnicos", title: "Cada trabajo tiene su siguiente paso", detail: "Órdenes, visitas y clientes con seguimiento.", priority: ["trabajos", "agenda", "clientes", "cotizaciones"] },
   salon: { name: "Salón / barbería", title: "Haz espacio para la próxima cita", detail: "Agenda, clientes y servicios de tu negocio.", priority: ["agenda", "clientes", "productos", "cobros"] },
@@ -28,6 +28,10 @@ export type Module = { id: string; title: string; feature?: string; permission?:
 const jobSectors: Sector[] = ["servicios_tecnicos", "taller", "construccion"];
 const appointmentSectors: Sector[] = ["servicios_tecnicos", "salon", "consultorio", "taller", "educacion"];
 export const modules: readonly Module[] = [
+  { id: "compras", title: "Compras y recepción", feature: "stock", permission: "finance", sectors: ["bodega", "mayorista"] },
+  { id: "proveedores", title: "Proveedores", feature: "stock", permission: "finance", table: "retail_suppliers", columns: "id,name", fields: [["name","Proveedor"]], order: "name" },
+  { id: "kardex", title: "Movimientos de inventario", feature: "stock", permission: "finance", table: "retail_stock_ledger", columns: "id,product_id,before_stock,after_stock,delta,created_at", fields: [["product_id","Producto"],["before_stock","Antes"],["after_stock","Después"],["delta","Movimiento"],["created_at","Fecha"]], order: "created_at" },
+  { id: "vender", title: "Vender", feature: "facturar", permission: "sell", sectors: ["bodega", "mayorista"] },
   { id: "comprobantes", title: "Comprobantes", feature: "facturar", permission: "sell", table: "invoices", columns: "id,number,issue_date,status,currency", fields: [["number", "Número"], ["issue_date", "Fecha"], ["status", "Estado"], ["currency", "Moneda"]], order: "created_at" },
   { id: "clientes", title: "Clientes", feature: "clientes", permission: "clients", table: "clients", columns: "id,name,tax_id,email,phone", fields: [["name", "Nombre"], ["tax_id", "Documento"], ["email", "Correo"], ["phone", "Teléfono"]], order: "name" },
   { id: "productos", title: "Productos y servicios", feature: "facturar", permission: "sell", table: "products", columns: "id,name,unit_price,unit,active", fields: [["name", "Nombre"], ["unit_price", "Precio unitario"], ["unit", "Unidad"], ["active", "Activo"]], order: "name" },

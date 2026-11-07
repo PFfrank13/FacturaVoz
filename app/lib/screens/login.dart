@@ -1,3 +1,4 @@
+import '../ui/retail_identity.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -18,7 +19,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _code = TextEditingController();
   final _password = TextEditingController();
@@ -31,27 +32,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   String _msg = '';
   int _cooldown = 0;
   Timer? _timer;
-  late final AnimationController _intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
-  bool _started = false;
-
   static const _offlineMsg = 'No hay conexión a internet. Revisa tus datos móviles o el Wi‑Fi e inténtalo de nuevo.';
 
   static bool _isOffline(String lowerMsg) =>
       lowerMsg.contains('socketexception') || lowerMsg.contains('failed host lookup') || lowerMsg.contains('clientexception') || lowerMsg.contains('timed out');
 
   static final _emailRe = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (MediaQuery.of(context).disableAnimations) {
-      _intro.value = 1;
-    } else {
-      _intro.forward();
-    }
-  }
 
   void _soon(String what) {
     ScaffoldMessenger.of(context)
@@ -61,7 +47,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    _intro.dispose();
     _timer?.cancel();
     _email.dispose();
     _code.dispose();
@@ -260,74 +245,22 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final dark = t.brightness == Brightness.dark;
-    final kb = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: LayoutBuilder(builder: (context, c) {
-        final h = c.maxHeight;
-        return Stack(children: [
-          Positioned.fill(child: RepaintBoundary(child: const _HeroBackdrop())),
-          // Marca: nace en el centro y sube al hacer sitio a la hoja.
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _intro,
-              builder: (context, _) {
-                final move = Curves.easeInOutCubic.transform(const Interval(0.5, 0.82).transform(_intro.value));
-                final y = h * (0.5 - 0.33 * move);
-                return Stack(children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: y - 70,
-                    child: AnimatedOpacity(
-                      opacity: kb ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: _BrandIntro(t: _intro, move: move),
-                    ),
-                  ),
-                ]);
-              },
-            ),
-          ),
-          // Hoja blanca que sube con el formulario.
-          Positioned.fill(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: kb ? 0.12 : 0.36),
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              builder: (context, target, _) => AnimatedBuilder(
-                animation: _intro,
-                builder: (context, _) {
-                  final k = Curves.easeOutCubic.transform(const Interval(0.62, 1.0).transform(_intro.value));
-                  return Stack(children: [
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      top: h + (h * target - h) * k,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: dark ? Brand.darkBg : Colors.white,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .18), blurRadius: 30, offset: const Offset(0, -8))],
-                        ),
-                        child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
-                          padding: EdgeInsets.fromLTRB(24, 28, 24, 20 + MediaQuery.of(context).padding.bottom),
-                          child: Center(
-                            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 400), child: _form(t)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ]);
-                },
-              ),
-            ),
-          ),
-        ]);
-      }),
-    );
+    return Scaffold(body: SafeArea(child: LayoutBuilder(builder: (context, constraints) {
+      return SingleChildScrollView(padding: const EdgeInsets.all(24), child: Center(
+        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const RetailWordmark(), const SizedBox(height: 36),
+            Text('Tu tienda.\nTodo en su lugar.', style: t.textTheme.displaySmall),
+            const SizedBox(height: 12),
+            Text('Productos, ventas y caja. Empieza por lo que necesitas hacer hoy.', style: t.textTheme.bodyLarge),
+            const SizedBox(height: 28),
+            Card(margin: EdgeInsets.zero, child: Padding(padding: const EdgeInsets.all(24), child: _form(t))),
+            const SizedBox(height: 20),
+            Text(RetailIdentity.maker, textAlign: TextAlign.center, style: t.textTheme.bodySmall),
+          ],
+        )),
+      ));
+    })));
   }
 
   Widget _social(ThemeData t, String label, Widget mark, VoidCallback onTap) => Expanded(
@@ -506,72 +439,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 }
 
-/// Nombre de la app: las letras aparecen una a una y la marca respira.
-class _BrandIntro extends StatelessWidget {
-  const _BrandIntro({required this.t, required this.move});
-  final Animation<double> t;
-  final double move;
-
-  static const _name = 'FacturaVoz';
-
-  @override
-  Widget build(BuildContext context) {
-    final pop = Curves.elasticOut.transform(const Interval(0.0, 0.3).transform(t.value));
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      Transform.scale(
-        scale: (0.4 + 0.6 * pop) * (1 - 0.18 * move),
-        child: Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: .22),
-            border: Border.all(color: Colors.white.withValues(alpha: .5), width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: .25), blurRadius: 30 * pop)],
-          ),
-          child: const BrandMark(size: 74),
-        ),
-      ),
-      const SizedBox(height: 14),
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        for (var i = 0; i < _name.length; i++)
-          Builder(builder: (_) {
-            final a = Curves.easeOutCubic.transform(Interval(0.18 + i * 0.03, 0.34 + i * 0.03, curve: Curves.linear).transform(t.value));
-            return Opacity(
-              opacity: a,
-              child: Transform.translate(
-                offset: Offset(0, 14 * (1 - a)),
-                child: Text(_name[i], style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
-              ),
-            );
-          }),
-      ]),
-      const SizedBox(height: 6),
-      Opacity(
-        opacity: Curves.easeOut.transform(const Interval(0.45, 0.62).transform(t.value)),
-        child: Text('Tu negocio en movimiento.', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: .88), fontSize: 16)),
-      ),
-    ]);
-  }
-}
-
-/// Fondo ilustrado y animado: degradado, orbes que flotan y comprobantes translúcidos que se mecen.
-/// Fotografía editorial de un minimarket realista. Sin caricaturas ni interfaces inventadas.
-class _HeroBackdrop extends StatelessWidget {
-  const _HeroBackdrop();
-
-  @override
-  Widget build(BuildContext context) => Stack(fit: StackFit.expand, children: [
-        Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover, alignment: Alignment.center),
-        const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          colors: [Color(0x9E0C1339), Color(0x5826226E), Color(0xCE0C1238)],
-          stops: [0, 0.55, 1],
-        ))),
-      ]);
-}
-
-/// Medidor de seguridad de la contraseña con barra animada.
 class _StrengthBar extends StatelessWidget {
   const _StrengthBar({required this.password});
   final String password;

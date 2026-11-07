@@ -4,6 +4,8 @@ import { workspaceContext } from "@/lib/erp/context";
 import { modules, moduleAllowed, featureLimit, can, hasFeature } from "@/lib/erp/access";
 import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
+import PointOfSale from "@/components/erp/PointOfSale";
+import Receiving from "@/components/erp/Receiving";
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
@@ -12,6 +14,23 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const c = await workspaceContext(org);
   const m = modules.find(m => m.id === id);
   if (!m || !moduleAllowed(m, c.license, c.access, c.sector)) notFound();
+  if (id === "compras") {
+    const [products, receipts] = await Promise.all([
+      c.db.from("products").select("id,name,stock").eq("org_id",org).eq("active",true).order("name").limit(500),
+      c.db.from("retail_receipts").select("id,supplier_name,reference,total,currency,created_at").eq("org_id",org).order("created_at",{ascending:false}).limit(50),
+    ]);
+    return <><section className="fv-heading"><p className="fv-eyebrow">ABASTECIMIENTO</p><h1>Compras y recepción</h1><p>Recibe mercadería, conserva el documento y consulta sus efectos en inventario.</p><Link href={`/erp/${org}/inventario`}>Ver existencias</Link> · <Link href={`/erp/${org}/kardex`}>Ver movimientos</Link></section>
+      {products.error || receipts.error ? <p role="alert">El servicio de recepción no está disponible. Actualiza para reintentar; no se registró una compra.</p> : <><Link href={`/erp/${org}/productos`}>Crear un producto para recibirlo</Link><Receiving key={`${org}:${c.user.id}`} org={org} products={products.data ?? []}/><h2>Últimas 50 recepciones confirmadas</h2><DataTable rows={receipts.data ?? []} fields={[["reference","Documento"],["supplier_name","Proveedor"],["total","Costo total"],["currency","Moneda"],["created_at","Recibida"]]}/></>}
+    </>;
+  }
+  if (id === "vender") {
+    const result = await c.db.from("products").select("id,name,unit_price").eq("org_id", org).eq("active", true).order("name").limit(500);
+    return <><section className="fv-heading"><p className="fv-eyebrow">PUNTO DE VENTA</p><h1>Vender</h1><p>Elige productos, revisa tu carrito y registra el cobro.</p></section>
+      {result.error ? <p role="alert">No pudimos cargar el catálogo. Pulsa Actualizar para reintentar.</p> : <PointOfSale key={`${org}:${c.user.id}`} org={org} userId={c.user.id}
+        products={(result.data ?? []).map(p => ({ ...p, unit_price: Number(p.unit_price) }))}
+        currency={c.organization.currency || "PEN"} taxRate={Number(c.organization.default_tax_rate ?? 18)}
+        canCollect={can(c.access, "collect")} canEdit={can(c.access, "products_edit")} />}</>;
+  }
   const title = id === "clientes" && c.sector === "consultorio" ? "Pacientes" : id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title;
   if (id === "reportes") {
     const search = await searchParams;
@@ -27,7 +46,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     </>;
   }
   if (id === "plan") return <><section className="fv-heading"><p className="fv-eyebrow">SOLVEX HUB</p><h1>Mi plan</h1><p>Una sola licencia para móvil y web.</p></section><dl className="fv-details"><dt>Plan</dt><dd>{c.license.plan || "Sin asignar"}</dd><dt>Estado</dt><dd>{c.license.status || "Sin verificar"}</dd><dt>Usuarios</dt><dd>{featureLimit(c.license, "max_users") === -1 ? "Sin límite" : featureLimit(c.license, "max_users")}</dd><dt>Sucursales</dt><dd>{featureLimit(c.license, "max_branches") === -1 ? "Sin límite" : featureLimit(c.license, "max_branches")}</dd></dl><p>{c.license.message}</p></>;
-  if (id === "configuracion") return <><section className="fv-heading"><p className="fv-eyebrow">EMPRESA</p><h1>Configuración</h1><p>Datos compartidos con FacturaVoz Mobile.</p></section><dl className="fv-details">{[["Razón social", c.organization.name], ["Documento", c.organization.tax_id], ["Dirección", c.organization.address], ["Moneda", c.organization.currency]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "Sin configurar"}</dd></div>)}</dl></>;
+  if (id === "configuracion") return <><section className="fv-heading"><p className="fv-eyebrow">EMPRESA</p><h1>Configuración</h1><p>Datos compartidos con Solvex Retail POS.</p></section><dl className="fv-details">{[["Razón social", c.organization.name], ["Documento", c.organization.tax_id], ["Dirección", c.organization.address], ["Moneda", c.organization.currency]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "Sin configurar"}</dd></div>)}</dl></>;
   if (id === "equipo") {
     const result = await c.db.rpc("team_members", { p_org: org });
     return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS</p><h1>Equipo</h1></section>{result.error ? <p role="alert">No se pudo cargar el equipo. Pulsa Actualizar para reintentar.</p> : <DataTable rows={result.data ?? []} fields={[["display_name", "Nombre"], ["email", "Correo"], ["role", "Rol"], ["staff_role", "Función"]]} />}</>;
@@ -40,7 +59,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const result = await query.order(m.order!, { ascending: ["name", "scheduled_at"].includes(m.order!) }).order("id").range((page - 1) * 50, page * 50);
   const rows = (result.data ?? []) as unknown as Record<string, unknown>[];
   return <><section className="fv-heading"><p className="fv-eyebrow">OPERACIÓN / {c.organization.name}</p><h1>{title}</h1><p>{id === "agenda" ? "Citas registradas, ordenadas por fecha." : "Información de tu empresa, compartida con la aplicación móvil."}</p></section>
-    {(["clientes", "trabajos", "agenda"].includes(id) || (id === "productos" && can(c.access, "products_edit"))) && <CreateRecord org={org} moduleId={id} />}
+    {(["clientes", "trabajos", "agenda"].includes(id) || (id === "productos" && can(c.access, "products_edit"))) && <CreateRecord org={org} moduleId={id} stockAllowed={hasFeature(c.license,'stock')} />}
     {id === "comprobantes" && <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />}
     {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los registros</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div> : <><DataTable rows={rows.slice(0, 50)} fields={m.fields!} /><nav className="fv-pagination" aria-label="Paginación">{page > 1 && <Link className="fv-button secondary" href={`?page=${page - 1}`}>Anterior</Link>}<span>Página {page}</span>{rows.length > 50 && <Link className="fv-button secondary" href={`?page=${page + 1}`}>Siguiente</Link>}</nav></>}
   </>;

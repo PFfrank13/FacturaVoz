@@ -1,20 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const retailFont = localFont({ variable: "--font-retail", display: "swap", src: [
+  { path: "../../public/fonts/Inter-Regular.otf", weight: "400" },
+  { path: "../../public/fonts/Inter-Medium.otf", weight: "500" },
+  { path: "../../public/fonts/Inter-SemiBold.otf", weight: "600" },
+  { path: "../../public/fonts/Inter-Bold.otf", weight: "700" },
+] });
 
 export const metadata: Metadata = {
-  title: "FacturaVoz",
-  description: "Facturación por voz para negocios peruanos",
+  title: "Solvex Retail Control",
+  description: "Administración de tienda de Solvex Retail, por Solvex Software Labs.",
 };
 
 export default function RootLayout({
@@ -25,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${retailFont.variable} antialiased`}
       >
         {children}
       </body>

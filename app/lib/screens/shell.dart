@@ -1,3 +1,4 @@
+import 'menu.dart';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -59,6 +60,7 @@ const _dSell = _Dest('sell', Icons.point_of_sale_rounded, 'Vender', 'Vender');
 const _dClients = _Dest('clients', Icons.people_alt_rounded, 'Clientes', 'Clientes');
 const _dCollect = _Dest('collect', Icons.account_balance_wallet_rounded, 'Cobrar', 'Cobrar y pagar');
 const _dBusiness = _Dest('business', Icons.insights_rounded, 'Negocio', 'Mi negocio');
+const _dTools = _Dest('tools', Icons.grid_view_rounded, 'Herramientas', 'Herramientas de la tienda');
 const _dSettings = _Dest('settings', Icons.settings_rounded, 'Ajustes', 'Ajustes');
 const _dJobs = _Dest('jobs', Icons.assignment_rounded, 'Trabajos', 'Mis trabajos');
 const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda');
@@ -187,6 +189,14 @@ class _MainShellState extends State<MainShell> {
   List<_Dest> _dests() {
     final a = Access.instance;
     final simple = _settings?.simpleMode ?? false;
+    if (a.rubro == 'bodega' || a.rubro == 'mayorista') {
+      return [
+        if (_destAllowed('sell', a)) _dSell,
+        _dHome,
+        if (_destAllowed('cash', a)) const _Dest('cash', Icons.account_balance_wallet_outlined, 'Caja', 'Caja y cierre'),
+        _dTools,
+      ];
+    }
     if (a.role == 'tecnico') return [for (final d in const [_dJobs, _dAgenda, _dClients, _dSettings]) if (_destAllowed(d.id, a)) d];
     // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
     final spec = rubroFor(_settings?.businessType);
@@ -274,6 +284,7 @@ class _MainShellState extends State<MainShell> {
         'fiados' => const FiadosScreen(),
         'cash' => const CashDayScreen(),
         'tables' => const KitchenScreen(),
+        'tools' => const MenuScreen(),
         _ => const SettingsScreen(embedded: true),
       };
 
@@ -293,7 +304,9 @@ class _MainShellState extends State<MainShell> {
             if (!didPop) _go(first); // "atrás" vuelve a la primera pestaña antes de salir
           },
           child: Scaffold(
-            extendBody: true,
+            // Reserve the dock's height for nested operational Scaffolds (POS).
+            // Otherwise their checkout bar is painted underneath navigation.
+            extendBody: false,
             body: Column(children: [
               const LicenseBanner(),
               Expanded(
@@ -421,13 +434,13 @@ class _Dock extends StatelessWidget {
                 // Dos mitades iguales: el hueco del micrófono queda SIEMPRE al centro, aunque haya 3 a un lado y 2 al otro.
                 child: Row(children: [
                   Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
-                  if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
+                  if (Access.instance.rubro != 'bodega' && Access.instance.rubro != 'mayorista' && Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
                   Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
                 ]),
               ),
             ),
           ),
-          if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) Positioned(
+          if (Access.instance.rubro != 'bodega' && Access.instance.rubro != 'mayorista' && Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) Positioned(
             top: 0,
             child: Semantics(
               button: true,

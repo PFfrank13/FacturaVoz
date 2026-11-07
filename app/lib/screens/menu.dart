@@ -113,11 +113,11 @@ class _MenuScreenState extends State<MenuScreen> {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search_rounded),
               hintText: '¿Qué necesitas hacer?',
-              suffixIcon: IconButton(
+              suffixIcon: Access.instance.has('voz') ? IconButton(
                 tooltip: 'Buscar por voz',
                 icon: const Icon(Icons.mic_rounded),
                 onPressed: () => openUniversalSearch(context, voice: true),
-              ),
+              ) : null,
             ),
             onChanged: (v) => setState(() => _q = v),
             onSubmitted: (v) {

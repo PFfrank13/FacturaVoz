@@ -24,6 +24,9 @@ class LiveHub {
     'payments',
     'clients',
     'products',
+    'retail_receipts',
+    'retail_suppliers',
+    'retail_stock_ledger',
     'expenses',
     'quotes',
     'jobs',
@@ -72,7 +75,9 @@ class LiveHub {
               filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'org_id', value: org),
               callback: (_) => _bump(t),
             )
-            .subscribe();
+            .subscribe((status, error) {
+              if (_org == org && status == RealtimeSubscribeStatus.subscribed) _bump(t);
+            });
         _channels.add(ch);
       } catch (_) {}
     }
@@ -147,18 +152,43 @@ mixin LiveReload<T extends StatefulWidget> on State<T> {
   Future<void> reloadLive();
 
   Listenable? _liveSource;
+  AppLifecycleListener? _lifecycle;
+  Timer? _fallback;
+  bool _reloading = false;
+  bool _reloadAgain = false;
 
   void startLive() {
+    stopLive();
     LiveHub.instance.start();
     _liveSource = LiveHub.instance.of(liveTables)..addListener(_onLive);
+    _lifecycle = AppLifecycleListener(onResume: _onLive);
+    // Re-read authoritative queries even when replication is unavailable.
+    _fallback = Timer.periodic(const Duration(seconds: 30), (_) => _onLive());
   }
 
   void stopLive() {
     _liveSource?.removeListener(_onLive);
     _liveSource = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
+    _fallback?.cancel();
+    _fallback = null;
+    _reloadAgain = false;
   }
 
-  void _onLive() {
-    if (mounted) reloadLive();
+  Future<void> _onLive() async {
+    if (!mounted || _liveSource == null) return;
+    final state = WidgetsBinding.instance.lifecycleState;
+    if (state != null && state != AppLifecycleState.resumed) return;
+    if (_reloading) { _reloadAgain = true; return; }
+    _reloading = true;
+    try {
+      do {
+        _reloadAgain = false;
+        await reloadLive();
+      } while (_reloadAgain && mounted && _liveSource != null);
+    } catch (_) {
+      // Screens own their error presentation. The next resume/poll retries reads.
+    } finally { _reloading = false; }
   }
 }

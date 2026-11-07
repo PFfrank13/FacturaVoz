@@ -98,7 +98,8 @@ class _ProductPickerState extends State<_ProductPicker> {
 
 /// Catálogo de la empresa activa: crear, editar, archivar y borrar.
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({super.key, this.loadProducts});
+  final Future<List<Product>> Function()? loadProducts;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -108,6 +109,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   List<Product>? _all;
   String? _error;
   String _q = '';
+  String _filter = 'Activos';
 
   @override
   List<String> get liveTables => const ['products'];
@@ -132,7 +134,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final r = await Repo.listProducts();
+      final r = await (widget.loadProducts?.call() ?? Repo.listProducts());
       LiveCache.put('products.all', r);
       if (mounted) setState(() => _all = r);
     } catch (e) {
@@ -145,6 +147,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     ..showSnackBar(SnackBar(content: Text(m)));
 
   Future<void> _edit([Product? p]) async {
+    if (!Access.instance.has('facturar') || !Access.instance.can('products_edit')) return;
+    final stockAllowed = Access.instance.has('stock');
+    final storeAllowed = Access.instance.has('tienda');
     final name = TextEditingController(text: p?.name ?? '');
     final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(p.unitPrice));
     var unit = p?.unit ?? 'ZZ';
@@ -152,7 +157,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
     final reorder = TextEditingController(text: p?.reorderPoint == null ? '' : qtyText(p!.reorderPoint!));
     final cost = TextEditingController(text: p?.unitCost == null ? '' : qtyText(p!.unitCost!));
-    var inStore = p?.inStore ?? true;
+    var inStore = p?.inStore ?? false;
     var err = '';
     // v2.0: código de barras, foto, categoría, descripción y precio por mayor.
     final extra = p == null ? null : await V2Repo.productExtra(p.id);
@@ -226,7 +231,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 selected: {unit},
                 onSelectionChanged: (s) => setS(() => unit = s.first),
               ),
-              SwitchListTile(
+              if (storeAllowed) SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: inStore,
                 onChanged: (v) => setS(() => inStore = v),
@@ -304,7 +309,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   ),
                 ),
               ]),
-              if (unit == 'NIU') ...[
+              if (unit == 'NIU' && stockAllowed) ...[
                 const SizedBox(height: 6),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -346,9 +351,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     setS(() => err = 'El nombre es obligatorio');
                   } else if (v == null || v < 0 || v > 10000000) {
                     setS(() => err = 'Escribe un precio válido');
-                  } else if (inStore && !hasImage) {
+                  } else if (storeAllowed && inStore && !hasImage) {
                     setS(() => err = 'Para mostrarlo en la tienda agrega una foto (o apaga "Mostrar en mi tienda").');
-                  } else if (inStore && unit == 'NIU' && barcode.text.trim().isEmpty) {
+                  } else if (storeAllowed && inStore && unit == 'NIU' && barcode.text.trim().isEmpty) {
                     setS(() => err = 'Para mostrarlo en la tienda agrega su código de barras (o apaga "Mostrar en mi tienda").');
                   } else if (wholesale.text.trim().isNotEmpty && (parseDecimal(wholesale.text) == null || parseDecimal(wholesaleMin.text) == null)) {
                     setS(() => err = 'Para el precio por mayor indica también desde cuántas unidades.');
@@ -386,7 +391,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       } catch (e) {
         _snack(e.toString().contains('23505') ? 'Guardado, pero ese código de barras ya lo tiene otro producto.' : 'Guardado. ${V2Repo.missingHint(e)}');
       }
-      if (stockChanged) {
+      if (stockAllowed && stockChanged && Access.instance.has('stock')) {
         try {
           await ProRepo.setStockConfig(id, stock: stockValue, reorderPoint: reorderValue);
         } catch (e) {
@@ -418,13 +423,14 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   }
 
   Future<void> _more(Product p) async {
+    if (!Access.instance.has('facturar') || !Access.instance.can('products_edit')) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Editar'), onTap: () => Navigator.pop(ctx, 'edit')),
-          if (p.tracksStock)
+          if (p.tracksStock && Access.instance.has('stock'))
             ListTile(
               leading: const Icon(Icons.move_down_rounded),
               title: const Text('Registrar entrada o salida de stock'),
@@ -465,6 +471,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
 
   /// Entrada (compra) o salida (merma, uso interno) de stock. Atómico en la base de datos.
   Future<void> _adjust(Product p) async {
+    if (!Access.instance.has('stock') || !Access.instance.can('products_edit')) return;
     final qty = TextEditingController();
     var inbound = true;
     final ok = await showModalBottomSheet<bool>(
@@ -518,10 +525,20 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final t = Theme.of(context);
     final all = _all;
     final q = _q.trim().toLowerCase();
-    final list = (all ?? const <Product>[]).where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).toList();
+    final stockAllowed = Access.instance.has('stock');
+    final list = (all ?? const <Product>[]).where((p) {
+      final matches = q.isEmpty || p.name.toLowerCase().contains(q);
+      final status = switch (_filter) {
+        'Activos' => p.active,
+        'Archivados' => !p.active,
+        'Por reponer' => stockAllowed && p.active && p.lowStock,
+        _ => true,
+      };
+      return matches && status;
+    }).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Productos y servicios')),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')),
+      appBar: AppBar(title: const Text('Catálogo'), actions: [IconButton(tooltip: 'Actualizar catálogo', onPressed: _load, icon: const Icon(Icons.refresh_rounded))]),
+      floatingActionButton: Access.instance.can('products_edit') ? FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')) : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -529,13 +546,28 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
-            SectorPhotoBanner(rubro: Access.instance.rubro,
-              title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
+            Text('Cada producto, listo para vender.', style: t.textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            Text('Busca, revisa precios y mantén tu surtido al día.', style: t.textTheme.bodyMedium),
+            if (all != null) Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Wrap(spacing: 8, runSpacing: 8, children: [
+                StatusPill('${all.where((p) => p.active).length} activos', tone: PillTone.ok),
+                if (stockAllowed) StatusPill('${all.where((p) => p.active && p.lowStock).length} por reponer', tone: PillTone.warn),
+                StatusPill('${all.where((p) => !p.active).length} archivados'),
+              ]),
+            ),
             const SizedBox(height: 16),
             TextField(
               onChanged: (v) => setState(() => _q = v),
-              decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded), isDense: true),
+              decoration: const InputDecoration(labelText: 'Buscar producto', hintText: 'Ej.: arroz, leche, aceite', prefixIcon: Icon(Icons.search_rounded)),
             ),
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final filter in ['Activos', if (stockAllowed) 'Por reponer', 'Archivados', 'Todos'])
+                ChoiceChip(label: Text(filter), selected: _filter == filter, onSelected: (_) => setState(() => _filter = filter)),
+            ]),
+            Padding(padding: const EdgeInsets.only(top: 12), child: Text('${list.length} resultados · toca un producto para ver sus acciones', style: t.textTheme.bodySmall)),
             const SizedBox(height: 14),
             if (_error != null)
               SoftCard(
@@ -561,7 +593,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     child: Opacity(
                       opacity: p.active ? 1 : .5,
                       child: Pressable(
-                        onTap: () => _more(p),
+                        onTap: Access.instance.can('products_edit') ? () => _more(p) : null,
                         child: SoftCard(
                           padding: const EdgeInsets.all(14),
                           child: Row(children: [
@@ -578,7 +610,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Wrap(spacing: 6, runSpacing: 4, children: [
-                                      if (p.tracksStock) StatusPill('Stock ${qtyText(p.stock ?? 0)}', tone: p.lowStock ? PillTone.warn : PillTone.ok),
+                                      if (p.tracksStock && Access.instance.has('stock')) StatusPill('Stock ${qtyText(p.stock ?? 0)}', tone: p.lowStock ? PillTone.warn : PillTone.ok),
                                       if (p.margin != null)
                                         StatusPill('Margen ${(p.margin! * 100).round()} %', tone: p.margin! < 0.15 ? PillTone.bad : (p.margin! < 0.3 ? PillTone.warn : PillTone.ok)),
                                     ]),
@@ -586,7 +618,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                               ]),
                             ),
                             const SizedBox(width: 8),
-                            Text(p.unitPrice.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w700)),
+                            Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                              Text('Precio', style: t.textTheme.bodySmall),
+                              Text(p.unitPrice.toStringAsFixed(2), style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                              if (Access.instance.can('products_edit')) const Icon(Icons.chevron_right_rounded, size: 20),
+                            ])),
                           ]),
                         ),
                       ),

@@ -1,1 +1,25 @@
 infra/lycet/.env
+
+# Secrets and exports stay local, including at the monorepo root.
+.env*
+!.env.example
+**/.env*
+!**/.env.example
+**/.vercel/
+**/supabase/.temp/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+**/key.properties
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+*.7z
+*.log
+**/backups/
+**/node_modules/
+release-private/
