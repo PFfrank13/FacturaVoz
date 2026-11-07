@@ -1,0 +1,18 @@
+# Deploy only the administrative web application; never upload Hub or Flutter.
+/app/
+/infra/
+/solvex-plataforma-actualizado/
+/docs/
+/tools/
+/.github/
+/.git/
+**/.claude/
+**/node_modules/
+**/.next/
+**/.dart_tool/
+**/.env*
+**/*.log
+backend/tests/
+backend/scripts/
+backend/supabase/
+*.md
