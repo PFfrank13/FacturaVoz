@@ -79,3 +79,28 @@ existentes permanecen configuradas en producción.
 
 GitHub sigue privado. Rama de trabajo `codex/solvex-retail-preview`; main y el
 archivo local `archive/facturavoz-before-solvex-20261107` preservan el punto previo.
+
+## Ensayo de actualización y publicación
+
+- Commits `a0b3122` y `9d9a0fe` publicados en la rama de trabajo; sin merge a main.
+- `node backend/scripts/test-restored-upgrade.mjs restore_20261107121401629485`
+  aprobado: aplica la propuesta de recepción dentro de una transacción local,
+  compara datos Auth/organizaciones/licencias/eventos y definiciones de funciones
+  de licencia; todo idéntico. Finalmente ROLLBACK, sin cambiar la restauración.
+- La restauración no contiene `fast_checkout_requests`: el POS actual aún necesita
+  una actualización compatible que debe ensayarse antes de tocar Supabase remoto.
+- Vercel rechaza Preview como primer despliegue de un proyecto nuevo. Se mantiene
+  `solvex-retail-control` preparado y se usa Preview del proyecto `factura-voz`,
+  sin promover producción ni tocar su webhook. No se declara POS operativo aún.
+- `.vercelignore` reduce el envío de 6.46 GB a 156 entradas/3.46 MB. Excluye
+  Flutter, Hub, infraestructura, exportaciones, pruebas y secretos; conserva las
+  rutas reales Next.js. Manifiesto del dry-run verificado antes de subir.
+- Preview `https://factura-rofaq1gyx-portafolio-frank.vercel.app`, deployment
+  `dpl_G3yZR9k8CgF6Qn1uQKwKuNtS2jhT`: Ready, target preview, commit de código
+  `9d9a0fe`. Build remoto aprobado. HTTP autenticado de automatización:
+  `/login` 200 con marca/formulario; `/erp` sin sesión 307;
+  `/api/cron/solvex-sync` sin autorización 401. No se ejecutó sincronización.
+- `vercel curl` creó automáticamente una credencial de bypass de automatización
+  del proyecto existente. Deployment Protection sigue activo; no se modificaron
+  las claves de Hub/Supabase ni se publicaron valores. La comprobación HTTP no
+  certifica acceso público ni revisión visual del navegador.
