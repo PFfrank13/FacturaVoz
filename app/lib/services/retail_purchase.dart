@@ -161,3 +161,107 @@ class RetailPurchaseRepo {
     return id;
   }
 }
+
+class PendingRetailSettlement {
+  const PendingRetailSettlement({
+    required this.orgId, required this.userId, required this.requestId,
+    required this.receiptId, required this.method, required this.evidence,
+  });
+  final String orgId;
+  final String userId;
+  final String requestId;
+  final String receiptId;
+  final String method;
+  final String evidence;
+
+  Map<String, dynamic> toJson() => {
+    'v': 1, 'org_id': orgId, 'user_id': userId, 'request_id': requestId,
+    'receipt_id': receiptId, 'method': method, 'evidence': evidence,
+  };
+  factory PendingRetailSettlement.fromJson(Map<String, dynamic> json) {
+    if (json['v'] != 1 || json['org_id'] is! String ||
+        json['user_id'] is! String || json['request_id'] is! String ||
+        json['receipt_id'] is! String || json['method'] is! String ||
+        json['evidence'] is! String) {
+      throw const FormatException('Pago pendiente inválido');
+    }
+    final v = PendingRetailSettlement(
+      orgId: json['org_id'] as String,
+      userId: json['user_id'] as String,
+      requestId: json['request_id'] as String,
+      receiptId: json['receipt_id'] as String,
+      method: json['method'] as String,
+      evidence: json['evidence'] as String,
+    );
+    if (v.orgId.isEmpty || v.userId.isEmpty || v.requestId.isEmpty ||
+        v.receiptId.isEmpty || v.evidence.length > 200 ||
+        !const {'efectivo','yape','plin','tarjeta','transferencia'}
+            .contains(v.method)) {
+      throw const FormatException('Pago pendiente dañado');
+    }
+    return v;
+  }
+}
+
+class RetailSettlementStore {
+  RetailSettlementStore._();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  static String _key(String user, String org) => 'fv_settle_pending_v1_${user}_$org';
+
+  static Future<PendingRetailSettlement?> load(String user, String org) async {
+    final raw = await _storage.read(key: _key(user, org));
+    if (raw == null) return null;
+    final p = PendingRetailSettlement.fromJson(
+      Map<String, dynamic>.from(jsonDecode(raw) as Map),
+    );
+    if (p.userId != user || p.orgId != org) {
+      throw const FormatException('Pago pendiente de otra sesión');
+    }
+    return p;
+  }
+
+  static Future<void> save(PendingRetailSettlement p) async {
+    final old = await load(p.userId, p.orgId);
+    if (old != null && old.requestId != p.requestId) {
+      throw StateError('Primero recupera el pago pendiente anterior.');
+    }
+    await _storage.write(key: _key(p.userId, p.orgId), value: jsonEncode(p.toJson()));
+  }
+
+  static Future<void> clear(PendingRetailSettlement p) async {
+    final old = await load(p.userId, p.orgId);
+    if (old != null && old.requestId != p.requestId) {
+      throw StateError('No se borrará un pago pendiente distinto.');
+    }
+    await _storage.delete(key: _key(p.userId, p.orgId));
+  }
+}
+
+class RetailSettlementRepo {
+  RetailSettlementRepo._();
+
+  static Future<String> settle(PendingRetailSettlement p) async {
+    final user = Supabase.instance.client.auth.currentUser?.id;
+    if (user != p.userId || Repo.activeOrgId != p.orgId) {
+      throw AppException('Cuenta o empresa distinta del pago pendiente.');
+    }
+    final result = await Supabase.instance.client.rpc('retail_settle', params: {
+      'p_org': p.orgId,
+      'p_receipt': p.receiptId,
+      'p_request_id': p.requestId,
+      'p_method': p.method,
+      'p_evidence': p.evidence,
+    });
+    if (result is! List || result.isEmpty || result.first is! Map) {
+      throw AppException('Pago sin respuesta del servidor; reintenta la misma operación.');
+    }
+    final row = Map<String, dynamic>.from(result.first as Map);
+    final id = row['settlement_id'];
+    if (id is! String || id.isEmpty) {
+      throw AppException('Pago sin identificador de confirmación.');
+    }
+    return id;
+  }
+}
