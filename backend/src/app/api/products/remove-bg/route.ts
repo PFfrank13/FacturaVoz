@@ -49,14 +49,14 @@ export async function POST(req: Request) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const mime = sniffImage(bytes);
   if (!mime) return json({ error: "Formato de imagen no admitido." }, 415);
+  const apiKey = process.env.REMOVE_BG_API_KEY;
+  if (!apiKey) return json({ error: "La eliminación de fondo aún no está configurada en el servidor." }, 503);
+
   const { data: allowed, error: limitError } = await auth.supabase.rpc("consume_api_quota", {
     p_per_minute: 3, p_per_day: 30,
   });
   if (limitError) return json({ error: "No se pudo comprobar la cuota de procesamiento." }, 503);
   if (allowed !== true) return json({ error: "Límite de imágenes alcanzado. Prueba más tarde." }, 429);
-
-  const apiKey = process.env.REMOVE_BG_API_KEY;
-  if (!apiKey) return json({ error: "La eliminación de fondo aún no está configurada en el servidor." }, 503);
 
   try {
     const input = new FormData();
