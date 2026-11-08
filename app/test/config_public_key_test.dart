@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/config.dart';
+import 'package:facturavoz/config.dart';
 
 void main() {
   group('Supabase public API key configuration', () {
