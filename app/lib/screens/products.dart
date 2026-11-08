@@ -12,6 +12,7 @@ import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import 'package:image_picker/image_picker.dart';
+import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import 'client_profile.dart' show StorageImage;
@@ -520,7 +521,16 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final q = _q.trim().toLowerCase();
     final list = (all ?? const <Product>[]).where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Productos y servicios')),
+      appBar: AppBar(title: const Text('Productos y servicios'), actions: [
+        if (Access.instance.has('stock') && Access.instance.can('products_edit'))
+          IconButton(
+            tooltip: 'Compras y recepción', icon: const Icon(Icons.local_shipping_outlined),
+            onPressed: () async {
+              await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const RetailPurchasesScreen()));
+              _load();
+            },
+          ),
+      ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')),
       body: RefreshIndicator(
         onRefresh: _load,
