@@ -22,6 +22,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
+import 'pos_payment.dart';
 import 'new_invoice.dart';
 import 'team.dart' show dbMessage;
 
@@ -459,9 +460,11 @@ class _PosScreenState extends State<PosScreen> {
               for (final k in const ['efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'])
                 ActionChip(
                   label: Text(paymentMethods[k]!),
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    _fastCharge(k);
+                    final approval = await confirmPosPayment(context, method: k, currency: _cur, total: total);
+                    if (!mounted || approval == null) return;
+                    await _fastCharge(k, paymentEvidence: approval.note);
                   },
                 ),
             ]),
@@ -480,7 +483,7 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
-  Future<void> _fastCharge(String method) async {
+  Future<void> _fastCharge(String method, {String? paymentEvidence}) async {
     if (_charging || _recoveringCheckout || _checkoutRecoveryError != null) return;
     if (_chargeMethod != null && _chargeMethod != method) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reintenta con el mismo método del primer cobro para evitar diferencias.')));
@@ -509,6 +512,7 @@ class _PosScreenState extends State<PosScreen> {
         notes: [
           if (_table.text.trim().isNotEmpty) 'Mesa ${_table.text.trim()}',
           if (_coupon != null) 'Cupón ${_coupon!.code}',
+          if (paymentEvidence != null) paymentEvidence,
         ].join(' · '),
         items: lines,
       );
