@@ -20,7 +20,7 @@ import 'catalog.dart';
 import 'license_gate.dart';
 import 'menu.dart' show upgradeLabel;
 import 'owner_control.dart';
-import 'rubro_picker.dart';
+import '../ux/commerce_navigation.dart';
 import 'team.dart';
 import 'trash.dart';
 
@@ -104,6 +104,7 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
   }
 
   Future<void> _dailyReport(OrgSettings s) async {
+    if (_saving) return;
     final email = TextEditingController(text: s.dailyReportTo);
     var on = s.dailyReport;
     final ok = await showDialog<bool>(
@@ -181,15 +182,9 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
       if (admin && s != null)
         _row(
             Icons.dashboard_customize_rounded,
-            'Rubro',
-            rubroFor(s.businessType) == null ? 'Sin elegir · tócalo para elegir (se elige una sola vez)' : '${rubroFor(s.businessType)!.name} · fijo (si necesitas cambiarlo, escríbenos y lo hacemos sin perder datos)',
-            () {
-              if (rubroFor(s.businessType) == null) {
-                go(RubroPickerScreen(current: s.businessType));
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El rubro queda fijo. Escríbenos por WhatsApp y lo cambiamos sin perder tus datos.')));
-              }
-            }),
+            'Experiencia comercial',
+            commerceExperience(a.license.plan),
+            () => go(const PlanScreen())),
       _row(
         Icons.text_increase_rounded,
         'Modo Fácil',
@@ -203,23 +198,6 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
           },
         ),
       ),
-      // Modo simple antiguo: solo si la empresa aún no eligió rubro (con rubro, la barra la define el rubro).
-      if (admin && s != null && rubroFor(s.businessType) == null)
-        _row(
-          Icons.looks_4_rounded,
-          'Modo simple',
-          s.simpleMode ? 'Solo Vender, Clientes, Cobrar y Ajustes' : 'Apagado: ves Inicio y Mi negocio',
-          () {},
-          trailing: Switch(
-            value: s.simpleMode,
-            onChanged: _saving
-                ? null
-                : (v) {
-                    s.simpleMode = v;
-                    _save(() => V2Repo.saveSettings(s), v ? 'Modo simple activado' : 'Modo completo activado');
-                  },
-          ),
-        ),
       if (a.has('copiloto'))
         _row(
           Icons.record_voice_over_rounded,
@@ -236,8 +214,6 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
       if (admin && s != null && rubroFor(s.businessType) != null)
         _row(Icons.science_rounded, 'Datos de práctica', 'Productos y clientes de ejemplo de tu rubro (se borran con un toque)', () => showPracticeSheet(context, rubroFor(s.businessType)!)),
       if (admin) _row(Icons.tune_rounded, 'Funciones a la vista', 'Elige qué se ve primero (nada se borra)', () => go(const ModulesScreen())),
-      if (admin && s != null)
-        _row(Icons.linear_scale_rounded, 'Pasos de tus ${s.jobsWord.toLowerCase()}', s.statuses.map((x) => x.label).join(' → '), () => go(const JobFlowScreen())),
       _row(Icons.animation_rounded, 'Animaciones', rm == null ? 'Automático' : (rm ? 'Reducidas' : 'Completas'), _animations),
       if (a.can('team')) _row(Icons.groups_rounded, 'Equipo y permisos', 'Invita y elige qué ve cada uno', () => go(const TeamScreen())),
       _row(Icons.workspace_premium_rounded, 'Mi plan', a.license.dev
@@ -245,7 +221,7 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
               : [
                   'Plan ${planName(a.license.plan)}',
                   if (planPriceText(a.license.plan).isNotEmpty) planPriceText(a.license.plan),
-                  if (rubroFor(a.rubro) != null) rubroFor(a.rubro)!.name,
+                  commerceExperience(a.license.plan),
                 ].join(' · '), () => go(const PlanScreen())),
       if (admin) _row(Icons.palette_rounded, 'Logo y comprobantes', 'Logo, diseño del PDF y ancho del ticket', () => go(const BrandingScreen())),
       _row(Icons.print_rounded, 'Impresora de tickets', 'Bluetooth o red · 58 u 80 mm', () => go(const PrinterSettingsScreen())),
@@ -324,7 +300,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
               SoftCard(
                 padding: EdgeInsets.zero,
                 child: Column(children: [
-                  for (final e in allModules.entries)
+                  for (final e in allModules.entries.where((e) => !const {'carta_qr', 'trabajos', 'agenda'}.contains(e.key)))
                     SwitchListTile(
                       value: s.shows(e.key),
                       onChanged: (v) => _toggle(e.key, v),
@@ -535,11 +511,7 @@ void showSecuritySheet(BuildContext context) {
             subtitle: Text(f.planOk ? f.subtitle : upgradeLabel(f)),
             onTap: () {
               Navigator.pop(c);
-              if (f.planOk) {
-                openFeature(context, f);
-              } else {
-                pushPremium(context, const PlanScreen());
-              }
+              openFeature(context, f);
             },
           ),
       ]),

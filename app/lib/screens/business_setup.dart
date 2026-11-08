@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../business_templates.dart';
 import '../rubros.dart';
-import '../services/rubro_apply.dart';
+import '../access.dart';
+import '../ux/commerce_navigation.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
@@ -27,7 +28,7 @@ class BusinessSetupScreen extends StatefulWidget {
 class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
   final _pages = PageController();
   int _page = 0;
-  String _type = '';
+  String _type = 'bodega';
   bool _easy = AppState.instance.easyMode.value;
   bool _saving = false;
   OrgSettings? _settings;
@@ -39,7 +40,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
       if (!mounted) return;
       setState(() {
         _settings = s;
-        _type = rubroFor(s.businessType)?.id ?? '';
+        _type = 'bodega';
       });
     });
   }
@@ -57,18 +58,22 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
   }
 
   Future<void> _finish({bool skipped = false}) async {
+    final s = _settings;
+    if (s == null || !V2Repo.ready) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Espera a que cargue la configuración o vuelve a abrir esta pantalla.')));
+      return;
+    }
     setState(() => _saving = true);
-    final s = _settings ?? OrgSettings();
     try {
-      if (!skipped && rubroFor(_type) != null) {
-        await applyRubro(_type, firstTime: true);
-        await AppState.instance.setEasyMode(_easy);
-      } else {
-        s.onboardingDone = true; // sin rubro: la app lo pedirá después (no se bloquea nada)
-        await V2Repo.saveSettings(s);
-      }
+      if (!skipped) await AppState.instance.setEasyMode(_easy);
+      // Do not rewrite historical business_type or Hub grants.
+      s.onboardingDone = true;
+      await V2Repo.saveSettings(s);
     } catch (_) {
-      // Sin la migración (o sin permiso de administrador) la presentación igual se cierra.
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No pudimos guardar. Inténtalo de nuevo.')));
+      return;
     }
     if (!mounted) return;
     Haptics.success();
@@ -166,9 +171,9 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('¿Qué tipo de negocio tienes?', style: t.textTheme.headlineSmall),
+          Text('Tu experiencia comercial', style: t.textTheme.headlineSmall),
           const SizedBox(height: 4),
-          Text('Cada negocio tendrá sus propias funciones y datos, sin mezclarse con otros rubros.', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+          Text('Las funciones disponibles dependen de tu licencia y de tus permisos.', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ]),
       ),
       Expanded(
@@ -177,9 +182,9 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(178)),
-            itemCount: rubros.length,
+            itemCount: 1,
             itemBuilder: (context, i) {
-              final b = templateFor(rubros[i].id);
+              final b = templateFor('bodega');
               final on = b.id == _type;
               return Reveal(
                 index: i < 8 ? i : 8,
@@ -190,7 +195,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
                   },
                   child: SectorPhotoTile(
                     rubro: b.id,
-                    label: b.name,
+                    label: commerceExperience(Access.instance.license.plan),
                     selected: on,
                     height: MediaQuery.textScalerOf(context).scale(174),
                   ),

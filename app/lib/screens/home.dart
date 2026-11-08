@@ -36,7 +36,8 @@ import 'scan.dart';
 import 'store.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.embedded = false, this.onNavigate});
+  const HomeScreen({super.key, this.embedded = false, this.onNavigate, this.initialDate});
+  final DateTime? initialDate;
 
   /// true dentro de [MainShell]: el micrófono vive en el dock, no aquí.
   final bool embedded;
@@ -78,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchFocus.addListener(() {
       if (mounted) setState(() {});
     });
-    _items = LiveCache.get<List<InvoiceRecord>>('home.inv'); // lo último que viste, al instante
+    _items = widget.initialDate == null ? LiveCache.get<List<InvoiceRecord>>('home.inv') : null; // lo último que viste, al instante
     _more = (_items?.length ?? 0) >= _limit;
     _load();
     _subscribe();
@@ -153,12 +154,13 @@ class _HomeScreenState extends State<HomeScreen> {
     // La cifra del mes viene del servidor (una consulta agregada) EN PARALELO con la lista.
     _loadSummary();
     try {
-      final r = await Repo.listInvoices(limit: _limit);
-      if (_limit == 100) LiveCache.put('home.inv', r);
+      final day = widget.initialDate;
+      final r = day == null ? await Repo.listInvoices(limit: _limit) : await Repo.listInvoicesBetween(todayIso(day), todayIso(day.add(const Duration(days: 1))));
+      if (_limit == 100 && day == null) LiveCache.put('home.inv', r);
       if (mounted) {
         setState(() {
           _items = r;
-          _more = r.length >= _limit;
+          _more = day == null && r.length >= _limit;
           _error = null;
         });
         _loadExtras();
@@ -353,6 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            if (widget.initialDate != null) SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(16), child: Text('Comprobantes del ${displayDate(todayIso(widget.initialDate!))}', style: Theme.of(context).textTheme.titleLarge))),
             SliverToBoxAdapter(
               child: HomeHeader(
                 name: AppState.instance.activeOrg?.name ?? profile?.businessName ?? '',
@@ -601,7 +604,19 @@ class HomeHeader extends StatelessWidget {
     this.todayTotal,
     this.todayCount,
     this.onMenu,
+    this.onToday,
+    this.onMonth,
+    this.showMetrics = true,
+    this.canEditGoal = true,
+    this.summaryError,
+    this.onRetrySummary,
   });
+  final bool showMetrics;
+  final bool canEditGoal;
+  final String? summaryError;
+  final VoidCallback? onRetrySummary;
+  final VoidCallback? onToday;
+  final VoidCallback? onMonth;
   final double? todayTotal;
   final int? todayCount;
   final VoidCallback? onMenu;
@@ -657,7 +672,7 @@ class HomeHeader extends StatelessWidget {
               const SizedBox(height: Gap.md),
               // Fila 2: accesos grandes, mismo ancho, con el texto centrado.
               Row(children: [
-                Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
+                if (Access.instance.has('copiloto')) Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
                 if (onMenu != null) ...[
                   const SizedBox(width: Gap.sm),
                   Expanded(child: _HeaderAction(icon: Icons.menu_rounded, label: 'Menú', onTap: onMenu!)),
@@ -666,7 +681,7 @@ class HomeHeader extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 22),
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          if (showMetrics) Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Reveal(
@@ -675,7 +690,7 @@ class HomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 if (!loaded)
-                  const SizedBox(height: 56)
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(summaryError ?? 'Cargando resumen…', style: TextStyle(color: white85)))
                 else
                   Reveal(
                     index: 2,
@@ -701,7 +716,7 @@ class HomeHeader extends StatelessWidget {
               ]),
             ),
             const SizedBox(width: 12),
-            Reveal(
+            if (canEditGoal) Reveal(
               index: 3,
               child: Semantics(
                 button: true,
@@ -734,11 +749,12 @@ class HomeHeader extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 10),
-          if (loaded)
+          if (showMetrics && summaryError != null && onRetrySummary != null) TextButton(onPressed: onRetrySummary, child: const Text('Reintentar resumen', style: TextStyle(color: Colors.white))),
+          if (showMetrics && loaded)
             Reveal(
               index: 3,
               child: Wrap(spacing: 8, runSpacing: 6, children: [
-                if (todayTotal != null) HomeHeaderPill('Hoy ${money(todayTotal!, currency)} · ${todayCount == 1 ? '1 venta' : '${todayCount ?? 0} ventas'}'),
+                if (todayTotal != null) InkWell(onTap: onToday, child: HomeHeaderPill('Hoy ${money(todayTotal!, currency)} · ${todayCount == 1 ? '1 venta' : '${todayCount ?? 0} ventas'}')),
                 HomeHeaderPill(count == 0 ? 'Aún sin ventas emitidas este mes' : (count == 1 ? '1 venta emitida' : '$count ventas emitidas')),
                 if (drafts > 0) HomeHeaderPill('$drafts ${drafts == 1 ? 'borrador' : 'borradores'} sin emitir · ${money(draftsTotal, currency)}'),
                 if (g != null && !g.reached)
@@ -746,6 +762,7 @@ class HomeHeader extends StatelessWidget {
                 if (g != null && g.reached) const HomeHeaderPill('¡Meta cumplida!'),
               ]),
             ),
+          if (showMetrics && loaded && onMonth != null) TextButton(onPressed: onMonth, child: const Text('Ver reporte del mes', style: TextStyle(color: Colors.white))),
           if (loaded && series.any((v) => v > 0)) ...[
             const SizedBox(height: 14),
             Reveal(

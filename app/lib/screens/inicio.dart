@@ -25,8 +25,9 @@ import '../ui/work_queue.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
 import 'goal_sheet.dart';
-import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
-import 'hubs_v3.dart' show showNewSaleSheet;
+import 'home.dart' show CopilotCards, HomeHeader, HomeScreen, InvoiceRow;
+import '../ux/commerce_navigation.dart';
+import 'license_gate.dart' show PlanScreen;
 import 'invoice_detail.dart';
 import 'menu.dart';
 import 'jobs.dart' show JobDetailScreen;
@@ -54,13 +55,17 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
   String? _workError;
   bool _workLoading = true;
 
-  bool get _appointmentHome => const ['salon', 'consultorio', 'educacion'].contains(Access.instance.rubro);
-  bool get _showWork => Access.instance.can('jobs') && (_appointmentHome
-      ? Access.instance.has('agenda')
-      : const ['servicios_tecnicos', 'taller', 'construccion'].contains(Access.instance.rubro) && Access.instance.has('trabajos'));
+  bool get _appointmentHome => false;
+  bool get _showWork => false; // historical screens preserved; no sector navigation
+  bool get _canReadInvoices => Access.instance.has('facturar') &&
+      (Access.instance.can('sell') || Access.instance.can('finance') || Access.instance.can('collect'));
+  bool get _canSeeMoney => Access.instance.has('facturar') &&
+      (Access.instance.can('finance') || Access.instance.can('collect'));
+  int _generation = 0;
+  String? _summaryError;
 
   @override
-  List<String> get liveTables => const ['invoices', 'payments', 'jobs'];
+  List<String> get liveTables => const ['invoices', 'payments'];
 
   @override
   Future<void> reloadLive() => _load();
@@ -79,13 +84,26 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     _load();
     startLive(); // tiempo real: venta o cobro nuevo = se actualiza sin tocar nada
     AppState.instance.addListener(_onApp);
+    Access.instance.addListener(_onAccess);
   }
 
   @override
   void dispose() {
+    _generation++;
+    Access.instance.removeListener(_onAccess);
     stopLive();
     AppState.instance.removeListener(_onApp);
     super.dispose();
+  }
+
+  void _onAccess() {
+    _generation++;
+    setState(() {
+      _today = null; _month = null; _items = null;
+      _goal = null; _alerts = const []; _summaryError = null; _error = null;
+      _tried = false;
+    });
+    _load();
   }
 
   void _onApp() {
@@ -107,6 +125,8 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
 
   /// Cada pieza se muestra apenas llega (no espera a la más lenta) y se guarda para la próxima vez.
   Future<void> _load() async {
+    final generation = ++_generation;
+    if (!Access.instance.licenseReady) return;
     final org = Repo.activeOrgId;
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final now = DateTime.now();
@@ -114,19 +134,27 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final tomorrow = todayIso(now.add(const Duration(days: 1)));
     final first = todayIso(DateTime(now.year, now.month, 1));
     final next = todayIso(DateTime(now.year, now.month + 1, 1));
-    final seeMoney = Access.instance.can('finance') || Access.instance.can('collect');
-    bool same() => mounted && org == Repo.activeOrgId;
+    final seeMoney = _canSeeMoney;
+    bool same() => mounted && generation == _generation && org == Repo.activeOrgId;
+    if (mounted) setState(() => _summaryError = null);
 
     Future<void> piece<V>(Future<V> f, String key, void Function(V v) apply) async {
       try {
         final v = await f;
         if (!same()) return;
+        if (key == 'inicio.today' || key == 'inicio.month') {
+          if (v is! Map || v['sales_total'] is! num || v['sales_count'] is! num) {
+            throw StateError('Resumen no disponible');
+          }
+        }
         LiveCache.put(key, v);
         setState(() {
           apply(v);
           _tried = true;
         });
-      } catch (_) {}
+      } catch (_) {
+        if (same()) setState(() => _summaryError = 'No pudimos actualizar el resumen.');
+      }
     }
 
     // Todo en paralelo y agregado en la base: dos números, no miles de filas.
@@ -151,9 +179,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
       }(),
       if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(today, tomorrow, cur), 'inicio.today', (v) => _today = v),
       if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(first, next, cur), 'inicio.month', (v) => _month = v),
-      piece<double?>(GrowthRepo.monthlyGoal().catchError((Object _) => null), 'inicio.goal', (v) => _goal = v),
-      piece<List<DailyAlert>>(V2Repo.dailyAlerts().catchError((Object _) => const <DailyAlert>[]), 'inicio.alerts', (v) => _alerts = v),
-      () async {
+      if (seeMoney) piece<double?>(GrowthRepo.monthlyGoal(), 'inicio.goal', (v) => _goal = v),
+      if (Access.instance.has('copiloto')) piece<List<DailyAlert>>(V2Repo.dailyAlerts(), 'inicio.alerts', (v) => _alerts = v),
+      if (_canReadInvoices) () async {
         try {
           final inv = await Repo.listInvoices(limit: _limit);
           if (!same()) return;
@@ -208,11 +236,13 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
   }
 
   Future<void> _open(InvoiceRecord inv) async {
+    if (!_canReadInvoices) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: inv.id)));
     if (mounted) _load();
   }
 
   Future<void> _setGoal(double salesSoFar) async {
+    if (!_canSeeMoney || !Access.instance.isAdmin) return;
     final v = await showGoalSheet(context, current: _goal, salesSoFar: salesSoFar);
     if (v != null && mounted) setState(() => _goal = v <= 0 ? null : v);
   }
@@ -221,19 +251,19 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final a = Access.instance;
-    final spec = rubroFor(a.rubro);
+    final spec = rubroFor('bodega');
     final guide = experienceFor(spec?.id);
     final cur = AppState.instance.profile?.currency ?? 'PEN';
-    final seeMoney = a.can('finance') || a.can('collect');
+    final seeMoney = _canSeeMoney;
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
     final todayCount = ((_today?['sales_count'] as num?) ?? 0).toInt();
     final monthTotal = ((_month?['sales_total'] as num?) ?? 0).toDouble();
     final monthCount = ((_month?['sales_count'] as num?) ?? 0).toInt();
     final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
     final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
-    final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (!(a.can('sell') && a.has('facturar') && id == 'pos')) if (featureById(id) case final f? when f.allowed) f];
-    final list = _visible();
-    final buyers = _todayBuyers();
+    final shortcuts = [for (final id in commerceHomeOrder(a.license.plan)) if (!(a.can('sell') && a.has('facturar') && id == 'pos')) if (featureById(id) case final f? when f.allowed) f];
+    final list = _canReadInvoices ? _visible() : <InvoiceRecord>[];
+    final buyers = _canReadInvoices && a.can('clients') ? _todayBuyers() : <InvoiceRecord>[];
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,
@@ -247,15 +277,29 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               count: monthCount,
               drafts: drafts,
               draftsTotal: draftsTotal,
-              loaded: seeMoney && _tried && _month != null,
+              loaded: seeMoney && _tried && _month != null && _summaryError == null,
+              showMetrics: seeMoney,
+              canEditGoal: seeMoney && a.isAdmin,
+              summaryError: _summaryError,
+              onRetrySummary: _load,
               goal: seeMoney ? _goal : null,
               series: seeMoney ? dailySeries(_items ?? const <InvoiceRecord>[], currency: cur, today: todayIso()) : const <double>[],
               onGoal: () => _setGoal(monthTotal),
               todayTotal: seeMoney && _today != null ? todayTotal : null,
               todayCount: todayCount,
+              onToday: _canReadInvoices ? () => openFeature(context, FeatureEntry(id: 'comprobantes', title: 'Ventas de hoy', subtitle: '', icon: Icons.receipt_long, group: 'Vender', feature: 'facturar', builder: (_) => HomeScreen(initialDate: DateTime.now()))) : null,
+              onMonth: featureById('reportes')!.allowed ? () => openFeature(context, featureById('reportes')!) : null,
               onMenu: () => pushPremium(context, const MenuScreen()),
             ),
           ),
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: ActionChip(
+              avatar: const Icon(Icons.workspace_premium_rounded, size: 18),
+              label: Text(commerceExperience(a.license.plan)),
+              onPressed: () => pushPremium(context, const PlanScreen()),
+            ),
+          )),
           if (spec != null)
             SliverToBoxAdapter(
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -276,10 +320,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                     padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
                     children: [
                       if (a.can('sell') && a.has('facturar'))
-                        QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => showNewSaleSheet(context).then((_) {
+                        QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => openFeature(context, featureById('pos')!).then((_) {
                               if (mounted) _load();
                             })),
-                      for (final f in shortcuts.take(3))
+                      for (final f in shortcuts.take(6))
                         QuickAction(
                           icon: f.icon,
                           label: shortActionLabel(f.id, f.title),
@@ -339,8 +383,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
             ),
-          if (_error != null && _items == null)
-            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          if (!_canReadInvoices)
+            const SliverToBoxAdapter(child: SizedBox(height: 140))
+          else if (_error != null && _items == null)
+            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [Text(_error!, textAlign: TextAlign.center), TextButton(onPressed: _load, child: const Text('Reintentar'))])))
           else if (_items == null)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -348,7 +394,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
             )
           else if (_items!.isEmpty)
             const SliverToBoxAdapter(
-              child: Reveal(child: EmptyState(title: 'Aún no hay comprobantes', body: 'Cuando emitas una boleta o factura, aparecerá aquí. Las citas, pedidos y trabajos siguen en sus propias secciones.')),
+              child: Reveal(child: EmptyState(title: 'Aún no hay comprobantes', body: 'Cuando emitas una boleta o factura, aparecerá aquí.')),
             )
           else ...[
             SliverToBoxAdapter(

@@ -88,10 +88,10 @@ void main() {
     }
   });
 
-  test('lo que el plan no trae dice en qué plan está', () {
+  test('el menú no deduce ofertas vigentes de la matriz histórica', () {
     final api = featureById('api')!;
-    expect(upgradeLabel(api), 'Disponible en el plan Empresa');
-    expect(upgradeLabel(featureById('agenda')!), 'Disponible en el plan Pro');
+    expect(upgradeLabel(api), 'No incluida en tu plan actual');
+    expect(upgradeLabel(featureById('agenda')!), 'No incluida en tu plan actual');
   });
 
   test('cambiar de rubro no pierde estados ni datos del cliente', () {

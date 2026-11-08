@@ -6,37 +6,25 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
 import '../app_state.dart';
-import '../models_v2.dart';
-import '../rubros.dart';
 import '../services/quick_launch.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
+import '../ui/feature_access.dart';
 import '../ui/theme.dart';
 import 'assistant.dart';
 import 'catalog.dart';
-import 'clients_hub.dart';
 import 'cash_day.dart';
-import 'collections.dart';
 import 'fiados.dart';
-import 'home.dart';
-import 'hubs_v3.dart';
 import 'inicio.dart';
 import 'invoice_detail.dart';
-import 'jobs.dart';
-import 'kitchen.dart';
 import 'license_gate.dart';
 import 'new_invoice.dart';
 import 'pos.dart';
-import 'profit.dart';
-import 'quotes.dart';
-import 'rubro_picker.dart';
 import 'settings.dart';
 
-/// Estructura principal v2.0 (Fase 7): máximo 5 destinos + micrófono central en un dock de cristal flotante.
-///   Completo: INICIO · VENDER · [mic] · CLIENTES · COBRAR Y PAGAR · MI NEGOCIO
-///   Simple:   VENDER · CLIENTES · [mic] · COBRAR · AJUSTES   (+ "Todas las funciones" desde el avatar)
-///   Técnico:  MIS TRABAJOS · AGENDA · [mic] · CLIENTES · AJUSTES
+/// Navegación comercial: Inicio · Vender · [mic] · Fiados · Caja.
+/// Conserva el dock de cristal y filtra destinos según Hub y rol.
 /// Toque en el micrófono = vender por voz. Mantener presionado = Copiloto de IA.
 /// Las pestañas que el rol o el plan no permiten no se muestran (la base de datos igual lo impide).
 class MainShell extends StatefulWidget {
@@ -56,27 +44,8 @@ class _Dest {
 
 const _dHome = _Dest('home', Icons.space_dashboard_rounded, 'Inicio', 'Inicio');
 const _dSell = _Dest('sell', Icons.point_of_sale_rounded, 'Vender', 'Vender');
-const _dClients = _Dest('clients', Icons.people_alt_rounded, 'Clientes', 'Clientes');
-const _dCollect = _Dest('collect', Icons.account_balance_wallet_rounded, 'Cobrar', 'Cobrar y pagar');
-const _dBusiness = _Dest('business', Icons.insights_rounded, 'Negocio', 'Mi negocio');
-const _dSettings = _Dest('settings', Icons.settings_rounded, 'Ajustes', 'Ajustes');
-const _dJobs = _Dest('jobs', Icons.assignment_rounded, 'Trabajos', 'Mis trabajos');
-const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda');
-
-/// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
-const _rubroIcons = <String, IconData>{
-  'home': Icons.space_dashboard_rounded,
-  'sell': Icons.point_of_sale_rounded,
-  'clients': Icons.people_alt_rounded,
-  'collect': Icons.account_balance_wallet_rounded,
-  'business': Icons.insights_rounded,
-  'jobs': Icons.assignment_rounded,
-  'agenda': Icons.calendar_month_rounded,
-  'quotes': Icons.request_quote_rounded,
-  'fiados': Icons.menu_book_rounded,
-  'tables': Icons.table_restaurant_rounded,
-  'cash': Icons.lock_clock_rounded,
-};
+const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
+const _dCash = _Dest('cash', Icons.lock_clock_rounded, 'Caja', 'Caja');
 
 /// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
 bool _destAllowed(String id, Access a) => switch (id) {
@@ -96,7 +65,6 @@ bool _destAllowed(String id, Access a) => switch (id) {
 class _MainShellState extends State<MainShell> {
   String _tab = ''; // se resuelve al construir: la app abre donde se vende
   final Set<String> _built = {};
-  OrgSettings? _settings;
   RealtimeChannel? _licChan;
   String? _orgSeen;
 
@@ -127,26 +95,9 @@ class _MainShellState extends State<MainShell> {
     _watchLicense();
   }
 
-  bool _gateShown = false;
-
   Future<void> _reloadSettings() async {
     final s = await V2Repo.settings();
-    Access.instance.rubro = s.businessType;
-    if (mounted) setState(() => _settings = s);
-    _maybeGate(s);
-  }
-
-  /// "Otro / personalizado" ya no existe: el dueño elige su rubro una vez (nada se pierde mientras tanto).
-  void _maybeGate(OrgSettings s) {
-    if (_gateShown || !V2Repo.ready || !s.onboardingDone || rubroFor(s.businessType) != null) return;
-    _gateShown = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (ctx) => RubroPickerScreen(current: s.businessType, gate: true, onDone: () => Navigator.of(ctx).pop()),
-      ));
-    });
+    Access.instance.rubro = s.businessType; // historical compatibility only
   }
 
   /// Si el Hub cambia la licencia (pago, corte), la app se entera al instante.
@@ -184,45 +135,18 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  List<_Dest> _dests() {
-    final a = Access.instance;
-    final simple = _settings?.simpleMode ?? false;
-    if (a.role == 'tecnico') return [for (final d in const [_dJobs, _dAgenda, _dClients, _dSettings]) if (_destAllowed(d.id, a)) d];
-    // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
-    final spec = rubroFor(_settings?.businessType);
-    if (spec != null) {
-      final out = [
-        for (final n in spec.nav)
-          if (_destAllowed(n.id, a)) _Dest(n.id, _rubroIcons[n.id] ?? Icons.circle_outlined, n.label, n.label),
-      ];
-      if (out.length < 4 && !out.any((d) => d.id == 'clients') && _destAllowed('clients', a)) out.add(_Dest('clients', _rubroIcons['clients']!, spec.word('clients'), spec.word('clients')));
-      if (out.length < 4) out.add(_dSettings);
-      return out.take(4).toList();
-    }
-    final out = <_Dest>[];
-    if (!simple) out.add(_dHome);
-    if (_destAllowed('sell', a)) out.add(_dSell);
-    if (_destAllowed('clients', a)) out.add(_dClients);
-    if (_destAllowed('collect', a)) out.add(_dCollect);
-    if (simple) {
-      out.add(_dSettings);
-    } else if (_destAllowed('business', a)) {
-      out.add(_dBusiness);
-    } else {
-      out.add(_dSettings);
-    }
-    return out.take(5).toList();
-  }
+  List<_Dest> _dests() => [
+    for (final d in const [_dHome, _dSell, _dFiados, _dCash])
+      if (_destAllowed(d.id, Access.instance)) d,
+  ];
 
-  /// Pantalla con la que abre la app: cada rubro abre en SU primera pestaña (la que definió su barra). Solo si la barra
-  /// incluye Vender (p. ej. Bodega) abre ahí, para vender sin pasos. Restaurante, servicios, etc. NO se saltan a nada.
-  String _landing(List<_Dest> d) => d.any((x) => x.id == 'sell') ? 'sell' : d.first.id;
+  String _landing(List<_Dest> d) => 'home';
 
   void _go(String id) {
     if (id == _tab) return;
     if (!_dests().any((d) => d.id == id)) {
       // Ese destino no está en la barra de este rubro: se abre como pantalla.
-      final f = featureById(const {'sell': 'facturar', 'collect': 'cobranza', 'business': 'negocio', 'clients': 'clientes', 'jobs': 'trabajos', 'agenda': 'agenda'}[id] ?? id);
+      final f = featureById(const {'sell': 'pos', 'collect': 'cobranza', 'business': 'negocio', 'clients': 'clientes', 'jobs': 'trabajos', 'agenda': 'agenda'}[id] ?? id);
       if (f != null && f.allowed) openFeature(context, f);
       return;
     }
@@ -235,47 +159,22 @@ class _MainShellState extends State<MainShell> {
 
   Future<void> _newInvoice() async {
     if (!Access.instance.has('facturar') || !Access.instance.has('voz')) return;
-    if (!Access.instance.can('sell')) {
-      openCopilot(context);
-      return;
-    }
-    final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const NewInvoiceScreen()));
+    if (!Access.instance.can('sell')) return;
+    final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => FeatureAccessGate(roleAllowed: () => Access.instance.can('sell'), planAllowed: () => Access.instance.has('facturar') && Access.instance.has('voz'), builder: (_) => const NewInvoiceScreen())));
     AppState.instance.bump();
-    if (id != null && mounted) {
+    if (id != null && mounted && Access.instance.has('facturar') && Access.instance.can('sell')) {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true)));
       AppState.instance.bump();
     }
   }
 
-  Widget _page(String id) {
-    // v3: con rubro, Inicio limpio y los hubs agrupados (E). Sin rubro, la estructura v2 de siempre.
-    if (rubroFor(_settings?.businessType) != null) {
-      switch (id) {
-        case 'home':
-          return const InicioScreen();
-        case 'collect':
-          return const OwedHubScreen();
-        case 'business':
-          return const BusinessHubScreen();
-      }
-    }
-    return _pageV2(id);
-  }
-
-  Widget _pageV2(String id) => switch (id) {
-        'home' => HomeScreen(embedded: true, onNavigate: (i) => _go(const ['home', 'sell', 'collect', 'business'][i.clamp(0, 3)])),
-        'sell' => const PosScreen(embedded: true),
-        'clients' => const ClientsHubScreen(embedded: true),
-        'collect' => const CollectionsScreen(embedded: true),
-        'business' => const ProfitScreen(embedded: true),
-        'jobs' => JobsScreen(embedded: true, mine: Access.instance.role == 'tecnico'),
-        'agenda' => const AgendaScreen(embedded: true),
-        'quotes' => const QuotesScreen(embedded: true),
-        'fiados' => const FiadosScreen(),
-        'cash' => const CashDayScreen(),
-        'tables' => const KitchenScreen(),
-        _ => const SettingsScreen(embedded: true),
-      };
+  Widget _page(String id) => switch (id) {
+    'home' => const InicioScreen(),
+    'sell' => const PosScreen(embedded: true),
+    'fiados' => const FiadosScreen(),
+    'cash' => const CashDayScreen(),
+    _ => const SettingsScreen(embedded: true),
+  };
 
   @override
   Widget build(BuildContext context) {

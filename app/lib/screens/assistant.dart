@@ -16,9 +16,11 @@ import '../models_pro.dart';
 import '../services/pro_api.dart';
 import '../services/voice.dart';
 import '../ui/motion.dart';
+import '../ui/feature_access.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'collections.dart';
+import 'license_gate.dart' show PlanScreen;
 import 'expenses.dart';
 import 'new_invoice.dart';
 import '../models.dart';
@@ -35,6 +37,8 @@ import 'taxes.dart';
 /// Abre el Copiloto: pregunta por tu negocio o da una orden, por voz o por texto.
 /// Con [ask] la pregunta se envía sola al abrir (p. ej. "plan de rescate de caja").
 Future<void> openCopilot(BuildContext context, {String? ask}) {
+  if (!Access.instance.licenseReady) return pushPremium(context, const PlanScreen());
+  if (!Access.instance.has('copiloto')) return showUpgradeDialog(context);
   final nav = Navigator.of(context);
   Haptics.soft();
   return showModalBottomSheet<void>(
@@ -42,7 +46,16 @@ Future<void> openCopilot(BuildContext context, {String? ask}) {
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (ctx) => SizedBox(height: MediaQuery.of(ctx).size.height * 0.9, child: _CopilotSheet(nav: nav, ask: ask)),
+    builder: (ctx) => SizedBox(height: MediaQuery.of(ctx).size.height * 0.9, child: FeatureAccessGate(roleAllowed: () => true, planAllowed: () => Access.instance.has('copiloto'), builder: (_) => _CopilotSheet(nav: nav, ask: ask))),
+  );
+}
+
+class CopilotScreen extends StatelessWidget {
+  const CopilotScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Copiloto')),
+    body: _CopilotSheet(nav: Navigator.of(context)),
   );
 }
 

@@ -18,7 +18,8 @@ import '../app_state.dart';
 import '../logic/search_score.dart';
 import '../models.dart';
 import '../models_v2.dart';
-import '../rubros.dart';
+import '../ux/commerce_navigation.dart';
+import '../ui/feature_access.dart';
 import '../services/repo.dart';
 import 'receiving.dart';
 import '../services/v2_api.dart';
@@ -27,6 +28,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'agent.dart';
+import 'assistant.dart' show CopilotScreen;
 import 'api_access.dart';
 import 'bank_recon.dart';
 import 'branding.dart';
@@ -109,10 +111,12 @@ class FeatureEntry {
   bool get allowed => roleOk && planOk;
 
   /// ¿El rol lo permite (y la plataforma)? Si no, no se muestra.
-  bool get roleOk => rubroShows(rubroFor(Access.instance.rubro), id) && (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
+  bool get roleOk => isCommerceDestination(id) && (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
 
   /// ¿Hub lo incluye? Los menús filtran por allowed y omiten lo no contratado.
-  bool get planOk => feature == null || Access.instance.has(feature!);
+  bool get requiresLicense => !const {'plan', 'seguridad', 'ajustes'}.contains(id);
+
+  bool get planOk => (!requiresLicense || Access.instance.licenseReady) && (feature == null || Access.instance.has(feature!)) && (id != 'voz' || Access.instance.has('facturar'));
 }
 
 const groupOrder = ['Vender', 'Clientes y trabajos', 'Cobrar y pagar', 'Mi negocio', 'Control del dueño', 'Ajustes'];
@@ -137,8 +141,10 @@ const groupColors = <String, Color>{
 
 /// Registro único de funciones (el orden importa: es el orden en pantalla).
 List<FeatureEntry> featureCatalog() => [
+      FeatureEntry(id: 'copiloto', title: 'Copiloto', subtitle: 'Consulta tu negocio con el asistente', icon: Icons.auto_awesome_rounded, group: 'Mi negocio', feature: 'copiloto', builder: (_) => const CopilotScreen()),
+      FeatureEntry(id: 'voz', title: 'Facturación por voz', subtitle: 'Dicta el borrador y revisa antes de emitir', icon: Icons.mic_rounded, group: 'Vender', feature: 'voz', perm: 'sell', builder: (_) => const NewInvoiceScreen()),
       // ───── Vender ─────
-      FeatureEntry(id: 'facturar', title: 'Facturar por voz', subtitle: 'Boleta o factura dictada o escrita', icon: Icons.mic_rounded, group: 'Vender', feature: 'facturar', perm: 'sell', keywords: const ['boleta', 'factura', 'vender', 'comprobante', 'sunat'], builder: (_) => const NewInvoiceScreen()),
+      FeatureEntry(id: 'facturar', title: 'Nueva boleta o factura', subtitle: 'Prepara un comprobante para tu cliente', icon: Icons.mic_rounded, group: 'Vender', feature: 'facturar', perm: 'sell', keywords: const ['boleta', 'factura', 'vender', 'comprobante', 'sunat'], builder: (_) => const NewInvoiceScreen()),
       FeatureEntry(id: 'comprobantes', feature: 'facturar', title: 'Comprobantes', subtitle: 'Todas tus boletas y facturas, con búsqueda y filtros', icon: Icons.receipt_long_rounded, group: 'Vender', keywords: const ['boletas', 'facturas', 'lista', 'historial', 'anular', 'sunat'], builder: (_) => const HomeScreen()),
       FeatureEntry(id: 'pos', title: 'Venta rápida (caja)', subtitle: 'Toca productos o escanea su código de barras', icon: Icons.point_of_sale_rounded, group: 'Vender', module: 'pos', feature: 'facturar', perm: 'sell', keywords: const ['caja', 'pos', 'codigo de barras', 'carrito'], builder: (_) => const PosScreen()),
       FeatureEntry(id: 'cotizaciones', title: 'Cotizaciones y pedidos', subtitle: 'Cotiza, comparte y convierte en factura', icon: Icons.request_quote_rounded, group: 'Vender', module: 'cotizaciones', feature: 'cotizaciones', perm: 'sell', keywords: const ['presupuesto', 'proforma', 'pedido web'], builder: (_) => const QuotesScreen()),
@@ -213,86 +219,31 @@ FeatureEntry? featureById(String id) {
 }
 
 Future<void> openFeature(BuildContext context, FeatureEntry f) async {
+  if (!f.roleOk) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tu rol no tiene permiso para esta herramienta.')));
+    return;
+  }
+  if (f.requiresLicense && !Access.instance.licenseReady) {
+    await pushPremium(context, const PlanScreen());
+    return;
+  }
+  if (!f.planOk) {
+    await showUpgradeDialog(context);
+    return;
+  }
   Haptics.tap();
-  await pushPremium(context, Builder(builder: f.builder));
+  await pushPremium(context, FeatureAccessGate(
+    roleAllowed: () => f.roleOk, planAllowed: () => f.planOk,
+    requiresLicense: f.requiresLicense, builder: f.builder,
+  ));
   AppState.instance.bump();
 }
 
 // ═════════════════════════ Todas las funciones ═════════════════════════
-class AllFunctionsScreen extends StatefulWidget {
+class AllFunctionsScreen extends StatelessWidget {
   const AllFunctionsScreen({super.key});
-
   @override
-  State<AllFunctionsScreen> createState() => _AllFunctionsScreenState();
-}
-
-class _AllFunctionsScreenState extends State<AllFunctionsScreen> {
-  OrgSettings? _settings;
-
-  @override
-  void initState() {
-    super.initState();
-    V2Repo.settings().then((s) {
-      if (mounted) setState(() => _settings = s);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final all = featureCatalog().where((f) => f.allowed).toList();
-    final s = _settings;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Todas las funciones'), actions: [
-        IconButton(tooltip: 'Buscar', onPressed: () => openUniversalSearch(context), icon: const Icon(Icons.search_rounded)),
-      ]),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
-        if (s != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Ordenado para: ${s.template.name}. Lo marcado con ★ se ve a primera vista.', style: t.textTheme.bodySmall),
-          ),
-        for (final (gi, g) in groupOrder.indexed) ...[
-          if (all.any((f) => f.group == g)) ...[
-            SectionTitle(g),
-            Reveal(
-              index: gi,
-              child: SoftCard(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(children: [
-                  for (final f in all.where((f) => f.group == g))
-                    ListTile(
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(color: (groupColors[g] ?? Brand.indigo).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
-                        child: Icon(f.icon, color: groupColors[g] ?? Brand.indigo, size: 21),
-                      ),
-                      title: Text.rich(TextSpan(children: [
-                        TextSpan(text: f.title),
-                        if (s != null && f.module != null && s.shows(f.module!)) const TextSpan(text: '  ★', style: TextStyle(color: Brand.warn)),
-                      ])),
-                      subtitle: Text(f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => openFeature(context, f),
-                    ),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-        ],
-        const SizedBox(height: 8),
-        Center(
-          child: TextButton.icon(
-            onPressed: () => pushPremium(context, const PlanScreen()),
-            icon: const Icon(Icons.workspace_premium_rounded),
-            label: const Text('¿Falta algo? Mira lo que incluye cada plan'),
-          ),
-        ),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => const MenuScreen();
 }
 
 /// Fila horizontal de accesos (para los hubs). Solo muestra lo que el plan y el rol permiten.
@@ -463,7 +414,7 @@ Future<void> showAccountSheet(BuildContext context) {
 }
 
 // ═════════════════════════ Buscador universal ═════════════════════════
-Future<void> openUniversalSearch(BuildContext context, {bool voice = false}) => pushPremium(context, UniversalSearchScreen(startWithVoice: voice));
+Future<void> openUniversalSearch(BuildContext context, {bool voice = false}) => pushPremium(context, FeatureAccessGate(roleAllowed: () => true, planAllowed: () => true, builder: (_) => UniversalSearchScreen(startWithVoice: voice && Access.instance.has('voz'))));
 
 class _Hit {
   const _Hit(this.score, this.kind, this.title, this.subtitle, this.icon, this.open);
@@ -512,17 +463,17 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
   Future<void> _preload() async {
     // Se cargan una vez y se filtra en el teléfono: la búsqueda responde al instante.
     final a = Access.instance;
-    try {
-      _clients = await V2Repo.clients();
-    } catch (_) {}
-    if (a.can('sell') || a.can('finance')) {
+    if (a.has('clientes') && a.can('clients')) {
+      try { _clients = await V2Repo.clients(); } catch (_) {}
+    }
+    if (a.has('facturar') && (a.can('sell') || a.can('finance') || a.can('collect'))) {
       try {
         _invoices = await Repo.listInvoices(limit: 300);
       } catch (_) {}
     }
-    try {
-      _products = await Repo.listProducts();
-    } catch (_) {}
+    if (a.has('facturar') && a.can('sell')) {
+      try { _products = await Repo.listProducts(); } catch (_) {}
+    }
     if (mounted) setState(() => _loaded = true);
   }
 
@@ -538,6 +489,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
   }
 
   Future<void> _voice() async {
+    if (!Access.instance.has('voz')) return;
     if (_listening) return _stopVoice();
     try {
       if (!await _recorder.hasPermission()) {
@@ -582,7 +534,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
         } catch (_) {}
       }
     }
-    if (bytes == null) {
+    if (bytes == null || !Access.instance.has('voz')) {
       if (mounted) setState(() => _transcribing = false);
       return;
     }
@@ -601,9 +553,9 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
   List<_Hit> _hits(String q) {
     final out = <_Hit>[];
     if (q.trim().isEmpty) return out;
-    for (final f in featureCatalog().where((f) => f.allowed)) {
+    for (final f in featureCatalog().where((f) => f.roleOk)) {
       final s = matchScore(q, f.title, extra: [f.subtitle, ...f.keywords]);
-      if (s > 0) out.add(_Hit(s + 0.2, 'Función', f.title, f.subtitle, f.icon, () => openFeature(context, f)));
+      if (s > 0) out.add(_Hit(s + 0.2, 'Función', f.title, f.planOk ? f.subtitle : 'No incluida en tu plan actual', f.planOk ? f.icon : Icons.lock_rounded, () => openFeature(context, f)));
     }
     for (final c in _clients) {
       final s = matchScore(q, c.name, extra: [c.taxId, c.phone, c.district, ...c.tags]);
@@ -622,7 +574,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
     }
     for (final p in _products) {
       final s = matchScore(q, p.name);
-      if (s > 0) out.add(_Hit(s * 0.85, 'Producto', p.name, money(p.unitPrice, AppState.instance.profile?.currency ?? 'PEN'), Icons.inventory_2_rounded, () => pushPremium(context, const ProductsScreen())));
+      if (s > 0) out.add(_Hit(s * 0.85, 'Producto', p.name, money(p.unitPrice, AppState.instance.profile?.currency ?? 'PEN'), Icons.inventory_2_rounded, () => openFeature(context, featureById('productos')!)));
     }
     out.sort((a, b) => b.score.compareTo(a.score));
     return out.take(60).toList();
@@ -654,7 +606,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
               },
               icon: const Icon(Icons.close_rounded),
             ),
-          IconButton(
+          if (Access.instance.has('voz')) IconButton(
             tooltip: _listening ? 'Detener' : 'Buscar con la voz',
             onPressed: _transcribing ? null : _voice,
             icon: _transcribing

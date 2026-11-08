@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../access.dart';
 import '../logic/search_score.dart';
-import '../rubros.dart';
+import '../rubros.dart' show RubroArea;
+import '../ux/commerce_navigation.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -20,21 +21,26 @@ class MenuScreen extends StatefulWidget {
 }
 
 /// Plan mínimo para mostrar el candado sin inventar accesos.
-String upgradeLabel(FeatureEntry f) {
-  final code = f.feature == null ? null : minPlanFor(f.feature!, planFeatures, rubro: Access.instance.rubro);
-  return code == null ? 'No incluido en tu plan' : 'Disponible en el plan ${planName(code)}';
-}
+String upgradeLabel(FeatureEntry f) => 'No incluida en tu plan actual';
 
 class _MenuScreenState extends State<MenuScreen> {
   String _q = '';
 
-  void _open(FeatureEntry f) {
-    if (!f.planOk) {
-      pushPremium(context, const PlanScreen());
-    } else {
-      openFeature(context, f);
-    }
+  @override
+  void initState() {
+    super.initState();
+    Access.instance.addListener(_accessChanged);
   }
+
+  void _accessChanged() { if (mounted) setState(() {}); }
+
+  @override
+  void dispose() {
+    Access.instance.removeListener(_accessChanged);
+    super.dispose();
+  }
+
+  void _open(FeatureEntry f) => openFeature(context, f);
 
   Widget _tile(FeatureEntry f) {
     final t = Theme.of(context);
@@ -79,16 +85,12 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final spec = rubroFor(Access.instance.rubro);
-    final guide = experienceFor(spec?.id);
-    // roleOk ya revisa rubro y rol: la búsqueda no ofrece herramientas de otro sector.
-    final all = featureCatalog().where((f) => f.allowed).toList();
+    final guide = experienceFor('bodega');
+    final all = featureCatalog().where((f) => f.roleOk).toList();
     final byId = {for (final f in all) f.id: f};
-    final areas = spec?.areas ?? [
+    final areas = [
       for (final g in groupOrder) RubroArea(g, [for (final f in all) if (f.group == g) f.id]),
     ];
-    final extrasIds = extraMenuFeatureIds(spec, all.map((f) => f.id)).toSet();
-    final extras = [for (final f in all) if (extrasIds.contains(f.id) && !(spec == null && areas.any((a) => a.features.contains(f.id)))) f];
     final q = _q.trim();
     final hits = q.isEmpty
         ? const <FeatureEntry>[]
@@ -97,23 +99,30 @@ class _MenuScreenState extends State<MenuScreen> {
             ..sort((a, b) => b.$2.compareTo(a.$2)))
             .map((x) => x.$1).take(20).toList();
     final priorities = <FeatureEntry>[];
-    for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza']) {
+    for (final id in const ['pos', 'productos', 'caja']) {
       final f = byId[id];
-      if (f != null && !priorities.any((x) => x.id == id)) priorities.add(f);
+      if (f != null && f.allowed && !priorities.any((x) => x.id == id)) priorities.add(f);
       if (priorities.length == 3) break;
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(spec == null ? 'Todas las funciones' : 'Herramientas de tu negocio')),
+      appBar: AppBar(title: const Text('Herramientas de tu negocio')),
       body: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
+          ListTile(
+            leading: const Icon(Icons.workspace_premium_rounded),
+            title: Text(commerceExperience(Access.instance.license.plan)),
+            subtitle: const Text('Mi plan · capacidades verificadas por Solvex Hub'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => pushPremium(context, const PlanScreen()),
+          ),
           TextField(
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search_rounded),
               hintText: '¿Qué necesitas hacer?',
-              suffixIcon: IconButton(
+              suffixIcon: !Access.instance.has('voz') ? null : IconButton(
                 tooltip: 'Buscar por voz',
                 icon: const Icon(Icons.mic_rounded),
                 onPressed: () => openUniversalSearch(context, voice: true),
@@ -166,7 +175,7 @@ class _MenuScreenState extends State<MenuScreen> {
             SoftCard(
               padding: EdgeInsets.zero,
               child: ExpansionTile(
-                key: PageStorageKey<String>('how-to-${spec?.id ?? 'general'}'),
+                key: PageStorageKey<String>('how-to-commerce'),
                 shape: const Border(),
                 collapsedShape: const Border(),
                 leading: const Icon(Icons.help_outline_rounded, color: Brand.indigo),
@@ -184,18 +193,16 @@ class _MenuScreenState extends State<MenuScreen> {
             const SizedBox(height: 24),
             Text('Todas tus herramientas', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text('Despliega una sección cuando la necesites. Nada se ha eliminado.', style: t.textTheme.bodySmall),
+            Text('Explora las herramientas. Los candados indican funciones no incluidas.', style: t.textTheme.bodySmall),
             const SizedBox(height: 12),
             for (final (i, area) in areas.indexed)
               if (area.features.any(byId.containsKey))
                 _section(
-                  '${spec?.id ?? 'general'}-$i',
+                  'commerce-$i',
                   simpleAreaTitle(area.title),
                   [for (final id in area.features) if (byId[id] case final f?) f],
                   initiallyExpanded: i == 0,
                 ),
-            if (extras.isNotEmpty)
-              _section('${spec?.id ?? 'general'}-more', 'Más herramientas', extras),
           ],
         ],
       ),
