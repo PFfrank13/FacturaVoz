@@ -18,6 +18,17 @@ import '../services/v2_api.dart';
 import '../ui/barcode_scanner.dart';
 import 'client_profile.dart' show StorageImage;
 
+/// Detects the actual image format; never label a WebP as JPEG when restoring.
+String productPhotoExtension(Uint8List bytes) {
+  if (bytes.length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 &&
+      bytes[2] == 0x4e && bytes[3] == 0x47) return 'png';
+  if (bytes.length >= 12 && bytes[0] == 0x52 && bytes[1] == 0x49 &&
+      bytes[2] == 0x46 && bytes[3] == 0x46 &&
+      bytes[8] == 0x57 && bytes[9] == 0x45 &&
+      bytes[10] == 0x42 && bytes[11] == 0x50) return 'webp';
+  return 'jpg';
+}
+
 /// Elige un producto del catálogo (solo activos). Devuelve null si se cierra sin elegir.
 Future<Product?> pickProduct(BuildContext context, String currency) {
   return showModalBottomSheet<Product>(
@@ -267,8 +278,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                           setS(() {
                             newImage = b;
                             originalImage = b;
-                            imageExt = x.name.toLowerCase().endsWith('.png') ? 'png'
-                                : x.name.toLowerCase().endsWith('.webp') ? 'webp' : 'jpg';
+                            imageExt = productPhotoExtension(b);
                             aiProcessed = false;
                             imageError = null;
                           });
@@ -288,10 +298,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                       try {
                         final source = originalImage ?? newImage ?? await V2Repo.download(oldImage);
                         if (source == null || source.isEmpty) throw AppException('No se pudo recuperar la foto original.');
-                        final mime = source.length >= 12 &&
-                          source[0] == 0x89 && source[1] == 0x50 ? 'image/png'
-                          : source[0] == 0x52 && source[1] == 0x49 && source[2] == 0x46 ? 'image/webp'
-                          : 'image/jpeg';
+                        final imageFormat = productPhotoExtension(source);
+                        final mime = imageFormat == 'png' ? 'image/png'
+                            : imageFormat == 'webp' ? 'image/webp' : 'image/jpeg';
                         final png = await V2Api.removeProductBackground(source, mime: mime);
                         if (!ctx.mounted) return;
                         setS(() {
@@ -316,9 +325,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     TextButton.icon(
                       onPressed: processingImage ? null : () => setS(() {
                         newImage = originalImage;
-                        imageExt = originalImage!.length >= 8 &&
-                            originalImage![0] == 0x89 && originalImage![1] == 0x50
-                            ? 'png' : 'jpg';
+                        imageExt = productPhotoExtension(originalImage!);
                         aiProcessed = false;
                         imageError = null;
                       }),
@@ -458,8 +465,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
         String? originPath;
         if (originalToUpload != null) {
           originPath = await V2Repo.upload('productos-originales', originalToUpload,
-              ext: originalToUpload.length >= 8 && originalToUpload[0] == 0x89 &&
-                  originalToUpload[1] == 0x50 ? 'png' : 'jpg');
+              ext: productPhotoExtension(originalToUpload));
         }
         if (imageToUpload != null) {
           extraFields['image_path'] = await V2Repo.upload('productos', imageToUpload, ext: imageUploadExt);
