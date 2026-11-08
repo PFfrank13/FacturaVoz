@@ -69,8 +69,10 @@ if (-not (Test-Path -LiteralPath $defines)) {
       Write-Host 'Supabase > Project Settings > API Keys. Nunca uses service_role.' -ForegroundColor Yellow
       $key = Read-Host 'Clave PUBLICABLE de Supabase'
     }
-    if ([string]::IsNullOrWhiteSpace($key) -or $key.Trim().Length -lt 20) {
-      throw 'La clave PUBLICABLE esta vacia o es demasiado corta.'
+    if ([string]::IsNullOrWhiteSpace($key) -or
+        (($key.Trim() -notmatch '^sb_publishable_[A-Za-z0-9_-]{10,}$') -and
+         ($key.Trim() -notmatch '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'))) {
+      throw 'Introduce solo la clave PUBLICABLE: no pegues flutter run ni --dart-define.'
     }
     $values = @{
       SUPABASE_URL = 'https://qzcpeipjlskyazrrelqu.supabase.co'
@@ -83,6 +85,20 @@ if (-not (Test-Path -LiteralPath $defines)) {
 }
 try {
   $config = Get-Content -LiteralPath $defines -Raw | ConvertFrom-Json
+  $configuredKey = [string]$config.SUPABASE_ANON_KEY
+  # Recover if a user accidentally pasted the entire 'flutter run' command
+  # into the public-key prompt. Never display the key in the terminal.
+  if ($configuredKey -match '--dart-define=SUPABASE_ANON_KEY=([A-Za-z0-9_.-]+)') {
+    $configuredKey = $Matches[1]
+    $config.SUPABASE_ANON_KEY = $configuredKey
+    $fixedJson = ConvertTo-Json -InputObject $config -Depth 4
+    [System.IO.File]::WriteAllText($defines, $fixedJson, ([System.Text.UTF8Encoding]::new($false)))
+    Write-Host 'Clave publica reparada desde la configuracion anterior.' -ForegroundColor Green
+  }
+  if (($configuredKey -notmatch '^sb_publishable_[A-Za-z0-9_-]{10,}$') -and
+      ($configuredKey -notmatch '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$')) {
+    throw 'Clave PUBLICABLE invalida. Abre dart_defines.json y coloca SOLO la clave anon o sb_publishable (sin comandos).'
+  }
   if ([string]::IsNullOrWhiteSpace($config.SUPABASE_URL) -or
       [string]::IsNullOrWhiteSpace($config.SUPABASE_ANON_KEY) -or
       [string]::IsNullOrWhiteSpace($config.API_BASE_URL)) {
