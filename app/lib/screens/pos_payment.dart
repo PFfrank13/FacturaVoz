@@ -86,11 +86,11 @@ Future<PosPaymentApproval?> confirmPosPayment(
                     ),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, children: [
-                      for (final value in <int>[
+                      for (final value in <int>{
                         amountCents,
                         ((amountCents + 999) ~/ 1000) * 1000,
                         ((amountCents + 4999) ~/ 5000) * 5000,
-                      ].toSet().where((value) => value >= amountCents))
+                      }.where((value) => value >= amountCents))
                         ActionChip(
                           label: Text(money(value / 100, currency)),
                           onPressed: () {
