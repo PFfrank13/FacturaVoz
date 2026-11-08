@@ -78,7 +78,7 @@ if (-not (Test-Path -LiteralPath $defines)) {
       API_BASE_URL = 'https://factura-voz-two.vercel.app'
     }
     $json = ConvertTo-Json -InputObject $values -Depth 4
-    [System.IO.File]::WriteAllText($defines, $json, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($defines, $json, ([System.Text.UTF8Encoding]::new($false)))
   }
 }
 try {
