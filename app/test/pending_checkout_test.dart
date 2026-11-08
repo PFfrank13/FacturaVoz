@@ -3,12 +3,12 @@ import 'package:facturavoz/models.dart';
 import 'package:facturavoz/services/pending_checkout.dart';
 
 void main() {
-  final item = LineItem(
-    description: 'Arroz (promoción)',
-    productId: '00000000-0000-4000-8000-000000000012',
-    quantity: 2,
-    unitPrice: 5.75,
-  );
+  LineItem product() => LineItem(
+        description: 'Arroz (promoción)',
+        productId: '00000000-0000-4000-8000-000000000012',
+        quantity: 2,
+        unitPrice: 5.75,
+      );
 
   PendingCheckout sample() => PendingCheckout(
         orgId: 'org-A',
@@ -18,7 +18,7 @@ void main() {
         taxRate: 18,
         currency: 'PEN',
         notes: 'Mesa 3',
-        items: [item],
+        items: [product()],
       );
 
   test('recovered payment preserves the exact request and original SKU/price', () {
@@ -27,7 +27,7 @@ void main() {
     expect(restored.method, 'yape');
     expect(restored.orgId, 'org-A');
     expect(restored.userId, 'user-A');
-    expect(restored.toDraft().items.single.productId, item.productId);
+    expect(restored.toDraft().items.single.productId, product().productId);
     expect(restored.toDraft().items.single.description, 'Arroz (promoción)');
     expect(restored.toDraft().items.single.quantity, 2);
     expect(restored.toDraft().items.single.unitPrice, 5.75);
@@ -37,7 +37,7 @@ void main() {
   test('snapshot is independent of subsequent cart edits', () {
     final pending = sample();
     final serialized = pending.toJson();
-    item.unitPrice = 99;
+    pending.items.single.unitPrice = 99;
     final restored = PendingCheckout.fromJson(serialized);
     expect(restored.items.single.unitPrice, 5.75);
   });
