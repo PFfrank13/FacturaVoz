@@ -27,7 +27,7 @@ import '../services/v2_repo.dart';
 import 'owner_control.dart' show ensureOwnerPin;
 
 class InvoiceDetailScreen extends StatefulWidget {
-  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false, this.autoPrint = false, this.autoEmitDocType});
+  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false, this.autoPrint = false, this.autoEmitDocType, this.autoSharePdf = false});
   final String invoiceId;
 
   /// true al venir de crear la factura: envía una copia al correo de la cuenta.
@@ -38,6 +38,8 @@ class InvoiceDetailScreen extends StatefulWidget {
 
   /// Opens the SUNAT form preselected as '03' (boleta) or '01' (factura).
   final String? autoEmitDocType;
+  /// Open the native share chooser with a generated PDF after loading.
+  final bool autoSharePdf;
 
   @override
   State<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
@@ -52,6 +54,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   bool _copySent = false;
   bool _autoPrinted = false;
   bool _autoFiscalOpened = false;
+  bool _autoShared = false;
   bool _busy = false;
 
   @override
@@ -86,6 +89,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         if (widget.autoPrint && !_autoPrinted) {
           _autoPrinted = true;
           _autoPrintTicket();
+        }
+        if (widget.autoSharePdf && !_autoShared) {
+          _autoShared = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _share();
+          });
         }
         if (widget.autoEmitDocType != null && !_autoFiscalOpened) {
           _autoFiscalOpened = true;
