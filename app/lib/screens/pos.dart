@@ -56,6 +56,39 @@ class _PosScreenState extends State<PosScreen> {
   PendingCheckout? _pendingCheckout;
   bool _recoveringCheckout = true;
   String? _checkoutRecoveryError;
+  String? _sessionOrg;
+  String? _sessionUser;
+
+  void _onSessionContext() {
+    final nextOrg = Repo.activeOrgId;
+    final nextUser = Supabase.instance.client.auth.currentUser?.id;
+    if (_sessionOrg == nextOrg && _sessionUser == nextUser) return;
+    _sessionOrg = nextOrg;
+    _sessionUser = nextUser;
+    // A retained tab must not show company A's products/checkout under company B.
+    // The original encrypted pending request is kept under its own user/org key.
+    setState(() {
+      _cart.clear();
+      _notes.clear();
+      _coupon = null;
+      _q.clear();
+      _table.clear();
+      _products = null;
+      _extra = const {};
+      _promos = const [];
+      _error = null;
+      _chargeRequestId = null;
+      _chargeMethod = null;
+      _pendingCheckout = null;
+      _recoveringCheckout = true;
+      _checkoutRecoveryError = null;
+      _kitchenRequestId = null;
+      _savedOrderId = null;
+      _savedOrderNumber = null;
+    });
+    _restoreCheckout();
+    _load();
+  }
   bool _seeding = false;
   bool _savingOrder = false;
   String? _kitchenRequestId; // Se conserva si la red falla para no duplicar pedidos.
@@ -68,6 +101,9 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
+    _sessionOrg = Repo.activeOrgId;
+    _sessionUser = Supabase.instance.client.auth.currentUser?.id;
+    AppState.instance.addListener(_onSessionContext);
     _products = LiveCache.get<List<Product>>('pos.products') ?? _products;
     _load();
     _restoreCheckout();
@@ -79,7 +115,8 @@ class _PosScreenState extends State<PosScreen> {
       final uid = Supabase.instance.client.auth.currentUser?.id;
       if (org == null || uid == null) throw const FormatException('Selecciona una empresa e inicia sesión.');
       final pending = await PendingCheckoutStore.load(userId: uid, orgId: org);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) return;
       setState(() {
         _pendingCheckout = pending;
         _chargeRequestId = pending?.requestId;
@@ -87,15 +124,20 @@ class _PosScreenState extends State<PosScreen> {
         _checkoutRecoveryError = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != _sessionOrg ||
+          Supabase.instance.client.auth.currentUser?.id != _sessionUser) return;
       setState(() => _checkoutRecoveryError = 'No se pudo verificar si existe un cobro pendiente: $e');
     } finally {
-      if (mounted) setState(() => _recoveringCheckout = false);
+      if (mounted && Repo.activeOrgId == _sessionOrg &&
+          Supabase.instance.client.auth.currentUser?.id == _sessionUser) {
+        setState(() => _recoveringCheckout = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onSessionContext);
     _q.dispose();
     _focus.dispose();
     _table.dispose();
@@ -103,6 +145,8 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     try {
       final p = await Repo.listProducts(activeOnly: true);
       LiveCache.put('pos.products', p);
@@ -113,7 +157,8 @@ class _PosScreenState extends State<PosScreen> {
           promos = await V2Repo.promotions();
         } catch (_) {}
       }
-      if (mounted) {
+      if (mounted && org == Repo.activeOrgId &&
+          uid == Supabase.instance.client.auth.currentUser?.id) {
         setState(() {
           _products = p;
           _extra = e;
@@ -121,7 +166,10 @@ class _PosScreenState extends State<PosScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = friendly(e));
+      if (mounted && org == Repo.activeOrgId &&
+          uid == Supabase.instance.client.auth.currentUser?.id) {
+        setState(() => _error = friendly(e));
+      }
     }
   }
 
@@ -544,7 +592,8 @@ class _PosScreenState extends State<PosScreen> {
       // Failure to clear the secure record must block new sales, not retry with a new key.
       await PendingCheckoutStore.clear(checkout);
       AppState.instance.bump();
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != checkout.orgId ||
+          Supabase.instance.client.auth.currentUser?.id != checkout.userId) return;
       setState(() {
         _cart.clear();
         _notes.clear();
