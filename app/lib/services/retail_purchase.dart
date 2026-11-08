@@ -18,7 +18,12 @@ class RetailPurchaseLine {
   final double quantity;
   final int unitCostCents;
 
-  int get lineTotalCents => (quantity * unitCostCents).round();
+  int get lineTotalCents {
+    // Currency arithmetic never multiplies binary floating-point values.
+    // Quantity is represented to two decimals: 1.25 units -> 125 hundredths.
+    final hundredths = int.parse(quantity.toStringAsFixed(2).replaceAll('.', ''));
+    return (hundredths * unitCostCents + 50) ~/ 100;
+  }
 
   Map<String, dynamic> toJson() => {
         'product_id': productId,
