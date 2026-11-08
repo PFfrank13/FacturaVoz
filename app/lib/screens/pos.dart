@@ -24,6 +24,7 @@ import '../ui/widgets.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
+import 'pos_payment_success.dart';
 import 'new_invoice.dart';
 import 'team.dart' show dbMessage;
 
@@ -583,55 +584,16 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
-  /// Cobro en un toque: elige cómo paga el cliente y listo (se registra la venta, el cobro y se imprime el ticket).
+  /// Four-stage mobile POS: basket → method → verified payment → receipt.
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
-        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
-      return;
-    }
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return;
     final lines = _lines();
     if (lines.isEmpty) return;
     final total = computeTotals(lines, _rate).total;
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        final t = Theme.of(ctx);
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Cobrar', style: t.textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Money(money(total, _cur), size: 30, weight: FontWeight.w800),
-            const SizedBox(height: 12),
-            Text('¿Cómo paga?', style: t.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final k in const ['efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'])
-                ActionChip(
-                  label: Text(paymentMethods[k]!),
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    final approval = await confirmPosPayment(context, method: k, currency: _cur, total: total);
-                    if (!mounted || approval == null) return;
-                    await _fastCharge(k, paymentEvidence: approval.note);
-                  },
-                ),
-            ]),
-            const SizedBox(height: 14),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _checkout();
-              },
-              icon: const Icon(Icons.tune_rounded),
-              label: const Text('Más opciones (cliente, factura, crédito)'),
-            ),
-          ]),
-        );
-      },
-    );
+    final approval = await choosePosPayment(context, currency: _cur, total: total, items: lines);
+    if (!mounted || approval == null) return;
+    await _fastCharge(approval.method, paymentEvidence: approval.note);
   }
 
   Future<void> _fastCharge(String method, {String? paymentEvidence}) async {
@@ -724,7 +686,18 @@ class _PosScreenState extends State<PosScreen> {
       if (kitchenLinkError != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Venta cobrada, pero no se pudo vincular a la comanda: $kitchenLinkError')));
       }
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
+      if (Access.instance.rubro == 'bodega') {
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => PosPaymentSuccessScreen(
+            invoiceId: id, method: checkout.method, currency: checkout.currency,
+            total: computeTotals(checkout.items, checkout.taxRate).total,
+          ),
+        ));
+      } else {
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true),
+        ));
+      }
       _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; si el servidor ya lo registró no creará una venta duplicada. ${friendly(e)}')));
@@ -785,7 +758,13 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
+    final retail = Access.instance.rubro == 'bodega';
+    final t = retail
+        ? ThemeData.dark().copyWith(
+            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF9658FA), brightness: Brightness.dark),
+            scaffoldBackgroundColor: const Color(0xFF0B1030),
+          )
+        : Theme.of(context);
     final all = _products ?? const <Product>[];
     final cats = {for (final x in _extra.values) if ((x['category'] ?? '').toString().isNotEmpty) x['category'].toString()}.toList()..sort();
     final q = _q.text.trim().toLowerCase();
@@ -797,8 +776,13 @@ class _PosScreenState extends State<PosScreen> {
       IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
-    return Scaffold(
-      appBar: widget.embedded ? null : AppBar(title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'), actions: actions),
+    return Theme(data: t, child: Scaffold(
+      backgroundColor: retail ? const Color(0xFF0B1030) : null,
+      appBar: widget.embedded ? null : AppBar(
+        title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'),
+        backgroundColor: retail ? const Color(0xFF0B1030) : null,
+        actions: actions,
+      ),
       body: (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
               _checkoutRecoveryError != null || _pendingCheckout != null)
           ? Center(child: Padding(
@@ -832,6 +816,20 @@ class _PosScreenState extends State<PosScreen> {
           : _products == null
               ? const SkeletonList()
               : Column(children: [
+                  if (retail)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+                      child: Center(child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF5530A0), Color(0xFF7D4DD7)]),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: const Color(0xFFB49AFF)),
+                        ),
+                        child: const Text('Plan Básico · Bodega / Tienda',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                      )),
+                    ),
                   if (widget.embedded)
                     Padding(
                       padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 8, 8, 0),
@@ -995,6 +993,6 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               ),
       ),
-    );
+    ));
   }
 }
