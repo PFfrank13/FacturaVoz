@@ -8,9 +8,10 @@ import '../ui/widgets.dart';
 /// Emisión de factura (01) o boleta (03) electrónica. El servidor reserva el número, envía a SUNAT
 /// y guarda el resultado; reintentar nunca consume otro correlativo.
 class EmitSunatScreen extends StatefulWidget {
-  const EmitSunatScreen({super.key, required this.invoice, required this.company});
+  const EmitSunatScreen({super.key, required this.invoice, required this.company, this.initialDocType});
   final InvoiceRecord invoice;
   final FiscalCompany company;
+  final String? initialDocType;
 
   @override
   State<EmitSunatScreen> createState() => _EmitSunatScreenState();
@@ -36,10 +37,13 @@ class _EmitSunatScreenState extends State<EmitSunatScreen> {
     _clientDocType = const ['6', '1', '4', '7', '0'].contains(inv.clientDocType)
         ? inv.clientDocType
         : (RegExp(r'^\d{11}$').hasMatch(tax) ? '6' : (RegExp(r'^\d{8}$').hasMatch(tax) ? '1' : '6'));
-    _docType = _clientDocType == '6' ? '01' : '03';
+    if (widget.initialDocType == '03' && tax.isEmpty) _clientDocType = '0';
+    _docType = const ['01', '03'].contains(widget.initialDocType)
+        ? widget.initialDocType! : (_clientDocType == '6' ? '01' : '03');
     _doc = TextEditingController(text: _clientDocType == '0' ? '' : tax);
     _address = TextEditingController();
-    _name = TextEditingController(text: inv.clientName == '—' ? '' : inv.clientName);
+    _name = TextEditingController(text: inv.clientName == '—' || inv.clientName.trim().isEmpty
+        ? (_clientDocType == '0' ? 'Consumidor final' : '') : inv.clientName);
     if (inv.taxRate == 0) _afectacion = 'exonerado';
   }
 
