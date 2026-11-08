@@ -11,6 +11,7 @@ import '../services/retail_purchase.dart';
 import '../ui/widgets.dart';
 import 'pos_payment_logic.dart';
 import 'products.dart';
+import 'retail_settlements.dart';
 
 /// Plan Básico: supplier -> product ID -> atomic stock receipt -> expense/cash.
 /// This is deliberately online-only until an audited offline ledger exists.
@@ -35,7 +36,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   String _search = '';
   String _method = 'pendiente';
 
-  bool get _allowed => Access.instance.has('stock') && Access.instance.can('products_edit');
+  bool get _allowed => Access.instance.has('stock') && Access.instance.isAdmin;
   String get _currency => AppState.instance.profile?.currency.isNotEmpty == true
       ? AppState.instance.profile!.currency : 'PEN';
   int get _total => _lines.values.fold<int>(0, (sum, item) => sum + item.lineTotalCents);
@@ -85,7 +86,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
           .eq('org_id', org)
           .order('created_at', ascending: false)
           .limit(30);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org) return;
       setState(() {
         _products = products.where((p) => !p.isService).toList();
         _history = [for (final row in rows) Map<String, dynamic>.from(row)];
@@ -227,6 +228,17 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     }
   }
 
+  Future<void> _openSettlement([Map<String, dynamic>? receipt]) async {
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => RetailSettlementScreen(receipt: receipt)),
+    );
+    if (completed == true && mounted) {
+      LiveCache.clear();
+      AppState.instance.bump();
+      await _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_allowed) {
@@ -240,7 +252,15 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Compras y recepción'),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'Actualizar')],
+        actions: [
+          IconButton(
+            onPressed: () => _openSettlement(),
+            icon: const Icon(Icons.pending_actions_rounded),
+            tooltip: 'Recuperar pago de proveedor',
+          ),
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Actualizar'),
+        ],
       ),
       body: _recovering || _recoveryError != null || _pending != null
           ? Center(child: Padding(
@@ -369,10 +389,17 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                         leading: const Icon(Icons.receipt_long_outlined),
                         title: Text((receipt['supplier_name'] ?? '') as String),
                         subtitle: Text('${(receipt['created_at'] ?? '').toString().split('T').first} · ${receipt['payment_method']}'),
-                        trailing: Text(money(
-                          ((receipt['total_cents'] as num?) ?? 0).toDouble() / 100,
-                          (receipt['currency'] ?? _currency) as String,
-                        )),
+                        trailing: receipt['payment_method'] == 'pendiente'
+                            ? OutlinedButton(
+                                onPressed: _saving ? null : () => _openSettlement(receipt),
+                                child: const Text('Pagar'),
+                              )
+                            : Text(money(
+                                ((receipt['total_cents'] as num?) ?? 0).toDouble() / 100,
+                                (receipt['currency'] ?? _currency) as String,
+                              )),
+                        onTap: receipt['payment_method'] == 'pendiente'
+                            ? () => _openSettlement(receipt) : null,
                       ),
                   ],
                 ),
