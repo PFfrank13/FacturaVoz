@@ -20,12 +20,13 @@ class PosPaymentSuccessScreen extends StatelessWidget {
   final String currency;
   final double total;
 
-  Future<void> _openDetail(BuildContext context, {String? doc}) async {
+  Future<void> _openDetail(BuildContext context, {String? doc, bool share = false}) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => InvoiceDetailScreen(
         invoiceId: invoiceId,
         autoEmitDocType: doc,
-        autoPrint: doc == null,
+        autoSharePdf: share,
+        autoPrint: doc == null && !share,
       ),
     ));
   }
@@ -106,8 +107,8 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             action(Icons.description_rounded, 'Emitir factura',
               () => _openDetail(context, doc: '01')),
             const SizedBox(height: 9),
-            action(Icons.chat_rounded, 'Enviar por WhatsApp',
-              () => _openDetail(context), color: const Color(0xFF45D78E)),
+            action(Icons.chat_rounded, 'Compartir por WhatsApp',
+              () => _openDetail(context, share: true), color: const Color(0xFF45D78E)),
             const SizedBox(height: 9),
             action(Icons.article_outlined, 'Ver comprobante',
               () => _openDetail(context)),
