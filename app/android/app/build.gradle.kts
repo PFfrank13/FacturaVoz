@@ -12,12 +12,19 @@ val facturavozSigningFile = File(
     "FacturaVoz-Signing/signing.properties"
 )
 
-check(facturavozSigningFile.isFile) {
-    "Falta la configuracion privada de firma de FacturaVoz"
+// Debug CI does not require a private distribution keystore. Release always
+// requires the real signing file; never use a debug key for production output.
+val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+if (facturavozSigningFile.isFile) {
+    facturavozSigningFile.inputStream().use {
+        facturavozSigningProperties.load(it)
+    }
 }
-
-facturavozSigningFile.inputStream().use {
-    facturavozSigningProperties.load(it)
+val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseSigning = facturavozSigningFile.isFile &&
+    releaseSigningKeys.all { !facturavozSigningProperties.getProperty(it).isNullOrBlank() }
+check(!isReleaseTask || hasReleaseSigning) {
+    "Falta la configuracion privada completa de firma de FacturaVoz"
 }
 android {
     namespace = "pe.tuempresa.facturavoz"
@@ -45,16 +52,20 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file(facturavozSigningProperties.getProperty("storeFile"))
-            storePassword = facturavozSigningProperties.getProperty("storePassword")
-            keyAlias = facturavozSigningProperties.getProperty("keyAlias")
-            keyPassword = facturavozSigningProperties.getProperty("keyPassword")
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(facturavozSigningProperties.getProperty("storeFile"))
+                storePassword = facturavozSigningProperties.getProperty("storePassword")
+                keyAlias = facturavozSigningProperties.getProperty("keyAlias")
+                keyPassword = facturavozSigningProperties.getProperty("keyPassword")
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }
