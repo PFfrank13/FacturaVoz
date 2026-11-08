@@ -27,7 +27,7 @@ import '../services/v2_repo.dart';
 import 'owner_control.dart' show ensureOwnerPin;
 
 class InvoiceDetailScreen extends StatefulWidget {
-  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false, this.autoPrint = false});
+  const InvoiceDetailScreen({super.key, required this.invoiceId, this.sendCopy = false, this.autoPrint = false, this.autoEmitDocType});
   final String invoiceId;
 
   /// true al venir de crear la factura: envía una copia al correo de la cuenta.
@@ -35,6 +35,9 @@ class InvoiceDetailScreen extends StatefulWidget {
 
   /// Venta rápida: imprime el ticket solo al abrir, si hay una impresora Bluetooth o de red configurada.
   final bool autoPrint;
+
+  /// Opens the SUNAT form preselected as '03' (boleta) or '01' (factura).
+  final String? autoEmitDocType;
 
   @override
   State<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
@@ -48,6 +51,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   String? _error;
   bool _copySent = false;
   bool _autoPrinted = false;
+  bool _autoFiscalOpened = false;
   bool _busy = false;
 
   @override
@@ -82,6 +86,12 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         if (widget.autoPrint && !_autoPrinted) {
           _autoPrinted = true;
           _autoPrintTicket();
+        }
+        if (widget.autoEmitDocType != null && !_autoFiscalOpened) {
+          _autoFiscalOpened = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _emitSunat(docType: widget.autoEmitDocType);
+          });
         }
         if (widget.sendCopy && !_copySent) {
           _copySent = true;
@@ -222,7 +232,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
-  Future<void> _emitSunat() async {
+  Future<void> _emitSunat({String? docType}) async {
     final inv = _inv!;
     var company = _company;
     if (company == null) {
@@ -236,7 +246,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       if (company == null || !mounted) return;
     }
     final changed = await Navigator.of(context)
-        .push<bool>(MaterialPageRoute(builder: (_) => EmitSunatScreen(invoice: inv, company: company!)));
+        .push<bool>(MaterialPageRoute(builder: (_) => EmitSunatScreen(invoice: inv, company: company!, initialDocType: docType)));
     if (changed == true) {
       await _load();
       if (_fiscal?.status == 'accepted') _sendOwnCopy();
