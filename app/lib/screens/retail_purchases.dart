@@ -8,6 +8,7 @@ import '../models.dart';
 import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/retail_purchase.dart';
+import '../ui/widgets.dart';
 import 'pos_payment_logic.dart';
 import 'products.dart';
 
@@ -154,8 +155,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
         ],
       ),
     );
-    qty.dispose();
-    cost.dispose();
+    disposeAfterClose([qty, cost]);
     if (item != null && mounted) setState(() => _lines[product.id] = item);
   }
 
