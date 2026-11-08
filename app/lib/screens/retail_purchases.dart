@@ -91,8 +91,10 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
         _error = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _error =
+      if (mounted) {
+        setState(() => _error =
           'No se pudo cargar compras. Revisa la migración de recepción en staging. ${friendly(e)}');
+      }
     }
   }
 
@@ -215,9 +217,11 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       );
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Recepción sin confirmar. Reintenta con la misma solicitud. ${friendly(e)}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Recepción sin confirmar. Reintenta con la misma solicitud. ${friendly(e)}')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -225,9 +229,11 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_allowed) return const Scaffold(body: Center(
-      child: Text('Tu licencia o tu rol no permite registrar compras de inventario.'),
-    ));
+    if (!_allowed) {
+      return const Scaffold(body: Center(
+        child: Text('Tu licencia o tu rol no permite registrar compras de inventario.'),
+      ));
+    }
     final products = (_products ?? const <Product>[])
         .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
         .toList();
