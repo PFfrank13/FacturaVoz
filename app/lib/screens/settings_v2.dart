@@ -23,6 +23,7 @@ import 'owner_control.dart';
 import 'rubro_picker.dart';
 import 'team.dart';
 import 'trash.dart';
+import 'retail_purchases.dart';
 
 class BusinessSettingsCard extends StatefulWidget {
   const BusinessSettingsCard({super.key});
@@ -235,6 +236,8 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
       _row(Icons.security_rounded, 'Seguridad', 'Alertas, bitácora, PIN, papelera y huella', () => showSecuritySheet(context)),
       if (admin && s != null && rubroFor(s.businessType) != null)
         _row(Icons.science_rounded, 'Datos de práctica', 'Productos y clientes de ejemplo de tu rubro (se borran con un toque)', () => showPracticeSheet(context, rubroFor(s.businessType)!)),
+      if (a.has('stock') && a.can('products_edit'))
+        _row(Icons.local_shipping_outlined, 'Compras y recepción', 'Proveedor, mercadería, costo y salida de caja', () => go(const RetailPurchasesScreen())),
       if (admin) _row(Icons.tune_rounded, 'Funciones a la vista', 'Elige qué se ve primero (nada se borra)', () => go(const ModulesScreen())),
       if (admin && s != null)
         _row(Icons.linear_scale_rounded, 'Pasos de tus ${s.jobsWord.toLowerCase()}', s.statuses.map((x) => x.label).join(' → '), () => go(const JobFlowScreen())),
