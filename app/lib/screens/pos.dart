@@ -589,7 +589,7 @@ class _PosScreenState extends State<PosScreen> {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
         _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return;
     final lines = _lines();
-    if (lines.isEmpty) return;
+    if (lines.isEmpty) { return; }
     final total = computeTotals(lines, _rate).total;
     final approval = await choosePosPayment(context, currency: _cur, total: total, items: lines);
     if (!mounted || approval == null) return;
@@ -773,6 +773,7 @@ class _PosScreenState extends State<PosScreen> {
     final totals = computeTotals(lines, _rate);
     final count = _cart.values.fold(0.0, (a, b) => a + b);
     final actions = <Widget>[
+      if (retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
       IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
