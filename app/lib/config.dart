@@ -24,8 +24,28 @@ class Config {
       u.startsWith('https://') ||
       (kDebugMode && (u.startsWith('http://localhost') || u.startsWith('http://10.0.2.2')));
 
+  /// Accept only a public Supabase key, not an entire 'flutter run' command.
+  /// This is format validation only; the backend still validates the key and
+  /// the authenticated user. Never ship a service_role or sb_secret key.
+  static bool isPublicKeyFormat(String value) {
+    final key = value.trim();
+    if (key != value || key.contains(RegExp(r'\s'))) return false;
+    if (RegExp(r'^sb_publishable_[A-Za-z0-9_-]{10,}
+
+  static String get apiBase =>
+      apiBaseUrl.endsWith('/') ? apiBaseUrl.substring(0, apiBaseUrl.length - 1) : apiBaseUrl;
+}
+).hasMatch(key)) return true;
+    return RegExp(r'^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+
+
+  static String get apiBase =>
+      apiBaseUrl.endsWith('/') ? apiBaseUrl.substring(0, apiBaseUrl.length - 1) : apiBaseUrl;
+}
+).hasMatch(key);
+  }
+
   static bool get isValid =>
-      _secure(supabaseUrl) && supabaseAnonKey.isNotEmpty && _secure(apiBaseUrl);
+      _secure(supabaseUrl) && isPublicKeyFormat(supabaseAnonKey) && _secure(apiBaseUrl);
 
   static String get apiBase =>
       apiBaseUrl.endsWith('/') ? apiBaseUrl.substring(0, apiBaseUrl.length - 1) : apiBaseUrl;
