@@ -261,20 +261,19 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                         index: 1,
                         child: SoftCard(
                           child: Column(children: [
-                            _line(context, 'Apertura', s.opening),
-                            _line(context, 'Ventas en efectivo', s.cashSales),
-                            _line(context, 'Otros ingresos de efectivo', s.cashIn),
-                            _line(context, 'Salidas de efectivo', -s.cashOut),
-                            const Divider(),
-                            if (_closing != null)
-                              _line(context, 'Debería haber en caja', s.expectedCash, bold: true)
-                            else
+                            if (_closing == null)
                               const ListTile(
                                 leading: Icon(Icons.visibility_off_outlined),
-                                title: Text('Saldo esperado oculto'),
-                                subtitle: Text('Se revela después de confirmar el arqueo ciego.'),
-                              ),
-                            if (_closing != null) ...[
+                                title: Text('Arqueo ciego'),
+                                subtitle: Text('El saldo teórico y sus movimientos se muestran después de cerrar caja.'),
+                              )
+                            else ...[
+                              _line(context, 'Apertura', s.opening),
+                              _line(context, 'Ventas en efectivo', s.cashSales),
+                              _line(context, 'Otros ingresos de efectivo', s.cashIn),
+                              _line(context, 'Salidas de efectivo', -s.cashOut),
+                              const Divider(),
+                              _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
                               _line(context, 'Contado al cerrar', ((_closing!['counted_cash'] as num?) ?? 0).toDouble()),
                               _line(context, 'Diferencia', ((_closing!['difference'] as num?) ?? 0).toDouble(), bold: true, signed: true),
                             ],
@@ -282,7 +281,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                         ),
                       ),
                       const SizedBox(height: 12),
-                      if (s.byMethod.isNotEmpty)
+                      if (_closing != null && s.byMethod.isNotEmpty)
                         Reveal(
                           index: 2,
                           child: SoftCard(
@@ -306,7 +305,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                           OutlinedButton.icon(onPressed: () => _move('ingreso'), icon: const Icon(Icons.south_west_rounded), label: const Text('Entra efectivo')),
                           OutlinedButton.icon(onPressed: () => _move('egreso'), icon: const Icon(Icons.north_east_rounded), label: const Text('Sale efectivo')),
                         ]),
-                      if (_moves.isNotEmpty) ...[
+                      if (_closing != null && _moves.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         const SectionTitle('Movimientos de caja'),
                         for (final m in _moves)
