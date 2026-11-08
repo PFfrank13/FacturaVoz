@@ -635,8 +635,11 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _fastCharge(String method, {String? paymentEvidence}) async {
+    // An immutable pending charge must be recoverable even if its unrelated
+    // editable cart backup is damaged. Never allow a NEW charge in that case.
     if (_charging || _recoveringCheckout || _restoringCart ||
-        _cartStorageError != null || _checkoutRecoveryError != null) {
+        (_cartStorageError != null && _pendingCheckout == null) ||
+        _checkoutRecoveryError != null) {
       return;
     }
     if (_chargeMethod != null && _chargeMethod != method) {
