@@ -69,60 +69,10 @@ class PendingCheckout {
         record.userId.isEmpty ||
         record.requestId.isEmpty ||
         !const {'efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'}.contains(record.method) ||
-        !RegExp(r'^[A-Z]{3}
-      throw const FormatException('Cobro pendiente dañado; no se puede reintentar automáticamente');
-    }
-    return record;
-  }
-}
-
-class PendingCheckoutStore {
-  PendingCheckoutStore._();
-
-  static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
-
-  static String _key(String userId, String orgId) => 'fv_pos_pending_v1_${userId}_${orgId}';
-
-  static Future<PendingCheckout?> load({
-    required String userId,
-    required String orgId,
-  }) async {
-    final raw = await _storage.read(key: _key(userId, orgId));
-    if (raw == null) return null;
-    final parsed = PendingCheckout.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
-    if (parsed.userId != userId || parsed.orgId != orgId) {
-      throw const FormatException('El cobro pendiente pertenece a otra sesión o empresa');
-    }
-    return parsed;
-  }
-
-  static Future<void> save(PendingCheckout checkout) async {
-    final previous = await load(userId: checkout.userId, orgId: checkout.orgId);
-    if (previous != null && previous.requestId != checkout.requestId) {
-      throw StateError('Confirma el cobro pendiente antes de empezar otro.');
-    }
-    await _storage.write(
-      key: _key(checkout.userId, checkout.orgId),
-      value: jsonEncode(checkout.toJson()),
-    );
-  }
-
-  static Future<void> clear(PendingCheckout checkout) async {
-    final previous = await load(userId: checkout.userId, orgId: checkout.orgId);
-    if (previous != null && previous.requestId != checkout.requestId) {
-      throw StateError('Otro cobro ocupa la recuperación; no se eliminará.');
-    }
-    await _storage.delete(key: _key(checkout.userId, checkout.orgId));
-  }
-}
-).hasMatch(record.currency) ||
+        !RegExp(r'^[A-Z]{3}$').hasMatch(record.currency) ||
         !record.taxRate.isFinite || record.taxRate < 0 || record.taxRate > 100 ||
-        items.isEmpty ||
-        items.length > 50 ||
-        items.any((i) =>
-            i.productId == null || i.productId!.isEmpty ||
+        items.isEmpty || items.length > 50 ||
+        items.any((i) => i.productId == null || i.productId!.isEmpty ||
             i.description.trim().isEmpty ||
             !i.quantity.isFinite || !i.unitPrice.isFinite ||
             i.quantity <= 0 || i.unitPrice < 0)) {
