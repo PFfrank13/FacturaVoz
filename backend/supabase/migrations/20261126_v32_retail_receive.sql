@@ -16,6 +16,7 @@ create table if not exists public.retail_receipts (
   total_cents bigint not null default 0 check (total_cents between 0 and 10000000000),
   payload_hash text not null,
   expense_id uuid unique references public.expenses(id) on delete restrict,
+  cash_move_id uuid unique references public.cash_movements(id) on delete restrict,
   created_at timestamptz not null default now(),
   primary key (org_id, request_id)
 );
@@ -90,6 +91,7 @@ declare
   v_before numeric(14,2);
   v_after numeric(14,2);
   v_expense uuid;
+  v_cash_move uuid;
   v_supplier text := btrim(coalesce(p_supplier,''));
   v_reference text := nullif(btrim(coalesce(p_reference,'')),'');
   r record;
@@ -224,12 +226,14 @@ begin
       insert into public.cash_movements(org_id, user_id, day, kind, amount, method, note)
         values(p_org, v_uid, private.today_pe(), 'egreso',
                v_total::numeric / 100, 'efectivo',
-               left('Compra ' || v_supplier || ' · ' || coalesce(v_reference,''),200));
+               left('Compra ' || v_supplier || ' · ' || coalesce(v_reference,''),200))
+        returning id into v_cash_move;
     end if;
   end if;
 
   update public.retail_receipts
-    set total_cents = v_total, expense_id = v_expense
+    set total_cents = v_total, expense_id = v_expense,
+        cash_move_id = v_cash_move
     where org_id = p_org and request_id = p_request_id;
 
   return query select v_receipt_id, v_total, false;
