@@ -317,12 +317,14 @@ class _PlanScreenState extends State<PlanScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(l.dev ? 'Pendiente de activación' : 'Plan ${l.plan}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text(l.source == 'local' ? 'Plan ${l.plan} · Local' : l.dev ? 'Pendiente de activación' : 'Plan ${l.plan}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(
-                      l.dev
-                          ? 'Solvex Hub todavía no ha verificado tu licencia.'
-                          : [
+                      l.source == 'local'
+                          ? 'Desarrollo independiente · funciones del plan habilitadas para pruebas'
+                          : l.dev
+                              ? 'Activación de la licencia pendiente.'
+                              : [
                               if (l.isTrial) 'Prueba gratis' else 'Estado: ${l.status}',
                               if (days != null) (days == 0 ? 'vence hoy' : 'quedan $days días'),
                             ].join(' · '),
@@ -336,7 +338,7 @@ class _PlanScreenState extends State<PlanScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              if (a.isAdmin && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
+              if (l.source != 'local' && a.isAdmin && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
               const SizedBox(height: 18),
               const SectionTitle('Incluido en tu plan'),
               SoftCard(
@@ -345,11 +347,10 @@ class _PlanScreenState extends State<PlanScreen> {
                 ]),
               ),
               const SizedBox(height: 18),
-              const SectionTitle('Gestión de tu suscripción'),
-              const SoftCard(child: Text(
-                'El plan, su precio, los límites y las funciones activas los administra Solvex Hub. '
-                'Los módulos marcados arriba son los autorizados por tu licencia; '
-                'si necesitas más herramientas, solicita el cambio a Solvex.',
+              SectionTitle(l.source == 'local' ? 'Modo de desarrollo' : 'Gestión de tu suscripción'),
+              SoftCard(child: Text(l.source == 'local'
+                ? 'Esta empresa usa temporalmente planes locales. Solo se muestran las funciones de su plan y se mantienen los permisos de usuario, la seguridad y la separación de empresas. No requiere activación comercial durante el desarrollo.'
+                : 'Las funciones y los límites dependen de la licencia activa. Para ampliar el plan, contacta con el proveedor.',
               )),
               const SizedBox(height: 14),
               Text('Tu rol en esta empresa: ${a.roleLabel}.', style: t.textTheme.bodySmall, textAlign: TextAlign.center),
