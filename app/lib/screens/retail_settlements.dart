@@ -68,7 +68,10 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
   }
 
   Future<void> _pay() async {
-    if (_busy || _loading || _error != null) return;
+    // An uncertain settlement must remain retryable with its original ID,
+    // even after a network error. Only block creating a NEW payment while
+    // local recovery is broken.
+    if (_busy || _loading || (_error != null && _pending == null)) return;
     if (_pending == null && !_confirmed) return;
     final org = Repo.activeOrgId;
     final user = Supabase.instance.client.auth.currentUser?.id;
