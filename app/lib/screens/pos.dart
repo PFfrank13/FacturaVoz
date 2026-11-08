@@ -587,7 +587,7 @@ class _PosScreenState extends State<PosScreen> {
   /// Four-stage mobile POS: basket → method → verified payment → receipt.
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
-        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return;
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) { return; }
     final lines = _lines();
     if (lines.isEmpty) { return; }
     final total = computeTotals(lines, _rate).total;
