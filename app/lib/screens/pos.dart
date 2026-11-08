@@ -1,6 +1,7 @@
 // Venta rápida / caja (POS): toca productos o escanea su código de barras, aplica el mejor precio vigente
 // (por mayor, promociones) y un cupón, y pasa a la boleta/factura para emitir e imprimir el ticket.
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
 import '../app_state.dart';
@@ -13,6 +14,7 @@ import '../services/live.dart';
 import '../services/print/kitchen_print.dart';
 import '../services/print/ticket_printer.dart' show TicketLine;
 import '../services/repo.dart';
+import '../services/pending_checkout.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/motion.dart';
@@ -50,6 +52,9 @@ class _PosScreenState extends State<PosScreen> {
   bool _charging = false;
   String? _chargeRequestId; // Preserve across timeout/retry to avoid duplicate invoice/payment.
   String? _chargeMethod;
+  PendingCheckout? _pendingCheckout;
+  bool _recoveringCheckout = true;
+  String? _checkoutRecoveryError;
   bool _seeding = false;
   bool _savingOrder = false;
   String? _kitchenRequestId; // Se conserva si la red falla para no duplicar pedidos.
@@ -64,6 +69,28 @@ class _PosScreenState extends State<PosScreen> {
     super.initState();
     _products = LiveCache.get<List<Product>>('pos.products') ?? _products;
     _load();
+    _restoreCheckout();
+  }
+
+  Future<void> _restoreCheckout() async {
+    try {
+      final org = Repo.activeOrgId;
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (org == null || uid == null) throw const FormatException('Selecciona una empresa e inicia sesión.');
+      final pending = await PendingCheckoutStore.load(userId: uid, orgId: org);
+      if (!mounted) return;
+      setState(() {
+        _pendingCheckout = pending;
+        _chargeRequestId = pending?.requestId;
+        _chargeMethod = pending?.method;
+        _checkoutRecoveryError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _checkoutRecoveryError = 'No se pudo verificar si existe un cobro pendiente: $e');
+    } finally {
+      if (mounted) setState(() => _recoveringCheckout = false);
+    }
   }
 
   @override
@@ -111,6 +138,10 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _add(Product p, [double n = 1]) {
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Confirma el cobro pendiente antes de modificar el carrito.')));
+      return;
+    }
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este pedido ya se guardó en Comandas. Pulsa Nuevo pedido para agregar más platos.')));
       return;
@@ -149,7 +180,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _applyCoupon() async {
-    if (_chargeRequestId != null) return; // No changes while a checkout may have committed.
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return; // No changes while a checkout may have committed.
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) return;
     final c = TextEditingController();
     final ok = await showDialog<bool>(
@@ -228,7 +259,7 @@ class _PosScreenState extends State<PosScreen> {
   /// Guardado real en Supabase ANTES de imprimir. La misma requestId se reusa
   /// en reintentos para que una caída de red no duplique la comanda.
   Future<bool> _persistKitchenOrder() async {
-    if (!_restaurant || _cart.isEmpty) return false;
+    if (!_restaurant || _cart.isEmpty || _chargeRequestId != null || _charging || _recoveringCheckout || _checkoutRecoveryError != null) return false;
     if (_savedOrderId != null) return true;
     if (_savingOrder) return false;
     setState(() => _savingOrder = true);
@@ -277,7 +308,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _newKitchenOrder() {
-    if (_savingOrder) return;
+    if (_savingOrder || _charging || _chargeRequestId != null || _recoveringCheckout || _checkoutRecoveryError != null) return;
     // Si hubo timeout, el servidor pudo guardar la comanda aunque no llegara
     // la respuesta. Obliga a reintentar la MISMA requestId antes de empezar otra.
     if (_kitchenRequestId != null && _savedOrderId == null) {
@@ -334,7 +365,7 @@ class _PosScreenState extends State<PosScreen> {
 
   /// Detalle del pedido: cantidades, nota por producto y (restaurante) comanda y precuenta.
   Future<void> _cartSheet() async {
-    if (_chargeRequestId != null) {
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cobro pendiente de confirmación. Reintenta antes de editar el pedido.')));
       return;
     }
@@ -405,6 +436,7 @@ class _PosScreenState extends State<PosScreen> {
 
   /// Cobro en un toque: elige cómo paga el cliente y listo (se registra la venta, el cobro y se imprime el ticket).
   Future<void> _chargeSheet() async {
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return;
     final lines = _lines();
     if (lines.isEmpty) return;
     final total = computeTotals(lines, _rate).total;
@@ -449,30 +481,54 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _fastCharge(String method) async {
-    if (_charging) return;
+    if (_charging || _recoveringCheckout || _checkoutRecoveryError != null) return;
     if (_chargeMethod != null && _chargeMethod != method) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reintenta con el mismo método del primer cobro para evitar diferencias.')));
       return;
     }
-    if (_restaurant && !await _persistKitchenOrder()) return;
+    // A recovered checkout is immutable. Its payload, method and request ID
+    // must be reused exactly even when the current catalog or cart changed.
+    final recovering = _pendingCheckout != null;
+    if (!recovering && _restaurant && !await _persistKitchenOrder()) return;
     if (!mounted) return;
-    final lines = _lines();
+    final pending = _pendingCheckout;
+    final lines = recovering ? pending!.items : _lines();
     if (lines.isEmpty) return;
-    _chargeRequestId ??= Repo.newRequestId();
-    _chargeMethod ??= method;
     setState(() => _charging = true);
     try {
-      final table = _table.text.trim();
-      final draft = InvoiceDraft(
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      final org = Repo.activeOrgId;
+      if (uid == null || org == null) throw AppException('Sesión o empresa no válida.');
+      final checkout = pending ?? PendingCheckout(
+        orgId: org,
+        userId: uid,
+        requestId: Repo.newRequestId(),
+        method: method,
         taxRate: _rate,
         currency: _cur,
+        notes: [
+          if (_table.text.trim().isNotEmpty) 'Mesa ${_table.text.trim()}',
+          if (_coupon != null) 'Cupón ${_coupon!.code}',
+        ].join(' · '),
         items: lines,
-        notes: [if (table.isNotEmpty) 'Mesa $table', if (_coupon != null) 'Cupón ${_coupon!.code}'].join(' · '),
-        transcript: 'Venta rápida',
       );
+      if (checkout.orgId != org || checkout.userId != uid || checkout.method != method) {
+        throw AppException('El cobro pertenece a otra empresa, cuenta o método.');
+      }
+      // Commit the immutable local snapshot BEFORE any remote money mutation.
+      if (!recovering) {
+        await PendingCheckoutStore.save(checkout);
+      }
+      if (!mounted) return;
+      setState(() {
+        _pendingCheckout = checkout;
+        _chargeRequestId = checkout.requestId;
+        _chargeMethod = checkout.method;
+      });
       final id = await Repo.fastCheckoutAtomic(
-        draft: draft, method: method, requestId: _chargeRequestId!);
-      // Transaction confirmed by PostgreSQL; only then show success and print.
+        draft: checkout.toDraft(), method: checkout.method, requestId: checkout.requestId,
+      );
+      // PostgreSQL confirmed the transaction. Never clear a pending key before this response.
       String? kitchenLinkError;
       if (_restaurant && _savedOrderId != null) {
         try {
@@ -481,12 +537,15 @@ class _PosScreenState extends State<PosScreen> {
           kitchenLinkError = friendly(e);
         }
       }
+      // Failure to clear the secure record must block new sales, not retry with a new key.
+      await PendingCheckoutStore.clear(checkout);
       AppState.instance.bump();
       if (!mounted) return;
       setState(() {
         _cart.clear();
         _notes.clear();
         _coupon = null;
+        _pendingCheckout = null;
         _chargeRequestId = null;
         _chargeMethod = null;
         if (_restaurant) {
@@ -499,18 +558,17 @@ class _PosScreenState extends State<PosScreen> {
       if (kitchenLinkError != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Venta cobrada, pero no se pudo vincular a la comanda: $kitchenLinkError')));
       }
-      // Se abre la venta con el ticket listo para imprimir (y desde ahí se emite la boleta o factura electrónica).
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; no se creará una venta duplicada si ya fue registrada. ${friendly(e)}')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; si el servidor ya lo registró no creará una venta duplicada. ${friendly(e)}')));
     } finally {
       if (mounted) setState(() => _charging = false);
     }
   }
 
   Future<void> _checkout() async {
-    if (_chargeRequestId != null) {
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Primero confirma o recupera el cobro rápido pendiente.')));
       return;
     }
@@ -569,7 +627,33 @@ class _PosScreenState extends State<PosScreen> {
     ];
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'), actions: actions),
-      body: _error != null
+      body: (_recoveringCheckout || _checkoutRecoveryError != null || _pendingCheckout != null)
+          ? Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (_recoveringCheckout) const CircularProgressIndicator(),
+                if (_recoveringCheckout) const SizedBox(height: 16),
+                Text(_recoveringCheckout
+                    ? 'Comprobando cobros pendientes…'
+                    : _checkoutRecoveryError ?? 'Hay un cobro pendiente de confirmación.',
+                    textAlign: TextAlign.center),
+                if (_pendingCheckout case final pending?) ...[
+                  const SizedBox(height: 12),
+                  Text('Importe y productos conservados del cobro original. No cambies el método de pago.', textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _charging ? null : () => _fastCharge(pending.method),
+                    icon: const Icon(Icons.sync_rounded),
+                    label: Text(_charging ? 'Verificando…' : 'Recuperar cobro (${paymentMethods[pending.method] ?? pending.method})'),
+                  ),
+                ],
+                if (_checkoutRecoveryError != null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton(onPressed: _restoreCheckout, child: const Text('Reintentar comprobación')),
+                ],
+              ]),
+            ))
+          : _error != null
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : _products == null
               ? const SkeletonList()
@@ -712,7 +796,7 @@ class _PosScreenState extends State<PosScreen> {
                       ),
                     ),
                     TextButton(
-                      onPressed: _savingOrder ? null : (_restaurant ? _newKitchenOrder : () => setState(() {
+                      onPressed: _savingOrder || _charging || _recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null ? null : (_restaurant ? _newKitchenOrder : () => setState(() {
                         _cart.clear();
                         _notes.clear();
                       })),
@@ -721,7 +805,7 @@ class _PosScreenState extends State<PosScreen> {
                     const SizedBox(width: 6),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                      onPressed: _charging || _savingOrder ? null : _chargeSheet,
+                      onPressed: _charging || _savingOrder || _recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null ? null : _chargeSheet,
                       icon: const Icon(Icons.point_of_sale_rounded),
                       label: const Text('Cobrar'),
                     ),
