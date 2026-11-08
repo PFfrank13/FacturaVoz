@@ -21,11 +21,11 @@ import 'client_profile.dart' show StorageImage;
 /// Detects the actual image format; never label a WebP as JPEG when restoring.
 String productPhotoExtension(Uint8List bytes) {
   if (bytes.length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 &&
-      bytes[2] == 0x4e && bytes[3] == 0x47) return 'png';
+      bytes[2] == 0x4e && bytes[3] == 0x47) { return 'png'; }
   if (bytes.length >= 12 && bytes[0] == 0x52 && bytes[1] == 0x49 &&
       bytes[2] == 0x46 && bytes[3] == 0x46 &&
       bytes[8] == 0x57 && bytes[9] == 0x45 &&
-      bytes[10] == 0x42 && bytes[11] == 0x50) return 'webp';
+      bytes[10] == 0x42 && bytes[11] == 0x50) { return 'webp'; }
   return 'jpg';
 }
 
