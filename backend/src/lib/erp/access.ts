@@ -2,7 +2,7 @@
 export type License = { enforced?: boolean; dev?: boolean; stale?: boolean; source?: string; mode?: string; plan?: string; status?: string; message?: string; features?: Record<string, unknown> };
 export type Access = { is_admin?: boolean; role?: string; display_name?: string; can?: Record<string, boolean> };
 export function licenseReady(l: License): boolean {
-  return l.enforced === true && l.dev !== true && l.stale !== true && l.source === "hub" && (l.mode === "full" || l.mode === "warning");
+  return l.enforced === true && l.dev !== true && l.stale !== true && (l.source === "hub" || l.source === "local") && (l.mode === "full" || l.mode === "warning");
 }
 export function hasFeature(l: License, key: string): boolean { return licenseReady(l) && l.features?.[key] === true; }
 export function featureLimit(l: License, key: string): number {
