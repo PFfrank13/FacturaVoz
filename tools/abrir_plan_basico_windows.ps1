@@ -113,15 +113,30 @@ try {
   if ([string]::IsNullOrWhiteSpace($DeviceId)) {
     $rawDevices = & flutter devices --machine
     Assert-Exit 'flutter devices --machine'
-    $androidDevices = @(($rawDevices -join "`n") | ConvertFrom-Json | Where-Object {
-      $_.targetPlatform -like 'android*' -and $_.isSupported -ne $false
-    })
-    $selected = $androidDevices | Where-Object { $_.id -like 'emulator-*' } | Select-Object -First 1
-    if ($null -eq $selected) { $selected = $androidDevices | Select-Object -First 1 }
-    if ($null -eq $selected) {
+    # Select a single Android device; PS 5.1 array handling differs from PS 7.
+    $deviceList = ConvertFrom-Json -InputObject ($rawDevices -join "`n")
+    foreach ($device in $deviceList) {
+      if ($device.targetPlatform -like 'android*' -and
+          $device.id -match '^emulator-[0-9]+$' -and
+          $device.isSupported -ne $false) {
+        $DeviceId = [string]$device.id
+        break
+      }
+    }
+    if ([string]::IsNullOrWhiteSpace($DeviceId)) {
+      foreach ($device in $deviceList) {
+        if ($device.targetPlatform -like 'android*' -and $device.isSupported -ne $false) {
+          $DeviceId = [string]$device.id
+          break
+        }
+      }
+    }
+    if ([string]::IsNullOrWhiteSpace($DeviceId)) {
       throw 'No hay emulador Android activo. Abre Medium Phone API 37 desde Android Studio y ejecuta de nuevo.'
     }
-    $DeviceId = $selected.id
+  }
+  if ([string]::IsNullOrWhiteSpace($DeviceId) -or $DeviceId -match '\s') {
+    throw 'DeviceId invalido: especifica un unico emulador, como emulator-5554.'
   }
 
   Write-Host "[5/5] Instalando y ejecutando FacturaVoz main en $DeviceId..." -ForegroundColor Green
