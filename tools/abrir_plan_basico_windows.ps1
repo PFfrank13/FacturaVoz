@@ -9,7 +9,7 @@ param(
   [switch]$PrepareOnly,
   [string]$DeviceId = ""
 )
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue' # We explicitly verify native git/flutter exit codes.
 function Assert-Exit([string]$Operation) {
   if ($LASTEXITCODE -ne 0) { throw "$Operation failed (exit $LASTEXITCODE)." }
 }
@@ -27,14 +27,14 @@ if ($origin -notmatch '(?i)PFfrank13/FacturaVoz(\.git)?$') {
 }
 
 Write-Host '[1/5] Obteniendo main, SIN modificar tu rama codex...' -ForegroundColor Cyan
-& git -C $repoRoot fetch origin main
+& git -C $repoRoot fetch --quiet origin main
 Assert-Exit 'git fetch origin main'
 
 $parent = Split-Path -Path $repoRoot -Parent
 $previewRoot = Join-Path $parent 'FacturaVoz-PlanBasico'
 if (-not (Test-Path -LiteralPath $previewRoot)) {
   Write-Host '[2/5] Creando copia de trabajo independiente...' -ForegroundColor Cyan
-  & git -C $repoRoot worktree add --detach $previewRoot origin/main
+  & git -C $repoRoot worktree add --quiet --detach $previewRoot origin/main
   Assert-Exit 'git worktree add'
 } else {
   $worktrees = (& git -C $repoRoot worktree list --porcelain)
@@ -50,7 +50,7 @@ if (-not (Test-Path -LiteralPath $previewRoot)) {
     throw "Hay cambios propios en $previewRoot. Guardalos antes de actualizar esta vista previa."
   }
   Write-Host '[2/5] Actualizando solamente la copia de trabajo del Plan Basico...' -ForegroundColor Cyan
-  & git -C $previewRoot switch --detach origin/main
+  & git -C $previewRoot switch --quiet --detach origin/main
   Assert-Exit 'git switch --detach origin/main'
 }
 
@@ -113,7 +113,7 @@ try {
   if ([string]::IsNullOrWhiteSpace($DeviceId)) {
     $rawDevices = & flutter devices --machine
     Assert-Exit 'flutter devices --machine'
-    $androidDevices = @($rawDevices | ConvertFrom-Json | Where-Object {
+    $androidDevices = @(($rawDevices -join "`n") | ConvertFrom-Json | Where-Object {
       $_.targetPlatform -like 'android*' -and $_.isSupported -ne $false
     })
     $selected = $androidDevices | Where-Object { $_.id -like 'emulator-*' } | Select-Object -First 1
