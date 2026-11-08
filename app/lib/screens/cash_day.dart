@@ -214,9 +214,11 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
       );
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('No se cerró caja: $e'),
-      ));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('No se cerró caja: $e'),
+        ));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
