@@ -22,11 +22,20 @@ describe("ERP: Hub is authoritative across all nine sectors", () => {
     });
   }
   it("closed modes, stale cache, dev and absent verification cannot grant rights", () => {
-    for (const patch of [{ mode: "blocked" }, { mode: "restricted" }, { stale: true }, { dev: true }, { enforced: false }, { source: "local" }]) {
+    for (const patch of [{ mode: "blocked" }, { mode: "restricted" }, { stale: true }, { dev: true }, { enforced: false }, { source: "unknown" }]) {
       expect(hasFeature({ ...active, ...patch }, "stock")).toBe(false);
       expect(featureLimit({ ...active, ...patch }, "max_users")).toBe(0);
     }
     expect(hasFeature({ ...active, mode: "warning" }, "stock")).toBe(true);
+  });
+  it("accepts verified local basic features, but not missing, blocked or stale ones", () => {
+    const local = { ...active, source: "local", plan: "BASICO", features: { stock: true, fiados: true, caja: true, copiloto: false, max_users: 1 } };
+    expect(hasFeature(local, "stock")).toBe(true);
+    expect(hasFeature(local, "fiados")).toBe(true);
+    expect(hasFeature(local, "copiloto")).toBe(false);
+    expect(featureLimit(local, "max_users")).toBe(1);
+    expect(hasFeature({ ...local, mode: "blocked" }, "stock")).toBe(false);
+    expect(hasFeature({ ...local, stale: true }, "stock")).toBe(false);
   });
   it("numeric limits never unlock boolean features", () => {
     for (const value of [-1, 0, 1, 4, "true", "false", null]) expect(hasFeature({ ...active, features: { stock: value } }, "stock")).toBe(false);
