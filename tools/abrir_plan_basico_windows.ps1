@@ -113,15 +113,40 @@ try {
   if ([string]::IsNullOrWhiteSpace($DeviceId)) {
     $rawDevices = & flutter devices --machine
     Assert-Exit 'flutter devices --machine'
-    $androidDevices = @(($rawDevices -join "`n") | ConvertFrom-Json | Where-Object {
-      $_.targetPlatform -like 'android*' -and $_.isSupported -ne $false
-    })
-    $selected = $androidDevices | Where-Object { $_.id -like 'emulator-*' } | Select-Object -First 1
-    if ($null -eq $selected) { $selected = $androidDevices | Select-Object -First 1 }
-    if ($null -eq $selected) {
+    # ConvertFrom-Json on Windows PowerShell 5.1 may return a JSON array as
+    # a single object. Enumerate it explicitly, never use .id on an array.
+    $deviceList = ConvertFrom-Json -InputObject ($rawDevices -join "`n")
+    foreach ($device in $deviceList) {
+      if (($device.targetPlatform -like 'android*') -and
+          ($device.id -match '^emulator-[0-9]+
+  Write-Host "[5/5] Instalando y ejecutando FacturaVoz main en $DeviceId..." -ForegroundColor Green
+  Write-Host 'Deten antes cualquier Flutter Run anterior para evitar dos sesiones de depuracion.' -ForegroundColor Yellow
+  & flutter run -d $DeviceId --debug "--dart-define-from-file=$defines"
+  Assert-Exit 'flutter run'
+} finally {
+  Pop-Location
+}
+) -and
+          ($device.isSupported -ne $false)) {
+        $DeviceId = [string]$device.id
+        break
+      }
+    }
+    if ([string]::IsNullOrWhiteSpace($DeviceId)) {
+      foreach ($device in $deviceList) {
+        if (($device.targetPlatform -like 'android*') -and
+            ($device.isSupported -ne $false)) {
+          $DeviceId = [string]$device.id
+          break
+        }
+      }
+    }
+    if ([string]::IsNullOrWhiteSpace($DeviceId)) {
       throw 'No hay emulador Android activo. Abre Medium Phone API 37 desde Android Studio y ejecuta de nuevo.'
     }
-    $DeviceId = $selected.id
+  }
+  if ([string]::IsNullOrWhiteSpace($DeviceId) -or $DeviceId -match '\s') {
+    throw 'DeviceId invalido: especifica un unico emulador, como emulator-5554.'
   }
 
   Write-Host "[5/5] Instalando y ejecutando FacturaVoz main en $DeviceId..." -ForegroundColor Green
