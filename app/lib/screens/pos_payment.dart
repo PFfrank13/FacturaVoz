@@ -181,8 +181,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
   bool get _sufficient => _tendered != null && _tendered! >= _chargeCents;
 
   bool get _canConfirm {
-    if (_loading) return false;
-    if (_method == 'efectivo') return _sufficient;
+    if (_loading) { return false; }
+    if (_method == 'efectivo') { return _sufficient; }
     if (_method == 'tarjeta') return _verified;
     return _verified && (!_requiresAccount || _account.isNotEmpty || _qrPath.isNotEmpty);
   }
