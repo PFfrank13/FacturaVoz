@@ -54,6 +54,7 @@ import 'owner_control.dart';
 import 'pay_settings.dart';
 import 'pos.dart';
 import 'products.dart';
+import 'retail_purchases.dart';
 import 'profile_form.dart';
 import 'profit.dart';
 import 'promos.dart';
@@ -145,6 +146,7 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'cuaderno', title: 'Del cuaderno a la factura', subtitle: 'Foto de tu cuaderno, nota o WhatsApp → venta', icon: Icons.menu_book_rounded, group: 'Vender', module: 'cuaderno_ia', feature: 'cuaderno_ia', perm: 'sell', keywords: const ['foto', 'nota', 'ia', 'cuaderno'], builder: (_) => const NotebookScreen()),
       FeatureEntry(id: 'recurrentes', title: 'Facturación recurrente', subtitle: 'Mensualidades que se facturan solas', icon: Icons.event_repeat_rounded, group: 'Vender', module: 'recurrentes', feature: 'recurrentes', perm: 'finance', keywords: const ['mensual', 'alquiler', 'suscripcion'], builder: (_) => const RecurringScreen()),
       FeatureEntry(id: 'productos', feature: 'stock', title: 'Productos e inventario', subtitle: 'Precios, stock, código de barras y fotos', icon: Icons.inventory_2_rounded, group: 'Vender', module: 'stock', keywords: const ['stock', 'catalogo', 'precio', 'inventario'], builder: (_) => const ProductsScreen()),
+      FeatureEntry(id: 'compras', title: 'Compras y recepción', subtitle: 'Proveedor → productos → inventario → gasto y caja', icon: Icons.local_shipping_outlined, group: 'Vender', module: 'stock', feature: 'stock', perm: 'products_edit', keywords: const ['compras', 'proveedor', 'recibir', 'reponer', 'inventario', 'costo'], builder: (_) => const RetailPurchasesScreen()),
       FeatureEntry(id: 'tienda', title: 'Tienda en línea', subtitle: 'Tu catálogo con carrito y pedidos por WhatsApp', icon: Icons.storefront_rounded, group: 'Vender', module: 'tienda', feature: 'tienda', perm: 'settings', keywords: const ['web', 'catalogo', 'whatsapp', 'pedidos'], builder: (_) => const StoreScreen()),
       FeatureEntry(id: 'carta', title: 'Carta QR y comandas', subtitle: 'Pedidos por mesa directo a cocina', icon: Icons.restaurant_menu_rounded, group: 'Vender', module: 'carta_qr', feature: 'carta_qr', keywords: const ['restaurante', 'mesa', 'cocina', 'comanda', 'menu'], builder: (_) => const KitchenScreen()),
       FeatureEntry(id: 'precios', title: 'Precios y promociones', subtitle: 'Mayorista, "lleva 3 paga 2" y cupones', icon: Icons.local_offer_rounded, group: 'Vender', module: 'precios', feature: 'precios', perm: 'products_edit', keywords: const ['descuento', 'promocion', 'cupon', 'mayorista'], builder: (_) => const PromosScreen()),
