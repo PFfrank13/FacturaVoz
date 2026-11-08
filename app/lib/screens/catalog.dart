@@ -54,6 +54,7 @@ import 'owner_control.dart';
 import 'pay_settings.dart';
 import 'pos.dart';
 import 'products.dart';
+import 'retail_purchases.dart';
 import 'profile_form.dart';
 import 'profit.dart';
 import 'promos.dart';
@@ -145,6 +146,7 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'cuaderno', title: 'Del cuaderno a la factura', subtitle: 'Foto de tu cuaderno, nota o WhatsApp → venta', icon: Icons.menu_book_rounded, group: 'Vender', module: 'cuaderno_ia', feature: 'cuaderno_ia', perm: 'sell', keywords: const ['foto', 'nota', 'ia', 'cuaderno'], builder: (_) => const NotebookScreen()),
       FeatureEntry(id: 'recurrentes', title: 'Facturación recurrente', subtitle: 'Mensualidades que se facturan solas', icon: Icons.event_repeat_rounded, group: 'Vender', module: 'recurrentes', feature: 'recurrentes', perm: 'finance', keywords: const ['mensual', 'alquiler', 'suscripcion'], builder: (_) => const RecurringScreen()),
       FeatureEntry(id: 'productos', feature: 'stock', title: 'Productos e inventario', subtitle: 'Precios, stock, código de barras y fotos', icon: Icons.inventory_2_rounded, group: 'Vender', module: 'stock', keywords: const ['stock', 'catalogo', 'precio', 'inventario'], builder: (_) => const ProductsScreen()),
+      FeatureEntry(id: 'compras', title: 'Compras y recepción', subtitle: 'Proveedor → productos → inventario → gasto y caja', icon: Icons.local_shipping_outlined, group: 'Vender', module: 'stock', feature: 'stock', perm: 'products_edit', keywords: const ['compras', 'proveedor', 'recibir', 'reponer', 'inventario', 'costo'], builder: (_) => const RetailPurchasesScreen()),
       FeatureEntry(id: 'tienda', title: 'Tienda en línea', subtitle: 'Tu catálogo con carrito y pedidos por WhatsApp', icon: Icons.storefront_rounded, group: 'Vender', module: 'tienda', feature: 'tienda', perm: 'settings', keywords: const ['web', 'catalogo', 'whatsapp', 'pedidos'], builder: (_) => const StoreScreen()),
       FeatureEntry(id: 'carta', title: 'Carta QR y comandas', subtitle: 'Pedidos por mesa directo a cocina', icon: Icons.restaurant_menu_rounded, group: 'Vender', module: 'carta_qr', feature: 'carta_qr', keywords: const ['restaurante', 'mesa', 'cocina', 'comanda', 'menu'], builder: (_) => const KitchenScreen()),
       FeatureEntry(id: 'precios', title: 'Precios y promociones', subtitle: 'Mayorista, "lleva 3 paga 2" y cupones', icon: Icons.local_offer_rounded, group: 'Vender', module: 'precios', feature: 'precios', perm: 'products_edit', keywords: const ['descuento', 'promocion', 'cupon', 'mayorista'], builder: (_) => const PromosScreen()),
@@ -184,7 +186,7 @@ List<FeatureEntry> featureCatalog() => [
       // ───── Control del dueño ─────
       FeatureEntry(id: 'alertas', title: 'Alertas del dueño', subtitle: 'Anulaciones, descuentos y caja que no cuadra', icon: Icons.shield_rounded, group: 'Control del dueño', module: 'antifraude', feature: 'antifraude', perm: 'team', keywords: const ['fraude', 'anulacion', 'distancia'], builder: (_) => const AlertsScreen()),
       FeatureEntry(id: 'bitacora', title: 'Bitácora', subtitle: 'Quién hizo qué y cuándo (no se puede alterar)', icon: Icons.history_rounded, group: 'Control del dueño', feature: 'antifraude', perm: 'team', keywords: const ['auditoria', 'historial', 'log'], builder: (_) => const AuditScreen()),
-      FeatureEntry(id: 'pin', title: 'PIN del dueño', subtitle: 'Pide tu PIN para anular o borrar cobros', icon: Icons.pin_rounded, group: 'Control del dueño', feature: 'antifraude', perm: 'team', keywords: const ['clave', 'autorizar'], builder: (_) => const OwnerPinScreen()),
+      FeatureEntry(id: 'pin', title: 'PIN del dueño', subtitle: 'Pide tu PIN para anular o borrar cobros', icon: Icons.pin_rounded, group: 'Control del dueño', perm: 'team', keywords: const ['clave', 'autorizar'], builder: (_) => const OwnerPinScreen()),
       FeatureEntry(id: 'papelera', title: 'Papelera', subtitle: 'Recupera lo borrado en los últimos 30 días', icon: Icons.restore_from_trash_rounded, group: 'Control del dueño', perm: 'finance', keywords: const ['borrado', 'recuperar', 'deshacer'], builder: (_) => const TrashScreen()),
       // ───── Ajustes ─────
       FeatureEntry(id: 'ajustes', title: 'Ajustes', subtitle: 'Todo lo de tu cuenta y tu negocio', icon: Icons.settings_rounded, group: 'Ajustes', keywords: const ['configuracion'], builder: (_) => const SettingsScreen()),

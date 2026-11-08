@@ -1,0 +1,408 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../access.dart';
+import '../app_state.dart';
+import '../errors.dart';
+import '../models.dart';
+import '../services/live.dart';
+import '../services/repo.dart';
+import '../services/retail_purchase.dart';
+import '../ui/widgets.dart';
+import 'pos_payment_logic.dart';
+import 'products.dart';
+import 'retail_settlements.dart';
+
+/// Plan Básico: supplier -> product ID -> atomic stock receipt -> expense/cash.
+/// This is deliberately online-only until an audited offline ledger exists.
+class RetailPurchasesScreen extends StatefulWidget {
+  const RetailPurchasesScreen({super.key});
+
+  @override
+  State<RetailPurchasesScreen> createState() => _RetailPurchasesScreenState();
+}
+
+class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
+  final _supplier = TextEditingController();
+  final _reference = TextEditingController();
+  List<Product>? _products;
+  List<Map<String, dynamic>> _history = const [];
+  final Map<String, RetailPurchaseLine> _lines = {};
+  PendingRetailPurchase? _pending;
+  String? _error;
+  String? _recoveryError;
+  bool _recovering = true;
+  bool _saving = false;
+  String _search = '';
+  String _method = 'pendiente';
+
+  bool get _allowed => Access.instance.has('stock') && Access.instance.isAdmin;
+  String get _currency => AppState.instance.profile?.currency.isNotEmpty == true
+      ? AppState.instance.profile!.currency : 'PEN';
+  int get _total => _lines.values.fold<int>(0, (sum, item) => sum + item.lineTotalCents);
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _supplier.dispose();
+    _reference.dispose();
+    super.dispose();
+  }
+
+  Future<void> _restore() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser?.id;
+      final org = Repo.activeOrgId;
+      if (user == null || org == null) throw const FormatException('Inicia sesión y elige una empresa');
+      final pending = await RetailPurchaseStore.load(user, org);
+      if (!mounted) return;
+      setState(() {
+        _pending = pending;
+        _recoveryError = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _recoveryError = 'No se pudo comprobar la compra pendiente: $e');
+    } finally {
+      if (mounted) setState(() => _recovering = false);
+    }
+  }
+
+  Future<void> _load() async {
+    if (!_allowed) return;
+    try {
+      final org = Repo.activeOrgId;
+      if (org == null) throw AppException('Selecciona una empresa.');
+      final products = await Repo.listProducts(activeOnly: true);
+      // A missing receipt table is a missing migration, not an empty history.
+      final rows = await Supabase.instance.client
+          .from('retail_receipts')
+          .select('id, supplier_name, document_ref, payment_method, currency, total_cents, created_at')
+          .eq('org_id', org)
+          .order('created_at', ascending: false)
+          .limit(30);
+      if (!mounted || Repo.activeOrgId != org) return;
+      setState(() {
+        _products = products.where((p) => !p.isService).toList();
+        _history = [for (final row in rows) Map<String, dynamic>.from(row)];
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error =
+          'No se pudo cargar compras. Revisa la migración de recepción en staging. ${friendly(e)}');
+      }
+    }
+  }
+
+  Future<void> _editLine(Product product) async {
+    if (_saving || _recovering || _pending != null || _recoveryError != null) return;
+    final existing = _lines[product.id];
+    final qty = TextEditingController(text: existing?.quantity.toStringAsFixed(2) ?? '1');
+    final cost = TextEditingController(
+      text: existing != null
+          ? (existing.unitCostCents / 100).toStringAsFixed(2)
+          : (product.unitCost ?? 0).toStringAsFixed(2),
+    );
+    final item = await showDialog<RetailPurchaseLine>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Recibir: ${product.name}'),
+        content: SizedBox(
+          width: 350,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: qty,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Cantidad recibida'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: cost,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Costo unitario ($_currency)',
+                helperText: 'Costo de compra, no precio de venta',
+              ),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              final quantity = parseDecimal(qty.text);
+              final costCents = parsePosCents(cost.text);
+              if (quantity == null || quantity <= 0 || quantity > 100000 ||
+                  quantity != double.parse(quantity.toStringAsFixed(2)) ||
+                  costCents == null || costCents > 1000000000) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Indica cantidad válida y costo con máximo 2 decimales')),
+                );
+                return;
+              }
+              Navigator.pop(ctx, RetailPurchaseLine(
+                productId: product.id, quantity: quantity, unitCostCents: costCents,
+              ));
+            },
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+    disposeAfterClose([qty, cost]);
+    if (item != null && mounted) setState(() => _lines[product.id] = item);
+  }
+
+  Future<void> _submit({PendingRetailPurchase? retry}) async {
+    if (_saving || _recovering || _recoveryError != null) return;
+    if (retry == null && (_lines.isEmpty || _supplier.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Indica el proveedor y al menos un producto.')),
+      );
+      return;
+    }
+    final paid = (retry?.paymentMethod ?? _method) != 'pendiente';
+    if (retry == null && paid) {
+      final confirmation = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirmar pago al proveedor'),
+          content: Text('El pago se registrará como gasto del negocio. '
+              '${_method == 'efectivo' ? 'También se registrará una salida de caja.' : 'Comprueba el pago en el medio indicado.'} '
+              '¿Ya se efectuó este pago?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Pago realizado')),
+          ],
+        ),
+      );
+      if (confirmation != true || !mounted) return;
+    }
+    setState(() => _saving = true);
+    try {
+      final user = Supabase.instance.client.auth.currentUser?.id;
+      final org = Repo.activeOrgId;
+      if (user == null || org == null) throw AppException('Sesión o empresa no válida');
+      final purchase = retry ?? PendingRetailPurchase(
+        orgId: org, userId: user, requestId: Repo.newRequestId(),
+        supplier: _supplier.text.trim(), reference: _reference.text.trim(),
+        paymentMethod: _method, lines: _lines.values.toList(),
+      );
+      if (purchase.orgId != org || purchase.userId != user) {
+        throw AppException('No se puede reintentar una compra de otra cuenta.');
+      }
+      if (retry == null) await RetailPurchaseStore.save(purchase);
+      if (!mounted) return;
+      setState(() => _pending = purchase);
+      final receiptId = await RetailPurchaseRepo.receive(purchase);
+      await RetailPurchaseStore.clear(purchase);
+      if (!mounted) return;
+      setState(() {
+        _pending = null;
+        _lines.clear();
+        _supplier.clear();
+        _reference.clear();
+        _method = 'pendiente';
+      });
+      LiveCache.clear();
+      AppState.instance.bump();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Compra recibida, inventario actualizado. Ref: ${receiptId.substring(0, 8)}')),
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Recepción sin confirmar. Reintenta con la misma solicitud. ${friendly(e)}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openSettlement([Map<String, dynamic>? receipt]) async {
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => RetailSettlementScreen(receipt: receipt)),
+    );
+    if (completed == true && mounted) {
+      LiveCache.clear();
+      AppState.instance.bump();
+      await _load();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_allowed) {
+      return const Scaffold(body: Center(
+        child: Text('Tu licencia o tu rol no permite registrar compras de inventario.'),
+      ));
+    }
+    final products = (_products ?? const <Product>[])
+        .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
+        .toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Compras y recepción'),
+        actions: [
+          IconButton(
+            onPressed: () => _openSettlement(),
+            icon: const Icon(Icons.pending_actions_rounded),
+            tooltip: 'Recuperar pago de proveedor',
+          ),
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Actualizar'),
+        ],
+      ),
+      body: _recovering || _recoveryError != null || _pending != null
+          ? Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (_recovering) const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(_recovering
+                    ? 'Buscando compras pendientes…'
+                    : _recoveryError ?? 'Una compra necesita confirmación.',
+                    textAlign: TextAlign.center),
+                if (_pending case final pending?) ...[
+                  const SizedBox(height: 16),
+                  Text('${pending.supplier} · ${money(pending.totalCents / 100, _currency)}'),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : () => _submit(retry: pending),
+                    icon: const Icon(Icons.sync_rounded),
+                    label: const Text('Recuperar la misma compra'),
+                  ),
+                ],
+                if (_recoveryError != null)
+                  TextButton(onPressed: _restore, child: const Text('Volver a comprobar')),
+              ]),
+            ))
+          : _error != null
+              ? Center(child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    TextButton(onPressed: _load, child: const Text('Reintentar')),
+                  ]),
+                ))
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+                  children: [
+                    const Text('1. ¿A quién compraste?'),
+                    TextField(
+                      controller: _supplier,
+                      maxLength: 120,
+                      decoration: const InputDecoration(labelText: 'Proveedor', hintText: 'Nombre o razón social'),
+                    ),
+                    TextField(
+                      controller: _reference,
+                      maxLength: 40,
+                      decoration: const InputDecoration(labelText: 'Documento del proveedor (opcional)'),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('2. Productos recibidos'),
+                    TextField(
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Buscar producto por nombre',
+                      ),
+                      onChanged: (v) => setState(() => _search = v),
+                    ),
+                    if (products.isEmpty)
+                      const Padding(padding: EdgeInsets.all(12), child: Text('No se encontraron productos. Agrégalos al catálogo.')),
+                    for (final p in products.take(40))
+                      ListTile(
+                        title: Text(p.name),
+                        subtitle: Text('Stock: ${p.stock == null ? 'sin control' : qtyText(p.stock!)}'
+                            ' · Costo anterior: ${money(p.unitCost ?? 0, _currency)}'),
+                        trailing: IconButton(
+                          tooltip: 'Agregar a recepción',
+                          onPressed: () => _editLine(p),
+                          icon: Icon(_lines.containsKey(p.id) ? Icons.check_circle_rounded : Icons.add_circle_outline),
+                        ),
+                        onTap: () => _editLine(p),
+                      ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => const ProductsScreen(),
+                        ));
+                        _load();
+                      },
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Abrir catálogo para crear un producto'),
+                    ),
+                    if (_lines.isNotEmpty) ...[
+                      const Divider(),
+                      const Text('Esta recepción'),
+                      for (final entry in _lines.entries)
+                        ListTile(
+                          title: Text((_products ?? []).where((p) => p.id == entry.key).firstOrNull?.name ?? entry.key),
+                          subtitle: Text('${qtyText(entry.value.quantity)} × ${money(entry.value.unitCostCents / 100, _currency)}'),
+                          trailing: IconButton(
+                            tooltip: 'Quitar línea',
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => setState(() => _lines.remove(entry.key)),
+                          ),
+                        ),
+                      Text('Total de compra: ${money(_total / 100, _currency)}',
+                          style: Theme.of(context).textTheme.titleLarge),
+                    ],
+                    const SizedBox(height: 20),
+                    const Text('3. ¿Ya se pagó?'),
+                    DropdownButtonFormField<String>(
+                      initialValue: _method,
+                      items: const [
+                        DropdownMenuItem(value: 'pendiente', child: Text('Pendiente de pago')),
+                        DropdownMenuItem(value: 'efectivo', child: Text('Efectivo (sale de caja)')),
+                        DropdownMenuItem(value: 'yape', child: Text('Yape')),
+                        DropdownMenuItem(value: 'plin', child: Text('Plin')),
+                        DropdownMenuItem(value: 'tarjeta', child: Text('Tarjeta')),
+                        DropdownMenuItem(value: 'transferencia', child: Text('Transferencia')),
+                      ],
+                      onChanged: (value) => setState(() => _method = value ?? 'pendiente'),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(_method == 'pendiente'
+                        ? 'Se ingresa el stock. El pago pendiente no se contabiliza todavía como gasto de caja.'
+                        : 'Se ingresa el stock y se registra el gasto; el efectivo también se descuenta del saldo de caja.',
+                        style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _saving || _lines.isEmpty || _total <= 0 ? null : _submit,
+                      icon: const Icon(Icons.inventory_rounded),
+                      label: const Text('Confirmar recepción'),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('Recepciones recientes', style: Theme.of(context).textTheme.titleMedium),
+                    for (final receipt in _history)
+                      ListTile(
+                        leading: const Icon(Icons.receipt_long_outlined),
+                        title: Text((receipt['supplier_name'] ?? '') as String),
+                        subtitle: Text('${(receipt['created_at'] ?? '').toString().split('T').first} · ${receipt['payment_method']}'),
+                        trailing: receipt['payment_method'] == 'pendiente'
+                            ? OutlinedButton(
+                                onPressed: _saving ? null : () => _openSettlement(receipt),
+                                child: const Text('Pagar'),
+                              )
+                            : Text(money(
+                                ((receipt['total_cents'] as num?) ?? 0).toDouble() / 100,
+                                (receipt['currency'] ?? _currency) as String,
+                              )),
+                        onTap: receipt['payment_method'] == 'pendiente'
+                            ? () => _openSettlement(receipt) : null,
+                      ),
+                  ],
+                ),
+    );
+  }
+}

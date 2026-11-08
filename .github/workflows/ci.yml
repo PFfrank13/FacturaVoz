@@ -49,8 +49,11 @@ jobs:
           --dart-define=SUPABASE_URL=https://example.supabase.co
           --dart-define=SUPABASE_ANON_KEY=ci
           --dart-define=API_BASE_URL=https://example.vercel.app
+      # CI cannot access the private FacturaVoz signing keystore.
+      # Validate Android source with an unsigned-for-distribution DEBUG build.
+      # Signed release APK/AAB remains a separate, mandatory gate on the signing host.
       - run: >
-          flutter build apk --release
+          flutter build apk --debug
           --dart-define=SUPABASE_URL=https://example.supabase.co
           --dart-define=SUPABASE_ANON_KEY=ci
           --dart-define=API_BASE_URL=https://example.vercel.app

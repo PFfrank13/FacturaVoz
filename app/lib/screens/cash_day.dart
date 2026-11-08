@@ -122,55 +122,103 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
   }
 
   Future<void> _close() async {
-    final s = _sum;
-    if (s == null) return;
-    final counted = TextEditingController();
+    if (_sum == null || _closing != null || _busy) return;
+    // Blind cash close: do not expose the expected balance while counting.
+    // Peruvian bill/coin values are in integer cents.
+    const values = [20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10];
+    final countFields = {for (final value in values) value: TextEditingController(text: '0')};
     final note = TextEditingController();
-    final ok = await showDialog<bool>(
+    final answer = await showDialog<({int cents, String note})>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cerrar la caja'),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Debería haber ${money(s.expectedCash, _cur)} en efectivo. Cuenta los billetes y monedas:'),
-          const SizedBox(height: 10),
-          TextField(
-            controller: counted,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: 'Efectivo contado', prefixText: '${currencySymbols[_cur] ?? _cur} '),
+        title: const Text('Cierre ciego de caja'),
+        content: SizedBox(
+          width: 390,
+          height: 460,
+          child: SingleChildScrollView(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('Cuenta billetes y monedas sin consultar el saldo esperado. '
+                  'Anota cuántos tienes de cada denominación.'),
+              const SizedBox(height: 12),
+              for (final value in values)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(children: [
+                    Expanded(child: Text(money(value / 100, _cur))),
+                    SizedBox(
+                      width: 110,
+                      child: TextField(
+                        controller: countFields[value],
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Cantidad', isDense: true),
+                      ),
+                    ),
+                  ]),
+                ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: note,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  labelText: 'Observación o motivo de diferencia',
+                  helperText: 'Obligatorio si el arqueo no cuadra.',
+                ),
+              ),
+            ]),
           ),
-          TextField(controller: note, decoration: const InputDecoration(labelText: 'Nota (opcional)')),
-        ]),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cerrar y enviar reporte')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () {
+            var cents = 0;
+            for (final denomination in values) {
+              final count = int.tryParse(countFields[denomination]!.text.trim());
+              if (count == null || count < 0 || count > 10000) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Cada cantidad debe ser un número entero entre 0 y 10 000')),
+                );
+                return;
+              }
+              cents += denomination * count;
+            }
+            Navigator.pop(ctx, (cents: cents, note: note.text.trim()));
+          }, child: const Text('Confirmar conteo')),
         ],
       ),
     );
-    final c = parseDecimal(counted.text);
-    final n = note.text;
-    disposeAfterClose([counted, note]);
-    if (ok != true) return;
+    disposeAfterClose([...countFields.values, note]);
+    if (answer == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final r = await V2Api.closeDay(day: _day, counted: c, note: n);
+      final r = await V2Api.closeDay(
+        day: _day, counted: answer.cents / 100, note: answer.note,
+      );
       if (!mounted) return;
-      final diff = c == null ? 0.0 : c - r.summary.expectedCash;
+      final diff = answer.cents / 100 - r.summary.expectedCash;
       Haptics.success();
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          icon: Icon(diff.abs() < 0.5 ? Icons.verified_rounded : Icons.error_outline_rounded, color: diff.abs() < 0.5 ? Brand.ok : Brand.warn, size: 40),
-          title: Text(diff.abs() < 0.5 ? '¡Caja cuadrada!' : (diff > 0 ? 'Sobra ${money(diff, _cur)}' : 'Falta ${money(-diff, _cur)}')),
-          content: Text(r.emailed ? 'El reporte del día se envió por correo al dueño.' : 'Cierre guardado. (El correo no se envió: revisa la configuración de Resend en el servidor.)'),
+          icon: Icon(diff.abs() < 0.01 ? Icons.verified_rounded : Icons.error_outline_rounded,
+              color: diff.abs() < 0.01 ? Brand.ok : Brand.warn, size: 40),
+          title: Text(diff.abs() < 0.01 ? 'Caja cuadrada' :
+              (diff > 0 ? 'Sobra ${money(diff, _cur)}' : 'Falta ${money(-diff, _cur)}')),
+          content: Text(r.emailed
+              ? 'Cierre guardado. Se envió el reporte del día al dueño.'
+              : 'Cierre guardado. No se pudo enviar correo; revisa Resend.'),
           actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Listo'))],
         ),
       );
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('No se cerró caja: $e'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (mounted) setState(() => _busy = false);
   }
 
   @override
@@ -210,13 +258,19 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                         index: 1,
                         child: SoftCard(
                           child: Column(children: [
-                            _line(context, 'Apertura', s.opening),
-                            _line(context, 'Ventas en efectivo', s.cashSales),
-                            _line(context, 'Otros ingresos de efectivo', s.cashIn),
-                            _line(context, 'Salidas de efectivo', -s.cashOut),
-                            const Divider(),
-                            _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
-                            if (_closing != null) ...[
+                            if (_closing == null)
+                              const ListTile(
+                                leading: Icon(Icons.visibility_off_outlined),
+                                title: Text('Arqueo ciego'),
+                                subtitle: Text('El saldo teórico y sus movimientos se muestran después de cerrar caja.'),
+                              )
+                            else ...[
+                              _line(context, 'Apertura', s.opening),
+                              _line(context, 'Ventas en efectivo', s.cashSales),
+                              _line(context, 'Otros ingresos de efectivo', s.cashIn),
+                              _line(context, 'Salidas de efectivo', -s.cashOut),
+                              const Divider(),
+                              _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
                               _line(context, 'Contado al cerrar', ((_closing!['counted_cash'] as num?) ?? 0).toDouble()),
                               _line(context, 'Diferencia', ((_closing!['difference'] as num?) ?? 0).toDouble(), bold: true, signed: true),
                             ],
@@ -224,7 +278,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                         ),
                       ),
                       const SizedBox(height: 12),
-                      if (s.byMethod.isNotEmpty)
+                      if (_closing != null && s.byMethod.isNotEmpty)
                         Reveal(
                           index: 2,
                           child: SoftCard(
@@ -248,7 +302,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                           OutlinedButton.icon(onPressed: () => _move('ingreso'), icon: const Icon(Icons.south_west_rounded), label: const Text('Entra efectivo')),
                           OutlinedButton.icon(onPressed: () => _move('egreso'), icon: const Icon(Icons.north_east_rounded), label: const Text('Sale efectivo')),
                         ]),
-                      if (_moves.isNotEmpty) ...[
+                      if (_closing != null && _moves.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         const SectionTitle('Movimientos de caja'),
                         for (final m in _moves)
@@ -270,7 +324,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                             const Icon(Icons.verified_rounded, color: Brand.ok),
                             const SizedBox(width: 10),
                             Expanded(child: Text('Caja cerrada${_closing!['note'] != null && '${_closing!['note']}'.isNotEmpty ? ' · ${_closing!['note']}' : ''}.')),
-                            TextButton(onPressed: _close, child: const Text('Volver a cerrar')),
+                            const Icon(Icons.lock_rounded),
                           ]),
                         ),
                     ]),

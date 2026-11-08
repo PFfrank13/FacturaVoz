@@ -1,6 +1,7 @@
 // Venta rápida / caja (POS): toca productos o escanea su código de barras, aplica el mejor precio vigente
 // (por mayor, promociones) y un cupón, y pasa a la boleta/factura para emitir e imprimir el ticket.
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
 import '../app_state.dart';
@@ -13,6 +14,8 @@ import '../services/live.dart';
 import '../services/print/kitchen_print.dart';
 import '../services/print/ticket_printer.dart' show TicketLine;
 import '../services/repo.dart';
+import '../services/pending_checkout.dart';
+import '../services/pos_cart_draft.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/motion.dart';
@@ -20,6 +23,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
+import 'pos_payment.dart';
 import 'new_invoice.dart';
 import 'team.dart' show dbMessage;
 
@@ -50,6 +54,127 @@ class _PosScreenState extends State<PosScreen> {
   bool _charging = false;
   String? _chargeRequestId; // Preserve across timeout/retry to avoid duplicate invoice/payment.
   String? _chargeMethod;
+  PendingCheckout? _pendingCheckout;
+  bool _recoveringCheckout = true;
+  String? _checkoutRecoveryError;
+  String? _sessionOrg;
+  String? _sessionUser;
+  bool _restoringCart = true;
+  String? _cartStorageError;
+  Future<void> _cartWrite = Future<void>.value();
+
+  Future<void> _restoreCart() async {
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (mounted) {
+      setState(() {
+        _restoringCart = true;
+        _cartStorageError = null;
+      });
+    }
+    try {
+      if (org == null || uid == null) {
+        throw const FormatException('Selecciona la empresa e inicia sesión.');
+      }
+      await _cartWrite.catchError((Object _) {});
+      final draft = await PosCartStore.load(uid, org);
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) {
+        return;
+      }
+      setState(() {
+        _cart..clear()..addAll(draft?.quantities ?? const <String, double>{});
+        _notes..clear()..addAll(draft?.notes ?? const <String, String>{});
+        _table.text = draft?.table ?? '';
+        _coupon = draft?.couponCode != null && draft?.couponKind != null &&
+                draft?.couponValue != null
+            ? (code: draft!.couponCode!, kind: draft.couponKind!, value: draft.couponValue!)
+            : null;
+        _cartStorageError = null;
+      });
+    } catch (e) {
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == uid) {
+        setState(() => _cartStorageError =
+            'No se pudo recuperar el carrito. No se sobrescribirá el respaldo: $e');
+      }
+    } finally {
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == uid) {
+        setState(() => _restoringCart = false);
+      }
+    }
+  }
+
+  Future<void> _queueCartSave() {
+    if (_restoringCart || _cartStorageError != null) return Future<void>.value();
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (org == null || uid == null) return Future<void>.value();
+    final coupon = _coupon;
+    final draft = PosCartDraft(
+      orgId: org, userId: uid,
+      quantities: Map<String, double>.of(_cart),
+      notes: Map<String, String>.of(_notes),
+      table: _table.text,
+      couponCode: coupon?.code,
+      couponKind: coupon?.kind,
+      couponValue: coupon?.value,
+    );
+    // Ordered snapshots ensure a slow earlier storage write cannot win.
+    _cartWrite = _cartWrite.catchError((Object _) {}).then((_) => PosCartStore.save(draft));
+    _cartWrite.catchError((Object e) {
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == uid) {
+        setState(() => _cartStorageError =
+            'Error guardando el ticket abierto. No cobres sin revisar el almacenamiento: $e');
+      }
+    });
+    return _cartWrite;
+  }
+
+  void _onTableChanged() { _queueCartSave(); }
+
+  Future<void> _clearStoredCart(String uid, String org) async {
+    await _cartWrite.catchError((Object _) {});
+    await PosCartStore.clear(userId: uid, orgId: org);
+  }
+
+  void _onSessionContext() {
+    final nextOrg = Repo.activeOrgId;
+    final nextUser = Supabase.instance.client.auth.currentUser?.id;
+    if (_sessionOrg == nextOrg && _sessionUser == nextUser) return;
+    _sessionOrg = nextOrg;
+    _sessionUser = nextUser;
+    // A retained tab must not show company A's products/checkout under company B.
+    // The original encrypted pending request is kept under its own user/org key.
+    setState(() {
+      // Suppress table-field listeners before clearing the old tenant's UI.
+      _restoringCart = true;
+      _cart.clear();
+      _notes.clear();
+      _coupon = null;
+      _q.clear();
+      _table.clear();
+      _products = null;
+      _extra = const {};
+      _promos = const [];
+      _error = null;
+      _chargeRequestId = null;
+      _chargeMethod = null;
+      _pendingCheckout = null;
+      _recoveringCheckout = true;
+      _checkoutRecoveryError = null;
+      _cartStorageError = null;
+      _restoringCart = true;
+      _kitchenRequestId = null;
+      _savedOrderId = null;
+      _savedOrderNumber = null;
+    });
+    _restoreCheckout();
+    _restoreCart();
+    _load();
+  }
   bool _seeding = false;
   bool _savingOrder = false;
   String? _kitchenRequestId; // Se conserva si la red falla para no duplicar pedidos.
@@ -62,12 +187,50 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
-    _products = LiveCache.get<List<Product>>('pos.products') ?? _products;
+    _sessionOrg = Repo.activeOrgId;
+    _sessionUser = Supabase.instance.client.auth.currentUser?.id;
+    AppState.instance.addListener(_onSessionContext);
+    _table.addListener(_onTableChanged);
+    _products = LiveCache.get<List<Product>>('pos.products.${Repo.activeOrgId}') ?? _products;
     _load();
+    _restoreCheckout();
+    _restoreCart();
+  }
+
+  Future<void> _restoreCheckout() async {
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    try {
+      if (org == null || uid == null) throw const FormatException('Selecciona una empresa e inicia sesión.');
+      final pending = await PendingCheckoutStore.load(userId: uid, orgId: org);
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) {
+        return;
+      }
+      setState(() {
+        _pendingCheckout = pending;
+        _chargeRequestId = pending?.requestId;
+        _chargeMethod = pending?.method;
+        _checkoutRecoveryError = null;
+      });
+    } catch (e) {
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) {
+        return;
+      }
+      setState(() => _checkoutRecoveryError = 'No se pudo verificar si existe un cobro pendiente: $e');
+    } finally {
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == uid) {
+        setState(() => _recoveringCheckout = false);
+      }
+    }
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onSessionContext);
+    _table.removeListener(_onTableChanged);
     _q.dispose();
     _focus.dispose();
     _table.dispose();
@@ -75,9 +238,13 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     try {
       final p = await Repo.listProducts(activeOnly: true);
-      LiveCache.put('pos.products', p);
+      if (org == Repo.activeOrgId && uid == Supabase.instance.client.auth.currentUser?.id) {
+        LiveCache.put('pos.products.$org', p);
+      }
       final e = await V2Repo.productExtras();
       List<Promo> promos = const [];
       if (Access.instance.has('precios')) {
@@ -85,7 +252,8 @@ class _PosScreenState extends State<PosScreen> {
           promos = await V2Repo.promotions();
         } catch (_) {}
       }
-      if (mounted) {
+      if (mounted && org == Repo.activeOrgId &&
+          uid == Supabase.instance.client.auth.currentUser?.id) {
         setState(() {
           _products = p;
           _extra = e;
@@ -93,7 +261,10 @@ class _PosScreenState extends State<PosScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = friendly(e));
+      if (mounted && org == Repo.activeOrgId &&
+          uid == Supabase.instance.client.auth.currentUser?.id) {
+        setState(() => _error = friendly(e));
+      }
     }
   }
 
@@ -111,6 +282,11 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _add(Product p, [double n = 1]) {
+    if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Confirma el cobro pendiente antes de modificar el carrito.')));
+      return;
+    }
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este pedido ya se guardó en Comandas. Pulsa Nuevo pedido para agregar más platos.')));
       return;
@@ -120,10 +296,12 @@ class _PosScreenState extends State<PosScreen> {
       final q = (_cart[p.id] ?? 0) + n;
       if (q <= 0) {
         _cart.remove(p.id);
+        _notes.remove(p.id);
       } else {
         _cart[p.id] = q;
       }
     });
+    _queueCartSave();
   }
 
   /// Lo escrito en el buscador: si es un código de barras exacto, se agrega solo (sirve con pistola lectora).
@@ -149,7 +327,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _applyCoupon() async {
-    if (_chargeRequestId != null) return; // No changes while a checkout may have committed.
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return; // No changes while a checkout may have committed.
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) return;
     final c = TextEditingController();
     final ok = await showDialog<bool>(
@@ -170,6 +348,7 @@ class _PosScreenState extends State<PosScreen> {
       final r = await V2Repo.useCoupon(code);
       if (r['kind'] == null) throw AppException('Cupón no válido o vencido.');
       setState(() => _coupon = (code: code, kind: (r['kind'] ?? 'porcentaje') as String, value: ((r['value'] as num?) ?? 0).toDouble()));
+      _queueCartSave();
       if (mounted) showSuccess(context, 'Cupón $code aplicado', icon: Icons.local_offer_rounded);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : dbMessage(e))));
@@ -228,7 +407,7 @@ class _PosScreenState extends State<PosScreen> {
   /// Guardado real en Supabase ANTES de imprimir. La misma requestId se reusa
   /// en reintentos para que una caída de red no duplique la comanda.
   Future<bool> _persistKitchenOrder() async {
-    if (!_restaurant || _cart.isEmpty) return false;
+    if (!_restaurant || _cart.isEmpty || _chargeRequestId != null || _charging || _recoveringCheckout || _checkoutRecoveryError != null) return false;
     if (_savedOrderId != null) return true;
     if (_savingOrder) return false;
     setState(() => _savingOrder = true);
@@ -277,7 +456,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _newKitchenOrder() {
-    if (_savingOrder) return;
+    if (_savingOrder || _charging || _chargeRequestId != null || _recoveringCheckout || _checkoutRecoveryError != null) return;
     // Si hubo timeout, el servidor pudo guardar la comanda aunque no llegara
     // la respuesta. Obliga a reintentar la MISMA requestId antes de empezar otra.
     if (_kitchenRequestId != null && _savedOrderId == null) {
@@ -293,6 +472,7 @@ class _PosScreenState extends State<PosScreen> {
       _savedOrderId = null;
       _savedOrderNumber = null;
     });
+    _queueCartSave();
   }
 
   Future<void> _printComanda() async {
@@ -334,7 +514,7 @@ class _PosScreenState extends State<PosScreen> {
 
   /// Detalle del pedido: cantidades, nota por producto y (restaurante) comanda y precuenta.
   Future<void> _cartSheet() async {
-    if (_chargeRequestId != null) {
+    if (_recoveringCheckout || _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cobro pendiente de confirmación. Reintenta antes de editar el pedido.')));
       return;
     }
@@ -371,7 +551,7 @@ class _PosScreenState extends State<PosScreen> {
                           initialValue: _notes[p.id] ?? '',
                           enabled: _kitchenRequestId == null && !_savingOrder,
                           maxLength: 200,
-                          onChanged: (v) => _notes[p.id] = v,
+                          onChanged: (v) { _notes[p.id] = v; _queueCartSave(); },
                           decoration: const InputDecoration(isDense: true, hintText: 'Nota (ej. sin cebolla, con arroz)', prefixIcon: Icon(Icons.edit_note_rounded)),
                         ),
                       ]),
@@ -405,6 +585,10 @@ class _PosScreenState extends State<PosScreen> {
 
   /// Cobro en un toque: elige cómo paga el cliente y listo (se registra la venta, el cobro y se imprime el ticket).
   Future<void> _chargeSheet() async {
+    if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
+      return;
+    }
     final lines = _lines();
     if (lines.isEmpty) return;
     final total = computeTotals(lines, _rate).total;
@@ -427,9 +611,11 @@ class _PosScreenState extends State<PosScreen> {
               for (final k in const ['efectivo', 'yape', 'plin', 'tarjeta', 'transferencia'])
                 ActionChip(
                   label: Text(paymentMethods[k]!),
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    _fastCharge(k);
+                    final approval = await confirmPosPayment(context, method: k, currency: _cur, total: total);
+                    if (!mounted || approval == null) return;
+                    await _fastCharge(k, paymentEvidence: approval.note);
                   },
                 ),
             ]),
@@ -448,31 +634,62 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
-  Future<void> _fastCharge(String method) async {
-    if (_charging) return;
+  Future<void> _fastCharge(String method, {String? paymentEvidence}) async {
+    // An immutable pending charge must be recoverable even if its unrelated
+    // editable cart backup is damaged. Never allow a NEW charge in that case.
+    if (_charging || _recoveringCheckout || _restoringCart ||
+        (_cartStorageError != null && _pendingCheckout == null) ||
+        _checkoutRecoveryError != null) {
+      return;
+    }
     if (_chargeMethod != null && _chargeMethod != method) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reintenta con el mismo método del primer cobro para evitar diferencias.')));
       return;
     }
-    if (_restaurant && !await _persistKitchenOrder()) return;
+    // A recovered checkout is immutable. Its payload, method and request ID
+    // must be reused exactly even when the current catalog or cart changed.
+    final recovering = _pendingCheckout != null;
+    if (!recovering && _restaurant && !await _persistKitchenOrder()) return;
     if (!mounted) return;
-    final lines = _lines();
+    final pending = _pendingCheckout;
+    final lines = recovering ? pending!.items : _lines();
     if (lines.isEmpty) return;
-    _chargeRequestId ??= Repo.newRequestId();
-    _chargeMethod ??= method;
     setState(() => _charging = true);
     try {
-      final table = _table.text.trim();
-      final draft = InvoiceDraft(
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      final org = Repo.activeOrgId;
+      if (uid == null || org == null) throw AppException('Sesión o empresa no válida.');
+      final checkout = pending ?? PendingCheckout(
+        orgId: org,
+        userId: uid,
+        requestId: Repo.newRequestId(),
+        method: method,
         taxRate: _rate,
         currency: _cur,
+        notes: [
+          if (_table.text.trim().isNotEmpty) 'Mesa ${_table.text.trim()}',
+          if (_coupon != null) 'Cupón ${_coupon!.code}',
+          if (paymentEvidence != null) paymentEvidence,
+        ].join(' · '),
         items: lines,
-        notes: [if (table.isNotEmpty) 'Mesa $table', if (_coupon != null) 'Cupón ${_coupon!.code}'].join(' · '),
-        transcript: 'Venta rápida',
       );
+      if (checkout.orgId != org || checkout.userId != uid || checkout.method != method) {
+        throw AppException('El cobro pertenece a otra empresa, cuenta o método.');
+      }
+      // Commit the immutable local snapshot BEFORE any remote money mutation.
+      if (!recovering) {
+        await PendingCheckoutStore.save(checkout);
+      }
+      if (!mounted) return;
+      setState(() {
+        _pendingCheckout = checkout;
+        _chargeRequestId = checkout.requestId;
+        _chargeMethod = checkout.method;
+      });
       final id = await Repo.fastCheckoutAtomic(
-        draft: draft, method: method, requestId: _chargeRequestId!);
-      // Transaction confirmed by PostgreSQL; only then show success and print.
+        draft: checkout.toDraft(), method: checkout.method, requestId: checkout.requestId,
+      );
+      // PostgreSQL confirmed the transaction. Never clear a pending key before this response.
       String? kitchenLinkError;
       if (_restaurant && _savedOrderId != null) {
         try {
@@ -481,12 +698,20 @@ class _PosScreenState extends State<PosScreen> {
           kitchenLinkError = friendly(e);
         }
       }
+      // Remove editable draft before the immutable checkout recovery key.
+      // A crash between these deletes can only replay the same idempotent sale.
+      await _clearStoredCart(checkout.userId, checkout.orgId);
+      await PendingCheckoutStore.clear(checkout);
       AppState.instance.bump();
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != checkout.orgId ||
+          Supabase.instance.client.auth.currentUser?.id != checkout.userId) {
+        return;
+      }
       setState(() {
         _cart.clear();
         _notes.clear();
         _coupon = null;
+        _pendingCheckout = null;
         _chargeRequestId = null;
         _chargeMethod = null;
         if (_restaurant) {
@@ -499,18 +724,18 @@ class _PosScreenState extends State<PosScreen> {
       if (kitchenLinkError != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Venta cobrada, pero no se pudo vincular a la comanda: $kitchenLinkError')));
       }
-      // Se abre la venta con el ticket listo para imprimir (y desde ahí se emite la boleta o factura electrónica).
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoiceId: id, sendCopy: true, autoPrint: true)));
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; no se creará una venta duplicada si ya fue registrada. ${friendly(e)}')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; si el servidor ya lo registró no creará una venta duplicada. ${friendly(e)}')));
     } finally {
       if (mounted) setState(() => _charging = false);
     }
   }
 
   Future<void> _checkout() async {
-    if (_chargeRequestId != null) {
+    if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Primero confirma o recupera el cobro rápido pendiente.')));
       return;
     }
@@ -536,6 +761,11 @@ class _PosScreenState extends State<PosScreen> {
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Venta creada; fallo al vincular la comanda: ${friendly(e)}')));
         }
       }
+      if (!mounted) return;
+      await _clearStoredCart(
+        Supabase.instance.client.auth.currentUser?.id ?? '',
+        Repo.activeOrgId ?? '',
+      );
       if (!mounted) return;
       setState(() {
         _cart.clear();
@@ -569,7 +799,35 @@ class _PosScreenState extends State<PosScreen> {
     ];
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'), actions: actions),
-      body: _error != null
+      body: (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
+              _checkoutRecoveryError != null || _pendingCheckout != null)
+          ? Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (_recoveringCheckout || _restoringCart) const CircularProgressIndicator(),
+                if (_recoveringCheckout || _restoringCart) const SizedBox(height: 16),
+                Text(_recoveringCheckout || _restoringCart
+                    ? 'Recuperando ticket y cobros pendientes…'
+                    : _cartStorageError ?? _checkoutRecoveryError ?? 'Hay un cobro pendiente de confirmación.',
+                    textAlign: TextAlign.center),
+                if (_pendingCheckout case final pending?) ...[
+                  const SizedBox(height: 12),
+                  Text('Importe y productos conservados del cobro original. No cambies el método de pago.', textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _charging ? null : () => _fastCharge(pending.method),
+                    icon: const Icon(Icons.sync_rounded),
+                    label: Text(_charging ? 'Verificando…' : 'Recuperar cobro (${paymentMethods[pending.method] ?? pending.method})'),
+                  ),
+                ],
+                if (_checkoutRecoveryError != null || _cartStorageError != null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton(onPressed: () { _restoreCheckout(); _restoreCart(); },
+                    child: const Text('Reintentar recuperación')),
+                ],
+              ]),
+            ))
+          : _error != null
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : _products == null
               ? const SkeletonList()
@@ -712,16 +970,24 @@ class _PosScreenState extends State<PosScreen> {
                       ),
                     ),
                     TextButton(
-                      onPressed: _savingOrder ? null : (_restaurant ? _newKitchenOrder : () => setState(() {
-                        _cart.clear();
-                        _notes.clear();
-                      })),
+                      onPressed: _savingOrder || _charging || _recoveringCheckout ||
+                          _restoringCart || _cartStorageError != null ||
+                          _checkoutRecoveryError != null || _chargeRequestId != null
+                          ? null : (_restaurant ? _newKitchenOrder : () {
+                              setState(() {
+                                _cart.clear(); _notes.clear(); _coupon = null;
+                              });
+                              _queueCartSave();
+                            }),
                       child: Text(_restaurant && _savedOrderId != null ? 'Nuevo pedido' : (_restaurant && _kitchenRequestId != null ? 'Pendiente' : 'Vaciar')),
                     ),
                     const SizedBox(width: 6),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                      onPressed: _charging || _savingOrder ? null : _chargeSheet,
+                      onPressed: _charging || _savingOrder || _recoveringCheckout ||
+                          _restoringCart || _cartStorageError != null ||
+                          _checkoutRecoveryError != null || _chargeRequestId != null
+                          ? null : _chargeSheet,
                       icon: const Icon(Icons.point_of_sale_rounded),
                       label: const Text('Cobrar'),
                     ),
