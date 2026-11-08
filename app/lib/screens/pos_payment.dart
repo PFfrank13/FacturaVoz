@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../models_pro.dart';
+import '../ui/widgets.dart';
 import '../services/pro_repo.dart';
 import 'pos_payment_logic.dart';
 
@@ -143,7 +144,7 @@ Future<PosPaymentApproval?> confirmPosPayment(
       ),
     );
   } finally {
-    moneyInput.dispose();
+    disposeAfterClose([moneyInput]);
   }
   return approved;
 }
