@@ -147,6 +147,8 @@ class _PosScreenState extends State<PosScreen> {
     // A retained tab must not show company A's products/checkout under company B.
     // The original encrypted pending request is kept under its own user/org key.
     setState(() {
+      // Suppress table-field listeners before clearing the old tenant's UI.
+      _restoringCart = true;
       _cart.clear();
       _notes.clear();
       _coupon = null;
@@ -292,6 +294,7 @@ class _PosScreenState extends State<PosScreen> {
       final q = (_cart[p.id] ?? 0) + n;
       if (q <= 0) {
         _cart.remove(p.id);
+        _notes.remove(p.id);
       } else {
         _cart[p.id] = q;
       }
