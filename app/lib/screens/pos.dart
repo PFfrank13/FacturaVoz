@@ -110,9 +110,9 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _restoreCheckout() async {
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     try {
-      final org = Repo.activeOrgId;
-      final uid = Supabase.instance.client.auth.currentUser?.id;
       if (org == null || uid == null) throw const FormatException('Selecciona una empresa e inicia sesión.');
       final pending = await PendingCheckoutStore.load(userId: uid, orgId: org);
       if (!mounted || Repo.activeOrgId != org ||
@@ -124,12 +124,12 @@ class _PosScreenState extends State<PosScreen> {
         _checkoutRecoveryError = null;
       });
     } catch (e) {
-      if (!mounted || Repo.activeOrgId != _sessionOrg ||
-          Supabase.instance.client.auth.currentUser?.id != _sessionUser) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) return;
       setState(() => _checkoutRecoveryError = 'No se pudo verificar si existe un cobro pendiente: $e');
     } finally {
-      if (mounted && Repo.activeOrgId == _sessionOrg &&
-          Supabase.instance.client.auth.currentUser?.id == _sessionUser) {
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == uid) {
         setState(() => _recoveringCheckout = false);
       }
     }
