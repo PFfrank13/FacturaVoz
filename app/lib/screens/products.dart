@@ -14,6 +14,7 @@ import '../ui/widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
+import '../services/v2_api.dart';
 import '../ui/barcode_scanner.dart';
 import 'client_profile.dart' show StorageImage;
 
@@ -153,7 +154,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
     final reorder = TextEditingController(text: p?.reorderPoint == null ? '' : qtyText(p!.reorderPoint!));
     final cost = TextEditingController(text: p?.unitCost == null ? '' : qtyText(p!.unitCost!));
-    var inStore = p?.inStore ?? true;
+    var inStore = p?.inStore ?? false;
     var err = '';
     // v2.0: código de barras, foto, categoría, descripción y precio por mayor.
     final extra = p == null ? null : await V2Repo.productExtra(p.id);
@@ -165,6 +166,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final wholesaleMin = TextEditingController(text: extra?['wholesale_min_qty'] == null ? '' : qtyText((extra!['wholesale_min_qty'] as num).toDouble()));
     final oldImage = extra?['image_path'] as String?;
     Uint8List? newImage;
+    Uint8List? originalImage;
+    var imageExt = 'jpg';
+    var aiProcessed = false;
+    var processingImage = false;
+    String? imageError;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -257,7 +263,15 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                           final x = await ImagePicker().pickImage(source: src, maxWidth: 1200, imageQuality: 75);
                           if (x == null) return;
                           final b = await x.readAsBytes();
-                          setS(() => newImage = b);
+                          if (!ctx.mounted) return;
+                          setS(() {
+                            newImage = b;
+                            originalImage = b;
+                            imageExt = x.name.toLowerCase().endsWith('.png') ? 'png'
+                                : x.name.toLowerCase().endsWith('.webp') ? 'webp' : 'jpg';
+                            aiProcessed = false;
+                            imageError = null;
+                          });
                         },
                         icon: Icon(src == ImageSource.camera ? Icons.photo_camera_rounded : Icons.photo_library_rounded, size: 18),
                         label: Text(src == ImageSource.camera ? 'Foto' : 'Galería'),
@@ -265,6 +279,62 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   ]),
                 ),
               ]),
+              if (newImage != null || (oldImage != null && oldImage.isNotEmpty)) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  OutlinedButton.icon(
+                    onPressed: processingImage ? null : () async {
+                      setS(() { processingImage = true; imageError = null; });
+                      try {
+                        final source = originalImage ?? newImage ?? await V2Repo.download(oldImage);
+                        if (source == null || source.isEmpty) throw AppException('No se pudo recuperar la foto original.');
+                        final mime = source.length >= 12 &&
+                          source[0] == 0x89 && source[1] == 0x50 ? 'image/png'
+                          : source[0] == 0x52 && source[1] == 0x49 && source[2] == 0x46 ? 'image/webp'
+                          : 'image/jpeg';
+                        final png = await V2Api.removeProductBackground(source, mime: mime);
+                        if (!ctx.mounted) return;
+                        setS(() {
+                          originalImage = source;
+                          newImage = png;
+                          imageExt = 'png';
+                          aiProcessed = true;
+                          imageError = null;
+                        });
+                      } catch (e) {
+                        if (ctx.mounted) setS(() => imageError = friendly(e));
+                      } finally {
+                        if (ctx.mounted) setS(() => processingImage = false);
+                      }
+                    },
+                    icon: processingImage
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.auto_fix_high_rounded),
+                    label: Text(processingImage ? 'Quitando fondo…' : 'Quitar fondo con IA'),
+                  ),
+                  if (aiProcessed && originalImage != null)
+                    TextButton.icon(
+                      onPressed: processingImage ? null : () => setS(() {
+                        newImage = originalImage;
+                        imageExt = originalImage!.length >= 8 &&
+                            originalImage![0] == 0x89 && originalImage![1] == 0x50
+                            ? 'png' : 'jpg';
+                        aiProcessed = false;
+                        imageError = null;
+                      }),
+                      icon: const Icon(Icons.undo_rounded),
+                      label: const Text('Usar foto original'),
+                    ),
+                ]),
+                if (imageError != null) Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(imageError!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                ),
+                if (aiProcessed) const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('PNG transparente preparado. Se guardará al confirmar el producto.'),
+                ),
+              ],
               const SizedBox(height: 10),
               TextField(
                 controller: barcode,
@@ -340,7 +410,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
               GradientButton(
                 label: 'Guardar',
                 icon: Icons.check_rounded,
-                onPressed: () {
+                onPressed: processingImage ? null : () {
                   final v = price.text.trim().isEmpty ? 0.0 : parseDecimal(price.text);
                   final hasImage = newImage != null || (oldImage != null && oldImage.isNotEmpty);
                   if (name.text.trim().isEmpty) {
@@ -377,13 +447,36 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       'wholesale_min_qty': parseDecimal(wholesale.text) == null ? null : parseDecimal(wholesaleMin.text),
     };
     final imageToUpload = newImage;
+    final originalToUpload = aiProcessed ? originalImage : null;
+    final imageUploadExt = imageExt;
+    final wasProcessed = aiProcessed;
     disposeAfterClose([name, price, stock, reorder, cost, barcode, category, description, wholesale, wholesaleMin]);
     if (ok != true) return;
     try {
       final id = await Repo.saveProduct(id: p?.id, name: values.$1, unitPrice: values.$2, unit: values.$3);
       try {
-        if (imageToUpload != null) extraFields['image_path'] = await V2Repo.upload('productos', imageToUpload);
+        String? originPath;
+        if (originalToUpload != null) {
+          originPath = await V2Repo.upload('productos-originales', originalToUpload,
+              ext: originalToUpload.length >= 8 && originalToUpload[0] == 0x89 &&
+                  originalToUpload[1] == 0x50 ? 'png' : 'jpg');
+        }
+        if (imageToUpload != null) {
+          extraFields['image_path'] = await V2Repo.upload('productos', imageToUpload, ext: imageUploadExt);
+        }
         await V2Repo.saveProductExtra(id, extraFields);
+        // Metadata is optional for deployments that have not installed
+        // the additive 20261129 migration. image_path always remains usable.
+        if (wasProcessed && originPath != null && extraFields['image_path'] != null) {
+          try {
+            await V2Repo.saveProductExtra(id, {
+              'image_original_path': originPath,
+              'image_clean_path': extraFields['image_path'],
+            });
+          } catch (e) {
+            _snack('Foto procesada guardada. Ejecuta 20261129 para conservar el origen en el catálogo.');
+          }
+        }
       } catch (e) {
         _snack(e.toString().contains('23505') ? 'Guardado, pero ese código de barras ya lo tiene otro producto.' : 'Guardado. ${V2Repo.missingHint(e)}');
       }
