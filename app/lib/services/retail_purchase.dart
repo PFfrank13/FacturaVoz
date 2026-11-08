@@ -98,7 +98,7 @@ class RetailPurchaseStore {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
-  static String _key(String user, String org) => 'fv_purchase_pending_v1_${user}_${org}';
+  static String _key(String user, String org) => 'fv_purchase_pending_v1_$user' '_$org';
 
   static Future<PendingRetailPurchase?> load(String user, String org) async {
     final raw = await _storage.read(key: _key(user, org));
