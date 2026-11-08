@@ -89,7 +89,7 @@ class PendingCheckoutStore {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static String _key(String userId, String orgId) => 'fv_pos_pending_v1_${userId}_${orgId}';
+  static String _key(String userId, String orgId) => 'fv_pos_pending_v1_$userId' '_$orgId';
 
   static Future<PendingCheckout?> load({
     required String userId,
