@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -78,12 +77,16 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
     if (file == null) return;
     final bytes = await file.readAsBytes();
     if (bytes.length < 12 || bytes.length > 3000000) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La imagen QR debe ocupar menos de 3 MB.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('La imagen QR debe ocupar menos de 3 MB.')));
+      }
       return;
     }
     if (!mounted) return;
-    setState(() { if (yape) _yapeQrBytes = bytes; else _plinQrBytes = bytes; });
+    setState(() {
+      if (yape) { _yapeQrBytes = bytes; } else { _plinQrBytes = bytes; }
+    });
   }
 
   Widget _qrPicker(bool yape) {
