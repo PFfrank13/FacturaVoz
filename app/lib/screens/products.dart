@@ -542,6 +542,33 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             SectorPhotoBanner(rubro: Access.instance.rubro,
               title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
             const SizedBox(height: 16),
+            if (all != null && Access.instance.isAdmin &&
+                Access.instance.has('stock') &&
+                all.any((p) => p.stock != null && p.stock! < 0))
+              SoftCard(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Hay productos por regularizar',
+                      style: t.textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${all.where((p) => p.stock != null && p.stock! < 0).length} '
+                    'artículo(s) vendidos con stock insuficiente. '
+                    'La venta queda registrada: repón mercadería o revisa el conteo.',
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const RetailPurchasesScreen(),
+                      ));
+                      _load();
+                    },
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    label: const Text('Registrar recepción'),
+                  ),
+                ],
+              )),
             TextField(
               onChanged: (v) => setState(() => _q = v),
               decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded), isDense: true),
@@ -588,7 +615,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Wrap(spacing: 6, runSpacing: 4, children: [
-                                      if (p.tracksStock) StatusPill('Stock ${qtyText(p.stock ?? 0)}', tone: p.lowStock ? PillTone.warn : PillTone.ok),
+                                      if (p.tracksStock) StatusPill(p.stock != null && p.stock! < 0
+                                          ? 'Regularizar ${qtyText(-p.stock!)}'
+                                          : 'Stock ${qtyText(p.stock ?? 0)}',
+                                          tone: p.stock != null && p.stock! < 0
+                                              ? PillTone.bad : (p.lowStock ? PillTone.warn : PillTone.ok)),
                                       if (p.margin != null)
                                         StatusPill('Margen ${(p.margin! * 100).round()} %', tone: p.margin! < 0.15 ? PillTone.bad : (p.margin! < 0.3 ? PillTone.warn : PillTone.ok)),
                                     ]),
