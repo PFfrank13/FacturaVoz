@@ -5,7 +5,6 @@ import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../services/retail_purchase.dart';
-import '../ui/widgets.dart';
 
 /// Settles an already received supplier purchase, without touching stock.
 /// A pending local operation always takes precedence over a new payment.
@@ -105,8 +104,10 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
       ));
       Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) setState(() => _error =
-          'Pago no confirmado. Conservamos la misma solicitud para recuperar: ${friendly(e)}');
+      if (mounted) {
+        setState(() => _error =
+            'Pago no confirmado. Conservamos la misma solicitud para recuperar: ${friendly(e)}');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
