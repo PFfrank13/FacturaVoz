@@ -113,29 +113,19 @@ try {
   if ([string]::IsNullOrWhiteSpace($DeviceId)) {
     $rawDevices = & flutter devices --machine
     Assert-Exit 'flutter devices --machine'
-    # ConvertFrom-Json on Windows PowerShell 5.1 may return a JSON array as
-    # a single object. Enumerate it explicitly, never use .id on an array.
+    # Select a single Android device; PS 5.1 array handling differs from PS 7.
     $deviceList = ConvertFrom-Json -InputObject ($rawDevices -join "`n")
     foreach ($device in $deviceList) {
-      if (($device.targetPlatform -like 'android*') -and
-          ($device.id -match '^emulator-[0-9]+
-  Write-Host "[5/5] Instalando y ejecutando FacturaVoz main en $DeviceId..." -ForegroundColor Green
-  Write-Host 'Deten antes cualquier Flutter Run anterior para evitar dos sesiones de depuracion.' -ForegroundColor Yellow
-  & flutter run -d $DeviceId --debug "--dart-define-from-file=$defines"
-  Assert-Exit 'flutter run'
-} finally {
-  Pop-Location
-}
-) -and
-          ($device.isSupported -ne $false)) {
+      if ($device.targetPlatform -like 'android*' -and
+          $device.id -match '^emulator-[0-9]+$' -and
+          $device.isSupported -ne $false) {
         $DeviceId = [string]$device.id
         break
       }
     }
     if ([string]::IsNullOrWhiteSpace($DeviceId)) {
       foreach ($device in $deviceList) {
-        if (($device.targetPlatform -like 'android*') -and
-            ($device.isSupported -ne $false)) {
+        if ($device.targetPlatform -like 'android*' -and $device.isSupported -ne $false) {
           $DeviceId = [string]$device.id
           break
         }
