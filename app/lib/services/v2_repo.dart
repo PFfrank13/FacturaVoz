@@ -220,7 +220,7 @@ class V2Repo {
   static Future<String> upload(String folder, Uint8List bytes, {String ext = 'jpg', String? fixedName}) async {
     final name = fixedName ?? '${DateTime.now().millisecondsSinceEpoch}_${bytes.length}.$ext';
     final path = '$org/$folder/$name';
-    await _db.storage.from(bucket).uploadBinary(path, bytes, fileOptions: FileOptions(contentType: ext == 'png' ? 'image/png' : 'image/jpeg', upsert: true));
+    await _db.storage.from(bucket).uploadBinary(path, bytes, fileOptions: FileOptions(contentType: ext == 'png' ? 'image/png' : ext == 'webp' ? 'image/webp' : 'image/jpeg', upsert: true));
     return path;
   }
 
