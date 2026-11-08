@@ -28,6 +28,25 @@ class PosPaymentBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (method == 'yape' || method == 'plin') {
+      final imageUrl = method == 'yape'
+          ? 'https://upload.wikimedia.org/wikipedia/commons/0/08/Icono_de_la_aplicaci%C3%B3n_Yape.png'
+          : 'https://www.bbva.pe/content/dam/public-web/peru/images/promo-sliders/promo-plin.im1585949297034im.png?imwidth=960';
+      return SizedBox(
+        width: size, height: size,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          semanticLabel: method == 'yape' ? 'Yape' : 'Plin',
+          errorBuilder: (_, _, _) => _offlineBrand(),
+          loadingBuilder: (_, child, progress) => progress == null ? child : _offlineBrand(),
+        ),
+      );
+    }
+    return _offlineBrand();
+  }
+
+  Widget _offlineBrand() {
     if (method == 'yape') {
       return Container(
         width: size, height: size,
