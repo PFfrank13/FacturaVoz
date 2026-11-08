@@ -186,10 +186,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
         ],
       ),
     );
-    for (final c in countFields.values) {
-      c.dispose();
-    }
-    note.dispose();
+    disposeAfterClose([...countFields.values, note]);
     if (answer == null || !mounted) return;
     setState(() => _busy = true);
     try {
