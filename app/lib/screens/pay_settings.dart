@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +8,8 @@ import '../errors.dart';
 import '../models_pro.dart';
 import '../services/pro_api.dart';
 import '../services/pro_repo.dart';
+import '../services/v2_repo.dart';
+import 'client_profile.dart' show StorageImage;
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -30,6 +33,8 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
   final _cci = TextEditingController();
   final _holder = TextEditingController();
   final _note = TextEditingController();
+  Uint8List? _yapeQrBytes;
+  Uint8List? _plinQrBytes;
 
   static const _allOffsets = [-7, -3, -1, 0, 1, 3, 7, 15, 30];
 
@@ -66,6 +71,35 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
     }
   }
 
+  Future<void> _pickMerchantQr(bool yape) async {
+    if (!_isAdmin || _saving) return;
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 100);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (bytes.length < 12 || bytes.length > 3000000) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('La imagen QR debe ocupar menos de 3 MB.')));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      if (yape) { _yapeQrBytes = bytes; } else { _plinQrBytes = bytes; }
+    });
+  }
+
+  Widget _qrPicker(bool yape) {
+    final s = _s!;
+    final bytes = yape ? _yapeQrBytes : _plinQrBytes;
+    final path = yape ? s.yapeQrPath : s.plinQrPath;
+    return OutlinedButton.icon(
+      onPressed: !_isAdmin || _saving ? null : () => _pickMerchantQr(yape),
+      icon: const Icon(Icons.qr_code_2_rounded),
+      label: Text('QR ${yape ? 'Yape' : 'Plin'} ${bytes != null || path.isNotEmpty ? '· Configurado' : '· Subir'}'),
+    );
+  }
+
   String? _validate() {
     final y = _yape.text.replaceAll(RegExp(r'\D'), '');
     final p = _plin.text.replaceAll(RegExp(r'\D'), '');
@@ -95,7 +129,17 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
       ..note = _note.text;
     setState(() => _saving = true);
     try {
+      if (_yapeQrBytes != null) {
+        final b = _yapeQrBytes!;
+        s.yapeQrPath = await V2Repo.upload('qr-medios', b, ext: b[0] == 0x89 ? 'png' : 'jpg');
+      }
+      if (_plinQrBytes != null) {
+        final b = _plinQrBytes!;
+        s.plinQrPath = await V2Repo.upload('qr-medios', b, ext: b[0] == 0x89 ? 'png' : 'jpg');
+      }
       await ProRepo.savePaySettings(s);
+      _yapeQrBytes = null;
+      _plinQrBytes = null;
       if (mounted) showSuccess(context, 'Guardado');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo guardar. ${friendly(e)}')));
@@ -202,6 +246,20 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                       TextField(controller: _yape, keyboardType: TextInputType.phone, inputFormatters: digits, decoration: const InputDecoration(labelText: 'Celular Yape', prefixIcon: Icon(Icons.phone_android_rounded))),
                       const SizedBox(height: 10),
                       TextField(controller: _plin, keyboardType: TextInputType.phone, inputFormatters: digits, decoration: const InputDecoration(labelText: 'Celular Plin', prefixIcon: Icon(Icons.phone_iphone_rounded))),
+                      const SizedBox(height: 10),
+                      Text('Para mostrar un QR auténtico en Venta rápida, sube la imagen de cobro de tu propia cuenta. Nunca generamos un QR bancario inventado.', style: t.textTheme.bodySmall),
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 8, runSpacing: 8, children: [_qrPicker(true), _qrPicker(false)]),
+                      if (_yapeQrBytes != null || s.yapeQrPath.isNotEmpty || _plinQrBytes != null || s.plinQrPath.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Wrap(spacing: 12, children: [
+                            if (_yapeQrBytes != null) SizedBox(width: 94, height: 94, child: Image.memory(_yapeQrBytes!, fit: BoxFit.contain))
+                            else if (s.yapeQrPath.isNotEmpty) SizedBox(width: 94, height: 94, child: StorageImage(path: s.yapeQrPath)),
+                            if (_plinQrBytes != null) SizedBox(width: 94, height: 94, child: Image.memory(_plinQrBytes!, fit: BoxFit.contain))
+                            else if (s.plinQrPath.isNotEmpty) SizedBox(width: 94, height: 94, child: StorageImage(path: s.plinQrPath)),
+                          ]),
+                        ),
                       const SizedBox(height: 10),
                       TextField(controller: _holder, maxLength: 120, decoration: const InputDecoration(labelText: 'Titular (como aparece en Yape/banco)', counterText: '')),
                       const SizedBox(height: 10),

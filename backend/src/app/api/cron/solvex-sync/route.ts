@@ -30,6 +30,9 @@ export async function GET(req: Request) {
         out.unknown++;
         continue;
       }
+      // Standalone development tenants must not be overwritten by external sync.
+      const { data: license } = await admin.from("org_licenses").select("source").eq("org_id", t.tenant).maybeSingle();
+      if (license?.source === "local") continue;
       const { data } = await admin.rpc("license_apply", { p_org: t.tenant, p_payload: t.payload, p_token: t.token });
       if (data === "ok") out.applied++;
       else if (data === "stale") out.stale++;

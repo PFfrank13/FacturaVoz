@@ -216,6 +216,8 @@ class PaySettings {
   PaySettings({
     this.yape = '',
     this.plin = '',
+    this.yapeQrPath = '',
+    this.plinQrPath = '',
     this.bankName = '',
     this.bankAccount = '',
     this.bankCci = '',
@@ -228,6 +230,8 @@ class PaySettings {
 
   String yape;
   String plin;
+  String yapeQrPath;
+  String plinQrPath;
   String bankName;
   String bankAccount;
   String bankCci;
@@ -242,6 +246,8 @@ class PaySettings {
   factory PaySettings.fromJson(Map<String, dynamic> j) => PaySettings(
         yape: _s(j['yape_phone']),
         plin: _s(j['plin_phone']),
+        yapeQrPath: _s(j['yape_qr_path']),
+        plinQrPath: _s(j['plin_qr_path']),
         bankName: _s(j['bank_name']),
         bankAccount: _s(j['bank_account']),
         bankCci: _s(j['bank_cci']),
@@ -259,6 +265,8 @@ class PaySettings {
       'org_id': orgId,
       'yape_phone': n(yape.replaceAll(RegExp(r'\D'), '')),
       'plin_phone': n(plin.replaceAll(RegExp(r'\D'), '')),
+      'yape_qr_path': n(yapeQrPath),
+      'plin_qr_path': n(plinQrPath),
       'bank_name': n(bankName),
       'bank_account': n(bankAccount),
       'bank_cci': n(bankCci.replaceAll(RegExp(r'\D'), '')),

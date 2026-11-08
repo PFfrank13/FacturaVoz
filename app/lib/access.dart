@@ -75,17 +75,16 @@ class LicenseInfo {
 /// Funciones básicas que todo plan incluye.
 const coreFeatures = {'facturar', 'clientes', 'cobros', 'voz'};
 
-/// ¿Hub concede [key]? Puro (se prueba con flutter test). Ningún rubro o plan añade derechos.
-/// El Hub define las funciones de cada plan. Nunca confiamos en un plan
-/// predeterminado ni en el caché para desbloquear funciones.
+/// The backend computes effective per-tenant features for Hub and standalone modes.
+/// Never accept an unverified cached or expired license as authorization.
 bool planHas(LicenseInfo l, String key, {String? rubro}) {
-  if (!l.enforced || l.dev || l.stale || l.source != 'hub' || !l.usable) return false;
+  if (!l.enforced || l.dev || l.stale || !const {'hub', 'local'}.contains(l.source) || !l.usable) return false;
   return l.features[key] == true;
 }
 
 /// Límite numérico del plan (-1 = sin límite).
 int planLimit(LicenseInfo l, String key) {
-  if (!l.enforced || l.dev || l.stale || l.source != 'hub' || !l.usable) return 0;
+  if (!l.enforced || l.dev || l.stale || !const {'hub', 'local'}.contains(l.source) || !l.usable) return 0;
   final v = l.features[key];
   return v is num && v.isFinite && v == v.truncateToDouble() && v >= -1 ? v.toInt() : 0;
 }
@@ -105,9 +104,9 @@ class Access extends ChangeNotifier {
   bool licenseCheckedOnline = false;
   bool licenseChecking = true;
   bool get licenseReady => licenseCheckedOnline && license.enforced && !license.dev &&
-      !license.stale && license.source == 'hub' && license.usable;
+      !license.stale && const {'hub', 'local'}.contains(license.source) && license.usable;
   bool get canEnter => licenseReady || (licenseCheckedOnline && license.enforced &&
-      !license.dev && license.source == 'hub' && license.mode == 'restricted' && isAdmin);
+      !license.dev && const {'hub', 'local'}.contains(license.source) && license.mode == 'restricted' && isAdmin);
 
 
   bool can(String what) => _can[what] ?? isAdmin;
