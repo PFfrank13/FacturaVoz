@@ -115,7 +115,8 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     final a = Access.instance;
     final l = a.license;
     final org = Repo.activeOrgId;
-    final pending = !l.enforced || l.dev || l.source != 'hub' || l.status == 'pendiente';
+    final localDevelopment = l.source == 'local';
+    final pending = !localDevelopment && (!l.enforced || l.dev || l.source != 'hub' || l.status == 'pendiente');
     return Scaffold(
       body: SafeArea(child: Center(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -127,15 +128,17 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
               child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 48),
             )),
             const SizedBox(height: 20),
-            Text(pending ? 'Activa tu FacturaVoz' : 'Tu licencia requiere atención',
+            Text(localDevelopment ? 'Comprobar acceso local' : pending ? 'Activa tu FacturaVoz' : 'Tu licencia requiere atención',
               style: t.textTheme.headlineSmall, textAlign: TextAlign.center),
             const SizedBox(height: 9),
-            Text(pending
-              ? 'Cuenta creada correctamente. Para empezar a vender, introduce la licencia que Solvex te entregó para tu negocio.'
-              : (l.message.isNotEmpty ? l.message : 'Tu plan no está activo. Puedes renovarlo o introducir un código actualizado.'),
+            Text(localDevelopment
+              ? 'La empresa usa el Plan Básico de desarrollo. No necesita un código del Hub. Revisa tu conexión y vuelve a comprobar el acceso en línea.'
+              : pending
+                ? 'Cuenta creada correctamente. Para empezar a vender, introduce la licencia asignada a tu negocio.'
+                : (l.message.isNotEmpty ? l.message : 'Tu plan no está activo. Puedes renovarlo o introducir un código actualizado.'),
               style: t.textTheme.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 24),
-            if (org != null) ...[
+            if (org != null && !localDevelopment) ...[
               Text('Identificador de tu empresa', style: t.textTheme.labelLarge),
               const SizedBox(height: 7),
               OutlinedButton.icon(
@@ -155,7 +158,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                 style: t.textTheme.bodySmall),
             ],
             const SizedBox(height: 20),
-            if (a.isAdmin) ...[
+            if (!localDevelopment && a.isAdmin) ...[
               TextField(
                 controller: _key, enabled: !_busy, obscureText: _hide,
                 autocorrect: false, enableSuggestions: false,
@@ -184,7 +187,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                 TextButton.icon(onPressed: () => openPayUrl(context, l.payUrl),
                   icon: const Icon(Icons.payments_rounded), label: const Text('Renovar mi plan')),
               ],
-            ] else
+            ] else if (!localDevelopment)
               const SoftCard(child: Text('Pídele al propietario o administrador de esta empresa que active la licencia.')),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -192,7 +195,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
             ],
             const SizedBox(height: 12),
             OutlinedButton.icon(onPressed: _busy ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded), label: const Text('Ya activé: comprobar licencia')),
+              icon: const Icon(Icons.refresh_rounded), label: Text(localDevelopment ? 'Reintentar acceso al Plan Básico' : 'Ya activé: comprobar licencia')),
             if (AppState.instance.orgs.length > 1)
               TextButton.icon(onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const OrgsScreen())),
