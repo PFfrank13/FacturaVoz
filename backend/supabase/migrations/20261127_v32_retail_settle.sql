@@ -28,6 +28,7 @@ create table if not exists public.retail_purchase_settlements (
   paid_cents bigint not null check (paid_cents > 0),
   currency text not null check (currency ~ '^[A-Z]{3}$'),
   expense_id uuid not null references public.expenses(id) on delete restrict,
+  cash_move_id uuid unique references public.cash_movements(id) on delete restrict,
   created_at timestamptz not null default now(),
   unique (org_id, request_id),
   unique (receipt_id)
@@ -53,6 +54,7 @@ declare
   v_receipt public.retail_receipts%rowtype;
   v_previous public.retail_purchase_settlements%rowtype;
   v_expense uuid;
+  v_cash_move uuid;
   v_id uuid;
   v_evidence text := btrim(coalesce(p_evidence,''));
 begin
@@ -114,15 +116,15 @@ begin
         p_org, v_uid, private.today_pe(), 'egreso',
         v_receipt.total_cents::numeric / 100, 'efectivo',
         left('Pago compra ' || v_receipt.supplier_name || ' · ' || v_evidence, 200)
-      );
+      ) returning id into v_cash_move;
   end if;
 
   insert into public.retail_purchase_settlements(
     org_id, request_id, receipt_id, user_id, method, evidence,
-    paid_cents, currency, expense_id
+    paid_cents, currency, expense_id, cash_move_id
   ) values (
     p_org, p_request_id, p_receipt, v_uid, p_method, v_evidence,
-    v_receipt.total_cents, v_receipt.currency, v_expense
+    v_receipt.total_cents, v_receipt.currency, v_expense, v_cash_move
   ) returning id into v_id;
 
   update public.retail_receipts
