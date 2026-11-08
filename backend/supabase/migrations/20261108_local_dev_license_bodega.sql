@@ -59,7 +59,7 @@ where s.business_type='bodega' and l.plan='BASICO' and l.source='hub'
 on conflict(org_id) do nothing;
 
 update public.org_licenses l set
-  source='local', status='desarrollo', mode='full',
+  source='local', mode='full',
   period_end=null, message='Plan Básico local de desarrollo (sin sincronización externa)',
   auto_cut=false
 from private.standalone_license_backups b
