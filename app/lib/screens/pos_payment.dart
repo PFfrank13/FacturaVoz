@@ -266,8 +266,11 @@ class _PaymentFlowState extends State<_PaymentFlow> {
           leading: IconButton(
             tooltip: method == null ? 'Volver' : 'Cambiar método',
             onPressed: () {
-              if (method != null) setState(() { _method = null; _verified = false; });
-              else Navigator.of(context).pop();
+              if (method != null) {
+                setState(() { _method = null; _verified = false; });
+              } else {
+                Navigator.of(context).pop();
+              }
             },
             icon: const Icon(Icons.arrow_back_rounded),
           ),
