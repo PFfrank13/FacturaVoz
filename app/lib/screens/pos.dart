@@ -66,10 +66,12 @@ class _PosScreenState extends State<PosScreen> {
   Future<void> _restoreCart() async {
     final org = Repo.activeOrgId;
     final uid = Supabase.instance.client.auth.currentUser?.id;
-    if (mounted) setState(() {
-      _restoringCart = true;
-      _cartStorageError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _restoringCart = true;
+        _cartStorageError = null;
+      });
+    }
     try {
       if (org == null || uid == null) {
         throw const FormatException('Selecciona la empresa e inicia sesión.');
@@ -584,7 +586,9 @@ class _PosScreenState extends State<PosScreen> {
   /// Cobro en un toque: elige cómo paga el cliente y listo (se registra la venta, el cobro y se imprime el ticket).
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
-        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) return;
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
+      return;
+    }
     final lines = _lines();
     if (lines.isEmpty) return;
     final total = computeTotals(lines, _rate).total;
@@ -632,7 +636,9 @@ class _PosScreenState extends State<PosScreen> {
 
   Future<void> _fastCharge(String method, {String? paymentEvidence}) async {
     if (_charging || _recoveringCheckout || _restoringCart ||
-        _cartStorageError != null || _checkoutRecoveryError != null) return;
+        _cartStorageError != null || _checkoutRecoveryError != null) {
+      return;
+    }
     if (_chargeMethod != null && _chargeMethod != method) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reintenta con el mismo método del primer cobro para evitar diferencias.')));
       return;
