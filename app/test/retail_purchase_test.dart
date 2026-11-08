@@ -48,6 +48,36 @@ void main() {
     expect(() => PendingRetailPurchase.fromJson(b), throwsFormatException);
   });
 
+  test('supplier settlement roundtrip preserves immutable payment identity', () {
+    const original = PendingRetailSettlement(
+      orgId: 'org-1',
+      userId: 'owner-1',
+      requestId: '00000000-0000-4000-8000-000000000001',
+      receiptId: '00000000-0000-4000-8000-000000000002',
+      method: 'yape',
+      evidence: 'Operación revisada por el cajero',
+    );
+    final decoded = PendingRetailSettlement.fromJson(original.toJson());
+    expect(decoded.orgId, original.orgId);
+    expect(decoded.userId, original.userId);
+    expect(decoded.requestId, original.requestId);
+    expect(decoded.receiptId, original.receiptId);
+    expect(decoded.method, 'yape');
+    expect(decoded.evidence, original.evidence);
+  });
+
+  test('supplier settlement rejects unsupported or corrupt payment snapshots', () {
+    const p = PendingRetailSettlement(
+      orgId: 'org-1', userId: 'owner-1', requestId: 'req',
+      receiptId: 'receipt', method: 'efectivo', evidence: '',
+    );
+    final j = p.toJson();
+    expect(() => PendingRetailSettlement.fromJson({...j, 'method': 'pendiente'}), throwsFormatException);
+    expect(() => PendingRetailSettlement.fromJson({...j, 'receipt_id': ''}), throwsFormatException);
+    expect(() => PendingRetailSettlement.fromJson({...j, 'v': 2}), throwsFormatException);
+    expect(() => PendingRetailSettlement.fromJson({...j, 'evidence': 'a' * 201}), throwsFormatException);
+  });
+
   test('bad source identity and unsupported payment method fail closed', () {
     final a = sample().toJson();
     expect(() => PendingRetailPurchase.fromJson({...a, 'org_id': ''}), throwsFormatException);
