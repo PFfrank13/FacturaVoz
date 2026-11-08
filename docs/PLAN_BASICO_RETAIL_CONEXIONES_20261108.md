@@ -70,3 +70,52 @@ Demostrar con dos tenants A/B y dos cajeros:
 ## Estado de integración
 
 El PR contiene código y pruebas; CI debe ejecutar `flutter analyze`, `flutter test`, builds Android/Web y backend TypeScript/tests. Éxito de CI **no prueba** el ciclo en staging ni habilita despliegue a producción.
+
+
+## Avances posteriores — 8 de noviembre de 2026
+
+### Ticket abierto (borrador local, no venta)
+`PosCartStore` conserva en almacenamiento del dispositivo el carrito, notas,
+mesa y cupón por usuario y empresa, con escrituras serializadas y restauración
+tras reinicio. No sobrescribe el respaldo cuando su lectura falla. Una venta
+rápida confirmada borra primero el borrador editable y después la clave de
+operación pendiente: si se interrumpe, se recupera **la misma operación**.
+No es todavía venta ni facturación offline.
+
+### Compra a crédito: pago posterior completo
+`20261127_v32_retail_settle.sql` registra un único pago diferido por
+recepción y por clave de solicitud, sin volver a ingresar el stock. Crea
+el gasto y la salida de caja en una sola transacción cuando el método es
+efectivo. `RetailSettlementScreen` permite pagar o recuperar el intento
+anterior tras timeout; Yape/Plin se confirman **manualmente**. Recepciones
+pagadas inicialmente y pagos posteriores guardan `cash_move_id` cuando
+hay una salida de efectivo, para conciliarla exactamente.
+
+**Limitación:** no hay abonos parciales, estados de cuenta de proveedores,
+ni verificación bancaria automática.
+
+### Ventas sin stock disponible
+`20261128_v32_retail_sale_stock_events.sql` sustituye el rechazo por
+stock insuficiente. Registra la venta, descuenta el SKU pudiendo quedar
+negativo y guarda evento con stock antes/después y factura de origen.
+La vista `retail_stock_flow` muestra solo eventos futuros de entradas y
+salidas; **no es kardex completo**. En Productos aparece un acceso para
+recibir mercadería cuando hay existencias negativas.
+
+### Puerta de staging antes de producción
+1. Preparar una **base aislada** sin datos productivos y realizar backup.
+2. Revisar dependencias y migraciones 20261123 a 20261128, aplicadas en
+   orden solo después de validar el esquema de ese entorno.
+3. Ejecutar los verificadores de lectura:
+   `verify_fast_checkout_staging_readonly.sql`,
+   `verify_retail_receive_staging_readonly.sql` y
+   `verify_retail_settle_staging_readonly.sql`.
+4. Demostrar dos empresas aisladas por RLS; recibo duplicado con mismo
+   `request_id`; pago duplicado del mismo recibo con otra solicitud;
+   simultaneidad de cajeros y corte de red después del COMMIT.
+5. Vender con stock cero, reponerlo y cuadrar caja, gastos y existencias.
+   Probar reinicio de app, cambio de empresa, cierre ciego, impresora
+   y los procedimientos legales de comprobantes SUNAT.
+
+**No fusionar ni desplegar sin superar las pruebas.** Compilar correctamente
+no demuestra funcionamiento integral con cobros ni inventarios reales.
