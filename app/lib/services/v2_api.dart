@@ -59,6 +59,41 @@ class LookupResult {
 }
 
 class V2Api {
+  /// Quita el fondo de una fotografía de catálogo usando el servidor.
+  /// Los bytes PNG solo se guardan si el usuario acepta el resultado.
+  static Future<Uint8List> removeProductBackground(Uint8List source, {String mime = 'image/jpeg'}) async {
+    final org = Repo.activeOrgId;
+    if (org == null) throw AppException('Selecciona la empresa antes de procesar fotos.');
+    if (source.isEmpty || source.length > 3000000) {
+      throw AppException('Elige una foto de máximo 3 MB.');
+    }
+    final req = http.MultipartRequest('POST', Uri.parse('${Config.apiBase}/api/products/remove-bg'))
+      ..headers['Authorization'] = 'Bearer ${await _token()}'
+      ..fields['org_id'] = org
+      ..files.add(http.MultipartFile.fromBytes(
+        'image', source, filename: 'producto.${mime == 'image/png' ? 'png' : 'jpg'}',
+        contentType: MediaType.parse(mime),
+      ));
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(
+        await req.send().timeout(const Duration(seconds: 65)),
+      );
+    } catch (_) {
+      throw AppException('No se pudo conectar con el procesador de imágenes.', code: 'net');
+    }
+    if (response.statusCode != 200) {
+      final error = _decode(response)['error'];
+      throw AppException(error is String ? error : 'No se pudo quitar el fondo.');
+    }
+    final png = response.bodyBytes;
+    if (png.length < 12 || png.length > 4000000 ||
+        png[0] != 0x89 || png[1] != 0x50 || png[2] != 0x4e || png[3] != 0x47) {
+      throw AppException('El servidor devolvió una imagen PNG inválida.');
+    }
+    return png;
+  }
+
   /// Consulta DNI/RUC. Nunca lanza por "no encontrado": devuelve el motivo para dejar escribir a mano.
   static Future<LookupResult> lookup(String number) async {
     try {
