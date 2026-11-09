@@ -887,8 +887,8 @@ class _PosScreenState extends State<PosScreen> {
               ? const SkeletonList()
               : Column(children: [
                   if (retail)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(18, 12, 18, 4),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
                       child: RetailVisualJourneyStart(),
                     ),
                   if (retail && Access.instance.license.plan == 'BASICO')
