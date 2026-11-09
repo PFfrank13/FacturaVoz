@@ -27,6 +27,7 @@ import 'pos_payment.dart';
 import 'pos_payment_success.dart';
 import 'pos_cart_review.dart';
 import 'new_invoice.dart';
+import 'products.dart';
 import 'team.dart' show dbMessage;
 
 class PosScreen extends StatefulWidget {
@@ -801,6 +802,14 @@ class _PosScreenState extends State<PosScreen> {
     final count = _cart.values.fold(0.0, (a, b) => a + b);
     final actions = <Widget>[
       if (retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
+      if (retail && Access.instance.has('stock') && Access.instance.can('products_edit'))
+        IconButton(
+          tooltip: 'Editar catálogo y fotos de productos',
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => const ProductsScreen(),
+          )),
+        ),
       IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
@@ -920,6 +929,17 @@ class _PosScreenState extends State<PosScreen> {
                                 final n = _cart[p.id] ?? 0;
                                 final img = _extra[p.id]?['image_path'] as String?;
                                 final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
+                                final category = '${p.name} ${_extra[p.id]?['category'] ?? ''}'.toLowerCase();
+                                final placeholderIcon =
+                                    category.contains('agua') || category.contains('bebida')
+                                        ? Icons.water_drop_rounded
+                                        : category.contains('arroz') || category.contains('cereal')
+                                            ? Icons.grain_rounded
+                                            : category.contains('aceite') || category.contains('leche')
+                                                ? Icons.local_drink_rounded
+                                                : category.contains('limpieza')
+                                                    ? Icons.cleaning_services_rounded
+                                                    : Icons.inventory_2_rounded;
                                 final pr = _price(p, n == 0 ? 1 : n);
                                 return Pressable(
                                   onTap: () => _add(p),
@@ -939,9 +959,16 @@ class _PosScreenState extends State<PosScreen> {
                                                 ? Container(
                                                     decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: 0.08), borderRadius: const BorderRadius.vertical(top: Radius.circular(17))),
                                                     alignment: Alignment.center,
-                                                    child: em == null
-                                                        ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
-                                                        : Text(em, style: const TextStyle(fontSize: 40)),
+                                                    child: retail
+                                                        ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                                            Icon(placeholderIcon, size: 42, color: const Color(0xFFB49BFF)),
+                                                            const SizedBox(height: 7),
+                                                            const Text('Foto por añadir', style: TextStyle(
+                                                              fontSize: 10, color: Color(0xFFB7B1CE))),
+                                                          ])
+                                                        : em == null
+                                                            ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
+                                                            : Text(em, style: const TextStyle(fontSize: 40)),
                                                   )
                                                 : ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(17)), child: StorageImage(path: img)),
                                           ),
