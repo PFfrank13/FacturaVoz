@@ -76,14 +76,50 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
   }
 
   Future<void> _newReceipt() async {
-    if (!Access.instance.can('sell')) return;
+    if (!Access.instance.can('sell') || !Access.instance.has('facturar')) return;
+    // The selection is intent only. Neither choice issues to SUNAT until the
+    // user reviews the document and confirms inside EmitSunatScreen.
+    final docType = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('¿Qué deseas emitir?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          const Text('Primero revisa cliente y productos. La emisión SUNAT se confirma al final.'),
+          const SizedBox(height: 12),
+          ListTile(
+            key: const ValueKey('receipt-create-boleta'),
+            leading: const Icon(Icons.receipt_long_rounded, color: Color(0xFFC0A0FF)),
+            title: const Text('Boleta electrónica'),
+            subtitle: const Text('Para consumidor final o cliente identificado'),
+            onTap: () => Navigator.pop(sheetContext, '03'),
+          ),
+          ListTile(
+            key: const ValueKey('receipt-create-factura'),
+            leading: const Icon(Icons.description_rounded, color: Color(0xFF89B8FF)),
+            title: const Text('Factura electrónica'),
+            subtitle: const Text('Requiere RUC y razón social del cliente'),
+            onTap: () => Navigator.pop(sheetContext, '01'),
+          ),
+        ]),
+      )),
+    );
+    if (!mounted || docType == null) return;
     final invoiceId = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const NewInvoiceScreen()),
+      MaterialPageRoute(builder: (_) => NewInvoiceScreen(
+        startManual: true,
+        defaultClientName: docType == '03' ? 'Público general' : '',
+      )),
     );
     if (!mounted) return;
     if (invoiceId != null) {
       await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => InvoiceDetailScreen(invoiceId: invoiceId),
+        builder: (_) => InvoiceDetailScreen(
+          invoiceId: invoiceId,
+          autoEmitDocType: docType,
+        ),
       ));
     }
     if (!mounted) return;
