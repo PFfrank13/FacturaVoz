@@ -167,7 +167,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final guided = p == null && Access.instance.rubro == 'bodega';
     var wizardStep = 0;
     const steps = ['Datos del producto', 'Código y foto', 'Presentaciones',
-      'Costos y precios', 'Stock inicial', 'Ficha guardada'];
+      'Costos y precios', 'Stock inicial', 'Revisar y guardar'];
     var unit = p?.unit ?? (guided ? 'NIU' : 'ZZ');
     var track = p?.tracksStock ?? guided;
     final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
