@@ -99,7 +99,9 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       final pending = await RetailPurchaseStore.load(user, org);
       if (!mounted || Repo.activeOrgId != org ||
           Supabase.instance.client.auth.currentUser?.id != user ||
-          generation != _restoreGeneration) return;
+          generation != _restoreGeneration) {
+        return;
+      }
       setState(() {
         _pending = pending;
         _recoveryError = null;
@@ -234,7 +236,9 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
         ),
       );
       if (confirmation != true || !mounted || Repo.activeOrgId != originOrg ||
-          Supabase.instance.client.auth.currentUser?.id != originUser) return;
+          Supabase.instance.client.auth.currentUser?.id != originUser) {
+        return;
+      }
     }
     setState(() => _saving = true);
     try {
@@ -253,12 +257,16 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       }
       if (retry == null) await RetailPurchaseStore.save(purchase);
       if (!mounted || Repo.activeOrgId != org ||
-          Supabase.instance.client.auth.currentUser?.id != user) return;
+          Supabase.instance.client.auth.currentUser?.id != user) {
+        return;
+      }
       setState(() => _pending = purchase);
       final receiptId = await RetailPurchaseRepo.receive(purchase);
       await RetailPurchaseStore.clear(purchase);
       if (!mounted || Repo.activeOrgId != org ||
-          Supabase.instance.client.auth.currentUser?.id != user) return;
+          Supabase.instance.client.auth.currentUser?.id != user) {
+        return;
+      }
       setState(() {
         _pending = null;
         _lines.clear();
