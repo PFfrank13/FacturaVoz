@@ -28,6 +28,7 @@ import 'goal_sheet.dart';
 import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'hubs_v3.dart' show showNewSaleSheet;
 import 'invoice_detail.dart';
+import 'retail_basic_modules.dart';
 import 'menu.dart';
 import 'jobs.dart' show JobDetailScreen;
 
@@ -254,6 +255,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               todayTotal: seeMoney && _today != null ? todayTotal : null,
               todayCount: todayCount,
               onMenu: () => pushPremium(context, const MenuScreen()),
+              onSale: a.rubro == 'bodega' && a.can('sell') && a.has('facturar')
+                  ? () {
+                      final pos = featureById('pos');
+                      if (pos != null && pos.allowed) openFeature(context, pos);
+                    }
+                  : null,
             ),
           ),
           if (spec != null)
@@ -265,7 +272,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   subtitle: guide.homeSubtitle,
                 )),
             ),
-          if (a.can('sell') || shortcuts.isNotEmpty)
+          if (a.rubro == 'bodega')
+            const SliverToBoxAdapter(child: RetailBasicModules()),
+          if (a.rubro != 'bodega' && (a.can('sell') || shortcuts.isNotEmpty))
             SliverToBoxAdapter(
               child: Reveal(
                 index: 1,
