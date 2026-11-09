@@ -70,8 +70,10 @@ abstract final class RetailVisual {
                 ),
                 child: Icon(icon, color: Colors.white, size: 28),
               ),
-              const Spacer(),
-              DecoratedBox(
+              const SizedBox(width: 10),
+              Expanded(child: Align(
+                alignment: Alignment.centerRight,
+                child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(30),
@@ -79,11 +81,13 @@ abstract final class RetailVisual {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Text(eyebrow.toUpperCase(), style: const TextStyle(
+                  child: Text(eyebrow.toUpperCase(),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
                     color: Color(0xFFE8DDFF), fontSize: 10,
                     fontWeight: FontWeight.w900, letterSpacing: 1.1)),
                 ),
-              ),
+              ))),
             ]),
             const SizedBox(height: 15),
             Text(title, style: const TextStyle(
