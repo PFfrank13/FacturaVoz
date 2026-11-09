@@ -13,6 +13,7 @@ import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'client_profile.dart';
 import 'trash.dart';
 
@@ -113,13 +114,17 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
                     Reveal(
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26)),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Te deben en fiados', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
-                          CountUp(value: total, builder: (_, v) => Text(money(v, _cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800))),
-                          Text('${list.where((b) => b.balance > 0).length} clientes con saldo', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
+                      child: RetailVisual.hero(
+                        context: context,
+                        eyebrow: 'Plan Básico · Fiados',
+                        title: 'Tus fiados, al día',
+                        subtitle: 'Consulta deudas, registra abonos y da seguimiento con el historial real.',
+                        icon: Icons.menu_book_rounded,
+                        footer: Row(children: [
+                          Expanded(child: RetailVisual.microStat('Total por cobrar', money(total, _cur))),
+                          const SizedBox(width: 10),
+                          Expanded(child: RetailVisual.microStat('Clientes con saldo',
+                            '${list.where((b) => b.balance > 0).length}')),
                         ]),
                       ),
                     ),
