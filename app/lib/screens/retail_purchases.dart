@@ -35,6 +35,36 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   bool _saving = false;
   String _search = '';
   String _method = 'pendiente';
+  String? _activeOrg;
+  String? _activeUser;
+  int _loadGeneration = 0;
+  int _restoreGeneration = 0;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    final user = Supabase.instance.client.auth.currentUser?.id;
+    if (!mounted || (org == _activeOrg && user == _activeUser)) return;
+    _activeOrg = org;
+    _activeUser = user;
+    _loadGeneration++;
+    _restoreGeneration++;
+    _supplier.clear();
+    _reference.clear();
+    setState(() {
+      _products = null;
+      _history = const [];
+      _lines.clear();
+      _pending = null;
+      _error = null;
+      _recoveryError = null;
+      _recovering = true;
+      _saving = false;
+      _search = '';
+      _method = 'pendiente';
+    });
+    _restore();
+    _load();
+  }
 
   bool get _allowed => Access.instance.has('stock') && Access.instance.isAdmin;
   String get _currency => AppState.instance.profile?.currency.isNotEmpty == true
@@ -44,39 +74,53 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    _activeUser = Supabase.instance.client.auth.currentUser?.id;
+    AppState.instance.addListener(_onCompanyChange);
     _restore();
     _load();
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     _supplier.dispose();
     _reference.dispose();
     super.dispose();
   }
 
   Future<void> _restore() async {
+    final user = Supabase.instance.client.auth.currentUser?.id;
+    final org = Repo.activeOrgId;
+    final generation = ++_restoreGeneration;
     try {
-      final user = Supabase.instance.client.auth.currentUser?.id;
-      final org = Repo.activeOrgId;
       if (user == null || org == null) throw const FormatException('Inicia sesión y elige una empresa');
       final pending = await RetailPurchaseStore.load(user, org);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user ||
+          generation != _restoreGeneration) return;
       setState(() {
         _pending = pending;
         _recoveryError = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _recoveryError = 'No se pudo comprobar la compra pendiente: $e');
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == user && generation == _restoreGeneration) {
+        setState(() => _recoveryError = 'No se pudo comprobar la compra pendiente: $e');
+      }
     } finally {
-      if (mounted) setState(() => _recovering = false);
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == user && generation == _restoreGeneration) {
+        setState(() => _recovering = false);
+      }
     }
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final generation = ++_loadGeneration;
     if (!_allowed) return;
     try {
-      final org = Repo.activeOrgId;
       if (org == null) throw AppException('Selecciona una empresa.');
       final products = await Repo.listProducts(activeOnly: true);
       // A missing receipt table is a missing migration, not an empty history.
@@ -86,14 +130,14 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
           .eq('org_id', org)
           .order('created_at', ascending: false)
           .limit(30);
-      if (!mounted || Repo.activeOrgId != org) return;
+      if (!mounted || Repo.activeOrgId != org || generation != _loadGeneration) return;
       setState(() {
         _products = products.where((p) => !p.isService).toList();
         _history = [for (final row in rows) Map<String, dynamic>.from(row)];
         _error = null;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && Repo.activeOrgId == org && generation == _loadGeneration) {
         setState(() => _error =
           'No se pudo cargar compras. Revisa la migración de recepción en staging. ${friendly(e)}');
       }
@@ -101,6 +145,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   }
 
   Future<void> _editLine(Product product) async {
+    final org = Repo.activeOrgId;
     if (_saving || _recovering || _pending != null || _recoveryError != null) return;
     final existing = _lines[product.id];
     final qty = TextEditingController(text: existing?.quantity.toStringAsFixed(2) ?? '1');
@@ -157,11 +202,15 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       ),
     );
     disposeAfterClose([qty, cost]);
-    if (item != null && mounted) setState(() => _lines[product.id] = item);
+    if (item != null && mounted && Repo.activeOrgId == org && _allowed) {
+      setState(() => _lines[product.id] = item);
+    }
   }
 
   Future<void> _submit({PendingRetailPurchase? retry}) async {
-    if (_saving || _recovering || _recoveryError != null) return;
+    final originOrg = Repo.activeOrgId;
+    final originUser = Supabase.instance.client.auth.currentUser?.id;
+    if (!_allowed || _saving || _recovering || _recoveryError != null) return;
     if (retry == null && (_lines.isEmpty || _supplier.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Indica el proveedor y al menos un producto.')),
@@ -183,13 +232,16 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
           ],
         ),
       );
-      if (confirmation != true || !mounted) return;
+      if (confirmation != true || !mounted || Repo.activeOrgId != originOrg ||
+          Supabase.instance.client.auth.currentUser?.id != originUser) return;
     }
     setState(() => _saving = true);
     try {
       final user = Supabase.instance.client.auth.currentUser?.id;
       final org = Repo.activeOrgId;
-      if (user == null || org == null) throw AppException('Sesión o empresa no válida');
+      if (user == null || org == null || org != originOrg || user != originUser) {
+        throw AppException('Sesión o empresa no válida');
+      }
       final purchase = retry ?? PendingRetailPurchase(
         orgId: org, userId: user, requestId: Repo.newRequestId(),
         supplier: _supplier.text.trim(), reference: _reference.text.trim(),
@@ -199,11 +251,13 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
         throw AppException('No se puede reintentar una compra de otra cuenta.');
       }
       if (retry == null) await RetailPurchaseStore.save(purchase);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user) return;
       setState(() => _pending = purchase);
       final receiptId = await RetailPurchaseRepo.receive(purchase);
       await RetailPurchaseStore.clear(purchase);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user) return;
       setState(() {
         _pending = null;
         _lines.clear();
@@ -218,7 +272,8 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       );
       await _load();
     } catch (e) {
-      if (mounted) {
+      if (mounted && Repo.activeOrgId == originOrg &&
+          Supabase.instance.client.auth.currentUser?.id == originUser) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Recepción sin confirmar. Reintenta con la misma solicitud. ${friendly(e)}')),
         );
