@@ -112,6 +112,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
       MaterialPageRoute(builder: (_) => NewInvoiceScreen(
         startManual: true,
         defaultClientName: docType == '03' ? 'Público general' : '',
+        documentLabel: docType == '03' ? 'boleta' : 'factura',
       )),
     );
     if (!mounted) return;
