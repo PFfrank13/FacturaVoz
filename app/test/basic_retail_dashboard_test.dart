@@ -67,6 +67,21 @@ void main() {
     });
   }
 
+  testWidgets('Pro and Empresa plans do not display the Basic-only home dashboard', (tester) async {
+    for (final plan in const ['PRO', 'EMPRESA']) {
+      Access.instance.license = LicenseInfo(
+        plan: plan, mode: 'full', source: 'hub', enforced: true,
+        features: const {'facturar': true, 'stock': true, 'caja': true},
+      );
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: SingleChildScrollView(child: RetailBasicModules())),
+      ));
+      expect(find.text('FacturaVoz · Plan Básico'), findsNothing);
+      expect(find.byKey(const ValueKey('retail-basic-modules')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
   testWidgets('Bodega module shortcuts are not available without a valid license', (tester) async {
     Access.instance.license = const LicenseInfo();
     Access.instance.licenseCheckedOnline = false;
