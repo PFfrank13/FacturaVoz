@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
+import 'retail_receipts.dart';
 
 /// Shown only AFTER fast_checkout_atomic has committed on Supabase.
 /// This screen never represents a bank webhook or a SUNAT CDR.
@@ -20,13 +21,13 @@ class PosPaymentSuccessScreen extends StatelessWidget {
   final String currency;
   final double total;
 
-  Future<void> _openDetail(BuildContext context, {String? doc, bool share = false}) async {
+  Future<void> _openDetail(BuildContext context, {String? doc, bool share = false, bool printTicket = false}) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => InvoiceDetailScreen(
         invoiceId: invoiceId,
         autoEmitDocType: doc,
         autoSharePdf: share,
-        autoPrint: doc == null && !share,
+        autoPrint: printTicket,
       ),
     ));
   }
@@ -107,11 +108,19 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             action(Icons.description_rounded, 'Emitir factura',
               () => _openDetail(context, doc: '01')),
             const SizedBox(height: 9),
-            action(Icons.chat_rounded, 'Compartir por WhatsApp',
+            action(Icons.chat_rounded, 'Compartir PDF (WhatsApp u otra app)',
               () => _openDetail(context, share: true), color: const Color(0xFF45D78E)),
             const SizedBox(height: 9),
             action(Icons.article_outlined, 'Ver comprobante',
               () => _openDetail(context)),
+            const SizedBox(height: 9),
+            action(Icons.print_rounded, 'Imprimir ticket',
+              () => _openDetail(context, printTicket: true)),
+            const SizedBox(height: 9),
+            action(Icons.history_rounded, 'Historial de comprobantes',
+              () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const RetailReceiptsScreen(),
+              ))),
             const SizedBox(height: 24),
             const Text(
               'El pago registrado no equivale a la emisión SUNAT. '
