@@ -32,6 +32,7 @@ import 'invoice_detail.dart';
 import 'new_invoice.dart';
 import 'products.dart';
 import 'recurring.dart';
+import 'retail_basic_modules.dart';
 import 'scan.dart';
 import 'store.dart';
 
@@ -367,6 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 onGoal: () => _setGoal(m.total),
               ),
             ),
+            if (Access.instance.rubro == 'bodega' &&
+                Access.instance.license.plan == 'BASICO')
+              const SliverToBoxAdapter(child: RetailBasicModules()),
             SliverToBoxAdapter(
               child: Reveal(
                 index: 1,
