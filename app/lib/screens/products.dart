@@ -49,7 +49,6 @@ class _ProductPicker extends StatefulWidget {
 
 class _ProductPickerState extends State<_ProductPicker> {
   List<Product>? _all;
-  Map<String, Map<String, dynamic>> _catalogExtras = const {};
   String? _error;
   String _q = '';
 
@@ -120,6 +119,7 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> with LiveReload<ProductsScreen> {
   List<Product>? _all;
+  Map<String, Map<String, dynamic>> _catalogExtras = const {};
   String? _error;
   String _q = '';
 
