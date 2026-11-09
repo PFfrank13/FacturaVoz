@@ -31,6 +31,20 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
   String? _currency;
   bool _exporting = false;
   int _token = 0; // descarta respuestas de meses ya abandonados
+  String? _activeOrg;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || org == _activeOrg) return;
+    _activeOrg = org;
+    _token++;
+    setState(() {
+      _rows = null;
+      _error = null;
+      _currency = null;
+    });
+    _load();
+  }
 
   @override
   List<String> get liveTables => const ['invoices'];
@@ -41,12 +55,15 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
     startLive();
     _load();
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     stopLive();
     super.dispose();
   }
@@ -55,6 +72,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
 
   Future<void> _load({bool quiet = false}) async {
     final token = ++_token;
+    final org = Repo.activeOrgId;
     final key = 'reports.$_year-$_month';
     if (!quiet) {
       setState(() {
@@ -65,14 +83,14 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
     try {
       final r = monthRange(_year, _month);
       final rows = await Repo.listInvoicesBetween(r.from, r.toExclusive);
+      if (!mounted || token != _token || Repo.activeOrgId != org) return;
       LiveCache.put(key, rows);
-      if (!mounted || token != _token) return;
       setState(() {
         _rows = rows;
         _error = null;
       });
     } catch (e) {
-      if (!mounted || token != _token) return;
+      if (!mounted || token != _token || Repo.activeOrgId != org) return;
       if (quiet && _rows != null) return; // refresco en segundo plano: se conserva lo que ya se ve
       setState(() => _error = friendly(e));
     }
