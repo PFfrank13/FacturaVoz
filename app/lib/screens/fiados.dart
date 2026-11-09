@@ -8,6 +8,7 @@ import '../errors.dart';
 import '../models.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
+import '../services/repo.dart';
 import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -29,6 +30,22 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
   String? _error;
   String _q = '';
   bool _all = false;
+  String? _activeOrg;
+  int _fetchGeneration = 0;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || org == _activeOrg) return;
+    _activeOrg = org;
+    _fetchGeneration++;
+    setState(() {
+      _list = null;
+      _error = null;
+      _q = '';
+      _all = false;
+    });
+    _load();
+  }
 
   @override
   List<String> get liveTables => const ['credit_ledger', 'clients'];
@@ -39,6 +56,8 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
     _list = LiveCache.get<List<CreditBalance>>('fiados.list');
     _load();
     startLive(); // tiempo real
@@ -46,13 +65,17 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     stopLive();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final generation = ++_fetchGeneration;
     try {
       final r = await V2Repo.creditBalances();
+      if (!mounted || Repo.activeOrgId != org || generation != _fetchGeneration) return;
       LiveCache.put('fiados.list', r);
       if (mounted) {
         setState(() {
@@ -61,7 +84,9 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = V2Repo.missingHint(e));
+      if (mounted && Repo.activeOrgId == org && generation == _fetchGeneration) {
+        setState(() => _error = V2Repo.missingHint(e));
+      }
     }
   }
 
