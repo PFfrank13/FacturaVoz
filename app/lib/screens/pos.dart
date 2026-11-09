@@ -889,7 +889,7 @@ class _PosScreenState extends State<PosScreen> {
                   if (retail)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
-                      child: RetailVisualJourneyStart(),
+                      child: RetailVisual.journey(step: 1, label: 'Elegir productos'),
                     ),
                   if (retail && Access.instance.license.plan == 'BASICO')
                     Padding(
