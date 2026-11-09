@@ -194,24 +194,56 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: guided ? const Color(0xFF111533) : null,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
           child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(p == null ? 'Nuevo producto o servicio' : 'Editar', style: Theme.of(ctx).textTheme.titleLarge),
-              if (guided) ...[
-                const SizedBox(height: 8),
-                Text('PASO ${wizardStep + 1}/6 · ${steps[wizardStep]}',
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFB49BFF))),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: (wizardStep + 1) / 6,
-                  minHeight: 5,
-                  borderRadius: BorderRadius.circular(20),
-                  color: const Color(0xFF915DFF),
-                ),
-              ],
+              if (guided)
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF5124B3), Color(0xFF242057)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFA87EFF)),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Row(children: [
+                      Icon(Icons.inventory_2_rounded, color: Colors.white, size: 27),
+                      SizedBox(width: 10),
+                      Expanded(child: Text('Agregar producto a tu tienda',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white))),
+                    ]),
+                    const SizedBox(height: 6),
+                    Text('PASO ${wizardStep + 1} DE 6 · ${steps[wizardStep]}',
+                      style: const TextStyle(color: Color(0xFFE4D7FF),
+                        fontWeight: FontWeight.w800, fontSize: 12)),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      for (var i = 0; i < steps.length; i++) ...[
+                        if (i != 0) const SizedBox(width: 5),
+                        Expanded(child: Container(
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: i <= wizardStep
+                                ? const Color(0xFFBB93FF)
+                                : const Color(0xFF68618F),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        )),
+                      ],
+                    ]),
+                  ]),
+                )
+              else
+                Text(p == null ? 'Nuevo producto o servicio' : 'Editar',
+                  style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 16),
               if (!guided || wizardStep == 0)
                 TextField(controller: name, autofocus: p == null, maxLength: 200, decoration: const InputDecoration(labelText: 'Nombre', counterText: '')),
