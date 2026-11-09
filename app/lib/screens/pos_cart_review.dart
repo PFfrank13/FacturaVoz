@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../ui/retail_visual.dart';
 import 'client_profile.dart' show StorageImage;
 
 enum RetailCartAction { collect, credit }
@@ -88,15 +89,14 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
               child: Column(children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Revisa los productos y cantidades',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                    ),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    RetailVisual.journey(step: 2, label: 'Revisar productos'),
+                    const SizedBox(height: 13),
+                    const Text('Revisa productos y cantidades',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                  ]),
                 ),
                 Expanded(
                   child: items.isEmpty
