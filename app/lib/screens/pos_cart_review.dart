@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import 'client_profile.dart' show StorageImage;
 
+enum RetailCartAction { collect, credit }
+
 /// Second screen of the physical-store POS: products -> editable cart -> pay.
 /// Every item comes from the active tenant's catalog. Never simulates sales.
 class PosCartReviewScreen extends StatefulWidget {
@@ -13,6 +15,7 @@ class PosCartReviewScreen extends StatefulWidget {
     required this.currency,
     required this.taxRate,
     required this.productImages,
+    this.canSellOnCredit = false,
   });
 
   final List<LineItem> Function() lines;
@@ -20,6 +23,7 @@ class PosCartReviewScreen extends StatefulWidget {
   final String currency;
   final double taxRate;
   final Map<String, String> productImages;
+  final bool canSellOnCredit;
 
   @override
   State<PosCartReviewScreen> createState() => _PosCartReviewScreenState();
@@ -198,6 +202,18 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                     const Divider(height: 26),
                     _totalLine('Total a cobrar', total.total, widget.currency, bold: true),
                     const SizedBox(height: 14),
+                    if (widget.canSellOnCredit && items.isNotEmpty) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('retail-credit-sale'),
+                          onPressed: () => Navigator.of(context).pop(RetailCartAction.credit),
+                          icon: const Icon(Icons.person_outline_rounded),
+                          label: const Text('Registrar venta a fiado (cliente requerido)'),
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -207,7 +223,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                           backgroundColor: _purple,
                           foregroundColor: Colors.white,
                         ),
-                        onPressed: items.isEmpty ? null : () => Navigator.of(context).pop(true),
+                        onPressed: items.isEmpty ? null : () => Navigator.of(context).pop(RetailCartAction.collect),
                         icon: const Icon(Icons.arrow_forward_rounded),
                         label: const Text('Continuar al pago',
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
