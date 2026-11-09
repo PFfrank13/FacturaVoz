@@ -242,7 +242,9 @@ class _MainShellState extends State<MainShell> {
   Future<void> _newInvoice() async {
     if (!Access.instance.has('facturar') || !Access.instance.has('voz')) return;
     if (!Access.instance.can('sell')) {
-      openCopilot(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tu rol no permite registrar ventas.')),
+      );
       return;
     }
     final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const NewInvoiceScreen()));
@@ -437,7 +439,9 @@ class _Dock extends StatelessWidget {
             top: 0,
             child: Semantics(
               button: true,
-              label: 'Vender por voz. Mantén presionado para el copiloto.',
+              label: Access.instance.has('copiloto')
+                  ? 'Vender por voz. Mantén presionado para el copiloto.'
+                  : 'Vender por voz.',
               child: GestureDetector(
                 onLongPress: () {
                   Haptics.heavy();
