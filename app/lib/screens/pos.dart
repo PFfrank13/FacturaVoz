@@ -613,7 +613,9 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
     if (!mounted || Repo.activeOrgId != org ||
-        Supabase.instance.client.auth.currentUser?.id != uid) return;
+        Supabase.instance.client.auth.currentUser?.id != uid) {
+      return;
+    }
     if (approved == RetailCartAction.collect) {
       await _chargeSheet();
     } else if (approved == RetailCartAction.credit) {
@@ -634,7 +636,9 @@ class _PosScreenState extends State<PosScreen> {
     final total = computeTotals(lines, taxRate).total;
     final approval = await choosePosPayment(context, currency: currency, total: total, items: lines);
     if (!mounted || approval == null || Repo.activeOrgId != org ||
-        Supabase.instance.client.auth.currentUser?.id != uid) return;
+        Supabase.instance.client.auth.currentUser?.id != uid) {
+      return;
+    }
     final current = _lines();
     final unchanged = current.length == lines.length &&
         _cur == currency && _rate == taxRate &&
