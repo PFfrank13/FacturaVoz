@@ -129,7 +129,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   /// A stock viewer must not see editing, deletion or stock mutation controls.
   /// The database remains the final authority for every write.
   bool get _canManageProducts =>
-      Access.instance.has('stock') && Access.instance.can('products_edit');
+      Access.instance.licenseReady &&
+      Access.instance.can('products_edit') &&
+      (Access.instance.rubro != 'bodega' || Access.instance.has('stock'));
 
   @override
   List<String> get liveTables => const ['products'];
