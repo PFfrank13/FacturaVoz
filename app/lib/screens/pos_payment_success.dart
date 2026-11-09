@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../ui/retail_visual.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'retail_receipts.dart';
@@ -64,6 +65,8 @@ class PosPaymentSuccessScreen extends StatelessWidget {
         body: SafeArea(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: ListView(padding: const EdgeInsets.all(16), children: [
+            RetailVisual.journey(step: 4, label: 'Comprobante y ticket'),
+            const SizedBox(height: 15),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
               decoration: BoxDecoration(
