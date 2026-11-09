@@ -370,7 +370,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       controller: _tender,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(prefixText: 'S/ ', border: OutlineInputBorder()),
+                      decoration: InputDecoration(prefixText: posCurrencyPrefix(widget.currency),
+                        border: const OutlineInputBorder()),
                     ),
                     const SizedBox(height: 12),
                     Text(_sufficient
