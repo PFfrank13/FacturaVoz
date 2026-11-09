@@ -57,6 +57,73 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
   String? _error;
   bool _loading = true;
   int _limit = 100;
+  bool _showHistoryOnly = false;
+  final ScrollController _listController = ScrollController();
+
+  @override
+  void dispose() {
+    _listController.dispose();
+    super.dispose();
+  }
+
+  void _openHistory() {
+    setState(() => _showHistoryOnly = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _listController.hasClients) _listController.jumpTo(0);
+    });
+  }
+
+  Future<void> _shareExisting() async {
+    if (_loading || _error != null) return;
+    if (_invoices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Todavía no hay comprobantes que compartir. Registra una venta primero.'),
+      ));
+      return;
+    }
+    final selected = await showModalBottomSheet<InvoiceRecord>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: _surface,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * .72),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 8, 18, 12),
+              child: Align(alignment: Alignment.centerLeft, child: Text(
+                'Elige qué comprobante compartir',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              )),
+            ),
+            Flexible(child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _invoices.length,
+              itemBuilder: (_, index) {
+                final inv = _invoices[index];
+                return ListTile(
+                  leading: const Icon(Icons.receipt_long_rounded, color: _violet),
+                  title: Text(inv.fiscalNumber ?? inv.number),
+                  subtitle: Text(
+                    '${inv.clientName} · ${inv.fiscalStatus == 'accepted' ? 'Verifica su entorno SUNAT' : 'Documento interno o pendiente'}',
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Text(money(inv.totals.total, inv.currency)),
+                  onTap: () => Navigator.pop(sheetContext, inv),
+                );
+              },
+            )),
+          ]),
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => InvoiceDetailScreen(invoiceId: selected.id, autoSharePdf: true),
+    ));
+    if (mounted) await _refresh();
+  }
 
   @override
   void initState() {
@@ -141,11 +208,13 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
     required String label,
     required String caption,
     required VoidCallback? action,
+    Key? key,
     Color accent = _violet,
   }) => Material(
     color: _surface,
     borderRadius: BorderRadius.circular(16),
     child: InkWell(
+      key: key,
       borderRadius: BorderRadius.circular(16),
       onTap: action,
       child: Container(
@@ -202,51 +271,103 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
           child: RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
+              controller: _listController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
-                const Text('Boletas, facturas y ventas internas',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4),
-                const Text(
-                  'Crea, consulta y emite desde un solo módulo. El documento será válido '
-                  'solo cuando SUNAT confirme su aceptación en producción.',
-                  style: TextStyle(color: Color(0xFFBABDD9), fontSize: 12),
-                ),
-                const SizedBox(height: 17),
-                _action(
-                  icon: Icons.note_add_rounded,
-                  label: 'Nuevo comprobante',
-                  caption: 'Registrar productos y preparar boleta o factura',
-                  action: access.can('sell') && access.has('facturar') ? _newReceipt : null,
-                ),
-                const SizedBox(height: 9),
-                _action(
-                  icon: Icons.admin_panel_settings_rounded,
-                  label: 'Configuración SUNAT',
-                  caption: 'RUC, entorno, usuario SOL y certificado digital',
-                  action: access.can('settings')
-                    ? () async {
-                        await Navigator.of(context).push(MaterialPageRoute<void>(
-                          builder: (_) => const FiscalSetupScreen(),
-                        ));
-                        if (mounted) _refresh();
-                      }
-                    : null,
-                  accent: const Color(0xFF2F93CA),
-                ),
-                if (access.can('settings')) ...[
+                if (_showHistoryOnly) ...[
+                  TextButton.icon(
+                    key: const ValueKey('receipt-back-menu'),
+                    onPressed: () => setState(() => _showHistoryOnly = false),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Volver al menú de comprobantes'),
+                  ),
+                  const SizedBox(height: 8),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(17),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(19),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4D2599), Color(0xFF24225B), _surface],
+                      ),
+                      border: Border.all(color: const Color(0xFF8D62EA)),
+                    ),
+                    child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Icon(Icons.receipt_long_rounded, color: Color(0xFFE7D3FF), size: 30),
+                        SizedBox(width: 12),
+                        Expanded(child: Text('Tus comprobantes',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
+                      ]),
+                      SizedBox(height: 6),
+                      Text('Emite boletas y facturas, consulta el historial y comparte tus documentos.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFFE3D8FF))),
+                    ]),
+                  ),
+                  const SizedBox(height: 14),
+                  _action(
+                    key: const ValueKey('receipt-emit-action'),
+                    icon: Icons.note_add_rounded,
+                    label: '1. Emitir comprobante',
+                    caption: 'Elige boleta o factura, revisa cliente y productos, confirma en SUNAT',
+                    action: access.can('sell') && access.has('facturar') ? _newReceipt : null,
+                  ),
                   const SizedBox(height: 9),
                   _action(
-                    icon: Icons.palette_rounded,
-                    label: 'Plantillas, logo y formatos',
-                    caption: 'Personaliza PDF A4 y ticket; se guarda por negocio',
-                    action: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => const BrandingScreen(),
-                    )),
-                    accent: const Color(0xFF8055D9),
+                    key: const ValueKey('receipt-history-action'),
+                    icon: Icons.history_rounded,
+                    label: '2. Historial de comprobantes',
+                    caption: 'Busca, filtra, descarga y revisa estados reales',
+                    action: _openHistory,
+                    accent: const Color(0xFF557BEA),
                   ),
+                  const SizedBox(height: 9),
+                  _action(
+                    key: const ValueKey('receipt-sunat-action'),
+                    icon: Icons.admin_panel_settings_rounded,
+                    label: '3. Configuración SUNAT',
+                    caption: 'RUC, entorno, usuario SOL y certificado digital',
+                    action: access.can('settings')
+                      ? () async {
+                          await Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => const FiscalSetupScreen(),
+                          ));
+                          if (mounted) await _refresh();
+                        }
+                      : null,
+                    accent: const Color(0xFF2F93CA),
+                  ),
+                  const SizedBox(height: 9),
+                  _action(
+                    key: const ValueKey('receipt-share-action'),
+                    icon: Icons.share_rounded,
+                    label: '4. Compartir comprobante',
+                    caption: 'Elige un documento real y abre WhatsApp, correo u otra app',
+                    action: _loading || _error != null ? null : _shareExisting,
+                    accent: const Color(0xFF259C81),
+                  ),
+                  if (access.can('settings')) ...[
+                    const SizedBox(height: 8),
+                    ExpansionTile(
+                      key: const ValueKey('receipt-branding-extras'),
+                      title: const Text('Opciones de diseño e impresión',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      leading: const Icon(Icons.tune_rounded, color: Color(0xFFBCA6FF)),
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.palette_rounded),
+                          title: const Text('Logo, PDF y ticket'),
+                          subtitle: const Text('Personaliza la plantilla del negocio'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => const BrandingScreen(),
+                          )),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 15),
                 ],
-                const SizedBox(height: 20),
                 const Text('Historial de comprobantes', style: TextStyle(
                   color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
