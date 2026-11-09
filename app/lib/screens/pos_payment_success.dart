@@ -90,15 +90,18 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 Text(money(total, currency), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 36)),
                 const SizedBox(height: 8),
                 Container(
-                  decoration: BoxDecoration(color: accent.withValues(alpha: .2), borderRadius: BorderRadius.circular(50)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  width: double.infinity,
+                  decoration: BoxDecoration(color: accent.withValues(alpha: .2), borderRadius: BorderRadius.circular(18)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(children: [
                     PosPaymentBrand(method, size: 30),
-                    const SizedBox(width: 8),
-                    Text(method == 'efectivo'
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(method == 'efectivo'
                       ? 'Cobrado con Efectivo'
                       : '${posMethodLabel(method)} · verificado por el cajero',
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700))),
                   ]),
                 ),
               ]),
