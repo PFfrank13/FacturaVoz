@@ -6,6 +6,7 @@ import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import 'fiscal_setup.dart';
+import 'branding.dart';
 import 'invoice_detail.dart';
 import 'new_invoice.dart';
 
@@ -232,6 +233,18 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                     : null,
                   accent: const Color(0xFF2F93CA),
                 ),
+                if (access.can('settings')) ...[
+                  const SizedBox(height: 9),
+                  _action(
+                    icon: Icons.palette_rounded,
+                    label: 'Plantillas, logo y formatos',
+                    caption: 'Personaliza PDF A4 y ticket; se guarda por negocio',
+                    action: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => const BrandingScreen(),
+                    )),
+                    accent: const Color(0xFF8055D9),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 const Text('Historial de comprobantes', style: TextStyle(
                   color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
