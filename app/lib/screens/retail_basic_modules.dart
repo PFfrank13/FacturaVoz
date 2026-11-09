@@ -46,7 +46,10 @@ class RetailBasicModules extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (Access.instance.rubro != 'bodega') return const SizedBox.shrink();
+    if (Access.instance.rubro != 'bodega' ||
+        Access.instance.license.plan != 'BASICO') {
+      return const SizedBox.shrink();
+    }
     final salesFeature = featureById('pos');
     final main = [
       for (final tile in _primary)
