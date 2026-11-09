@@ -9,6 +9,7 @@ import '../models_v2.dart';
 import '../services/v2_api.dart';
 import '../services/v2_repo.dart';
 import '../services/live.dart';
+import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -28,6 +29,23 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
   Map<String, dynamic>? _closing;
   String? _error;
   bool _busy = false;
+  String? _activeOrg;
+  int _loadGeneration = 0;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || org == _activeOrg) return;
+    _activeOrg = org;
+    _loadGeneration++;
+    setState(() {
+      _day = todayIso();
+      _sum = null;
+      _moves = const [];
+      _closing = null;
+      _error = null;
+    });
+    _load();
+  }
 
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
 
@@ -40,6 +58,8 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
     _sum = LiveCache.get<DaySummary>('cash.$_day.sum');
     _moves = LiveCache.get<List<CashMove>>('cash.$_day.moves') ?? const [];
     _closing = LiveCache.get<Map<String, dynamic>>('cash.$_day.closing');
@@ -49,15 +69,20 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     stopLive();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final day = _day;
+    final generation = ++_loadGeneration;
     try {
-      final s = await V2Repo.daySummary(_day);
-      final m = await V2Repo.cashMoves(_day);
-      final c = await V2Repo.dayClosing(_day);
+      final s = await V2Repo.daySummary(day);
+      final m = await V2Repo.cashMoves(day);
+      final c = await V2Repo.dayClosing(day);
+      if (!mounted || Repo.activeOrgId != org || _day != day || generation != _loadGeneration) return;
       LiveCache.put('cash.$_day.sum', s);
       LiveCache.put('cash.$_day.moves', m);
       LiveCache.put('cash.$_day.closing', c);
@@ -70,7 +95,9 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = V2Repo.missingHint(e));
+      if (mounted && Repo.activeOrgId == org && _day == day && generation == _loadGeneration) {
+        setState(() => _error = V2Repo.missingHint(e));
+      }
     }
   }
 
@@ -80,6 +107,9 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     setState(() {
       _day = todayIso(d);
       _sum = null;
+      _moves = const [];
+      _closing = null;
+      _error = null;
     });
     _load();
   }
