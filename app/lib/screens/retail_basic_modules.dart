@@ -107,7 +107,7 @@ class RetailBasicModules extends StatelessWidget {
           final width = constraints.maxWidth;
           final columns = width >= 720 ? 4 : (width >= 480 ? 3 : 2);
           final scale = MediaQuery.textScalerOf(context).scale(1.0);
-          final extent = 137.0 + (scale > 1 ? (scale - 1) * 105 : 0);
+          final extent = 166.0 + (scale > 1 ? (scale - 1) * 105 : 0);
           return GridView.builder(
             key: const ValueKey('retail-basic-modules'),
             shrinkWrap: true,
