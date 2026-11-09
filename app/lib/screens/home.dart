@@ -656,6 +656,31 @@ class HomeHeader extends StatelessWidget {
                 const SizedBox(width: Gap.sm),
                 const AvatarButton(onDark: true),
               ]),
+              if (Access.instance.rubro == 'bodega') ...[
+                const SizedBox(height: 9),
+                Wrap(spacing: 8, runSpacing: 6, children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .15),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white.withValues(alpha: .26)),
+                    ),
+                    child: const Text('Bodega / Tienda', style: TextStyle(
+                      color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5133A0),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: const Color(0xFFB59AF8)),
+                    ),
+                    child: Text('Plan ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+              ],
               const SizedBox(height: Gap.md),
               // Fila 2: accesos grandes, mismo ancho, con el texto centrado.
               Row(children: [
