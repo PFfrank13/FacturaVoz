@@ -109,7 +109,12 @@ class FeatureEntry {
   bool get allowed => roleOk && planOk;
 
   /// ¿El rol lo permite (y la plataforma)? Si no, no se muestra.
-  bool get roleOk => rubroShows(rubroFor(Access.instance.rubro), id) && (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
+  bool get roleOk => rubroShows(rubroFor(Access.instance.rubro), id) &&
+      (perm == null || Access.instance.can(perm!)) &&
+      // Receiving and supplier-payment flow currently requires administrator access.
+      // Do not advertise a shortcut that the underlying screen will reject.
+      (id != 'compras' || Access.instance.isAdmin) &&
+      !(mobileOnly && kIsWeb);
 
   /// ¿Hub lo incluye? Los menús filtran por allowed y omiten lo no contratado.
   bool get planOk => feature == null || Access.instance.has(feature!);
