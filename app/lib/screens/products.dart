@@ -123,6 +123,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   String? _error;
   String _q = '';
 
+  /// A stock viewer must not see editing, deletion or stock mutation controls.
+  /// The database remains the final authority for every write.
+  bool get _canManageProducts =>
+      Access.instance.has('stock') && Access.instance.can('products_edit');
+
   @override
   List<String> get liveTables => const ['products'];
 
@@ -162,6 +167,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     ..showSnackBar(SnackBar(content: Text(m)));
 
   Future<void> _edit([Product? p]) async {
+    if (!_canManageProducts) return;
     final name = TextEditingController(text: p?.name ?? '');
     final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(p.unitPrice));
     final guided = p == null && Access.instance.rubro == 'bodega';
@@ -606,6 +612,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   }
 
   Future<void> _more(Product p) async {
+    if (!_canManageProducts) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -632,6 +639,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
         ]),
       ),
     );
+    if (!_canManageProducts) return;
     try {
       switch (action) {
         case 'edit':
@@ -653,6 +661,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
 
   /// Entrada (compra) o salida (merma, uso interno) de stock. Atómico en la base de datos.
   Future<void> _adjust(Product p) async {
+    if (!_canManageProducts) return;
     final qty = TextEditingController();
     var inbound = true;
     final ok = await showModalBottomSheet<bool>(
@@ -718,7 +727,13 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             },
           ),
       ]),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')),
+      floatingActionButton: _canManageProducts
+          ? FloatingActionButton.extended(
+              onPressed: () => _edit(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Nuevo'),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -785,7 +800,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     child: Opacity(
                       opacity: p.active ? 1 : .5,
                       child: Pressable(
-                        onTap: () => _more(p),
+                        onTap: _canManageProducts ? () => _more(p) : null,
                         child: SoftCard(
                           padding: const EdgeInsets.all(14),
                           child: Row(children: [
