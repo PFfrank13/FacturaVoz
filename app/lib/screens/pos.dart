@@ -594,14 +594,15 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     if (_lines().isEmpty) return;
-    final approved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final approved = await Navigator.of(context).push<RetailCartAction>(
+      MaterialPageRoute<RetailCartAction>(
         builder: (_) => PosCartReviewScreen(
           lines: _lines,
           productImages: _extra.map((id, value) =>
               MapEntry(id, (value['image_path'] ?? '').toString())),
           currency: _cur,
           taxRate: _rate,
+          canSellOnCredit: Access.instance.has('fiados') && Access.instance.can('sell'),
           onChangeQuantity: (id, amount) {
             final p = _products?.where((x) => x.id == id).firstOrNull;
             if (p != null) _add(p, amount.toDouble());
@@ -609,7 +610,12 @@ class _PosScreenState extends State<PosScreen> {
         ),
       ),
     );
-    if (mounted && approved == true) await _chargeSheet();
+    if (!mounted) return;
+    if (approved == RetailCartAction.collect) {
+      await _chargeSheet();
+    } else if (approved == RetailCartAction.credit) {
+      await _checkout(credit: true);
+    }
   }
 
   /// Four-stage mobile POS: basket → method → verified payment → receipt.
@@ -734,7 +740,7 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
-  Future<void> _checkout() async {
+  Future<void> _checkout({bool credit = false}) async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
         _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Primero confirma o recupera el cobro rápido pendiente.')));
@@ -752,7 +758,7 @@ class _PosScreenState extends State<PosScreen> {
       notes: _coupon == null ? '' : 'Cupón ${_coupon!.code}',
       transcript: p == null ? null : 'Venta rápida',
     );
-    final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft)));
+    final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft, startAsCredit: credit)));
     AppState.instance.bump();
     if (id != null && mounted) {
       if (_restaurant && _savedOrderId != null) {
