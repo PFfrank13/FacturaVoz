@@ -38,6 +38,21 @@ void main() {
     expect(find.textContaining('13.33'), findsOneWidget);
   });
 
+  testWidgets('Credit checkout appears only when enabled and cart has products', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: PosCartReviewScreen(
+        lines: () => [LineItem(productId: 'p1', description: 'Aceite', unitPrice: 9.50)],
+        currency: 'PEN',
+        taxRate: 18,
+        productImages: const {},
+        canSellOnCredit: true,
+        onChangeQuantity: (_, _) {},
+      ),
+    ));
+    expect(find.byKey(const ValueKey('retail-credit-sale')), findsOneWidget);
+    expect(find.textContaining('cliente requerido'), findsOneWidget);
+  });
+
   testWidgets('Retail cart cannot proceed when empty', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: PosCartReviewScreen(
