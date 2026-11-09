@@ -116,7 +116,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                     ),
                     const SizedBox(height: 6),
                     if (list.isEmpty)
-                      const EmptyState(title: 'Nadie te debe 🎉', body: 'Cuando alguien se lleve algo fiado, anótalo con el botón de abajo o dile al copiloto: "anota que Rosa me debe 30".')
+                      const EmptyState(title: 'Nadie te debe 🎉', body: 'Cuando alguien se lleve algo fiado, toca «Anotar fiado», elige el cliente y registra el importe y la fecha de pago.')
                     else
                       for (final (i, b) in list.indexed)
                         Reveal(
