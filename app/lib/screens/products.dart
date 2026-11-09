@@ -49,6 +49,7 @@ class _ProductPicker extends StatefulWidget {
 
 class _ProductPickerState extends State<_ProductPicker> {
   List<Product>? _all;
+  Map<String, Map<String, dynamic>> _catalogExtras = const {};
   String? _error;
   String _q = '';
 
@@ -145,9 +146,12 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Future<void> _load() async {
     setState(() => _error = null);
     try {
+      final orgAtStart = Repo.activeOrgId;
       final r = await Repo.listProducts();
+      final extras = await V2Repo.productExtras();
+      if (!mounted || orgAtStart != Repo.activeOrgId) return;
       LiveCache.put('products.all', r);
-      if (mounted) setState(() => _all = r);
+      setState(() { _all = r; _catalogExtras = extras; });
     } catch (e) {
       if (mounted) setState(() => _error = friendly(e));
     }
@@ -701,15 +705,27 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                         child: SoftCard(
                           padding: const EdgeInsets.all(14),
                           child: Row(children: [
-                            CircleAvatar(
-                              backgroundColor: t.colorScheme.primary.withValues(alpha: .12),
-                              child: Icon(p.isService ? Icons.handyman_rounded : Icons.inventory_2_rounded, size: 20, color: t.colorScheme.primary),
+                            SizedBox(
+                              width: 56, height: 62,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: (_catalogExtras[p.id]?['image_path'] ?? '').toString().isNotEmpty
+                                  ? StorageImage(path: (_catalogExtras[p.id]?['image_path'] ?? '').toString())
+                                  : DecoratedBox(
+                                      decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: .12)),
+                                      child: Icon(p.isService ? Icons.handyman_rounded : Icons.inventory_2_rounded,
+                                        size: 25, color: t.colorScheme.primary),
+                                    ),
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
                                 Text(p.active ? (p.isService ? 'Servicio' : 'Producto') : 'Archivado', style: t.textTheme.bodySmall),
+                                if ((_catalogExtras[p.id]?['barcode'] ?? '').toString().isNotEmpty)
+                                  Text('Código: ${_catalogExtras[p.id]!['barcode']}',
+                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.bodySmall),
                                 if (p.tracksStock || p.margin != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
