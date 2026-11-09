@@ -25,6 +25,7 @@ import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'pos_payment_success.dart';
+import 'pos_cart_review.dart';
 import 'new_invoice.dart';
 import 'team.dart' show dbMessage;
 
@@ -584,6 +585,32 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  /// Review the complete cart as a separate screen before choosing payment.
+  /// Changes use the existing guarded, persisted cart methods.
+  Future<void> _reviewRetailCart() async {
+    if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
+      return;
+    }
+    if (_lines().isEmpty) return;
+    final approved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => PosCartReviewScreen(
+          lines: _lines,
+          productImages: _extra.map((id, value) =>
+              MapEntry(id, (value['image_path'] ?? '').toString())),
+          currency: _cur,
+          taxRate: _rate,
+          onChangeQuantity: (id, amount) {
+            final p = _products?.where((x) => x.id == id).firstOrNull;
+            if (p != null) _add(p, amount.toDouble());
+          },
+        ),
+      ),
+    );
+    if (mounted && approved == true) await _chargeSheet();
+  }
+
   /// Four-stage mobile POS: basket → method → verified payment → receipt.
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
@@ -885,7 +912,7 @@ class _PosScreenState extends State<PosScreen> {
                         : LayoutBuilder(builder: (context, c) {
                             final cols = (c.maxWidth / 150).floor().clamp(2, 6);
                             return GridView.builder(
-                              padding: EdgeInsets.fromLTRB(12, 8, 12, widget.embedded ? 210 : 120),
+                              padding: EdgeInsets.fromLTRB(12, 8, 12, retail && widget.embedded ? 8 : widget.embedded ? 210 : 120),
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(200)),
                               itemCount: list.length,
                               itemBuilder: (context, i) {
@@ -949,8 +976,48 @@ class _PosScreenState extends State<PosScreen> {
                             );
                           }),
                   ),
+                  if (retail && widget.embedded && lines.isNotEmpty)
+                    Container(
+                      key: const ValueKey('retail-pos-checkout-bar'),
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 94),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF1B214A),
+                        border: Border(top: BorderSide(color: Color(0xFF57418E))),
+                      ),
+                      child: Row(children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _reviewRetailCart,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${qtyText(count)} productos · Ver carrito',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFFE3D6FF))),
+                                Text(money(totals.total, _cur),
+                                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        FilledButton.icon(
+                          key: const ValueKey('retail-pos-charge'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 50),
+                            backgroundColor: const Color(0xFF9658FA),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _charging || _savingOrder || _chargeRequestId != null
+                              ? null : _reviewRetailCart,
+                          icon: const Icon(Icons.shopping_cart_checkout_rounded),
+                          label: const Text('Cobrar', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ]),
+                    ),
                 ]),
-      bottomNavigationBar: AnimatedSize(
+      bottomNavigationBar: retail && widget.embedded ? null : AnimatedSize(
         duration: Motion.d(context, Motion.medium),
         curve: Motion.standard,
         child: lines.isEmpty
