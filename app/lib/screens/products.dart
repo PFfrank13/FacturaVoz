@@ -123,6 +123,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Map<String, Map<String, dynamic>> _catalogExtras = const {};
   String? _error;
   String _q = '';
+  final TextEditingController _search = TextEditingController();
   String? _activeOrg;
   int _loadGeneration = 0;
 
@@ -154,6 +155,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     if (!mounted || _activeOrg == org) return;
     _activeOrg = org;
     _loadGeneration++;
+    _search.clear();
     setState(() {
       _all = null;
       _catalogExtras = const {};
@@ -167,6 +169,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   @override
   void dispose() {
     AppState.instance.removeListener(_onCompanyChange);
+    _search.dispose();
     stopLive();
     super.dispose();
   }
@@ -802,6 +805,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 ],
               )),
             TextField(
+              controller: _search,
               onChanged: (v) => setState(() => _q = v),
               decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded), isDense: true),
             ),
