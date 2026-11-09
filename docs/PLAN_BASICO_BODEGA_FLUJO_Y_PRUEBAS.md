@@ -24,6 +24,7 @@ conceder funciones de Pro/Empresa y sin desactivar RLS. Los módulos se muestran
   únicamente de la imagen real subida por el comerciante.
 - Se conserva el snapshot del checkout y su request ID antes de enviar la
   transacción para evitar dobles cobros ante cortes de red.
+- **Venta a fiado:** disponible en el carrito si el rol/plan lo permite; abre el formulario de cliente y exige fecha de vencimiento, sin registrar un pago ficticio.
 - **Solo después de confirmación del servidor**, se muestra Venta registrada.
   Desde allí se abre Boleta/Factura, comprobante y compartir/imprimir.
 - Registrar venta **no equivale** a obtener CDR de SUNAT, ni confirma
