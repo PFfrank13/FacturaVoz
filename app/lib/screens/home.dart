@@ -601,10 +601,12 @@ class HomeHeader extends StatelessWidget {
     this.todayTotal,
     this.todayCount,
     this.onMenu,
+    this.onSale,
   });
   final double? todayTotal;
   final int? todayCount;
   final VoidCallback? onMenu;
+  final VoidCallback? onSale;
   final String name;
   final String currency;
   final double total;
@@ -654,10 +656,38 @@ class HomeHeader extends StatelessWidget {
                 const SizedBox(width: Gap.sm),
                 const AvatarButton(onDark: true),
               ]),
+              if (Access.instance.rubro == 'bodega') ...[
+                const SizedBox(height: 9),
+                Wrap(spacing: 8, runSpacing: 6, children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .15),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white.withValues(alpha: .26)),
+                    ),
+                    child: const Text('Bodega / Tienda', style: TextStyle(
+                      color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5133A0),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: const Color(0xFFB59AF8)),
+                    ),
+                    child: Text('Plan ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+              ],
               const SizedBox(height: Gap.md),
               // Fila 2: accesos grandes, mismo ancho, con el texto centrado.
               Row(children: [
-                Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
+                if (Access.instance.has('copiloto'))
+                  Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context)))
+                else if (onSale != null)
+                  Expanded(child: _HeaderAction(icon: Icons.shopping_cart_checkout_rounded, label: 'Venta rápida', onTap: onSale!)),
                 if (onMenu != null) ...[
                   const SizedBox(width: Gap.sm),
                   Expanded(child: _HeaderAction(icon: Icons.menu_rounded, label: 'Menú', onTap: onMenu!)),

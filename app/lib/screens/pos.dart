@@ -25,7 +25,9 @@ import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'pos_payment_success.dart';
+import 'pos_cart_review.dart';
 import 'new_invoice.dart';
+import 'products.dart';
 import 'team.dart' show dbMessage;
 
 class PosScreen extends StatefulWidget {
@@ -584,6 +586,38 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  /// Review the complete cart as a separate screen before choosing payment.
+  /// Changes use the existing guarded, persisted cart methods.
+  Future<void> _reviewRetailCart() async {
+    if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
+        _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
+      return;
+    }
+    if (_lines().isEmpty) return;
+    final approved = await Navigator.of(context).push<RetailCartAction>(
+      MaterialPageRoute<RetailCartAction>(
+        builder: (_) => PosCartReviewScreen(
+          lines: _lines,
+          productImages: _extra.map((id, value) =>
+              MapEntry(id, (value['image_path'] ?? '').toString())),
+          currency: _cur,
+          taxRate: _rate,
+          canSellOnCredit: Access.instance.has('fiados') && Access.instance.can('sell'),
+          onChangeQuantity: (id, amount) {
+            final p = _products?.where((x) => x.id == id).firstOrNull;
+            if (p != null) _add(p, amount.toDouble());
+          },
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (approved == RetailCartAction.collect) {
+      await _chargeSheet();
+    } else if (approved == RetailCartAction.credit) {
+      await _checkout(credit: true);
+    }
+  }
+
   /// Four-stage mobile POS: basket → method → verified payment → receipt.
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
@@ -706,7 +740,7 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
-  Future<void> _checkout() async {
+  Future<void> _checkout({bool credit = false}) async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
         _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Primero confirma o recupera el cobro rápido pendiente.')));
@@ -724,7 +758,7 @@ class _PosScreenState extends State<PosScreen> {
       notes: _coupon == null ? '' : 'Cupón ${_coupon!.code}',
       transcript: p == null ? null : 'Venta rápida',
     );
-    final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft)));
+    final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft, startAsCredit: credit)));
     AppState.instance.bump();
     if (id != null && mounted) {
       if (_restaurant && _savedOrderId != null) {
@@ -774,6 +808,14 @@ class _PosScreenState extends State<PosScreen> {
     final count = _cart.values.fold(0.0, (a, b) => a + b);
     final actions = <Widget>[
       if (retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
+      if (retail && Access.instance.has('stock') && Access.instance.can('products_edit'))
+        IconButton(
+          tooltip: 'Editar catálogo y fotos de productos',
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => const ProductsScreen(),
+          )),
+        ),
       IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
@@ -885,7 +927,7 @@ class _PosScreenState extends State<PosScreen> {
                         : LayoutBuilder(builder: (context, c) {
                             final cols = (c.maxWidth / 150).floor().clamp(2, 6);
                             return GridView.builder(
-                              padding: EdgeInsets.fromLTRB(12, 8, 12, widget.embedded ? 210 : 120),
+                              padding: EdgeInsets.fromLTRB(12, 8, 12, retail && widget.embedded ? 8 : widget.embedded ? 210 : 120),
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(200)),
                               itemCount: list.length,
                               itemBuilder: (context, i) {
@@ -893,6 +935,17 @@ class _PosScreenState extends State<PosScreen> {
                                 final n = _cart[p.id] ?? 0;
                                 final img = _extra[p.id]?['image_path'] as String?;
                                 final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
+                                final category = '${p.name} ${_extra[p.id]?['category'] ?? ''}'.toLowerCase();
+                                final placeholderIcon =
+                                    category.contains('agua') || category.contains('bebida')
+                                        ? Icons.water_drop_rounded
+                                        : category.contains('arroz') || category.contains('cereal')
+                                            ? Icons.grain_rounded
+                                            : category.contains('aceite') || category.contains('leche')
+                                                ? Icons.local_drink_rounded
+                                                : category.contains('limpieza')
+                                                    ? Icons.cleaning_services_rounded
+                                                    : Icons.inventory_2_rounded;
                                 final pr = _price(p, n == 0 ? 1 : n);
                                 return Pressable(
                                   onTap: () => _add(p),
@@ -912,9 +965,16 @@ class _PosScreenState extends State<PosScreen> {
                                                 ? Container(
                                                     decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: 0.08), borderRadius: const BorderRadius.vertical(top: Radius.circular(17))),
                                                     alignment: Alignment.center,
-                                                    child: em == null
-                                                        ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
-                                                        : Text(em, style: const TextStyle(fontSize: 40)),
+                                                    child: retail
+                                                        ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                                            Icon(placeholderIcon, size: 42, color: const Color(0xFFB49BFF)),
+                                                            const SizedBox(height: 7),
+                                                            const Text('Foto por añadir', style: TextStyle(
+                                                              fontSize: 10, color: Color(0xFFB7B1CE))),
+                                                          ])
+                                                        : em == null
+                                                            ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
+                                                            : Text(em, style: const TextStyle(fontSize: 40)),
                                                   )
                                                 : ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(17)), child: StorageImage(path: img)),
                                           ),
@@ -949,8 +1009,48 @@ class _PosScreenState extends State<PosScreen> {
                             );
                           }),
                   ),
+                  if (retail && widget.embedded && lines.isNotEmpty)
+                    Container(
+                      key: const ValueKey('retail-pos-checkout-bar'),
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 94),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF1B214A),
+                        border: Border(top: BorderSide(color: Color(0xFF57418E))),
+                      ),
+                      child: Row(children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _reviewRetailCart,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${qtyText(count)} productos · Ver carrito',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFFE3D6FF))),
+                                Text(money(totals.total, _cur),
+                                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        FilledButton.icon(
+                          key: const ValueKey('retail-pos-charge'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 50),
+                            backgroundColor: const Color(0xFF9658FA),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _charging || _savingOrder || _chargeRequestId != null
+                              ? null : _reviewRetailCart,
+                          icon: const Icon(Icons.shopping_cart_checkout_rounded),
+                          label: const Text('Cobrar', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ]),
+                    ),
                 ]),
-      bottomNavigationBar: AnimatedSize(
+      bottomNavigationBar: retail && widget.embedded ? null : AnimatedSize(
         duration: Motion.d(context, Motion.medium),
         curve: Motion.standard,
         child: lines.isEmpty
