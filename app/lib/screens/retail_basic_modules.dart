@@ -2,106 +2,184 @@ import 'package:flutter/material.dart';
 
 import '../access.dart';
 import 'catalog.dart';
+import 'menu.dart';
 
-/// Single navigation source for the Base retail journey. Only real, authorized
-/// destinations are rendered; no fake preview cards or unconnected buttons.
+/// The Basic bodega dashboard follows the same visual order as the retail
+/// flowchart. Every tile points to an existing authorized, functioning screen.
 class RetailBasicModules extends StatelessWidget {
   const RetailBasicModules({super.key});
 
-  static const _items = <({String id, String label, IconData icon})>[
-    (id: 'pos', label: 'Venta rápida', icon: Icons.point_of_sale_rounded),
-    (id: 'productos', label: 'Inventario', icon: Icons.inventory_2_rounded),
-    (id: 'compras', label: 'Compras', icon: Icons.local_shipping_rounded),
-    (id: 'reponer', label: 'Reponer', icon: Icons.shopping_cart_checkout_rounded),
-    (id: 'fiados', label: 'Fiados', icon: Icons.group_rounded),
-    (id: 'caja', label: 'Caja', icon: Icons.account_balance_wallet_rounded),
-    (id: 'reportes', label: 'Reportes', icon: Icons.bar_chart_rounded),
-    (id: 'comprobantes', label: 'Comprobantes', icon: Icons.receipt_long_rounded),
+  static const _primary = <({String id, String label, IconData icon, Color top, Color bottom})>[
+    (id: 'pos', label: 'Nueva venta', icon: Icons.shopping_cart_checkout_rounded,
+      top: Color(0xFF7947FF), bottom: Color(0xFF3655E3)),
+    (id: 'productos', label: 'Inventario', icon: Icons.inventory_2_rounded,
+      top: Color(0xFF12A6C3), bottom: Color(0xFF1066A0)),
+    (id: 'compras', label: 'Compras', icon: Icons.local_shipping_rounded,
+      top: Color(0xFF087EDE), bottom: Color(0xFF294BBE)),
+    (id: 'fiados', label: 'Fiados', icon: Icons.groups_rounded,
+      top: Color(0xFF69BD21), bottom: Color(0xFF187A40)),
+    (id: 'caja', label: 'Caja', icon: Icons.account_balance_wallet_rounded,
+      top: Color(0xFF139E73), bottom: Color(0xFF086B54)),
+    (id: 'reportes', label: 'Reportes', icon: Icons.bar_chart_rounded,
+      top: Color(0xFF8D4BEE), bottom: Color(0xFF5231A7)),
+    (id: 'comprobantes', label: 'Comprobantes', icon: Icons.receipt_long_rounded,
+      top: Color(0xFF4776EA), bottom: Color(0xFF2852BC)),
+  ];
+  static const _secondary = <({String id, String label, IconData icon})>[
+    (id: 'reponer', label: 'Reponer', icon: Icons.add_box_rounded),
     (id: 'clientes', label: 'Clientes', icon: Icons.people_alt_rounded),
     (id: 'gastos', label: 'Gastos', icon: Icons.receipt_long_outlined),
     (id: 'ajustes', label: 'Configuración', icon: Icons.settings_rounded),
     (id: 'medios', label: 'Medios de pago', icon: Icons.qr_code_2_rounded),
     (id: 'impresora', label: 'Impresora', icon: Icons.print_rounded),
-    (id: 'sunat', label: 'Facturación SUNAT', icon: Icons.verified_rounded),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final entries = [
-      for (final item in _items)
-        if (featureById(item.id) case final feature? when feature.allowed)
-          (item: item, feature: feature),
+    if (Access.instance.rubro != 'bodega') return const SizedBox.shrink();
+    final main = [
+      for (final tile in _primary)
+        if (featureById(tile.id) case final feature? when feature.allowed)
+          (tile: tile, feature: feature),
     ];
-    if (entries.isEmpty || Access.instance.rubro != 'bodega') {
-      return const SizedBox.shrink();
-    }
-
-    const purple = Color(0xFF8953F5);
+    final extras = [
+      for (final tile in _secondary)
+        if (featureById(tile.id) case final feature? when feature.allowed)
+          (tile: tile, feature: feature),
+    ];
+    const lilac = Color(0xFFC7B6FF);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Row(children: [
-          Icon(Icons.storefront_rounded, color: purple),
-          SizedBox(width: 10),
+          Icon(Icons.storefront_rounded, color: lilac, size: 23),
+          SizedBox(width: 8),
           Expanded(child: Text('Plan Básico · Bodega / Tienda',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
         ]),
-        const SizedBox(height: 5),
-        Text('Tus herramientas, en orden de trabajo. Cada acceso abre su módulo real.',
+        const SizedBox(height: 4),
+        Text('Tus herramientas, en el orden en que las usas cada día.',
           style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 13),
+        const SizedBox(height: 12),
         GridView.builder(
           key: const ValueKey('retail-basic-modules'),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: entries.length,
+          itemCount: main.length + 1,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            mainAxisExtent: 100,
+            crossAxisCount: 4,
+            mainAxisSpacing: 9,
+            crossAxisSpacing: 8,
+            mainAxisExtent: 91,
           ),
           itemBuilder: (context, index) {
-            final entry = entries[index];
-            final featured = entry.item.id == 'pos';
-            return Material(
-              color: featured ? const Color(0xFF45258A) :
-                Theme.of(context).colorScheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(17),
-              child: InkWell(
-                key: ValueKey('retail-module-${entry.item.id}'),
-                borderRadius: BorderRadius.circular(17),
-                onTap: () => openFeature(context, entry.feature),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 9),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(17),
-                    border: Border.all(
-                      color: featured ? const Color(0xFFC39DFF) :
-                        purple.withValues(alpha: .33),
-                      width: featured ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(entry.item.icon, color: featured ? Colors.white : purple, size: 30),
-                    const SizedBox(height: 9),
-                    Text(entry.item.label,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: featured ? Colors.white :
-                            Theme.of(context).colorScheme.onSurface,
-                        fontSize: 11.5, fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ]),
-                ),
-              ),
+            if (index == main.length) {
+              return _tile(context,
+                key: const ValueKey('retail-module-all'),
+                label: 'Ver todas',
+                icon: Icons.apps_rounded,
+                top: const Color(0xFF57538E),
+                bottom: const Color(0xFF302A66),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const MenuScreen())),
+              );
+            }
+            final entry = main[index];
+            return _tile(context,
+              key: ValueKey('retail-module-${entry.tile.id}'),
+              label: entry.tile.label,
+              icon: entry.tile.icon,
+              top: entry.tile.top, bottom: entry.tile.bottom,
+              onTap: () => openFeature(context, entry.feature),
             );
           },
         ),
+        if (extras.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C224F),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: const Color(0xFF50417F)),
+            ),
+            child: ExpansionTile(
+              key: const ValueKey('retail-other-modules'),
+              title: const Text('Más herramientas del negocio',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              subtitle: const Text('Reponer, clientes, pagos y ajustes'),
+              leading: const Icon(Icons.tune_rounded, color: lilac),
+              children: [
+                for (final extra in extras)
+                  ListTile(
+                    key: ValueKey('retail-secondary-${extra.tile.id}'),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    leading: Icon(extra.tile.icon, color: lilac),
+                    title: Text(extra.tile.label),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => openFeature(context, extra.feature),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: const Color(0xFF171C41),
+            border: Border.all(color: const Color(0xFF49417A)),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Orden recomendado de trabajo',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+            SizedBox(height: 7),
+            Text('1. Inventario  ·  2. Compras  ·  3. Nueva venta',
+              style: TextStyle(fontSize: 11.5)),
+            SizedBox(height: 3),
+            Text('4. Caja  ·  5. Comprobantes  ·  6. Reportes',
+              style: TextStyle(fontSize: 11.5)),
+          ]),
+        ),
       ]),
+    );
+  }
+
+  Widget _tile(
+    BuildContext context, {
+    required Key key,
+    required String label,
+    required IconData icon,
+    required Color top,
+    required Color bottom,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: double.infinity, height: 57,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft,
+                end: Alignment.bottomRight, colors: [top, bottom]),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withValues(alpha: .25)),
+              boxShadow: [
+                BoxShadow(color: top.withValues(alpha: .16), blurRadius: 9, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: Icon(icon, size: 28, color: Colors.white),
+          ),
+          const SizedBox(height: 6),
+          Text(label, textAlign: TextAlign.center,
+            maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10.3, fontWeight: FontWeight.w700)),
+        ]),
+      ),
     );
   }
 }
