@@ -1,3 +1,11 @@
+/// The tender field must use the actual tenant currency, not a fixed sol sign.
+String posCurrencyPrefix(String currency) => switch (currency.toUpperCase()) {
+  'PEN' => 'S/ ',
+  'USD' => 'USD ',
+  'EUR' => 'EUR ',
+  _ => '${currency.toUpperCase()} ',
+};
+
 /// Quantities are stored in integer cents during POS tender calculation.
 int? parsePosCents(String input) {
   final raw = input.trim().replaceAll(',', '.');
