@@ -179,7 +179,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       final r = await Repo.listProducts();
       final extras = await V2Repo.productExtras();
       if (!mounted || orgAtStart != Repo.activeOrgId ||
-          generation != _loadGeneration) return;
+          generation != _loadGeneration) {
+        return;
+      }
       LiveCache.put('products.all', r);
       setState(() { _all = r; _catalogExtras = extras; });
     } catch (e) {
