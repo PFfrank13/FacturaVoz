@@ -164,8 +164,12 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Future<void> _edit([Product? p]) async {
     final name = TextEditingController(text: p?.name ?? '');
     final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(p.unitPrice));
-    var unit = p?.unit ?? 'ZZ';
-    var track = p?.tracksStock ?? false;
+    final guided = p == null && Access.instance.rubro == 'bodega';
+    var wizardStep = 0;
+    const steps = ['Datos del producto', 'Código y foto', 'Presentaciones',
+      'Costos y precios', 'Stock inicial', 'Ficha guardada'];
+    var unit = p?.unit ?? (guided ? 'NIU' : 'ZZ');
+    var track = p?.tracksStock ?? guided;
     final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
     final reorder = TextEditingController(text: p?.reorderPoint == null ? '' : qtyText(p!.reorderPoint!));
     final cost = TextEditingController(text: p?.unitCost == null ? '' : qtyText(p!.unitCost!));
@@ -196,9 +200,23 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(p == null ? 'Nuevo producto o servicio' : 'Editar', style: Theme.of(ctx).textTheme.titleLarge),
+              if (guided) ...[
+                const SizedBox(height: 8),
+                Text('PASO ${wizardStep + 1}/6 · ${steps[wizardStep]}',
+                  style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFB49BFF))),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: (wizardStep + 1) / 6,
+                  minHeight: 5,
+                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFF915DFF),
+                ),
+              ],
               const SizedBox(height: 16),
-              TextField(controller: name, autofocus: p == null, maxLength: 200, decoration: const InputDecoration(labelText: 'Nombre', counterText: '')),
+              if (!guided || wizardStep == 0)
+                TextField(controller: name, autofocus: p == null, maxLength: 200, decoration: const InputDecoration(labelText: 'Nombre', counterText: '')),
               const SizedBox(height: 10),
+              if (!guided || wizardStep == 3) ...[
               TextField(
                 controller: price,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -239,8 +257,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   ]),
                 );
               }),
+              ],
               const SizedBox(height: 12),
-              SegmentedButton<String>(
+              if (!guided || wizardStep == 0) SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'ZZ', label: Text('Servicio'), icon: Icon(Icons.handyman_rounded)),
                   ButtonSegment(value: 'NIU', label: Text('Producto'), icon: Icon(Icons.inventory_2_rounded)),
@@ -248,7 +267,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 selected: {unit},
                 onSelectionChanged: (s) => setS(() => unit = s.first),
               ),
-              SwitchListTile(
+              if (!guided || wizardStep == 2) SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: inStore,
                 onChanged: (v) => setS(() => inStore = v),
@@ -256,7 +275,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 subtitle: inStore ? Text(unit == 'NIU' ? 'Para publicarlo necesita foto y código de barras.' : 'Para publicarlo necesita una foto.') : null,
               ),
               // ── Foto (se comprime en el teléfono antes de subirla; se guarda en Storage privado) ──
-              Row(children: [
+              if (!guided || wizardStep == 1) Row(children: [
                 SizedBox(
                   width: 74,
                   height: 74,
@@ -293,7 +312,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   ]),
                 ),
               ]),
-              if (newImage != null || (oldImage != null && oldImage.isNotEmpty)) ...[
+              if ((!guided || wizardStep == 1) && (newImage != null || (oldImage != null && oldImage.isNotEmpty))) ...[
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
                   OutlinedButton.icon(
@@ -347,7 +366,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 ),
               ],
               const SizedBox(height: 10),
-              TextField(
+              if (!guided || wizardStep == 1) TextField(
                 controller: barcode,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
@@ -364,11 +383,15 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 ),
               ),
               const SizedBox(height: 10),
-              Row(children: [
+              if (!guided || wizardStep == 0) Row(children: [
                 Expanded(child: TextField(controller: category, decoration: const InputDecoration(labelText: 'Categoría (ej.: Bebidas)'))),
               ]),
               const SizedBox(height: 10),
-              TextField(controller: description, maxLines: 2, maxLength: 400, decoration: const InputDecoration(labelText: 'Descripción para la tienda (opcional)', counterText: '')),
+              if (!guided || wizardStep == 0) TextField(controller: description, maxLines: 2, maxLength: 400, decoration: const InputDecoration(labelText: 'Descripción para la tienda (opcional)', counterText: '')),
+              if (!guided || wizardStep == 2) ...[
+                const Text('Unidad comercial', style: TextStyle(fontWeight: FontWeight.w800)),
+                const Text('Para cajas o paquetes registra su equivalente en unidades de stock. '
+                    'Esta versión admite precio por mayor; no descuenta cajas automáticamente.'),
               Row(children: [
                 Expanded(
                   child: TextField(
@@ -386,7 +409,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   ),
                 ),
               ]),
-              if (unit == 'NIU') ...[
+              ],
+              if ((!guided || wizardStep == 4) && unit == 'NIU') ...[
                 const SizedBox(height: 6),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -416,12 +440,40 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     ),
                   ]),
               ],
+              if (guided && wizardStep == 5) ...[
+                const SizedBox(height: 12),
+                Text('Revisa la ficha antes de guardar', style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text('Producto: ${name.text.trim()}'),
+                Text('Código: ${barcode.text.trim().isEmpty ? 'Sin código' : barcode.text.trim()}'),
+                Text('Categoría: ${category.text.trim().isEmpty ? 'Sin categoría' : category.text.trim()}'),
+                Text('Precio: S/ ${price.text.trim().isEmpty ? '0.00' : price.text.trim()}'),
+                Text('Stock inicial: ${track ? stock.text : 'Sin control'}'),
+                const Text('La ficha se guardará en Supabase al pulsar «Guardar producto».'),
+              ],
               if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err, style: const TextStyle(color: Color(0xFFD94A5E)))),
               const SizedBox(height: 16),
+              if (guided && wizardStep > 0)
+                TextButton.icon(
+                  onPressed: processingImage ? null : () => setS(() { wizardStep--; err = ''; }),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Anterior'),
+                ),
               GradientButton(
-                label: 'Guardar',
-                icon: Icons.check_rounded,
+                label: guided && wizardStep < 5 ? 'Siguiente' : 'Guardar producto',
+                icon: guided && wizardStep < 5 ? Icons.arrow_forward_rounded : Icons.check_rounded,
                 onPressed: processingImage ? null : () {
+                  if (guided && wizardStep < 5) {
+                    if (wizardStep == 0 && name.text.trim().isEmpty) {
+                      setS(() => err = 'Escribe el nombre del producto.');
+                    } else if (wizardStep == 3 && (parseDecimal(price.text) == null ||
+                        parseDecimal(price.text)! < 0)) {
+                      setS(() => err = 'Ingresa un precio válido para continuar.');
+                    } else {
+                      setS(() { wizardStep++; err = ''; });
+                    }
+                    return;
+                  }
                   final v = price.text.trim().isEmpty ? 0.0 : parseDecimal(price.text);
                   final hasImage = newImage != null || (oldImage != null && oldImage.isNotEmpty);
                   if (name.text.trim().isEmpty) {
