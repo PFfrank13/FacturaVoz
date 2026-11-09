@@ -13,6 +13,7 @@ import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'client_profile.dart' show shortDateTime;
 
 class CashDayScreen extends StatefulWidget {
@@ -270,16 +271,16 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                     onRefresh: _load,
                     child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                       Reveal(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26)),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('Vendido ${isToday ? 'hoy' : 'ese día'}', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
-                            CountUp(value: s.salesTotal, builder: (_, v) => Text(money(v, _cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800))),
-                            Text(
-                              '${s.salesCount} ${s.salesCount == 1 ? 'venta' : 'ventas'}${s.draftsCount > 0 ? ' · ${s.draftsCount} sin emitir' : ''}',
-                              style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.9)),
-                            ),
+                        child: RetailVisual.hero(
+                          context: context,
+                          eyebrow: isToday ? 'Caja · Hoy' : 'Caja · Histórico',
+                          title: 'Control de caja',
+                          subtitle: 'Registra movimientos y cierra con un arqueo ciego. El saldo esperado solo se muestra después del cierre.',
+                          icon: Icons.account_balance_wallet_rounded,
+                          footer: Row(children: [
+                            Expanded(child: RetailVisual.microStat('Ventas del día', money(s.salesTotal, _cur))),
+                            const SizedBox(width: 10),
+                            Expanded(child: RetailVisual.microStat('Operaciones', '${s.salesCount} ventas')),
                           ]),
                         ),
                       ),
