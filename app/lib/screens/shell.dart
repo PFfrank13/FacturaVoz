@@ -216,7 +216,13 @@ class _MainShellState extends State<MainShell> {
 
   /// Pantalla con la que abre la app: cada rubro abre en SU primera pestaña (la que definió su barra). Solo si la barra
   /// incluye Vender (p. ej. Bodega) abre ahí, para vender sin pasos. Restaurante, servicios, etc. NO se saltan a nada.
-  String _landing(List<_Dest> d) => d.any((x) => x.id == 'sell') ? 'sell' : d.first.id;
+  String _landing(List<_Dest> d) {
+    // A bodega starts at its ordered dashboard; selling is one visible tap away.
+    if (Access.instance.rubro == 'bodega' && d.any((x) => x.id == 'home')) {
+      return 'home';
+    }
+    return d.any((x) => x.id == 'sell') ? 'sell' : d.first.id;
+  }
 
   void _go(String id) {
     if (id == _tab) return;
