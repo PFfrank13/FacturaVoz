@@ -601,10 +601,12 @@ class HomeHeader extends StatelessWidget {
     this.todayTotal,
     this.todayCount,
     this.onMenu,
+    this.onSale,
   });
   final double? todayTotal;
   final int? todayCount;
   final VoidCallback? onMenu;
+  final VoidCallback? onSale;
   final String name;
   final String currency;
   final double total;
@@ -657,7 +659,10 @@ class HomeHeader extends StatelessWidget {
               const SizedBox(height: Gap.md),
               // Fila 2: accesos grandes, mismo ancho, con el texto centrado.
               Row(children: [
-                Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
+                if (Access.instance.has('copiloto'))
+                  Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context)))
+                else if (onSale != null)
+                  Expanded(child: _HeaderAction(icon: Icons.shopping_cart_checkout_rounded, label: 'Venta rápida', onTap: onSale!)),
                 if (onMenu != null) ...[
                   const SizedBox(width: Gap.sm),
                   Expanded(child: _HeaderAction(icon: Icons.menu_rounded, label: 'Menú', onTap: onMenu!)),
