@@ -21,6 +21,7 @@ import '../ui/barcode_scanner.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
@@ -886,8 +887,13 @@ class _PosScreenState extends State<PosScreen> {
               ? const SkeletonList()
               : Column(children: [
                   if (retail)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(18, 12, 18, 4),
+                      child: RetailVisualJourneyStart(),
+                    ),
+                  if (retail && Access.instance.license.plan == 'BASICO')
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
                       child: Center(child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
@@ -1123,3 +1129,4 @@ class _PosScreenState extends State<PosScreen> {
     ));
   }
 }
+
