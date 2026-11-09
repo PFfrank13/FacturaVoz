@@ -122,6 +122,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Map<String, Map<String, dynamic>> _catalogExtras = const {};
   String? _error;
   String _q = '';
+  String? _activeOrg;
+  int _loadGeneration = 0;
 
   /// A stock viewer must not see editing, deletion or stock mutation controls.
   /// The database remains the final authority for every write.
@@ -137,28 +139,51 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
     _all = LiveCache.get<List<Product>>('products.all');
+    AppState.instance.addListener(_onCompanyChange);
     _load();
     startLive(); // tiempo real
   }
 
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || _activeOrg == org) return;
+    _activeOrg = org;
+    _loadGeneration++;
+    setState(() {
+      _all = null;
+      _catalogExtras = const {};
+      _error = null;
+      _q = '';
+    });
+    LiveHub.instance.start();
+    _load();
+  }
+
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     stopLive();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final orgAtStart = Repo.activeOrgId;
+    final generation = ++_loadGeneration;
     setState(() => _error = null);
     try {
-      final orgAtStart = Repo.activeOrgId;
       final r = await Repo.listProducts();
       final extras = await V2Repo.productExtras();
-      if (!mounted || orgAtStart != Repo.activeOrgId) return;
+      if (!mounted || orgAtStart != Repo.activeOrgId ||
+          generation != _loadGeneration) return;
       LiveCache.put('products.all', r);
       setState(() { _all = r; _catalogExtras = extras; });
     } catch (e) {
-      if (mounted) setState(() => _error = friendly(e));
+      if (mounted && orgAtStart == Repo.activeOrgId &&
+          generation == _loadGeneration) {
+        setState(() => _error = friendly(e));
+      }
     }
   }
 
