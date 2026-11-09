@@ -55,6 +55,7 @@ import 'pay_settings.dart';
 import 'pos.dart';
 import 'products.dart';
 import 'retail_purchases.dart';
+import 'retail_receipts.dart';
 import 'profile_form.dart';
 import 'profit.dart';
 import 'promos.dart';
@@ -139,7 +140,7 @@ const groupColors = <String, Color>{
 List<FeatureEntry> featureCatalog() => [
       // ───── Vender ─────
       FeatureEntry(id: 'facturar', title: 'Facturar por voz', subtitle: 'Boleta o factura dictada o escrita', icon: Icons.mic_rounded, group: 'Vender', feature: 'facturar', perm: 'sell', keywords: const ['boleta', 'factura', 'vender', 'comprobante', 'sunat'], builder: (_) => const NewInvoiceScreen()),
-      FeatureEntry(id: 'comprobantes', feature: 'facturar', title: 'Comprobantes', subtitle: 'Todas tus boletas y facturas, con búsqueda y filtros', icon: Icons.receipt_long_rounded, group: 'Vender', keywords: const ['boletas', 'facturas', 'lista', 'historial', 'anular', 'sunat'], builder: (_) => const HomeScreen()),
+      FeatureEntry(id: 'comprobantes', feature: 'facturar', title: 'Comprobantes', subtitle: 'Emitir, consultar, descargar y configurar SUNAT', icon: Icons.receipt_long_rounded, group: 'Vender', keywords: const ['boletas', 'facturas', 'lista', 'historial', 'anular', 'sunat'], builder: (_) => const RetailReceiptsScreen()),
       FeatureEntry(id: 'pos', title: 'Venta rápida (caja)', subtitle: 'Toca productos o escanea su código de barras', icon: Icons.point_of_sale_rounded, group: 'Vender', module: 'pos', feature: 'facturar', perm: 'sell', keywords: const ['caja', 'pos', 'codigo de barras', 'carrito'], builder: (_) => const PosScreen()),
       FeatureEntry(id: 'cotizaciones', title: 'Cotizaciones y pedidos', subtitle: 'Cotiza, comparte y convierte en factura', icon: Icons.request_quote_rounded, group: 'Vender', module: 'cotizaciones', feature: 'cotizaciones', perm: 'sell', keywords: const ['presupuesto', 'proforma', 'pedido web'], builder: (_) => const QuotesScreen()),
       FeatureEntry(id: 'agente', title: 'Tareas del Copiloto', subtitle: 'Encárgale una tarea: la prepara y tú la apruebas', icon: Icons.smart_toy_rounded, group: 'Control del dueño', feature: 'copiloto_agente', perm: 'settings', keywords: const ['copiloto', 'agente', 'tarea', 'delegar', 'cobrar', 'automatico'], builder: (_) => const AgentScreen()),
