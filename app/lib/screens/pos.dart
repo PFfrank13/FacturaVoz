@@ -589,6 +589,8 @@ class _PosScreenState extends State<PosScreen> {
   /// Review the complete cart as a separate screen before choosing payment.
   /// Changes use the existing guarded, persisted cart methods.
   Future<void> _reviewRetailCart() async {
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
         _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       return;
@@ -610,7 +612,8 @@ class _PosScreenState extends State<PosScreen> {
         ),
       ),
     );
-    if (!mounted) return;
+    if (!mounted || Repo.activeOrgId != org ||
+        Supabase.instance.client.auth.currentUser?.id != uid) return;
     if (approved == RetailCartAction.collect) {
       await _chargeSheet();
     } else if (approved == RetailCartAction.credit) {
@@ -622,11 +625,30 @@ class _PosScreenState extends State<PosScreen> {
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
         _checkoutRecoveryError != null || _chargeRequestId != null || _charging) { return; }
+    final org = Repo.activeOrgId;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    final currency = _cur;
+    final taxRate = _rate;
     final lines = _lines();
     if (lines.isEmpty) { return; }
-    final total = computeTotals(lines, _rate).total;
-    final approval = await choosePosPayment(context, currency: _cur, total: total, items: lines);
-    if (!mounted || approval == null) return;
+    final total = computeTotals(lines, taxRate).total;
+    final approval = await choosePosPayment(context, currency: currency, total: total, items: lines);
+    if (!mounted || approval == null || Repo.activeOrgId != org ||
+        Supabase.instance.client.auth.currentUser?.id != uid) return;
+    final current = _lines();
+    final unchanged = current.length == lines.length &&
+        _cur == currency && _rate == taxRate &&
+        List.generate(lines.length, (i) => i).every((i) =>
+          lines[i].productId == current[i].productId &&
+          lines[i].quantity == current[i].quantity &&
+          lines[i].unitPrice == current[i].unitPrice &&
+          lines[i].description == current[i].description);
+    if (!unchanged) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('El carrito o la moneda cambió durante el cobro. Revisa el importe antes de confirmar.'),
+      ));
+      return;
+    }
     await _fastCharge(approval.method, paymentEvidence: approval.note);
   }
 
@@ -1061,8 +1083,8 @@ class _PosScreenState extends State<PosScreen> {
                   child: Row(children: [
                     Expanded(
                       child: InkWell(
-                        onTap: _cartSheet,
-                        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        onTap: retail ? _reviewRetailCart : _cartSheet,
+                         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text('${qtyText(count)} ${count == 1 ? 'producto' : 'productos'}${_coupon != null ? ' · cupón ${_coupon!.code}' : ''} · ver detalle', style: t.textTheme.bodySmall),
                           Money(money(totals.total, _cur), size: 22, weight: FontWeight.w800),
                         ]),
@@ -1086,9 +1108,9 @@ class _PosScreenState extends State<PosScreen> {
                       onPressed: _charging || _savingOrder || _recoveringCheckout ||
                           _restoringCart || _cartStorageError != null ||
                           _checkoutRecoveryError != null || _chargeRequestId != null
-                          ? null : _chargeSheet,
-                      icon: const Icon(Icons.point_of_sale_rounded),
-                      label: const Text('Cobrar'),
+                          ? null : (retail ? _reviewRetailCart : _chargeSheet),
+                       icon: Icon(retail ? Icons.shopping_cart_checkout_rounded : Icons.point_of_sale_rounded),
+                       label: Text(retail ? 'Revisar' : 'Cobrar'),
                     ),
                   ]),
                 ),
