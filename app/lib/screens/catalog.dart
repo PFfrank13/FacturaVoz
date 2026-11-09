@@ -38,7 +38,6 @@ import 'collections.dart';
 import 'expenses.dart';
 import 'fiados.dart';
 import 'fiscal_setup.dart';
-import 'home.dart' show HomeScreen;
 import 'hubs_v3.dart';
 import 'import_screen.dart';
 import 'invoice_detail.dart';
