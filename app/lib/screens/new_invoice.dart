@@ -53,10 +53,16 @@ class _Row {
 /// Con [quote] = true guarda una COTIZACIÓN (mismo flujo de voz). Con [initial] abre directo la revisión
 /// (borrador que viene del Copiloto o del escáner).
 class NewInvoiceScreen extends StatefulWidget {
-  const NewInvoiceScreen({super.key, this.quote = false, this.initial, this.startAsCredit = false});
+  const NewInvoiceScreen({super.key, this.quote = false, this.initial, this.startAsCredit = false,
+    this.startManual = false, this.defaultClientName = '', this.documentLabel});
   final bool quote;
   final InvoiceDraft? initial;
   final bool startAsCredit;
+  /// Opens the editable document form directly; voice remains optional elsewhere.
+  final bool startManual;
+  final String defaultClientName;
+  /// Visual label for a document still awaiting confirmed SUNAT issuance.
+  final String? documentLabel;
 
   @override
   State<NewInvoiceScreen> createState() => _NewInvoiceScreenState();
@@ -105,7 +111,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
   String _fxMsg = '';
 
   Profile get _profile => AppState.instance.profile!;
-  String get _noun => widget.quote ? 'cotización' : 'factura';
+  String get _noun => widget.quote ? 'cotización' : (widget.documentLabel ?? 'factura');
 
   @override
   void initState() {
@@ -123,6 +129,14 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
       _loadDraft(init);
       _phase = _Phase.review;
       _dirty = true;
+    } else if (widget.startManual) {
+      _loadDraft(InvoiceDraft(
+        clientName: widget.defaultClientName,
+        taxRate: _profile.taxRate ?? 0,
+        currency: _profile.currency,
+        items: [LineItem()],
+      ));
+      _phase = _Phase.review;
     }
   }
 
