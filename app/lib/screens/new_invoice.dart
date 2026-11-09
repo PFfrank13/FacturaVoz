@@ -53,9 +53,10 @@ class _Row {
 /// Con [quote] = true guarda una COTIZACIÓN (mismo flujo de voz). Con [initial] abre directo la revisión
 /// (borrador que viene del Copiloto o del escáner).
 class NewInvoiceScreen extends StatefulWidget {
-  const NewInvoiceScreen({super.key, this.quote = false, this.initial});
+  const NewInvoiceScreen({super.key, this.quote = false, this.initial, this.startAsCredit = false});
   final bool quote;
   final InvoiceDraft? initial;
+  final bool startAsCredit;
 
   @override
   State<NewInvoiceScreen> createState() => _NewInvoiceScreenState();
@@ -361,8 +362,10 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     }
     _currency = d.currency.isEmpty ? _profile.currency : d.currency;
     _taxRate.text = qtyText(d.taxRate);
-    _credit = false;
-    _due = null;
+    // A POS credit sale is not an already-paid checkout. The cashier must
+    // choose a named customer and a due date before saving the debt.
+    _credit = widget.startAsCredit || d.dueDate != null;
+    _due = d.dueDate == null ? null : DateTime.tryParse(d.dueDate!);
     _calOpen = false;
     _notes.text = d.notes;
     _showNotes = d.notes.isNotEmpty;
