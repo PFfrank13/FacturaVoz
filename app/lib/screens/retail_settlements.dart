@@ -89,12 +89,16 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
     // even after a network error. Only block creating a NEW payment while
     // local recovery is broken.
     if (_sessionChanged || _busy || _loading ||
-        (_error != null && _pending == null)) return;
+        (_error != null && _pending == null)) {
+      return;
+    }
     if (_pending == null && !_confirmed) return;
     final org = Repo.activeOrgId;
     final user = Supabase.instance.client.auth.currentUser?.id;
     if (org == null || user == null || org != _initialOrg ||
-        user != _initialUser) return;
+        user != _initialUser) {
+      return;
+    }
     final p = _pending;
     if (p == null && widget.receipt?['payment_method'] != 'pendiente') return;
     final receiptId = widget.receipt?['id'] as String?;
@@ -114,7 +118,9 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
         await RetailSettlementStore.save(checkout);
       }
       if (!mounted || _sessionChanged || Repo.activeOrgId != org ||
-          Supabase.instance.client.auth.currentUser?.id != user) return;
+          Supabase.instance.client.auth.currentUser?.id != user) {
+        return;
+      }
       setState(() => _pending = checkout);
       final id = await RetailSettlementRepo.settle(checkout);
       await RetailSettlementStore.clear(checkout);
