@@ -58,7 +58,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
       data: ThemeData.dark().copyWith(scaffoldBackgroundColor: bg),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Pago confirmado'),
+          title: const Text('Cobro registrado'),
           backgroundColor: bg,
         ),
         body: SafeArea(child: Center(child: ConstrainedBox(
@@ -95,7 +95,9 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     PosPaymentBrand(method, size: 30),
                     const SizedBox(width: 8),
-                    Text('Cobrado con ${posMethodLabel(method)}',
+                    Text(method == 'efectivo'
+                      ? 'Cobrado con Efectivo'
+                      : '${posMethodLabel(method)} · verificado por el cajero',
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                   ]),
                 ),
@@ -123,6 +125,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               ))),
             const SizedBox(height: 24),
             const Text(
+              'El cobro se registró tras la verificación del cajero; no se comprueba automáticamente con el banco. '
               'El pago registrado no equivale a la emisión SUNAT. '
               'Para emitir boleta o factura electrónica se necesitan RUC, SOL, '
               'certificado y configuración tributaria. Si falta alguno, se abrirá la configuración.',
