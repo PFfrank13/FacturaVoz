@@ -137,7 +137,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Expanded(child: Column(
+                              Expanded(flex: 3, child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(item.description,
@@ -182,8 +182,10 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                 ],
                               )),
                               const SizedBox(width: 6),
-                              Text(money(item.amount, widget.currency),
-                                style: const TextStyle(fontWeight: FontWeight.w800)),
+                              Flexible(flex: 2, child: Text(money(item.amount, widget.currency),
+                                maxLines: 2, overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.end,
+                                style: const TextStyle(fontWeight: FontWeight.w800))),
                             ]),
                           );
                         },
