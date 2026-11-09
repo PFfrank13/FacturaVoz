@@ -163,6 +163,39 @@ abstract final class RetailVisual {
     );
   }
 
+  /// Compact step tracker for the physical-store sale, no fake completion state.
+  static Widget journey({required int step, required String label}) {
+    assert(step >= 1 && step <= 4);
+    return Semantics(
+      label: 'Paso $step de 4: $label',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          for (var i = 1; i <= 4; i++)
+            Expanded(child: Padding(
+              padding: EdgeInsets.only(right: i == 4 ? 0 : 5),
+              child: Container(
+                height: 5,
+                decoration: BoxDecoration(
+                  color: i <= step ? violet : const Color(0xFF42466D),
+                  borderRadius: BorderRadius.circular(8)),
+              ),
+            )),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Text('PASO $step DE 4', style: const TextStyle(
+            color: Color(0xFFCDBBFD), fontSize: 10, fontWeight: FontWeight.w900,
+            letterSpacing: .9)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, textAlign: TextAlign.end,
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFFC2C1D9),
+              fontSize: 11, fontWeight: FontWeight.w700))),
+        ]),
+      ]),
+    );
+  }
+
   static Widget microStat(String label, String value) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label.toUpperCase(), style: const TextStyle(
