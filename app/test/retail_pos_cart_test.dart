@@ -48,10 +48,7 @@ void main() {
       ),
     ));
     final button = tester.widget<FilledButton>(
-      find.ancestor(
-        of: find.byKey(const ValueKey('retail-continue-payment')),
-        matching: find.byType(FilledButton),
-      ).first,
+      find.byKey(const ValueKey('retail-continue-payment')),
     );
     expect(button.onPressed, isNull);
   });
