@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../ui/onboarding_steps.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_state.dart';
@@ -168,6 +169,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
           child: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
             padding: const EdgeInsets.all(16),
             children: [
+              if (widget.onboarding) const Padding(padding: EdgeInsets.only(bottom: 16), child: OnboardingSteps(current: 2)),
               if (widget.onboarding)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),

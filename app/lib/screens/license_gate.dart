@@ -14,6 +14,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'orgs.dart';
 import 'plan_compare.dart';
+import '../ui/onboarding_steps.dart';
 import '../permissions.dart';
 
 const _featureNames = <String, String>{
@@ -124,6 +125,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (pending) ...[const OnboardingSteps(current: 1), const SizedBox(height: 20)],
             Center(child: Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(25)),
@@ -194,6 +196,15 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(_error, style: const TextStyle(color: Brand.bad), textAlign: TextAlign.center),
+            ],
+            // §14: elegir plan ANTES de activar. La compra y la prueba las da Solvex; aquí solo se comparan.
+            if (pending) ...[
+              const SizedBox(height: 28),
+              Text('Planes', style: t.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text('Pide a Solvex el plan que elijas para este ID; te enviará el código de licencia o activará tu prueba.', style: t.textTheme.bodySmall),
+              const SizedBox(height: 12),
+              PlanCompare(rubro: a.rubro, currentPlan: ''),
             ],
             const SizedBox(height: 12),
             OutlinedButton.icon(onPressed: _busy ? null : _refresh,

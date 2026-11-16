@@ -2,6 +2,7 @@
 // v3: pregunta el RUBRO (9 rubros; "Otro / personalizado" ya no existe) y si prefiere el modo FÁCIL (letras grandes).
 // El rubro define la barra, las palabras y los accesos; ninguna función se borra (todo sigue en Menú → Otras funciones).
 import 'package:flutter/material.dart';
+import '../ui/onboarding_steps.dart';
 
 import '../app_state.dart';
 import '../business_templates.dart';
@@ -81,6 +82,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
     return Scaffold(
       body: SafeArea(
         child: Column(children: [
+          if (!widget.reopened) const Padding(padding: EdgeInsets.fromLTRB(20, 12, 20, 4), child: OnboardingSteps(current: 3)),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
             child: Row(children: [

@@ -454,6 +454,18 @@ String? minPlanFor(String feature, Map<String, Map<String, dynamic>> plans, {Str
 /// así que si cambias un precio allá, cámbialo también aquí (una prueba compara con el JSON).
 const planPrices = <String, double>{'BASICO': 29, 'PRO': 59, 'EMPRESA': 119};
 
+/// Límites por plan (copia de docs/facturavoz-planes.json → features.max_users / max_branches; -1 = sin límite).
+/// La base aplica los que entrega Solvex Hub para cada empresa (feature_limit); esto es solo para comparar planes.
+const planLimits = <String, ({int users, int branches})>{
+  'BASICO': (users: 1, branches: 1),
+  'PRO': (users: 5, branches: 1),
+  'EMPRESA': (users: 20, branches: 5),
+};
+
+/// Días de prueba gratis configurados por plan (docs/facturavoz-planes.json → trial_days). Una prueba lo compara.
+/// Para ofrecer 7 días: cámbialo primero en Solvex Hub, luego en el JSON y aquí.
+const planTrialDays = <String, int>{'BASICO': 3, 'PRO': 3, 'EMPRESA': 3};
+
 String planPriceText(String code) {
   final p = planPrices[code];
   if (p == null) return '';

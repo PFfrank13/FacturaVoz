@@ -32,14 +32,13 @@ class PlanCompare extends StatelessWidget {
     ];
     return LayoutBuilder(builder: (context, c) {
       if (c.maxWidth >= 720) {
-        return IntrinsicHeight(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            for (final (i, w) in cards.indexed) ...[
-              if (i > 0) const SizedBox(width: 12),
-              Expanded(flex: planCodes[i] == recommended ? 6 : 5, child: w),
-            ],
-          ]),
-        );
+        // Sin IntrinsicHeight (costoso): las tarjetas se alinean arriba.
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final (i, w) in cards.indexed) ...[
+            if (i > 0) const SizedBox(width: 12),
+            Expanded(flex: planCodes[i] == recommended ? 6 : 5, child: w),
+          ],
+        ]);
       }
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (final (i, w) in cards.indexed) ...[
@@ -49,6 +48,35 @@ class PlanCompare extends StatelessWidget {
       ]);
     });
   }
+}
+
+/// Funciones nuevas por plan sin rubro elegido (lista general de docs/facturavoz-planes.json).
+List<String> _generalNewTools(String code) {
+  bool on(String c, String k) => planFeatures[c]?[k] == true;
+  final i = planCodes.indexOf(code);
+  return [
+    for (final k in allFeatureKeys)
+      if (on(code, k) && (i == 0 || !on(planCodes[i - 1], k))) k,
+  ];
+}
+
+String _pitch(String code) => switch (code) {
+      'BASICO' => 'Lo esencial completo para operar tu negocio.',
+      'PRO' => 'Más productividad: módulo estrella de tu rubro y Copiloto.',
+      _ => 'Mayor escala: más usuarios y locales, control del dueño e integraciones.',
+    };
+
+Widget _chip(BuildContext context, IconData icon, String text) {
+  final cs = Theme.of(context).colorScheme;
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(99)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 14, color: cs.onSurfaceVariant),
+      const SizedBox(width: 4),
+      Flexible(child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface))),
+    ]),
+  );
 }
 
 class _PlanCard extends StatelessWidget {
@@ -64,7 +92,10 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final cs = t.colorScheme;
-    final tools = planNewTools(rubro, code);
+    final tools = rubro != null && planMatrix(rubro, code) != null ? planNewTools(rubro, code) : _generalNewTools(code);
+    final lim = planLimits[code];
+    final trial = planTrialDays[code] ?? 0;
+    final star = rubro == null ? null : proStar[rubro];
     final prev = planCodes.indexOf(code) > 0 ? planName(planCodes[planCodes.indexOf(code) - 1]) : null;
     final price = planPriceText(code);
     return Container(
@@ -90,6 +121,20 @@ class _PlanCard extends StatelessWidget {
           Text(price, style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: highlighted ? cs.primary : null)),
           Text('Precio referencial con IGV. El cobro lo confirma Solvex.', style: t.textTheme.bodySmall),
         ],
+        const SizedBox(height: 8),
+        Text(_pitch(code), style: t.textTheme.bodyMedium),
+        if (code == 'PRO' && star != null) ...[
+          const SizedBox(height: 4),
+          Text('Módulo estrella de tu rubro: ${featureName(star)}', style: t.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+        if (lim != null) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            _chip(context, Icons.group_rounded, lim.users < 0 ? 'Usuarios sin límite' : lim.users == 1 ? '1 usuario' : '${lim.users} usuarios'),
+            _chip(context, Icons.store_rounded, lim.branches < 0 ? 'Sucursales sin límite' : lim.branches == 1 ? '1 local' : '${lim.branches} locales'),
+            if (trial > 0) _chip(context, Icons.card_giftcard_rounded, '$trial días de prueba'),
+          ]),
+        ],
         const SizedBox(height: 12),
         Text(prev == null ? 'Incluye' : 'Todo lo de $prev, más', style: t.textTheme.labelLarge),
         const SizedBox(height: 6),
@@ -102,18 +147,17 @@ class _PlanCard extends StatelessWidget {
               Expanded(child: Text(featureName(k), style: t.textTheme.bodyMedium)),
             ]),
           ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: current
-              ? const OutlinedButton(onPressed: null, child: Text('Tu plan actual'))
-              : onChoose == null
-                  ? const SizedBox.shrink()
-                  : highlighted
-                      ? FilledButton(onPressed: onChoose, child: Text('Elegir ${planName(code)}'))
-                      : OutlinedButton(onPressed: onChoose, child: Text('Elegir ${planName(code)}')),
-        ),
+        if (current || onChoose != null) ...[
+          const SizedBox(height: 14),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48, minWidth: double.infinity),
+            child: current
+                ? const OutlinedButton(onPressed: null, child: Text('Tu plan actual'))
+                : highlighted
+                    ? FilledButton(onPressed: onChoose, child: Text('Elegir ${planName(code)}'))
+                    : OutlinedButton(onPressed: onChoose, child: Text('Elegir ${planName(code)}')),
+          ),
+        ],
       ]),
     );
   }
