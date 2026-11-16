@@ -122,3 +122,24 @@ for r in navs:
         out.append('')
 open(os.path.join(R, 'docs/reconstruccion/01_MATRIZ_RUBRO_PLAN_ROL.md'), 'w', encoding='utf-8').write('\n'.join(out) + '\n')
 print('roles comunes', len(common), 'rubros', len(per), {k: len(v) for k, v in per.items()}, 'bloques', len(blocks), 'reglas', len(rules), 'contratos', len(contracts), 'navs', len(navs), 'catalogo', len(cat_entries))
+
+# ── Matriz de rutas únicas (una función = una ruta) ──
+groups = {}
+for m in re.finditer(r"FeatureEntry\(([^\n]*)\),\n", cat):
+    b = m.group(1)
+    g = re.search(r"group: '([^']+)'", b).group(1)
+    groups.setdefault(g, []).append(b)
+r_out = ['# Matriz de rutas únicas', '', '> Generado por `tool/gen_matriz.py` desde `screens/catalog.dart` (registro único). Cada función tiene un id, un nombre que no se repite (prueba `navigation_contract_test`) y una sola pantalla.', '',
+         '## Nivel 1 · barra inferior (contratos en `nav/navigation_contract.dart`)', '', '| Destino | Permiso | Función del plan |', '|---|---|---|']
+for k, (perm, feat) in contracts.items():
+    r_out.append(f'| `{k}` | {perm or "cualquier integrante"} | {feat or "—"} |')
+r_out += ['', '## Nivel 2 · funciones', '']
+for g, items in groups.items():
+    r_out += [f'### {g}', '', '| id | Nombre | Plan | Permiso de rol | Pantalla |', '|---|---|---|---|---|']
+    for b in items:
+        g1 = lambda k: (re.search(k + r": '([^']+)'", b) or [None, '—'])[1]
+        scr = (re.search(r"builder: \([^)]*\) => (?:const )?(\w+)", b) or [None, '—'])[1]
+        r_out.append(f"| `{g1('id')}` | {g1('title')} | {g1('feature')} | {g1('perm')} | `{scr}` |")
+    r_out.append('')
+open(os.path.join(R, 'docs/reconstruccion/07_RUTAS_UNICAS.md'), 'w', encoding='utf-8').write('\n'.join(r_out) + '\n')
+print('rutas', sum(len(v) for v in groups.values()))
