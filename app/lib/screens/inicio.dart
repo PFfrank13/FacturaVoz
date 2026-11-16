@@ -30,7 +30,10 @@ import 'hubs_v3.dart' show showNewSaleSheet;
 import 'invoice_detail.dart';
 import 'retail_basic_modules.dart';
 import 'menu.dart';
-import 'jobs.dart' show JobDetailScreen;
+import 'jobs.dart' show JobDetailScreen, showJobForm;
+import 'new_invoice.dart' show NewInvoiceScreen;
+import '../nav/navigation_contract.dart';
+import '../permissions.dart';
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
@@ -218,6 +221,30 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     if (v != null && mounted) setState(() => _goal = v <= 0 ? null : v);
   }
 
+  /// Acción principal del rubro (contrato de navegación). Bodega ya la tiene en la cabecera ("Vender").
+  PrimaryAction? _primary(Access a) {
+    if (a.rubro == 'bodega') return null;
+    final p = primaryActionFor(a.rubro);
+    if (p == null || !a.allows(p.permission) || (p.feature != null && !a.has(p.feature!))) return null;
+    if (p.kind == PrimaryKind.feature && !(featureById(p.featureId!)?.allowed ?? false)) return null;
+    return p;
+  }
+
+  Future<void> _runPrimary(PrimaryAction p) async {
+    switch (p.kind) {
+      case PrimaryKind.feature:
+        final f = featureById(p.featureId!);
+        if (f != null && f.allowed) await openFeature(context, f);
+      case PrimaryKind.jobForm:
+        final jobId = await showJobForm(context, kind: p.jobKind);
+        if (jobId != null && mounted) showSuccess(context, '${p.label} registrada');
+      case PrimaryKind.quote:
+        final quoteId = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const NewInvoiceScreen(quote: true)));
+        if (quoteId != null && mounted) showSuccess(context, 'Pedido guardado');
+    }
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -263,6 +290,23 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   : null,
             ),
           ),
+          if (_primary(a) case final p?)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: ConstrainedBox(
+                  // Altura mínima, no fija: con letra grande (modo Fácil) el botón crece y no corta el texto.
+                  constraints: const BoxConstraints(minHeight: 56, minWidth: double.infinity),
+                  child: FilledButton.icon(
+                    key: const ValueKey('inicio-primary-action'),
+                    onPressed: () => _runPrimary(p),
+                    icon: Icon(p.icon),
+                    label: Text(p.label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  ),
+                ),
+              ),
+            ),
           if (spec != null)
             SliverToBoxAdapter(
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),

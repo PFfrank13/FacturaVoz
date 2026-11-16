@@ -13,6 +13,8 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'orgs.dart';
+import 'plan_compare.dart';
+import '../permissions.dart';
 
 const _featureNames = <String, String>{
   'facturar': 'Facturas y boletas SUNAT',
@@ -182,7 +184,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
               const SizedBox(height: 16),
               GradientButton(label: 'Activar mi licencia', icon: Icons.check_circle_rounded,
                 busy: _busy, onPressed: _busy ? null : _activate),
-              if (l.payUrl.isNotEmpty) ...[
+              if (l.payUrl.isNotEmpty && a.allows('subscription.manage')) ...[
                 const SizedBox(height: 12),
                 TextButton.icon(onPressed: () => openPayUrl(context, l.payUrl),
                   icon: const Icon(Icons.payments_rounded), label: const Text('Renovar mi plan')),
@@ -273,7 +275,7 @@ class LicenseBanner extends StatelessWidget {
                     Icon(Icons.workspace_premium_rounded, color: b.$2, size: 20),
                     const SizedBox(width: 10),
                     Expanded(child: Text(b.$1, style: TextStyle(fontFamily: 'Inter', fontSize: 12.5, fontWeight: FontWeight.w600, color: b.$2))),
-                    if (a.isAdmin && l.payUrl.isNotEmpty)
+                    if (a.allows('subscription.manage') && l.payUrl.isNotEmpty)
                       TextButton(onPressed: () => openPayUrl(context, l.payUrl), child: const Text('Pagar'))
                     else
                       Icon(Icons.chevron_right_rounded, color: b.$2),
@@ -341,7 +343,7 @@ class _PlanScreenState extends State<PlanScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              if (l.source != 'local' && a.isAdmin && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
+              if (l.source != 'local' && a.allows('subscription.manage') && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
               const SizedBox(height: 18),
               const SectionTitle('Incluido en tu plan'),
               SoftCard(
@@ -349,6 +351,17 @@ class _PlanScreenState extends State<PlanScreen> {
                   for (final k in included) TagChip(featureName(k), color: Brand.ok, icon: Icons.check_rounded),
                 ]),
               ),
+              const SizedBox(height: 18),
+              const SectionTitle('Compara los planes'),
+              PlanCompare(
+                rubro: a.rubro,
+                currentPlan: l.plan,
+                onChoose: l.source != 'local' && a.allows('subscription.manage') && l.payUrl.isNotEmpty ? (_) => openPayUrl(context, l.payUrl) : null,
+              ),
+              if (!a.allows('subscription.manage')) ...[
+                const SizedBox(height: 8),
+                Text('Solo el propietario de la empresa puede cambiar o pagar el plan.', style: t.textTheme.bodySmall, textAlign: TextAlign.center),
+              ],
               const SizedBox(height: 18),
               SectionTitle(l.source == 'local' ? 'Modo de desarrollo' : 'Gestión de tu suscripción'),
               SoftCard(child: Text(l.source == 'local'
