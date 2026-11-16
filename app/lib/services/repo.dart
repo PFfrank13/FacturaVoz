@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../errors.dart';
+import '../logic/idempotent.dart';
 import '../models.dart';
 
 /// Acceso a datos. Todo pasa por RLS: el usuario solo ve y modifica lo suyo.
@@ -231,6 +232,16 @@ class Repo {
   }
 
 
+  /// Inserta una fila con id generado aquí y reintenta con el mismo id si la red falla (ver logic/idempotent.dart).
+  static Future<void> insertOnce(String table, Map<String, dynamic> row) {
+    final r = {...row, 'id': row['id'] ?? newRequestId()};
+    return runIdempotent(
+      () => _db.from(table).insert(r),
+      isDuplicate: (e) => e is PostgrestException && e.code == '23505',
+      isTransient: (e) => e is! PostgrestException && e is! AuthException,
+    );
+  }
+
   /// UUIDv4 generated with a cryptographic source. Reuse this ID on every retry.
   static String newRequestId() {
     final random = math.Random.secure();
@@ -429,7 +440,7 @@ class Repo {
   }) async {
     final org = activeOrgId;
     final inv = await _db.from('invoices').select('org_id').eq('id', invoiceId).single();
-    await _db.from('payments').insert({
+    await insertOnce('payments', {
       'org_id': (inv['org_id'] as String?) ?? org,
       'invoice_id': invoiceId,
       'user_id': _uid,

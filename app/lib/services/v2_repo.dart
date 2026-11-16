@@ -334,7 +334,7 @@ class V2Repo {
   static Future<List<CreditMove>> creditMoves(String clientId) async =>
       _rows(await _db.from('credit_ledger').select('id, kind, amount, description, due_date, method, created_at').eq('client_id', clientId).order('created_at', ascending: false).limit(300)).map(CreditMove.fromJson).toList();
 
-  static Future<void> addCredit({required String clientId, required String kind, required double amount, String description = '', String? dueDate, String? method}) => _db.from('credit_ledger').insert({
+  static Future<void> addCredit({required String clientId, required String kind, required double amount, String description = '', String? dueDate, String? method}) => Repo.insertOnce('credit_ledger', {
         'org_id': org,
         'client_id': clientId,
         'kind': kind,
@@ -352,7 +352,7 @@ class V2Repo {
       _rows(await _db.from('cash_movements').select('id, kind, amount, method, note, created_at').eq('org_id', org).eq('day', day).order('created_at')).map(CashMove.fromJson).toList();
 
   static Future<void> addCashMove({required String kind, required double amount, String method = 'efectivo', String note = ''}) =>
-      _db.from('cash_movements').insert({'org_id': org, 'kind': kind, 'amount': round2(amount), 'method': method, 'note': note.trim().isEmpty ? null : note.trim(), 'user_id': uid});
+      Repo.insertOnce('cash_movements', {'org_id': org, 'kind': kind, 'amount': round2(amount), 'method': method, 'note': note.trim().isEmpty ? null : note.trim(), 'user_id': uid});
 
   static Future<DaySummary> daySummary(String day) async {
     final r = await _db.rpc('day_summary', params: {'p_org': org, 'p_day': day});
