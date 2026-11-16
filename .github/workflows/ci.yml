@@ -37,6 +37,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Fijado: Flutter 3.50 deprecó package:flutter/material.dart (paso a material_ui) y flutter analyze
+          # falla con 95 avisos en TODOS los archivos. Migrar a material_ui es una tarea aparte.
+          flutter-version: 3.47.9
           cache: true
       # Si ya subiste android/ ios/ web/ al repo, estos dos pasos no cambian nada.
       - run: flutter create --org com.example --project-name facturavoz --platforms=android,ios,web .
