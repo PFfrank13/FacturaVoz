@@ -19,16 +19,14 @@ import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
-import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/work_queue.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
 import 'goal_sheet.dart';
 import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
-import 'hubs_v3.dart' show showNewSaleSheet;
 import 'invoice_detail.dart';
-import 'retail_basic_modules.dart';
+import 'role_home.dart';
 import 'menu.dart';
 import 'jobs.dart' show JobDetailScreen, showJobForm;
 import 'new_invoice.dart' show NewInvoiceScreen;
@@ -259,7 +257,6 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final monthCount = ((_month?['sales_count'] as num?) ?? 0).toInt();
     final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
     final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
-    final shortcuts = [for (final id in spec?.home ?? const ['facturar', 'clientes', 'cobranza', 'negocio']) if (!(a.can('sell') && a.has('facturar') && id == 'pos')) if (featureById(id) case final f? when f.allowed) f];
     final list = _visible();
     final buyers = _todayBuyers();
     return Scaffold(
@@ -276,6 +273,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               drafts: drafts,
               draftsTotal: draftsTotal,
               loaded: seeMoney && _tried && _month != null,
+              showMonth: a.allows('reports.view'),
               goal: seeMoney ? _goal : null,
               series: seeMoney ? dailySeries(_items ?? const <InvoiceRecord>[], currency: cur, today: todayIso()) : const <double>[],
               onGoal: () => _setGoal(monthTotal),
@@ -316,35 +314,13 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   subtitle: guide.homeSubtitle,
                 )),
             ),
-          if (a.rubro == 'bodega')
-            const SliverToBoxAdapter(child: RetailBasicModules()),
-          if (a.rubro != 'bodega' && (a.can('sell') || shortcuts.isNotEmpty))
-            SliverToBoxAdapter(
-              child: Reveal(
-                index: 1,
-                child: SizedBox(
-                  height: MediaQuery.textScalerOf(context).scale(104),
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
-                    children: [
-                      if (a.can('sell') && a.has('facturar'))
-                        QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => showNewSaleSheet(context).then((_) {
-                              if (mounted) _load();
-                            })),
-                      for (final f in shortcuts.take(3))
-                        QuickAction(
-                          icon: f.icon,
-                          label: shortActionLabel(f.id, f.title),
-                          colors: [featureColor(f.id).withValues(alpha: 0.8), featureColor(f.id)],
-                          onTap: () => openFeature(context, f),
-                        ),
-                      QuickAction(icon: Icons.menu_rounded, label: 'Ver todas', colors: const [Brand.lightInk, Brand.indigoDeep], onTap: () => pushPremium(context, const MenuScreen())),
-                    ],
-                  ),
-                ),
-              ),
+          // Inicio por rol (motor rubro × plan × rol). Reemplaza el tablero Básico de bodega y el carrusel de accesos.
+          SliverToBoxAdapter(
+            child: RoleHomePanel(
+              key: ValueKey('role-home-${Repo.activeOrgId}-${a.role}-${a.license.plan}'),
+              exclude: {if (a.rubro == 'bodega' || primaryActionFor(a.rubro)?.featureId == 'pos') 'sell_cta'},
             ),
+          ),
           if (_showWork) SliverToBoxAdapter(child: WorkQueue(
             title: _appointmentHome ? 'Tus citas de hoy' : 'Trabajos por avanzar', jobs: _work,
             loading: _workLoading, error: _workError, onRetry: _load,

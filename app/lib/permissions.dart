@@ -59,6 +59,26 @@ const permissionRules = <String, PermRule>{
   'subscription.manage': PermRule(label: 'Pagar o cambiar el plan', can: ['license'], ownerOnly: true),
 };
 
+/// Espejo de my_access_impl().can (20261107_equipo_roles.sql) por rol base. SOLO para simular y documentar la
+/// matriz rubro × plan × rol; la app real usa lo que devuelve my_access() (Access.can).
+Map<String, bool> baseCan(String role) {
+  final money = const {'owner', 'admin', 'finanzas'}.contains(role);
+  final admin = role == 'owner' || role == 'admin';
+  return {
+    'finance': money,
+    'sell': role != 'tecnico',
+    'collect': role != 'tecnico',
+    'clients': true,
+    'jobs': true,
+    'all_jobs': role != 'tecnico',
+    'products_edit': money,
+    'team': admin,
+    'settings': admin,
+    'license': admin,
+    'import': money,
+  };
+}
+
 /// Decisión pura (probada sin Supabase).
 bool permits(String id, {required String role, required bool isAdmin, required bool Function(String) can, required bool Function(String) has}) {
   final r = permissionRules[id];

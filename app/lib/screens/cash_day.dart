@@ -12,6 +12,7 @@ import '../services/live.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/ds.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import 'client_profile.dart' show shortDateTime;
@@ -261,8 +262,14 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
       appBar: AppBar(title: const Text('Caja del día'), actions: [
         TextButton.icon(onPressed: _pickDay, icon: const Icon(Icons.calendar_today_rounded, size: 18), label: Text(isToday ? 'Hoy' : displayDate(_day))),
       ]),
+      // Acción principal SIEMPRE visible (Prompt §11/§12): abrir caja si aún no hay apertura; si no, cerrar con arqueo.
+      bottomNavigationBar: _error == null && s != null && isToday && _closing == null
+          ? (_opened
+              ? DsActionBar(label: 'Cerrar caja (arqueo)', icon: Icons.lock_clock_rounded, busy: _busy, onPressed: _busy ? null : _close)
+              : DsActionBar(label: 'Abrir caja', icon: Icons.lock_open_rounded, busy: _busy, onPressed: _busy ? null : () => _move('apertura')))
+          : null,
       body: _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          ? Center(child: DsStateView.error(message: _error!, onRetry: _load))
           : s == null
               ? const SkeletonList(count: 4)
               : AbsorbPointer(
@@ -284,6 +291,8 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                           ]),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      if (isToday) _steps(context),
                       const SizedBox(height: 12),
                       Reveal(
                         index: 1,
@@ -329,7 +338,6 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                       const SizedBox(height: 12),
                       if (isToday && _closing == null)
                         Wrap(spacing: 8, runSpacing: 8, children: [
-                          OutlinedButton.icon(onPressed: () => _move('apertura'), icon: const Icon(Icons.lock_open_rounded), label: const Text('Apertura')),
                           OutlinedButton.icon(onPressed: () => _move('ingreso'), icon: const Icon(Icons.south_west_rounded), label: const Text('Entra efectivo')),
                           OutlinedButton.icon(onPressed: () => _move('egreso'), icon: const Icon(Icons.north_east_rounded), label: const Text('Sale efectivo')),
                         ]),
@@ -346,9 +354,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                           ),
                       ],
                       const SizedBox(height: 18),
-                      if (_closing == null)
-                        GradientButton(label: 'Cerrar la caja y enviar reporte', icon: Icons.lock_clock_rounded, busy: _busy, onPressed: _busy ? null : _close)
-                      else
+                      if (_closing != null)
                         SoftCard(
                           color: Brand.ok.withValues(alpha: 0.10),
                           child: Row(children: [
@@ -362,6 +368,21 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                   ),
                 ),
     );
+  }
+
+  /// ¿Hay apertura registrada hoy? (monto de apertura o movimiento de apertura)
+  bool get _opened => (_sum?.opening ?? 0) > 0 || _moves.any((m) => m.kind == 'apertura');
+
+  /// Apertura → Movimientos → Arqueo → Cierre. Antes del cierre no se muestran montos (arqueo ciego).
+  Widget _steps(BuildContext context) {
+    final closed = _closing != null;
+    final moves = _moves.where((m) => m.kind != 'apertura').length;
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      DsStatus(_opened ? 'Apertura hecha' : '1 · Apertura pendiente', tone: _opened ? DsTone.ok : DsTone.pending),
+      DsStatus(moves == 0 ? '2 · Sin movimientos' : '2 · $moves movimiento${moves == 1 ? '' : 's'}', tone: DsTone.info),
+      DsStatus(closed ? 'Arqueo hecho' : '3 · Arqueo al cerrar', tone: closed ? DsTone.ok : DsTone.info),
+      DsStatus(closed ? 'Caja cerrada' : '4 · Cierre', tone: closed ? DsTone.ok : DsTone.info),
+    ]);
   }
 
   Widget _line(BuildContext context, String label, double v, {bool bold = false, bool signed = false}) {

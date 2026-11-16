@@ -23,56 +23,88 @@ class Gap {
   static const xl = 24.0;
 }
 
+/// Tokens del Design System (Prompt Maestro §11). Modo oscuro = paleta exacta del prompt;
+/// modo claro = mismos tonos oscurecidos hasta contraste AA (texto ≥ 4.5:1, íconos ≥ 3:1). Ver docs/reconstruccion/02_DESIGN_SYSTEM.md.
+@immutable
+class DsColors {
+  const DsColors({
+    required this.bg, required this.surface, required this.elevated, required this.line,
+    required this.ink, required this.muted, required this.primary, required this.onPrimary,
+    required this.primaryText, required this.accent, required this.ok, required this.warn, required this.bad,
+  });
+
+  final Color bg, surface, elevated, line, ink, muted;
+  final Color primary; // relleno de la acción principal
+  final Color onPrimary;
+  final Color primaryText; // primario usado como TEXTO (enlaces, montos destacados)
+  final Color accent; // cian: voz y acciones rápidas
+  final Color ok, warn, bad;
+
+  static const dark = DsColors(
+    bg: Color(0xFF0B1024), surface: Color(0xFF151B34), elevated: Color(0xFF202947), line: Color(0xFF2C3557),
+    ink: Color(0xFFF6F7FC), muted: Color(0xFFADB7D1),
+    primary: Color(0xFF6957F5), onPrimary: Color(0xFFFFFFFF), primaryText: Color(0xFFA99DFF),
+    accent: Color(0xFF17B8D4), ok: Color(0xFF26B887), warn: Color(0xFFF0B34A), bad: Color(0xFFF16D79),
+  );
+
+  static const light = DsColors(
+    bg: Color(0xFFF6F7FC), surface: Color(0xFFFFFFFF), elevated: Color(0xFFEEF0F8), line: Color(0xFFD7DBEA),
+    ink: Color(0xFF0B1024), muted: Color(0xFF4F5873),
+    primary: Color(0xFF4C3BD7), onPrimary: Color(0xFFFFFFFF), primaryText: Color(0xFF4C3BD7),
+    accent: Color(0xFF0E7C91), ok: Color(0xFF13795A), warn: Color(0xFF8A5300), bad: Color(0xFFB42336),
+  );
+
+  static DsColors of(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? dark : light;
+}
+
 class Brand {
-  // Índigo + violeta profesional, con cian reservado para voz y acciones rápidas.
-  static const indigo = Color(0xFF5948DB);
-  static const indigoDeep = Color(0xFF302A85);
-  static const indigoSoft = Color(0xFFA9A1FF);
-  static const lilac = Color(0xFF8064F2);
-  static const gold = Color(0xFF00BAD8); // cian para dictado y accesos esenciales
-  static const goldDeep = Color(0xFF3386FF);
-  static const onGold = Color(0xFF071A34);
+  // Compatibilidad: las pantallas antiguas usan estas constantes en ambos modos. Son tonos medios de la paleta
+  // que dan ≥ 3:1 sobre fondo claro y oscuro (íconos, chips). Pantallas nuevas: DsColors.of(context).
+  static const indigo = Color(0xFF6957F5);
+  static const indigoDeep = Color(0xFF4C3BD7);
+  static const indigoSoft = Color(0xFFA99DFF);
+  static const lilac = Color(0xFF7B6CF6);
+  static const gold = Color(0xFF1399B0); // cian para dictado y accesos esenciales
+  static const goldDeep = Color(0xFF0E7C91);
+  static const onGold = Color(0xFFFFFFFF);
 
-  static const ok = Color(0xFF23956F);
-  static const warn = Color(0xFFC57A12);
-  static const bad = Color(0xFFD94A5E);
+  static const ok = Color(0xFF1F9D73);
+  static const warn = Color(0xFFB97E14);
+  static const bad = Color(0xFFE04F5F);
 
-  static const lightBg = Color(0xFFF6F7FD);
-  static const lightInk = Color(0xFF17183C);
-  static const lightMuted = Color(0xFF737996);
-  static const lightLine = Color(0xFFE4E7F7);
+  static const lightBg = Color(0xFFF6F7FC);
+  static const lightInk = Color(0xFF0B1024);
+  static const lightMuted = Color(0xFF4F5873);
+  static const lightLine = Color(0xFFD7DBEA);
 
-  static const darkBg = Color(0xFF0A1132);
-  static const darkCard = Color(0xFF171C40);
-  static const darkInk = Color(0xFFF4F5FF);
-  static const darkMuted = Color(0xFFB5B9D8);
-  static const darkLine = Color(0xFF333A68);
+  static const darkBg = Color(0xFF0B1024);
+  static const darkCard = Color(0xFF151B34);
+  static const darkInk = Color(0xFFF6F7FC);
+  static const darkMuted = Color(0xFFADB7D1);
+  static const darkLine = Color(0xFF2C3557);
 
+  // §11 "no abusar de degradados": los 79 usos existentes quedan casi planos (dos tonos vecinos de la marca).
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF101C58), Color(0xFF4631B7), Color(0xFF8048F5)],
+    colors: [Color(0xFF202947), Color(0xFF2A2F66)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF6445F5), Color(0xFF2F8CFC)],
+    colors: [Color(0xFF6957F5), Color(0xFF5E4CEB)],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
+  /// Reducido a tonos de la paleta: menos colores en pantalla.
   static const fnPalette = <Color>[
-    Color(0xFF4F46E5), Color(0xFF0284C7), Color(0xFF059669), Color(0xFFD97706), Color(0xFFDC2626), Color(0xFFDB2777),
-    Color(0xFF7C3AED), Color(0xFF0D9488), Color(0xFFEA580C), Color(0xFF65A30D), Color(0xFF0891B2), Color(0xFFC026D3),
-  ]; // tonos 600: el texto/icono blanco encima se lee bien
+    Color(0xFF6957F5), Color(0xFF1399B0), Color(0xFF1F9D73), Color(0xFF4C3BD7), Color(0xFFB97E14), Color(0xFF5B6B8C),
+  ];
 
-  /// Sombra suave y difusa (nunca dura): da sensación de flotar.
-  static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => [
-        BoxShadow(
-          color: (dark ? Colors.black : const Color(0xFF5948DB)).withValues(alpha: dark ? 0.35 : a),
-          blurRadius: 28,
-          offset: const Offset(0, 10),
-        ),
-      ];
+  /// Sombra apenas perceptible (§11: sin sombras duras). En oscuro no hay sombra: separa el borde.
+  static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => dark
+      ? const []
+      : [BoxShadow(color: const Color(0xFF0B1024).withValues(alpha: a * 0.5), blurRadius: 12, offset: const Offset(0, 3))];
 }
 
 const _font = 'Inter';
@@ -98,33 +130,35 @@ TextTheme _text(Color ink, Color muted) {
 
 ThemeData buildTheme(Brightness b) {
   final dark = b == Brightness.dark;
-  final bg = dark ? Brand.darkBg : Brand.lightBg;
-  final card = dark ? Brand.darkCard : Colors.white;
-  final ink = dark ? Brand.darkInk : Brand.lightInk;
-  final muted = dark ? Brand.darkMuted : Brand.lightMuted;
-  final line = dark ? Brand.darkLine : Brand.lightLine;
-  final primary = dark ? Brand.indigoSoft : Brand.indigo;
+  final ds = dark ? DsColors.dark : DsColors.light;
+  final bg = ds.bg;
+  final card = ds.surface;
+  final ink = ds.ink;
+  final muted = ds.muted;
+  final line = ds.line;
+  final primary = ds.primary;
 
   final scheme = ColorScheme(
     brightness: b,
     primary: primary,
-    onPrimary: dark ? Brand.darkBg : Colors.white,
-    secondary: Brand.gold,
-    onSecondary: Brand.onGold,
-    error: dark ? const Color(0xFFFF8A7A) : Brand.bad,
-    onError: dark ? Brand.darkBg : Colors.white,
+    onPrimary: ds.onPrimary,
+    secondary: ds.accent,
+    onSecondary: dark ? ds.bg : Colors.white,
+    tertiary: ds.ok,
+    error: ds.bad,
+    onError: dark ? ds.bg : Colors.white,
     surface: card,
     onSurface: ink,
     onSurfaceVariant: muted,
     outline: line,
     outlineVariant: line,
-    surfaceContainerHighest: dark ? const Color(0xFF292D5B) : const Color(0xFFE9E9FC),
-    surfaceContainerHigh: dark ? const Color(0xFF21264B) : const Color(0xFFF0F0FC),
+    surfaceContainerHighest: ds.elevated,
+    surfaceContainerHigh: ds.elevated,
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF343270) : const Color(0xFFEBE7FF),
-    onPrimaryContainer: dark ? Brand.indigoSoft : Brand.indigoDeep,
+    primaryContainer: dark ? const Color(0xFF2A2F66) : const Color(0xFFE9E6FF),
+    onPrimaryContainer: dark ? ds.primaryText : const Color(0xFF2A1FA0),
   );
 
   final radius = BorderRadius.circular(16);
@@ -167,7 +201,7 @@ ThemeData buildTheme(Brightness b) {
       color: card,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: line.withValues(alpha: 0.58))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: line)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -179,11 +213,11 @@ ThemeData buildTheme(Brightness b) {
       errorBorder: border(scheme.error),
       focusedErrorBorder: border(scheme.error, 2),
       labelStyle: TextStyle(fontFamily: _font, color: muted),
-      floatingLabelStyle: TextStyle(fontFamily: _font, color: primary, fontWeight: FontWeight.w600),
+      floatingLabelStyle: TextStyle(fontFamily: _font, color: ds.primaryText, fontWeight: FontWeight.w600),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(64, 54),
+        minimumSize: const Size(64, 52),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         textStyle: const TextStyle(fontFamily: _font, fontSize: 15.5, fontWeight: FontWeight.w600),
@@ -193,20 +227,20 @@ ThemeData buildTheme(Brightness b) {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(64, 52),
         foregroundColor: ink,
-        side: BorderSide(color: line, width: 1.4),
+        side: BorderSide(color: line),
         shape: RoundedRectangleBorder(borderRadius: radius),
         textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: primary,
+        foregroundColor: ds.primaryText,
         textStyle: const TextStyle(fontFamily: _font, fontSize: 14.5, fontWeight: FontWeight.w600),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: dark ? const Color(0xFF343270) : Brand.lightInk,
+      backgroundColor: dark ? ds.elevated : ds.ink,
       contentTextStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
@@ -247,7 +281,7 @@ ThemeData buildTheme(Brightness b) {
     ),
     textSelectionTheme: TextSelectionThemeData(cursorColor: primary, selectionColor: primary.withValues(alpha: 0.25), selectionHandleColor: primary),
     tooltipTheme: TooltipThemeData(
-      decoration: BoxDecoration(color: dark ? const Color(0xFF343270) : Brand.lightInk, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: dark ? ds.elevated : ds.ink, borderRadius: BorderRadius.circular(10)),
       textStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12.5),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),

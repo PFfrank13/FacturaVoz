@@ -143,3 +143,12 @@ Se escriben como migraciones nuevas, idempotentes, probadas en Postgres local, y
 3. Tokens de diseño: reemplazar colores sueltos y degradados por `ColorScheme` (sin degradado salvo la cabecera).
 4. Inicio por rol (§4) y roles por rubro (§3.3, con migración).
 5. Matriz de investigación por rubro (16 preguntas del prompt) con fuentes SUNAT/MINSA/MTC/MINEDU.
+
+## 9. Fase 2 (Prompt parte 2: §9.6–§12)
+- **Matriz rubro × plan × rol**: motor único `nav/role_matrix.dart` (`roleExperience`) + 38 roles de rubro (más propietario, administrador y finanzas) sobre los 6
+  roles base reales; documento generado `01_MATRIZ_RUBRO_PLAN_ROL.md` (`python3 tool/gen_matriz.py`), pruebas
+  `test/role_matrix_test.dart` sobre todas las combinaciones. Taller, mayorista, educación y construcción (§9.6–9.9)
+  tienen sus roles; los que la base no cubre exactamente están marcados ⚠ con la diferencia escrita.
+- **Design System**: `02_DESIGN_SYSTEM.md` (paleta del prompt, modo claro AA, contrastes calculados, componentes `ds.dart`).
+- **Bodega Básico**: `03_BODEGA_BASICO.md` (estado paso a paso; Inicio por rol y Caja reconstruidos).
+- **Pendiente**: investigación por rubro con fuentes oficiales (§8, 16 preguntas) y migraciones de roles por rubro.
