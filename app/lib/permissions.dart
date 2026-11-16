@@ -102,3 +102,15 @@ extension AccessPermissions on Access {
           if (allows(e.key)) e.value.label,
       ];
 }
+
+/// Permisos efectivos que tendría un integrante con [role] (owner/admin/finanzas/cajero/vendedor/tecnico) en una
+/// empresa cuyo plan contrata [has]. Se muestran al elegir el rol en Equipo (vista previa: la base aplica lo mismo).
+({List<String> allowed, List<String> denied}) previewPermissions(String role, bool Function(String feature) has) {
+  final can = baseCan(role);
+  final allowed = <String>[], denied = <String>[];
+  for (final e in permissionRules.entries) {
+    final ok = permits(e.key, role: role, isAdmin: role == 'owner' || role == 'admin', can: (k) => can[k] ?? false, has: has);
+    (ok ? allowed : denied).add(e.value.label);
+  }
+  return (allowed: allowed, denied: denied);
+}
