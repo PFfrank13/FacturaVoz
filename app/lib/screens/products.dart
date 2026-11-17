@@ -12,6 +12,7 @@ import '../services/repo.dart';
 import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
@@ -776,21 +777,51 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
-            if (widget.embedded && _canManageProducts) ...[
-              FilledButton.icon(
-                key: const ValueKey('bodega-new-product'),
-                onPressed: () => _edit(),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Agregar producto'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
+            if (Access.instance.rubro == 'bodega') ...[
+              RetailVisual.hero(
+                context: context,
+                eyebrow: 'Inventario · Bodega / Tienda',
+                title: 'Tus productos',
+                subtitle: 'Consulta existencias, precios y movimientos desde un único catálogo.',
+                icon: Icons.inventory_2_rounded,
+                footer: Row(children: [
+                  Expanded(child: RetailVisual.microStat('Productos activos',
+                      all == null ? '—' : '${all.where((p) => p.active).length}')),
+                  const SizedBox(width: 12),
+                  Expanded(child: RetailVisual.microStat('Stock bajo',
+                      all == null ? '—' : '${all.where((p) => p.active && p.tracksStock && p.lowStock).length}')),
+                ]),
               ),
-              const SizedBox(height: 14),
+              if (_canManageProducts || (Access.instance.has('stock') && Access.instance.can('products_edit'))) ...[
+                const SizedBox(height: 14),
+                Wrap(spacing: 9, runSpacing: 9, children: [
+                  if (_canManageProducts)
+                    FilledButton.icon(
+                      key: const ValueKey('bodega-new-product'),
+                      onPressed: () => _edit(),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Agregar producto'),
+                    ),
+                  if (Access.instance.has('stock') && Access.instance.can('products_edit'))
+                    OutlinedButton.icon(
+                      key: const ValueKey('bodega-open-purchases'),
+                      onPressed: () async {
+                        await Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => const RetailPurchasesScreen(),
+                        ));
+                        _load();
+                      },
+                      icon: const Icon(Icons.local_shipping_outlined),
+                      label: const Text('Registrar compra'),
+                    ),
+                ]),
+              ],
+            ] else ...[
+              SectorPhotoBanner(rubro: Access.instance.rubro,
+                title: 'Tu catálogo, con identidad',
+                subtitle: 'Organiza productos, servicios, precios y fotos reales.',
+                height: 136),
             ],
-            SectorPhotoBanner(rubro: Access.instance.rubro,
-              title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
             const SizedBox(height: 16),
             if (all != null && Access.instance.isAdmin &&
                 Access.instance.has('stock') &&
