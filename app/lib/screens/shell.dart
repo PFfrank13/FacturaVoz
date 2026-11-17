@@ -98,6 +98,17 @@ bool _destAllowed(String id, Access a) => switch (id) {
       _ => true,
     };
 
+/// Navegación visible de Bodega según la licencia y el rol verificados.
+/// Es la fuente única tanto del Drawer como de sus pruebas de regresión.
+List<String> bodegaDrawerIds(Access access) => [
+  'home',
+  if (_destAllowed('sell', access)) 'sell',
+  if (_destAllowed('fiados', access)) 'fiados',
+  if (_destAllowed('cash', access)) 'cash',
+  if (_destAllowed('stock', access)) 'stock',
+  'settings',
+];
+
 class _MainShellState extends State<MainShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _tab = ''; // se resuelve al construir: la app abre donde se vende
@@ -196,14 +207,15 @@ class _MainShellState extends State<MainShell> {
     // Una sola navegación para Bodega, independientemente del plan. Cada destino
     // procede del entitlement firmado por el Hub y de los permisos del rol.
     if ((a.rubro ?? _settings?.businessType) == 'bodega') {
-      return [
-        _dHome,
-        if (_destAllowed('sell', a)) _dSell,
-        if (_destAllowed('fiados', a)) _dFiados,
-        if (_destAllowed('cash', a)) _dCash,
-        if (_destAllowed('stock', a)) _dStock,
-        _dSettings,
-      ];
+      const destinations = <String, _Dest>{
+        'home': _dHome,
+        'sell': _dSell,
+        'fiados': _dFiados,
+        'cash': _dCash,
+        'stock': _dStock,
+        'settings': _dSettings,
+      };
+      return [for (final id in bodegaDrawerIds(a)) destinations[id]!];
     }
     if (a.role == 'tecnico') return [for (final d in const [_dJobs, _dAgenda, _dClients, _dSettings]) if (_destAllowed(d.id, a)) d];
     // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
