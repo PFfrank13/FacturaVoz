@@ -153,7 +153,7 @@ class SettingsScreen extends StatelessWidget {
     final a = Access.instance;
     void go(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
     return Scaffold(
-      appBar: widget.embedded && Access.instance.rubro == 'bodega' ? null : AppBar(
+      appBar: embedded && Access.instance.rubro == 'bodega' ? null : AppBar(
         title: const Text('Ajustes'),
         automaticallyImplyLeading: !embedded,
         actions: const [SearchButton(), SizedBox(width: 12)],
