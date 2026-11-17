@@ -14,4 +14,9 @@ class ScopeTicket {
   final String? user;
 
   bool matches(int scopeNow, String? orgNow, String? userNow) => scope == scopeNow && org == orgNow && user == userNow;
+
+  /// Un cambio de empresa, sesión o revisión impide enviar operaciones de dinero.
+  /// Un ámbito sin empresa o usuario autenticado nunca autoriza escrituras.
+  bool permitsMutation(int scopeNow, String? orgNow, String? userNow) =>
+      org != null && user != null && matches(scopeNow, orgNow, userNow);
 }
