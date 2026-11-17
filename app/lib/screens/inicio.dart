@@ -294,7 +294,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               ),
             ),
           ),
-          if ((!isBodegaBasic ? _primary(a) : null) case final p?)
+          if ((!isBodega ? _primary(a) : null) case final p?)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -311,10 +311,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
             ),
-          // Para Bodega Básico se muestra el tablero operativo real; antes estaba conectado
-          // únicamente al HomeScreen heredado y nunca aparecía en el Inicio de producción.
-          if (isBodegaBasic)
-            const SliverToBoxAdapter(child: RetailBasicModules())
+          // Un tablero por rubro y plan. No más menú adicional para Pro/Empresa.
+          if (isBodega)
+            SliverToBoxAdapter(
+              child: isBodegaBasic ? const RetailBasicModules()
+                  : const RetailPlanModules(),
+            )
           else if (spec != null)
             SliverToBoxAdapter(
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -324,12 +326,11 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   subtitle: guide.homeSubtitle,
                 )),
             ),
-          // Conservar las métricas, tareas pendientes y avisos de operaciones no confirmadas,
-          // pero sin duplicar el menú de accesos del tablero específico de Bodega Básico.
+          // Conservar métricas y operaciones pendientes, sin otros menús en Bodega.
           SliverToBoxAdapter(
             child: RoleHomePanel(
               key: ValueKey('role-home-${Repo.activeOrgId}-${a.role}-${a.license.plan}'),
-              showLinks: !isBodegaBasic,
+              showLinks: !isBodega,
               exclude: {if (a.rubro == 'bodega' || primaryActionFor(a.rubro)?.featureId == 'pos') 'sell_cta'},
             ),
           ),
