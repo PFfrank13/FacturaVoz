@@ -10,7 +10,6 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
-import 'license_gate.dart' show PlanScreen;
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -29,26 +28,22 @@ class _MenuScreenState extends State<MenuScreen> {
   String _q = '';
 
   void _open(FeatureEntry f) {
-    if (!f.planOk) {
-      pushPremium(context, const PlanScreen());
-    } else {
-      openFeature(context, f);
-    }
+    // Las funciones ajenas al plan/rol nunca conducen a una venta forzada.
+    if (f.allowed) openFeature(context, f);
   }
 
   Widget _tile(FeatureEntry f) {
-    final t = Theme.of(context);
-    final locked = !f.planOk;
+    if (!f.allowed) return const SizedBox.shrink();
     final c = featureColor(f.id);
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
-        decoration: BoxDecoration(color: c.withValues(alpha: locked ? 0.06 : 0.12), borderRadius: BorderRadius.circular(13)),
-        child: Icon(locked ? Icons.lock_rounded : f.icon, color: locked ? t.colorScheme.outline : c, size: 21),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
+        child: Icon(f.icon, color: c, size: 21),
       ),
-      title: Text(f.title, style: locked ? TextStyle(color: t.colorScheme.onSurfaceVariant) : null),
-      subtitle: Text(locked ? upgradeLabel(f) : f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      title: Text(f.title),
+      subtitle: Text(f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded, size: 20),
       onTap: () => _open(f),
     );
@@ -152,10 +147,10 @@ class _MenuScreenState extends State<MenuScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                       leading: CircleAvatar(
                         backgroundColor: featureColor(f.id).withValues(alpha: 0.13),
-                        child: Icon(f.planOk ? f.icon : Icons.lock_rounded, color: featureColor(f.id)),
+                        child: Icon(f.icon, color: featureColor(f.id)),
                       ),
                       title: Text(shortActionLabel(f.id, f.title), style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                      subtitle: Text(f.planOk ? f.subtitle : upgradeLabel(f), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
                       trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                       onTap: () => _open(f),
                     ),
@@ -184,7 +179,7 @@ class _MenuScreenState extends State<MenuScreen> {
             const SizedBox(height: 24),
             Text('Todas tus herramientas', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text('Despliega una sección cuando la necesites. Nada se ha eliminado.', style: t.textTheme.bodySmall),
+            Text('Solo aparecen las herramientas incluidas en tu plan y permitidas para tu rol.', style: t.textTheme.bodySmall),
             const SizedBox(height: 12),
             for (final (i, area) in areas.indexed)
               if (area.features.any(byId.containsKey))
