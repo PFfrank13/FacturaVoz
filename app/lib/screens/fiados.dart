@@ -12,6 +12,7 @@ import '../services/repo.dart';
 import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/ds.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import 'client_profile.dart';
@@ -109,7 +110,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
       appBar: widget.embedded ? null : AppBar(title: const Text('Fiados')),
       floatingActionButton: widget.embedded ? null : FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.add_rounded), label: const Text('Anotar fiado')),
       body: _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          ? Center(child: DsStateView.error(message: _error!, onRetry: _load))
           : _list == null
               ? const SkeletonList()
               : RefreshIndicator(
