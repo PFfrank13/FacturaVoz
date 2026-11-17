@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../access.dart';
 import '../logic/search_score.dart';
 import '../rubros.dart';
-import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ux/rubro_experience.dart';
