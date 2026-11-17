@@ -66,6 +66,7 @@ const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda
 const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
 const _dCash = _Dest('cash', Icons.account_balance_wallet_rounded, 'Caja', 'Caja');
 const _dStock = _Dest('stock', Icons.inventory_2_rounded, 'Inventario', 'Inventario');
+const _dBodegaSettings = _Dest('settings', Icons.settings_rounded, 'Configuración', 'Configuración');
 
 /// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
 const _rubroIcons = <String, IconData>{
@@ -213,7 +214,7 @@ class _MainShellState extends State<MainShell> {
         'fiados': _dFiados,
         'cash': _dCash,
         'stock': _dStock,
-        'settings': _dSettings,
+        'settings': _dBodegaSettings,
       };
       return [for (final id in bodegaDrawerIds(a)) destinations[id]!];
     }
