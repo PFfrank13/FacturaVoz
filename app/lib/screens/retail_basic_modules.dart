@@ -125,8 +125,13 @@ class _RetailPlanDashboard extends StatelessWidget {
         ]),
         if (pos != null && pos.allowed) ...[
           const SizedBox(height: 20),
-          Material(
-            color: colors.primary,
+          Semantics(
+            label: 'Nueva venta',
+            hint: 'Abrir el punto de venta',
+            button: true,
+            excludeSemantics: true,
+            child: Material(
+              color: colors.primary,
             borderRadius: BorderRadius.circular(Radii.lg),
             child: InkWell(
               key: const ValueKey('retail-module-pos'),
@@ -157,6 +162,7 @@ class _RetailPlanDashboard extends StatelessWidget {
               ),
             ),
           ),
+          ),
         ],
         if (actions.isNotEmpty) ...[
           const SizedBox(height: 24),
@@ -184,7 +190,12 @@ class _RetailPlanDashboard extends StatelessWidget {
               ),
               itemBuilder: (context, i) {
                 final entry = actions[i];
-                return Material(
+                return Semantics(
+                  button: true,
+                  label: 'Abrir ${entry.action.label}',
+                  hint: entry.action.detail,
+                  excludeSemantics: true,
+                  child: Material(
                   color: colors.surface,
                   borderRadius: BorderRadius.circular(Radii.md),
                   child: InkWell(
@@ -212,6 +223,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                       ]),
                     ),
                   ),
+                ),
                 );
               },
             );
@@ -237,7 +249,12 @@ class _RetailPlanDashboard extends StatelessWidget {
                 final entry = premium[i];
                 return SizedBox(
                   width: 174,
-                  child: Material(
+                  child: Semantics(
+                    button: true,
+                    label: 'Abrir ${entry.action.label}',
+                    hint: entry.action.detail,
+                    excludeSemantics: true,
+                    child: Material(
                     color: colors.surface,
                     borderRadius: BorderRadius.circular(Radii.md),
                     child: InkWell(
@@ -268,6 +285,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
                   ),
                 );
               },
