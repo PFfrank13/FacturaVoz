@@ -5,6 +5,8 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
+import '../ui/retail_visual.dart';
+import '../ui/theme.dart';
 import 'fiscal_setup.dart';
 import 'branding.dart';
 import 'invoice_detail.dart';
@@ -48,9 +50,6 @@ class RetailReceiptsScreen extends StatefulWidget {
 }
 
 class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
-  static const _bg = Color(0xFF0B1030);
-  static const _surface = Color(0xFF1C224C);
-  static const _violet = Color(0xFF9258FB);
   List<InvoiceRecord> _invoices = const [];
   String _filter = 'all';
   String _query = '';
@@ -110,7 +109,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      backgroundColor: _surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (sheetContext) => SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * .72),
@@ -128,7 +127,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
               itemBuilder: (_, index) {
                 final inv = _invoices[index];
                 return ListTile(
-                  leading: const Icon(Icons.receipt_long_rounded, color: _violet),
+                  leading: Icon(Icons.receipt_long_rounded, color: Theme.of(sheetContext).colorScheme.primary),
                   title: Text(inv.fiscalNumber ?? inv.number),
                   subtitle: Text(
                     '${inv.clientName} · ${inv.fiscalStatus == 'accepted' ? 'Verifica su entorno SUNAT' : 'Documento interno o pendiente'}',
@@ -239,55 +238,19 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
     required String caption,
     required VoidCallback? action,
     Key? key,
-    Color accent = _violet,
-  }) => Material(
-    color: _surface,
-    borderRadius: BorderRadius.circular(16),
-    child: InkWell(
-      key: key,
-      borderRadius: BorderRadius.circular(16),
-      onTap: action,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accent.withValues(alpha: .55)),
-        ),
-        child: Row(children: [
-          Container(
-            width: 43, height: 43,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [accent.withValues(alpha: .85), accent.withValues(alpha: .38)]),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
-            const SizedBox(height: 3),
-            Text(caption, style: const TextStyle(fontSize: 12, color: Color(0xFFC5C6E1))),
-          ])),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFCEB9FA)),
-        ]),
-      ),
-    ),
+  }) => RetailReceiptActionTile(
+    key: key, icon: icon, label: label, caption: caption, onTap: action,
   );
 
   @override
   Widget build(BuildContext context) {
     final access = Access.instance;
     final entries = _invoices.where((i) => retailReceiptMatches(i, _filter, _query)).toList();
-    return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: _bg,
-        colorScheme: ColorScheme.fromSeed(seedColor: _violet, brightness: Brightness.dark),
-      ),
-      child: Scaffold(
-        backgroundColor: _bg,
+    final c = DsColors.of(context);
+    final t = Theme.of(context);
+    return Scaffold(
         appBar: AppBar(
           title: const Text('Comprobantes'),
-          backgroundColor: _bg,
           actions: [
             IconButton(
               tooltip: 'Actualizar comprobantes',
@@ -313,34 +276,20 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                   ),
                   const SizedBox(height: 8),
                 ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(17),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(19),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF4D2599), Color(0xFF24225B), _surface],
-                      ),
-                      border: Border.all(color: const Color(0xFF8D62EA)),
-                    ),
-                    child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Icon(Icons.receipt_long_rounded, color: Color(0xFFE7D3FF), size: 30),
-                        SizedBox(width: 12),
-                        Expanded(child: Text('Tus comprobantes',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
-                      ]),
-                      SizedBox(height: 6),
-                      Text('Emite boletas y facturas, consulta el historial y comparte tus documentos.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFFE3D8FF))),
-                    ]),
+                  RetailVisual.hero(
+                    context: context,
+                    eyebrow: 'Facturación · Documentos',
+                    title: 'Tus comprobantes',
+                    subtitle: 'Emite boletas y facturas, revisa su estado SUNAT y comparte documentos reales.',
+                    icon: Icons.receipt_long_rounded,
                   ),
                   const SizedBox(height: 14),
-                  _action(
+                  if (access.can('sell') && access.has('facturar')) _action(
                     key: const ValueKey('receipt-emit-action'),
                     icon: Icons.note_add_rounded,
                     label: '1. Emitir comprobante',
                     caption: 'Elige boleta o factura, revisa cliente y productos, confirma en SUNAT',
-                    action: access.can('sell') && access.has('facturar') ? _newReceipt : null,
+                    action: _newReceipt,
                   ),
                   const SizedBox(height: 9),
                   _action(
@@ -349,23 +298,19 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                     label: '2. Historial de comprobantes',
                     caption: 'Busca, filtra, descarga y revisa estados reales',
                     action: _openHistory,
-                    accent: const Color(0xFF557BEA),
                   ),
                   const SizedBox(height: 9),
-                  _action(
+                  if (access.can('settings')) _action(
                     key: const ValueKey('receipt-sunat-action'),
                     icon: Icons.admin_panel_settings_rounded,
                     label: '3. Configuración SUNAT',
                     caption: 'RUC, entorno, usuario SOL y certificado digital',
-                    action: access.can('settings')
-                      ? () async {
-                          await Navigator.of(context).push(MaterialPageRoute<void>(
-                            builder: (_) => const FiscalSetupScreen(),
-                          ));
-                          if (mounted) await _refresh();
-                        }
-                      : null,
-                    accent: const Color(0xFF2F93CA),
+                    action: () async {
+                      await Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const FiscalSetupScreen(),
+                      ));
+                      if (mounted) await _refresh();
+                    },
                   ),
                   const SizedBox(height: 9),
                   _action(
@@ -374,7 +319,6 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                     label: '4. Compartir comprobante',
                     caption: 'Elige un documento real y abre WhatsApp, correo u otra app',
                     action: _loading || _error != null ? null : _shareExisting,
-                    accent: const Color(0xFF259C81),
                   ),
                   if (access.can('settings')) ...[
                     const SizedBox(height: 8),
@@ -382,7 +326,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                       key: const ValueKey('receipt-branding-extras'),
                       title: const Text('Opciones de diseño e impresión',
                         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      leading: const Icon(Icons.tune_rounded, color: Color(0xFFBCA6FF)),
+                      leading: Icon(Icons.tune_rounded, color: t.colorScheme.primary),
                       children: [
                         ListTile(
                           leading: const Icon(Icons.palette_rounded),
@@ -398,8 +342,8 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                   ],
                   const SizedBox(height: 15),
                 ],
-                const Text('Historial de comprobantes', style: TextStyle(
-                  color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                Text('Historial de comprobantes', style: t.textTheme.titleMedium?.copyWith(
+                  color: c.ink, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 TextField(
                   key: const ValueKey('receipt-search'),
@@ -429,7 +373,6 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                           label: Text(label),
                           selected: _filter == value,
                           onSelected: (_) => setState(() => _filter = value),
-                          selectedColor: const Color(0xFF6C3ACF),
                         ),
                       ),
                   ]),
@@ -439,7 +382,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                   padding: EdgeInsets.all(30),
                   child: Center(child: CircularProgressIndicator()),
                 ) else if (_error != null) ...[
-                  Text(_error!, style: const TextStyle(color: Color(0xFFFFADB9))),
+                  Text(_error!, style: TextStyle(color: c.bad)),
                   const SizedBox(height: 7),
                   OutlinedButton.icon(
                     onPressed: _refresh,
@@ -448,7 +391,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                   ),
                 ] else if (entries.isEmpty) ...[
                   const SizedBox(height: 20),
-                  const Icon(Icons.receipt_long_outlined, color: Color(0xFFB5A4DF), size: 48),
+                  Icon(Icons.receipt_long_outlined, color: c.muted, size: 48),
                   const SizedBox(height: 8),
                   const Text('No hay comprobantes para este filtro',
                     textAlign: TextAlign.center),
@@ -466,7 +409,6 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
             ),
           ),
         ))),
-      ),
     );
   }
 
@@ -486,22 +428,23 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
       'error' => 'Sin confirmación de SUNAT',
       _ => inv.status == 'draft' ? 'Borrador · sin emitir' : 'No emitido ante SUNAT',
     };
-    final color = inv.voided ? const Color(0xFFEF9299)
-      : fiscal == 'accepted' ? const Color(0xFF47E3AB)
-      : fiscal == 'rejected' || fiscal == 'error' ? const Color(0xFFFFB477)
-      : const Color(0xFFBFC1E4);
+    final c = DsColors.of(context);
+    final color = inv.voided ? c.bad
+      : fiscal == 'accepted' ? c.ok
+      : fiscal == 'rejected' || fiscal == 'error' ? c.warn
+      : c.muted;
     return Material(
-      color: _surface,
+      color: c.surface,
       borderRadius: BorderRadius.circular(15),
       child: ListTile(
         key: ValueKey('receipt-${inv.id}'),
         onTap: () => _openDetail(inv),
         shape: RoundedRectangleBorder(
-          side: const BorderSide(color: Color(0xFF484680)),
+          side: BorderSide(color: c.line),
           borderRadius: BorderRadius.circular(15),
         ),
         leading: Icon(kind == 'factura' ? Icons.description_rounded
-          : Icons.receipt_long_rounded, color: _violet, size: 32),
+          : Icons.receipt_long_rounded, color: c.primaryText, size: 28),
         title: Text(inv.fiscalNumber ?? inv.number,
           maxLines: 1, overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -512,8 +455,64 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
         trailing: Column(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
           Text(money(inv.totals.total, inv.currency),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFB7A3EE), size: 18),
+          Icon(Icons.chevron_right_rounded, color: c.muted, size: 18),
         ]),
+      ),
+    );
+  }
+}
+
+
+/// Acción fiscal independiente y verificable en pantallas pequeñas.
+class RetailReceiptActionTile extends StatelessWidget {
+  const RetailReceiptActionTile({
+    super.key, required this.icon, required this.label,
+    required this.caption, required this.onTap,
+  });
+  final IconData icon;
+  final String label, caption;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = DsColors.of(context);
+    final t = Theme.of(context);
+    return Material(
+      color: c.surface,
+      borderRadius: BorderRadius.circular(Radii.lg),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Radii.lg),
+            border: Border.all(color: c.line),
+          ),
+          child: Row(children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: c.elevated,
+                borderRadius: BorderRadius.circular(Radii.md),
+              ),
+              child: Icon(icon, color: c.primaryText, size: 23),
+            ),
+            const SizedBox(width: Gap.md),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: t.textTheme.titleSmall?.copyWith(
+                    color: c.ink, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(caption,
+                  style: t.textTheme.bodySmall?.copyWith(color: c.muted)),
+              ],
+            )),
+            const SizedBox(width: Gap.xs),
+            Icon(Icons.chevron_right_rounded, color: c.muted, size: 20),
+          ]),
+        ),
       ),
     );
   }
