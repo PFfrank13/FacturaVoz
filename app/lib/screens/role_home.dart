@@ -4,9 +4,12 @@
 // Cada bloque lleva a su ruta canónica del catálogo (una función = una pantalla).
 import 'package:flutter/material.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../access.dart';
 import '../app_state.dart';
 import '../models.dart';
+import '../logic/data_scope.dart';
 import '../models_v2.dart';
 import '../nav/role_matrix.dart';
 import '../permissions.dart';
@@ -16,7 +19,7 @@ import '../ui/ds.dart';
 import '../ui/theme.dart';
 import 'catalog.dart';
 import 'menu.dart';
-import '../ui/motion.dart' show pushPremium;
+import '../ui/motion.dart' show pushPremium, showSuccess;
 
 /// Bloques que muestran una cifra (el resto son accesos).
 const _statBlocks = {'today_sales', 'cash_status', 'fiados_total', 'stock_low'};
@@ -38,6 +41,8 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
   int? _low;
   final _errors = <String>{};
   String? _org;
+  int _gen = 0;
+  int _pending = 0;
 
   RoleExperience _experience(Access a) {
     final role = roleForUser(a.rubro, a.role);
@@ -47,17 +52,46 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
   @override
   void initState() {
     super.initState();
+    dataScope.addListener(_onScopeChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    dataScope.removeListener(_onScopeChanged);
+    super.dispose();
+  }
+
+  void _onScopeChanged() {
+    if (!mounted) return;
+    setState(_clear); // nada de la empresa anterior queda en pantalla
+    _load();
+  }
+
+  void _clear() {
+    _day = null;
+    _closing = null;
+    _credit = null;
+    _low = null;
+    _errors.clear();
+    _pending = 0;
   }
 
   @override
   void didUpdateWidget(covariant RoleHomePanel old) {
     super.didUpdateWidget(old);
-    if (_org != Repo.activeOrgId) _load();
+    if (_org != Repo.activeOrgId) _onScopeChanged();
   }
 
+  static String? _uid() => Supabase.instance.client.auth.currentUser?.id;
+
   Future<void> _load() async {
-    _org = Repo.activeOrgId;
+    // §9: cada respuesta se aplica SOLO si sigue siendo la misma empresa, el mismo usuario y la misma generación.
+    final ticket = ScopeTicket(dataScope.value, Repo.activeOrgId, _uid());
+    final gen = ++_gen;
+    bool current() => mounted && gen == _gen && ticket.matches(dataScope.value, Repo.activeOrgId, _uid());
+    if (_org != ticket.org) _clear();
+    _org = ticket.org;
     final blocks = _experience(Access.instance).home.toSet();
     final today = todayIso();
     _errors.clear();
@@ -65,28 +99,40 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
       try {
         await f();
       } catch (_) {
-        if (mounted) setState(() => _errors.add(key));
+        if (current()) setState(() => _errors.add(key));
       }
     }
 
     await Future.wait([
+      guard('pending', () async {
+        final n = (await Repo.pendingFinancial()).length;
+        if (current()) setState(() => _pending = n);
+      }),
       if (blocks.contains('today_sales') || blocks.contains('cash_status'))
         guard('day', () async {
           final d = await V2Repo.daySummary(today);
           final c = blocks.contains('cash_status') ? await V2Repo.dayClosing(today) : null;
-          if (mounted) setState(() { _day = d; _closing = c; });
+          if (current()) setState(() { _day = d; _closing = c; });
         }),
       if (blocks.contains('fiados_total'))
         guard('credit', () async {
           final c = await V2Repo.creditBalances();
-          if (mounted) setState(() => _credit = c);
+          if (current()) setState(() => _credit = c);
         }),
       if (blocks.contains('stock_low'))
         guard('stock', () async {
           final p = await Repo.listProducts(activeOnly: true);
-          if (mounted) setState(() => _low = p.where((x) => x.lowStock).length);
+          if (current()) setState(() => _low = p.where((x) => x.lowStock).length);
         }),
     ]);
+  }
+
+  Future<void> _resolvePending() async {
+    final scope = dataScope.value;
+    final done = await Repo.resolvePendingFinancial();
+    if (!mounted || scope != dataScope.value) return;
+    showSuccess(context, done == 0 ? 'Aún sin conexión: siguen pendientes de confirmar.' : '$done operación(es) confirmada(s), sin duplicar.');
+    _load();
   }
 
   void _open(String? route) {
@@ -164,6 +210,19 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
         return Padding(
           padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (_pending > 0) ...[
+              const SizedBox(height: Gap.md),
+              Material(
+                color: DsColors.of(context).surface,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: DsColors.of(context).warn)),
+                child: DsRow(
+                  title: '$_pending operación(es) pendiente(s) de confirmar',
+                  subtitle: 'Cobros o movimientos enviados sin respuesta. No los repitas: comprueba aquí.',
+                  leading: Icons.sync_problem_rounded,
+                  trailing: TextButton(onPressed: _resolvePending, child: const Text('Comprobar')),
+                ),
+              ),
+            ],
             if (stats.isNotEmpty) ...[
               const DsSection('Hoy'),
               DsStatGrid(children: stats),

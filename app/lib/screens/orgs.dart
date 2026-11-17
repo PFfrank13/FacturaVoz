@@ -99,6 +99,8 @@ class _OrgsScreenState extends State<OrgsScreen> {
       await _s.refreshOrgs();
       final created = _s.orgs.where((o) => o.id == id).firstOrNull;
       if (created != null) await _s.switchOrg(created);
+      // switchOrg cierra todas las pantallas de la empresa anterior (incluida esta).
+      if (!mounted) return;
       await _loadMembers();
       _snack('Empresa creada. Completa sus datos.');
       if (mounted && !(_s.profile?.isComplete ?? true)) Navigator.of(context).popUntil((r) => r.isFirst);

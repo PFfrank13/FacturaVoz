@@ -5,7 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'access.dart';
 import 'app_state.dart';
+import 'logic/data_scope.dart';
 import 'models_v2.dart';
+import 'services/repo.dart';
 import 'services/v2_repo.dart';
 import 'screens/business_setup.dart';
 import 'screens/license_gate.dart';
@@ -373,7 +375,8 @@ class _V2GateState extends State<V2Gate> {
             _loadSettings();
           });
         }
-        return const MainShell();
+        // §9: el Inicio y sus pestañas se reconstruyen por empresa; respuestas tardías de otra empresa se descartan.
+        return MainShell(key: ValueKey('shell-${Repo.activeOrgId}-${dataScope.value}'));
       },
     );
   }
