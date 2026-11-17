@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../ui/retail_visual.dart';
+import '../ui/theme.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'retail_receipts.dart';
@@ -35,33 +36,28 @@ class PosPaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1030);
-    const panel = Color(0xFF1E244F);
-    const accent = Color(0xFF9960FC);
+    final t = Theme.of(context);
+    final c = DsColors.of(context);
     Widget action(IconData icon, String name, VoidCallback onTap, {Color? color}) {
       return Material(
-        color: panel,
+        color: c.surface,
         borderRadius: BorderRadius.circular(15),
         child: ListTile(
           shape: RoundedRectangleBorder(
-            side: const BorderSide(color: Color(0xFF55518C)),
+            side: BorderSide(color: c.line),
             borderRadius: BorderRadius.circular(15),
           ),
-          leading: Icon(icon, color: color ?? const Color(0xFFBE9DFF)),
-          title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-          trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFBEBADD)),
+          leading: Icon(icon, color: color ?? c.primaryText),
+          title: Text(name, style: t.textTheme.titleSmall?.copyWith(
+            color: c.ink, fontWeight: FontWeight.w700)),
+          trailing: Icon(Icons.chevron_right_rounded, color: c.muted),
           onTap: onTap,
         ),
       );
     }
 
-    return Theme(
-      data: ThemeData.dark().copyWith(scaffoldBackgroundColor: bg),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Cobro registrado'),
-          backgroundColor: bg,
-        ),
+    return Scaffold(
+        appBar: AppBar(title: const Text('Cobro registrado')),
         body: SafeArea(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -70,31 +66,30 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(26),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0C3C3F), Color(0xFF2F226D), Color(0xFF5132AD)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: c.surface,
+                borderRadius: BorderRadius.circular(Radii.lg),
+                border: Border.all(color: c.line),
               ),
               child: Column(children: [
                 Container(
                   width: 86, height: 86,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF24EFC5), width: 3),
-                    boxShadow: [BoxShadow(color: const Color(0xFF24EFC5).withValues(alpha: .35), blurRadius: 28)],
+                    color: c.ok.withValues(alpha: .10),
+                    border: Border.all(color: c.ok, width: 2),
                   ),
-                  child: const Icon(Icons.check_rounded, color: Color(0xFF68FFE0), size: 56),
+                  child: Icon(Icons.check_rounded, color: c.ok, size: 48),
                 ),
                 const SizedBox(height: 18),
-                const Text('Venta registrada y cobrada', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                Text('Venta registrada y cobrada', style: t.textTheme.titleLarge?.copyWith(
+                  color: c.ink, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
-                Text(money(total, currency), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 36)),
+                Text(money(total, currency), style: t.textTheme.headlineMedium?.copyWith(
+                  color: c.ink, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(color: accent.withValues(alpha: .2), borderRadius: BorderRadius.circular(18)),
+                  decoration: BoxDecoration(color: c.elevated, borderRadius: BorderRadius.circular(Radii.md)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   child: Row(children: [
                     PosPaymentBrand(method, size: 30),
@@ -104,7 +99,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                       : '${posMethodLabel(method)} · verificado por el cajero',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700))),
+                      style: t.textTheme.bodyMedium?.copyWith(color: c.ink, fontWeight: FontWeight.w700))),
                   ]),
                 ),
               ]),
@@ -117,7 +112,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               () => _openDetail(context, doc: '01')),
             const SizedBox(height: 9),
             action(Icons.chat_rounded, 'Compartir PDF (WhatsApp u otra app)',
-              () => _openDetail(context, share: true), color: const Color(0xFF45D78E)),
+              () => _openDetail(context, share: true), color: c.ok),
             const SizedBox(height: 9),
             action(Icons.article_outlined, 'Ver comprobante',
               () => _openDetail(context)),
@@ -130,13 +125,13 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 builder: (_) => const RetailReceiptsScreen(),
               ))),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'El cobro se registró tras la verificación del cajero; no se comprueba automáticamente con el banco. '
               'El pago registrado no equivale a la emisión SUNAT. '
               'Para emitir boleta o factura electrónica se necesitan RUC, SOL, '
               'certificado y configuración tributaria. Si falta alguno, se abrirá la configuración.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFFB5B8D7), fontSize: 12),
+              style: t.textTheme.bodySmall?.copyWith(color: c.muted),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -146,7 +141,6 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             ),
           ]),
         ))),
-      ),
     );
   }
 }

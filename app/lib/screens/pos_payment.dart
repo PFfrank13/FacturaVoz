@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../ui/retail_visual.dart';
+import '../ui/theme.dart';
 import '../models_pro.dart';
 import '../services/pro_repo.dart';
 import 'client_profile.dart' show StorageImage;
@@ -14,11 +15,6 @@ class PosPaymentApproval {
   final String method;
   final String note;
 }
-
-const _navy = Color(0xFF0B1030);
-const _panel = Color(0xFF1D2353);
-const _violet = Color(0xFF9658FA);
-const _border = Color(0xFF6B5EA5);
 
 /// Brand-inspired marks matching the supplied visual reference. No invented
 /// bank QR or claim that the payment network authorized a transaction.
@@ -216,13 +212,14 @@ class _PaymentFlowState extends State<_PaymentFlow> {
     Navigator.of(context).pop(PosPaymentApproval(_method!, note));
   }
 
-  Widget _card({required Widget child, EdgeInsets padding = const EdgeInsets.all(16), Color color = _panel}) {
+  Widget _card({required Widget child, EdgeInsets padding = const EdgeInsets.all(16), Color? color}) {
+    final t = Theme.of(context);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: _border.withValues(alpha: .55)),
+        color: color ?? t.colorScheme.surface,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: t.colorScheme.outline),
       ),
       child: child,
     );
@@ -230,22 +227,26 @@ class _PaymentFlowState extends State<_PaymentFlow> {
 
   Widget _methodTile(String method) {
     final selected = _method == method;
+    final t = Theme.of(context);
     return Material(
-      color: selected ? const Color(0xFF4A237A) : _panel,
-      borderRadius: BorderRadius.circular(16),
+      color: selected ? t.colorScheme.primaryContainer : t.colorScheme.surface,
+      borderRadius: BorderRadius.circular(Radii.lg),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => setState(() { _method = method; _verified = false; }),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: selected ? _violet : _border, width: selected ? 2 : 1),
+            border: Border.all(color: selected ? t.colorScheme.primary : t.colorScheme.outline,
+              width: selected ? 2 : 1),
           ),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             PosPaymentBrand(method, size: 51),
             const SizedBox(height: 8),
-            Text(posMethodLabel(method), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+            Text(posMethodLabel(method), style: t.textTheme.titleSmall?.copyWith(
+              color: selected ? t.colorScheme.onPrimaryContainer : t.colorScheme.onSurface,
+              fontWeight: FontWeight.w800)),
           ]),
         ),
       ),
@@ -255,15 +256,11 @@ class _PaymentFlowState extends State<_PaymentFlow> {
   @override
   Widget build(BuildContext context) {
     final method = _method;
-    return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: _navy,
-        colorScheme: ColorScheme.fromSeed(seedColor: _violet, brightness: Brightness.dark),
-      ),
-      child: Scaffold(
+    final t = Theme.of(context);
+    final c = DsColors.of(context);
+    return Scaffold(
         appBar: AppBar(
           title: Text(method == null ? 'Método de cobro' : 'Cobro ${posMethodLabel(method).toLowerCase()}'),
-          backgroundColor: _navy,
           leading: IconButton(
             tooltip: method == null ? 'Volver' : 'Cambiar método',
             onPressed: () {
@@ -285,14 +282,15 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                 label: method == null ? 'Elegir medio de pago' : 'Verificar y confirmar'),
               const SizedBox(height: 15),
               _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Total a cobrar', style: TextStyle(color: Color(0xFFB8B7D4))),
+                Text('Total a cobrar', style: t.textTheme.bodyMedium?.copyWith(
+                  color: t.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 5),
-                Text(money(widget.total, widget.currency), style: const TextStyle(
-                  fontSize: 33, fontWeight: FontWeight.w900, color: Colors.white)),
+                Text(money(widget.total, widget.currency), style: t.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)),
                 if (widget.items.isNotEmpty) ...[
                   const Divider(height: 24),
                   Text('Resumen del pedido (${widget.items.length})',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   for (final item in widget.items.take(12))
                     Padding(
@@ -312,11 +310,16 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 14),
-                GridView.count(
+                GridView.builder(
                   shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2, childAspectRatio: 1.52,
-                  mainAxisSpacing: 10, crossAxisSpacing: 10,
-                  children: [for (final method in const ['efectivo', 'yape', 'plin', 'tarjeta']) _methodTile(method)],
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisExtent: MediaQuery.textScalerOf(context).scale(1.0) > 1.3 ? 150 : 128,
+                    mainAxisSpacing: 10, crossAxisSpacing: 10,
+                  ),
+                  itemCount: 4,
+                  itemBuilder: (context, i) =>
+                    _methodTile(const ['efectivo', 'yape', 'plin', 'tarjeta'][i]),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -325,20 +328,22 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   label: const Text('Transferencia bancaria'),
                 ),
                 const SizedBox(height: 14),
-                const Text('El efectivo calcula el vuelto. Yape, Plin y tarjeta necesitan confirmación del cajero.',
+                Text('El efectivo calcula el vuelto. Yape, Plin y tarjeta necesitan confirmación del cajero.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFFA9A9CB), fontSize: 12)),
+                  style: t.textTheme.bodySmall?.copyWith(color: c.muted)),
               ] else ...[
-                _card(color: const Color(0xFF3E1C78), child: Column(children: [
+                _card(color: t.colorScheme.surfaceContainerHigh, child: Column(children: [
                   PosPaymentBrand(method, size: 78),
                   const SizedBox(height: 10),
-                  Text('Paga con ${posMethodLabel(method)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                  Text('Paga con ${posMethodLabel(method)}', style: t.textTheme.titleMedium?.copyWith(
+                    color: c.ink, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   Text(money(widget.total, widget.currency),
-                    style: const TextStyle(fontSize: 31, fontWeight: FontWeight.w900, color: Colors.white)),
+                    style: t.textTheme.headlineMedium?.copyWith(
+                      color: c.ink, fontWeight: FontWeight.w800)),
                   if (_merchant?.holder.isNotEmpty == true)
                     Text(_merchant!.holder, textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFD2CAEE))),
+                      style: t.textTheme.bodyMedium?.copyWith(color: c.muted)),
                   if (_requiresAccount && _account.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     SelectableText(_account, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
@@ -355,14 +360,14 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       padding: const EdgeInsets.all(8),
                       child: StorageImage(path: _qrPath),
                     ),
-                    const Text('QR de cobro configurado por el negocio',
-                      style: TextStyle(color: Color(0xFFD2CAEE), fontSize: 11)),
+                    Text('QR de cobro configurado por el negocio',
+                      style: t.textTheme.bodySmall?.copyWith(color: c.muted)),
                   ],
                   if (_requiresAccount && _account.isEmpty && _qrPath.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 14),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
                       child: Text('Primero configura el medio de cobro en Ajustes. No se generará un QR ficticio.',
-                        textAlign: TextAlign.center, style: TextStyle(color: Color(0xFFFFC2C2))),
+                        textAlign: TextAlign.center, style: TextStyle(color: c.bad)),
                     ),
                 ])),
                 const SizedBox(height: 16),
@@ -382,7 +387,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                         ? 'Vuelto: ${money(posChangeDue(chargeCents: _chargeCents, tenderedCents: _tendered!) / 100, widget.currency)}'
                         : 'El monto recibido es insuficiente.',
                       style: TextStyle(fontWeight: FontWeight.w900,
-                        color: _sufficient ? const Color(0xFF4EFAC0) : const Color(0xFFFFA0A0))),
+                        color: _sufficient ? c.ok : c.bad)),
                   ]))
                 else _card(child: CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
@@ -398,7 +403,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
-                    backgroundColor: _violet, foregroundColor: Colors.white,
+                    backgroundColor: t.colorScheme.primary,
+                    foregroundColor: t.colorScheme.onPrimary,
                   ),
                   onPressed: _canConfirm ? _confirm : null,
                   icon: const Icon(Icons.check_rounded),
@@ -408,7 +414,6 @@ class _PaymentFlowState extends State<_PaymentFlow> {
             ],
           ),
         )),
-      ),
     );
   }
 }

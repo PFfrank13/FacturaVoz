@@ -15,8 +15,8 @@ Fecha de corte: 17-11-2026. Alcance: Bodega/Tienda en BÁSICO, PRO y EMPRESA; lo
 | Fase | Entrega | Estado verificable | Puerta de salida |
 | --- | --- | --- | --- |
 | 0. Auditoría y trazabilidad | Inventario de rutas, diseño, módulos y defectos, contrato de pruebas y tablero de seguimiento | Completada (este documento, inventario de abajo) | Riesgos, pruebas y criterios explícitos |
-| 1. Base visual consistente | Unificar superficies y texto en Caja/Fiados/Ventas, tema claro/oscuro y retirar encabezados redundantes | En desarrollo — rama `feat/bodega-visual-fase1-20261117` | Flutter analyze + tests de UI/responsividad sin overflow + compile; revisión de diferencias |
-| 2. Nueve flujos de Básico | Inicio, Ventas, Comprobantes, Fiados, Inventario, Compras, Caja, Reportes, Alta de productos, incluyendo pagos y ticket | Pendiente | Cada flujo real funciona, títulos/acciones coherentes, no menús/candados; accesibilidad de acciones |
+| 1. Base visual consistente | Unificar superficies y texto en Caja/Fiados/Ventas/Compras, tema claro/oscuro y retirar encabezados redundantes | Integrada en `main` mediante [PR #12](https://github.com/PFfrank13/FacturaVoz/pull/12), commit `7b05df9` | CI Flutter + PostgreSQL aprobados; auditoría de dependencias backend pendiente en #14 |
+| 2. Nueve flujos de Básico | Inicio, Ventas, Carrito, Pago, Comprobantes, Fiados, Inventario, Compras, Caja, Reportes y Alta de productos | En validación — [PR #15](https://github.com/PFfrank13/FacturaVoz/pull/15), sin fusionar | Flutter analyze, test de widgets 320/390/600, builds; prueba en dispositivo de flujos reales sigue pendiente |
 | 3. Pro, Empresa y roles | Mismos componentes, expansiones comerciales reales y cada rol ve solo lo autorizado | Pendiente | Matriz Bodega × 3 planes × roles, sin promociones ajenas |
 | 4. Calidad integral | Estados loading/vacío/error, accesibilidad, responsividad, teclado, contraste, rendimiento y recorridos integrados | Pendiente | 320/360/412/600 px, escalado 1.0/1.4, dos temas; cero overflow/análisis/test; checklist de tareas validado |
 | 5. Entrega Android real | Build release firmado, credenciales prod, versionado, verificación de APK/AAB y actualización en dispositivo | Pendiente | Prueba en Android físico, firma y backend configurados, verificación del Hub y circuitos de venta/comprobante/caja |
@@ -50,3 +50,10 @@ Fecha de corte: 17-11-2026. Alcance: Bodega/Tienda en BÁSICO, PRO y EMPRESA; lo
 - Cada PR debe indicar: fase, archivos tocados, pruebas ejecutadas, resultado de CI, captura o evidencia visual al estar disponible, riesgos y rollback.
 - El control objetivo será [GitHub Actions](https://github.com/PFfrank13/FacturaVoz/actions), con commit SHA concreto, **no un informe verbal**.
 - Considerar fase validada solo con artefactos y comprobaciones reales. Una APK debug con parámetros CI no cuenta como release comercial.
+
+## Evidencias de integración y QA (17-11-2026)
+
+- **Fase 1:** [PR #12](https://github.com/PFfrank13/FacturaVoz/pull/12), merge commit `7b05df9e5e43b17e1ae3451d69c73df1d91c81a6`; `app` y `database` aprobados en [run 44152019965](https://github.com/PFfrank13/FacturaVoz/actions/runs/44152019965). `backend` falló por advisories npm preexistentes.
+- **Fase 2:** PR #15 abierto. Se probaron componentes de Comprobantes y recorrido POS en 320/390/600 px y temas claro/oscuro. El primer CI detectó `const` incompatibles con colores dinámicos; corregidos. Otro encontró un botón «Imprimir ticket» fuera del viewport; se corrigió la prueba mediante desplazamiento, no se quitó el botón.
+- **Pruebas reales pendientes:** supresión de duplicados de cobro, integración con ticketera, configuración SUNAT real, permisos de Bodega × rol × plan, pruebas en Android emulado/físico, rendimiento y firma release.
+- **Bloqueo independiente:** [issue #14](https://github.com/PFfrank13/FacturaVoz/issues/14) — audit-gate backend. No se debe marcar «release comercial listo» hasta resolverlo.

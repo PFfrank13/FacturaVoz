@@ -260,6 +260,8 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
     final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
     final list = _visible();
+    // Inicio muestra un resumen: la búsqueda completa corresponde a Comprobantes.
+    final activity = isBodega ? list.take(4).toList() : list;
     final buyers = _todayBuyers();
     return Scaffold(
       body: RefreshIndicator(
@@ -292,7 +294,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               ),
             ),
           ),
-          if (_primary(a) case final p?)
+          if ((!isBodegaBasic ? _primary(a) : null) case final p?)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -341,7 +343,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
             },
           )),
           if (a.has('copiloto')) SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load, max: AppState.instance.easyMode.value ? 1 : 2)),
-          if (buyers.isNotEmpty)
+          if (!isBodega && buyers.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
@@ -394,13 +396,18 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 22, 16, 6),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  TextField(
+                  if (isBodega) ...[
+                    Text('Actividad reciente', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text('Últimas operaciones del negocio', style: t.textTheme.bodySmall),
+                  ],
+                  if (!isBodega) TextField(
                     onChanged: (v) => setState(() => _query = v),
                     textInputAction: TextInputAction.search,
                     decoration: const InputDecoration(hintText: 'Buscar por cliente o número', prefixIcon: Icon(Icons.search_rounded), isDense: true),
                   ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
+                  if (!isBodega) const SizedBox(height: 10),
+                  if (!isBodega) SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
                       for (final (k, label) in const [('all', 'Todas'), ('draft', 'Borradores'), ('issued', 'Emitidas'), ('due', 'Por cobrar'), ('review', 'Por revisar')])
@@ -413,7 +420,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ]),
               ),
             ),
-            if (list.isEmpty)
+            if (activity.isEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(32, 40, 32, 140),
@@ -424,9 +431,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 160),
                 sliver: SliverList.separated(
-                  itemCount: list.length + (_items!.length >= _limit ? 1 : 0),
+                  itemCount: activity.length + (!isBodega && _items!.length >= _limit ? 1 : 0),
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, i) => i == list.length
+                  itemBuilder: (context, i) => i == activity.length
                       ? Center(
                           child: TextButton.icon(
                             onPressed: () {
@@ -438,9 +445,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                           ),
                         )
                       : Reveal(
-                          key: ValueKey(list[i].id),
+                          key: ValueKey(activity[i].id),
                           index: 3 + (i < 8 ? i : 8),
-                          child: RepaintBoundary(child: InvoiceRow(inv: list[i], onTap: () => _open(list[i]))),
+                          child: RepaintBoundary(child: InvoiceRow(
+                            inv: activity[i], onTap: () => _open(activity[i]))),
                         ),
                 ),
               ),

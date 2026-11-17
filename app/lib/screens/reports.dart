@@ -13,6 +13,7 @@ import '../reports.dart';
 import '../services/live.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
+import '../ui/retail_visual.dart';
 import '../ui/widgets.dart';
 
 /// Reportes de ventas por mes + exportación CSV para el contador.
@@ -148,8 +149,17 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
           children: [
-            SectorPhotoBanner(rubro: Access.instance.rubro,
-              title: 'Tu negocio, en números', subtitle: sectorTagline(Access.instance.rubro), height: 142),
+            if (Access.instance.rubro == 'bodega')
+              RetailVisual.hero(
+                context: context,
+                eyebrow: 'Análisis · Bodega / Tienda',
+                title: 'Tu negocio, en números',
+                subtitle: 'Consulta ventas, impuestos, cobros y tendencias de cada período.',
+                icon: Icons.analytics_rounded,
+              )
+            else
+              SectorPhotoBanner(rubro: Access.instance.rubro,
+                title: 'Tu negocio, en números', subtitle: sectorTagline(Access.instance.rubro), height: 142),
             const SizedBox(height: 16),
             if (org != null) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(org, style: t.textTheme.bodySmall)),
             _monthBar(t),
@@ -233,21 +243,25 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
 
   Widget _hero(ThemeData t, CurrencyReport r) => Container(
         padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26), boxShadow: Brand.softShadow(false)),
+        decoration: BoxDecoration(
+          color: t.colorScheme.surface,
+          borderRadius: BorderRadius.circular(Radii.lg),
+          border: Border.all(color: t.colorScheme.outline),
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Ventas del mes', style: t.textTheme.bodyMedium?.copyWith(color: Colors.white70)),
+          Text('Ventas del mes', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 6),
           CountUp(
             value: r.total,
             builder: (_, v) => Text(
               money(v, r.currency),
-              style: t.textTheme.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+              style: t.textTheme.headlineMedium?.copyWith(color: t.colorScheme.onSurface, fontWeight: FontWeight.w800),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '${r.count} ${r.count == 1 ? 'comprobante' : 'comprobantes'} · promedio ${money(r.average, r.currency)}',
-            style: t.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+            style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
         ]),
       );
@@ -297,8 +311,9 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
                       builder: (_, f, _) => Container(
                         height: 3 + 93 * f,
                         decoration: BoxDecoration(
-                          gradient: (r.byDay[d] ?? 0) > 0 ? Brand.heroGradient : null,
-                          color: (r.byDay[d] ?? 0) > 0 ? null : t.colorScheme.outline.withValues(alpha: .5),
+                          color: (r.byDay[d] ?? 0) > 0
+                              ? t.colorScheme.primary
+                              : t.colorScheme.outline.withValues(alpha: .5),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
