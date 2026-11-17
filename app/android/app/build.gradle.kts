@@ -23,8 +23,21 @@ if (facturavozSigningFile.isFile) {
 val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 val hasReleaseSigning = facturavozSigningFile.isFile &&
     releaseSigningKeys.all { !facturavozSigningProperties.getProperty(it).isNullOrBlank() }
-check(!isReleaseTask || hasReleaseSigning) {
-    "Falta la configuracion privada completa de firma de FacturaVoz"
+// Release keys must exist outside source control, not just be non-empty strings.
+// A debug keystore or a copied key inside the repository is never distributable.
+val releaseKeystore = if (hasReleaseSigning) {
+    val setting = File(facturavozSigningProperties.getProperty("storeFile"))
+    (if (setting.isAbsolute) setting else File(project.projectDir, setting.path)).canonicalFile
+} else null
+val sourceRepository = File(project.projectDir, "../../..").canonicalFile.toPath()
+val hasSafeReleaseSigning = hasReleaseSigning &&
+    releaseKeystore?.isFile == true &&
+    !releaseKeystore.toPath().startsWith(sourceRepository) &&
+    !releaseKeystore.name.equals("debug.keystore", ignoreCase = true) &&
+    !facturavozSigningProperties.getProperty("keyAlias").equals("androiddebugkey", ignoreCase = true)
+check(!isReleaseTask || hasSafeReleaseSigning) {
+    "Firma release bloqueada: configura ~/FacturaVoz-Signing/signing.properties " +
+        "con un keystore real FUERA del repositorio (nunca debug.keystore)."
 }
 android {
     namespace = "pe.tuempresa.facturavoz"
@@ -52,9 +65,9 @@ android {
     }
 
     signingConfigs {
-        if (hasReleaseSigning) {
+        if (hasSafeReleaseSigning) {
             create("release") {
-                storeFile = file(facturavozSigningProperties.getProperty("storeFile"))
+                storeFile = releaseKeystore!!
                 storePassword = facturavozSigningProperties.getProperty("storePassword")
                 keyAlias = facturavozSigningProperties.getProperty("keyAlias")
                 keyPassword = facturavozSigningProperties.getProperty("keyPassword")
@@ -63,7 +76,7 @@ android {
     }
     buildTypes {
         release {
-            if (hasReleaseSigning) {
+            if (hasSafeReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
