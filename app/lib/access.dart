@@ -137,7 +137,7 @@ class Access extends ChangeNotifier {
   // entregue por error el flag. Es una restricción visual adicional, no un grant.
   bool has(String feature) =>
       licenseReady &&
-      !(license.plan == 'BASICO' &&
+      !(rubro == 'bodega' && license.plan == 'BASICO' &&
           (feature == 'copiloto' || feature == 'copiloto_agente')) &&
       planHas(license, feature, rubro: rubro);
   int limit(String feature) => licenseReady ? planLimit(license, feature) : 0;
