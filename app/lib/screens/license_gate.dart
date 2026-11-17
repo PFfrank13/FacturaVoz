@@ -373,10 +373,12 @@ class _PlanScreenState extends State<PlanScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(l.dev || !l.activated ? 'Pendiente de activación' : 'Plan ${planName(l.plan)}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text(l.dev || (l.source == 'hub' && !l.activated) ? 'Pendiente de activación' : 'Plan ${planName(l.plan)}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(
-                      l.dev || !l.activated
+                      l.source == 'local'
+                          ? 'En transición a tu licencia oficial de Solvex Hub (sin interrupción).'
+                          : l.dev || !l.activated
                               ? 'Activación de la licencia pendiente.'
                               : [
                               if (l.isTrial) 'Prueba gratis' else 'Estado: ${l.status}',

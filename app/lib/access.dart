@@ -34,7 +34,7 @@ class LicenseInfo {
   final String mode; // full | warning | restricted | blocked
   final String plan; // BASICO | PRO | EMPRESA
   final String status;
-  final String source; // siempre 'hub' desde v3.4 (none = no se pudo leer)
+  final String source; // 'hub' (y 'local' solo hasta la FASE B de v3.4); none = no se pudo leer
   final bool dev;
   final bool enforced;
   final Map<String, dynamic> features;
@@ -84,19 +84,22 @@ class LicenseInfo {
       );
 }
 
+/// Fuente comercial aceptada: el Hub y, solo durante la transición v3.4, la licencia local heredada (la FASE B la elimina).
+bool _commercialSource(String s) => s == 'hub' || s == 'local';
+
 /// Funciones básicas que todo plan incluye.
 const coreFeatures = {'facturar', 'clientes', 'cobros', 'voz'};
 
 /// The backend computes effective per-tenant features from the Solvex Hub license.
 /// Never accept an unverified cached or expired license as authorization.
 bool planHas(LicenseInfo l, String key, {String? rubro}) {
-  if (!l.enforced || l.dev || l.stale || l.source != 'hub' || !l.usable) return false;
+  if (!l.enforced || l.dev || l.stale || !_commercialSource(l.source) || !l.usable) return false;
   return l.features[key] == true;
 }
 
 /// Límite numérico del plan (-1 = sin límite).
 int planLimit(LicenseInfo l, String key) {
-  if (!l.enforced || l.dev || l.stale || l.source != 'hub' || !l.usable) return 0;
+  if (!l.enforced || l.dev || l.stale || !_commercialSource(l.source) || !l.usable) return 0;
   final v = l.features[key];
   return v is num && v.isFinite && v == v.truncateToDouble() && v >= -1 ? v.toInt() : 0;
 }
@@ -115,11 +118,12 @@ class Access extends ChangeNotifier {
   /// No se entra con una licencia cacheada sin validar la sesión ante Supabase.
   bool licenseCheckedOnline = false;
   bool licenseChecking = true;
-  // v3.4: Solvex Hub es la única fuente comercial. No existen licencias locales ni de desarrollo.
+  // v3.4: Solvex Hub es la única fuente comercial. 'local' solo existe hasta la FASE B (20261210), que la base
+  // garantiza que no deja ninguna; aceptarla mientras tanto evita cortar el servicio durante la transición.
   bool get licenseReady => licenseCheckedOnline && license.enforced && !license.dev &&
-      !license.stale && license.source == 'hub' && license.usable;
+      !license.stale && _commercialSource(license.source) && license.usable;
   bool get canEnter => licenseReady || (licenseCheckedOnline && license.enforced &&
-      !license.dev && license.source == 'hub' && license.mode == 'restricted' && isAdmin);
+      !license.dev && _commercialSource(license.source) && license.mode == 'restricted' && isAdmin);
 
   /// Por qué no se pudo leer la licencia (null = se leyó). Se muestra tal cual; nunca da acceso.
   String? licenseError;
