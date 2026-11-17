@@ -820,12 +820,8 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final retail = Access.instance.rubro == 'bodega';
-    final t = retail
-        ? ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF9658FA), brightness: Brightness.dark),
-            scaffoldBackgroundColor: const Color(0xFF0B1030),
-          )
-        : Theme.of(context);
+    // El POS no redefine el tema del usuario: se integra al unico shell.
+    final t = Theme.of(context);
     final all = _products ?? const <Product>[];
     final cats = {for (final x in _extra.values) if ((x['category'] ?? '').toString().isNotEmpty) x['category'].toString()}.toList()..sort();
     final q = _q.text.trim().toLowerCase();
@@ -847,10 +843,8 @@ class _PosScreenState extends State<PosScreen> {
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
     return Theme(data: t, child: Scaffold(
-      backgroundColor: retail ? const Color(0xFF0B1030) : null,
       appBar: widget.embedded ? null : AppBar(
         title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'),
-        backgroundColor: retail ? const Color(0xFF0B1030) : null,
         actions: actions,
       ),
       body: (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
@@ -891,24 +885,14 @@ class _PosScreenState extends State<PosScreen> {
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
                       child: RetailVisual.journey(step: 1, label: 'Elegir productos'),
                     ),
-                  if (retail && Access.instance.license.plan == 'BASICO')
+
+                  if (widget.embedded && actions.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
-                      child: Center(child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFF5530A0), Color(0xFF7D4DD7)]),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: const Color(0xFFB49AFF)),
-                        ),
-                        child: const Text('Plan Básico · Bodega / Tienda',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-                      )),
-                    ),
-                  if (widget.embedded)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 8, 8, 0),
-                      child: Row(children: [Expanded(child: Text(_restaurant ? 'Tomar pedido' : 'Vender', style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), ...actions]),
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+                      ),
                     ),
                   if (_restaurant)
                     Padding(
@@ -999,10 +983,10 @@ class _PosScreenState extends State<PosScreen> {
                                                     alignment: Alignment.center,
                                                     child: retail
                                                         ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                                            Icon(placeholderIcon, size: 42, color: const Color(0xFFB49BFF)),
+                                                            Icon(placeholderIcon, size: 42, color: t.colorScheme.primary),
                                                             const SizedBox(height: 7),
-                                                            const Text('Foto por añadir', style: TextStyle(
-                                                              fontSize: 10, color: Color(0xFFB7B1CE))),
+                                                            Text('Foto por añadir', style: t.textTheme.labelSmall?.copyWith(
+                                                              color: t.colorScheme.onSurfaceVariant)),
                                                           ])
                                                         : em == null
                                                             ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
@@ -1017,7 +1001,7 @@ class _PosScreenState extends State<PosScreen> {
                                               child: Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                 decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(Radii.pill)),
-                                                child: Text(qtyText(n), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w800)),
+                                                child: Text(qtyText(n), style: TextStyle(fontFamily: 'Inter', color: t.colorScheme.onPrimary, fontWeight: FontWeight.w800)),
                                               ),
                                             ),
                                           if (p.tracksStock && (p.stock ?? 0) <= 0)
@@ -1044,10 +1028,10 @@ class _PosScreenState extends State<PosScreen> {
                   if (retail && widget.embedded && lines.isNotEmpty)
                     Container(
                       key: const ValueKey('retail-pos-checkout-bar'),
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 94),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF1B214A),
-                        border: Border(top: BorderSide(color: Color(0xFF57418E))),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      decoration: BoxDecoration(
+                        color: t.colorScheme.surface,
+                        border: Border(top: BorderSide(color: t.colorScheme.outline)),
                       ),
                       child: Row(children: [
                         Expanded(
@@ -1059,9 +1043,11 @@ class _PosScreenState extends State<PosScreen> {
                               children: [
                                 Text('${qtyText(count)} productos · Ver carrito',
                                   maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12, color: Color(0xFFE3D6FF))),
+                                  style: t.textTheme.bodySmall?.copyWith(
+                                      color: t.colorScheme.onSurfaceVariant)),
                                 Text(money(totals.total, _cur),
-                                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Colors.white)),
+                                  style: t.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)),
                               ],
                             ),
                           ),
@@ -1071,8 +1057,8 @@ class _PosScreenState extends State<PosScreen> {
                           key: const ValueKey('retail-pos-charge'),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 50),
-                            backgroundColor: const Color(0xFF9658FA),
-                            foregroundColor: Colors.white,
+                            backgroundColor: t.colorScheme.primary,
+                            foregroundColor: t.colorScheme.onPrimary,
                           ),
                           onPressed: _charging || _savingOrder || _chargeRequestId != null
                               ? null : _reviewRetailCart,

@@ -1,8 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:facturavoz/ui/retail_visual.dart';
+import 'package:facturavoz/ui/theme.dart';
 
 void main() {
+  for (final brightness in [Brightness.light, Brightness.dark]) {
+    testWidgets('Retail surfaces respect ${brightness.name} theme without gradients', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(brightness),
+        home: Scaffold(body: Builder(builder: (context) => Center(
+          child: RetailVisual.hero(
+            context: context,
+            eyebrow: 'Caja · Hoy',
+            title: 'Control de caja',
+            subtitle: 'Movimientos reales del negocio',
+            icon: Icons.account_balance_wallet_rounded,
+            footer: Row(children: [
+              Expanded(child: RetailVisual.microStat('Ventas del día', 'S/ 100')),
+              const SizedBox(width: 12),
+              Expanded(child: RetailVisual.microStat('Operaciones', '3 ventas')),
+            ]),
+          ),
+        ))),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Control de caja'), findsOneWidget);
+      expect(find.text('Ventas del día'), findsOneWidget);
+      expect(find.text('S/ 100'), findsOneWidget);
+      expect(find.text('3 ventas'), findsOneWidget);
+      final expected = brightness == Brightness.dark ? DsColors.dark : DsColors.light;
+      final title = tester.widget<Text>(find.text('Control de caja'));
+      expect(title.style?.color, expected.ink);
+      final subtitle = tester.widget<Text>(find.text('Movimientos reales del negocio'));
+      expect(subtitle.style?.color, expected.muted);
+      final decorated = tester.widgetList<Container>(find.byType(Container))
+          .where((w) => w.decoration is BoxDecoration)
+          .map((w) => w.decoration! as BoxDecoration).toList();
+      expect(decorated.any((d) => d.color == expected.surface && d.gradient == null), isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final width in [320.0, 600.0]) {
     for (final scale in [1.0, 1.4]) {
       testWidgets('Retail UI fits narrow screens and large text', (tester) async {
@@ -44,7 +82,15 @@ void main() {
         ));
         await tester.pumpAndSettle();
         expect(find.text('Recibe mercadería'), findsOneWidget);
-        expect(find.text('PASO 3 DE 4'), findsOneWidget);
+        // En 320 px y fuente grande, el ListView construye la etapa 3
+        // solo al desplazarla a pantalla; no es un error de renderizado.
+        await tester.scrollUntilVisible(
+          find.text('Paso 3 de 4'),
+          170,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Paso 3 de 4'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }

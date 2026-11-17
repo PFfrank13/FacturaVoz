@@ -10,6 +10,7 @@ import '../services/repo.dart';
 import '../services/retail_purchase.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/theme.dart';
 import 'pos_payment_logic.dart';
 import 'products.dart';
 import 'retail_settlements.dart';
@@ -313,21 +314,9 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     final products = (_products ?? const <Product>[])
         .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
         .toList();
-    return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: RetailVisual.navy,
-        colorScheme: ColorScheme.fromSeed(seedColor: RetailVisual.violet, brightness: Brightness.dark),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true, fillColor: RetailVisual.surface,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF4B4C80))),
-        ),
-      ),
-      child: Scaffold(
-      backgroundColor: RetailVisual.navy,
+    // Tema global: compras no fuerza modo oscuro ni colores privados.
+    return Scaffold(
       appBar: AppBar(
-        backgroundColor: RetailVisual.navy,
         title: const Text('Compras y recepción', style: TextStyle(fontWeight: FontWeight.w900)),
         actions: [
           IconButton(
@@ -376,7 +365,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                   children: [
                     RetailVisual.hero(
                        context: context,
-                       eyebrow: 'Plan Básico · Compras',
+                       eyebrow: 'Compras · Recepción',
                        title: 'Recibe mercadería',
                        subtitle: 'Registra proveedor, cantidades y costos reales. El stock se actualiza al confirmar.',
                        icon: Icons.local_shipping_rounded,
@@ -412,7 +401,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     if (products.isEmpty)
                       const Padding(padding: EdgeInsets.all(12), child: Text('No se encontraron productos. Agrégalos al catálogo.')),
                     for (final p in products.take(40))
-                      Card(color: RetailVisual.surface,
+                      Card(
                         margin: const EdgeInsets.symmetric(vertical: 3),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15),
                           side: const BorderSide(color: Color(0xFF474777))),
@@ -454,11 +443,11 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                           ),
                         ),
                       RetailVisual.panel(context, child: Row(children: [
-                         const Expanded(child: Text('TOTAL DE COMPRA', style: TextStyle(
-                           color: Color(0xFFBDB3E0), fontWeight: FontWeight.w800, fontSize: 11))),
+                         Expanded(child: Text('TOTAL DE COMPRA', style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                           color: DsColors.of(context).muted, fontWeight: FontWeight.w800))),
                          Flexible(child: Text(money(_total / 100, _currency),
-                           textAlign: TextAlign.end, style: const TextStyle(
-                             color: Color(0xFF6FEBD4), fontWeight: FontWeight.w900, fontSize: 19))),
+                           textAlign: TextAlign.end, style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                             color: DsColors.of(context).ink, fontWeight: FontWeight.w800))),
                        ])),
                     ],
                     const SizedBox(height: 20),
@@ -486,7 +475,8 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     SizedBox(width: double.infinity, height: 54, child: FilledButton.icon(
                        key: const ValueKey('purchase-confirm-receipt'),
                        style: FilledButton.styleFrom(
-                         backgroundColor: RetailVisual.violet, foregroundColor: Colors.white,
+                         backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                        onPressed: _saving || _lines.isEmpty || _total <= 0 ? null : _submit,
                        icon: Icon(_saving ? Icons.hourglass_top_rounded : Icons.inventory_rounded),
@@ -518,6 +508,6 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                       )),
                   ],
                 ),
-    ));
+    );
   }
 }
