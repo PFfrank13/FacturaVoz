@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../access.dart';
+import '../permissions.dart';
 import '../ui/theme.dart';
 import 'catalog.dart';
 
@@ -77,8 +78,12 @@ class _RetailPlanDashboard extends StatelessWidget {
     final pos = featureById('pos');
     List<({ _RetailAction action, FeatureEntry feature })> allowed(List<_RetailAction> actions) => [
       for (final action in actions)
-        if (featureById(action.id) case final f? when f.allowed)
-          (action: action, feature: f),
+        // El catálogo legado no exige permiso explícito para Comprobantes
+        // ni Comisiones. No ofrecer accesos que el rol no puede operar.
+        if ((action.id != 'comprobantes' || a.allows('sales.read')) &&
+            (action.id != 'comisiones' || a.can('sell') || a.can('finance')))
+          if (featureById(action.id) case final f? when f.allowed)
+            (action: action, feature: f),
     ];
     final common = allowed(_common);
     final premium = basic ? <({ _RetailAction action, FeatureEntry feature })>[] : allowed(_extra);
