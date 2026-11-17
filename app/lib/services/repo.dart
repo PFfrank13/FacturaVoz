@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../errors.dart';
+import '../logic/financial_intent.dart';
 import '../logic/idempotent.dart';
 import '../models.dart';
 
@@ -232,14 +234,63 @@ class Repo {
   }
 
 
-  /// Inserta una fila con id generado aquí y reintenta con el mismo id si la red falla (ver logic/idempotent.dart).
-  static Future<void> insertOnce(String table, Map<String, dynamic> row) {
-    final r = {...row, 'id': row['id'] ?? newRequestId()};
-    return runIdempotent(
-      () => _db.from(table).insert(r),
-      isDuplicate: (e) => e is PostgrestException && e.code == '23505',
-      isTransient: (e) => e is! PostgrestException && e is! AuthException,
+  static bool _isDuplicate(Object e) => e is PostgrestException && e.code == '23505';
+  static bool _isTransient(Object e) => e is! PostgrestException && e is! AuthException && e is! AppException;
+
+  /// Intentos financieros guardados en el teléfono hasta conocer su estado final (logic/financial_intent.dart).
+  static final financialIntents = FinancialIntents(_SecureIntentStorage());
+
+  /// Registra un cobro, abono o movimiento de caja EXACTAMENTE una vez, aunque falle la red, se cierre la app o el
+  /// usuario lo repita. [target] = objetivo lógico (misma factura, mismo cliente, misma caja): mientras un intento
+  /// previo para ese objetivo no esté confirmado, no se crea otro.
+  static Future<void> insertOnce(String table, Map<String, dynamic> row, {required String target}) async {
+    final org = row['org_id'] as String?;
+    final user = _db.auth.currentUser?.id;
+    if (org == null || user == null) throw AppException('Tu sesión o empresa no está lista. Vuelve a intentarlo.');
+    final outcome = await financialIntents.record(
+      orgId: org,
+      userId: user,
+      table: table,
+      target: target,
+      row: row,
+      newId: newRequestId,
+      send: (t, r) => runIdempotent(() => _db.from(t).insert(r), isDuplicate: _isDuplicate, isTransient: _isTransient),
+      exists: (t, id) async => (await _db.from(t).select('id').eq('id', id).maybeSingle()) != null,
+      isDuplicate: _isDuplicate,
+      isTransient: _isTransient,
     );
+    if (outcome == IntentOutcome.previousConfirmed) {
+      throw AppException('La operación anterior SÍ se registró. No se creó otra para no duplicarla: revisa el historial y, si de verdad hace falta otra, repítela.');
+    }
+  }
+
+  /// Intentos sin confirmar de esta empresa (para mostrar "Pendiente de confirmar" y resolverlos al reconectar).
+  static Future<List<FinancialIntent>> pendingFinancial() async {
+    final org = activeOrgId;
+    final user = _db.auth.currentUser?.id;
+    if (org == null || user == null) return const [];
+    return financialIntents.list(user, org);
+  }
+
+  /// Resuelve los intentos pendientes (al volver la conexión): comprueba en el servidor y reenvía con el MISMO id.
+  static Future<int> resolvePendingFinancial() async {
+    var done = 0;
+    for (final i in await pendingFinancial()) {
+      try {
+        if (await financialIntents.resolve(i,
+            send: (t, r) => runIdempotent(() => _db.from(t).insert(r), isDuplicate: _isDuplicate, isTransient: _isTransient),
+            exists: (t, id) async => (await _db.from(t).select('id').eq('id', id).maybeSingle()) != null,
+            isDuplicate: _isDuplicate,
+            isTransient: _isTransient)) {
+          done++;
+        }
+      } on IntentUnknown {
+        break; // sigue sin conexión
+      } catch (_) {
+        // rechazado por la base: el intento se descartó (definitivo)
+      }
+    }
+    return done;
   }
 
   /// UUIDv4 generated with a cryptographic source. Reuse this ID on every retry.
@@ -440,7 +491,7 @@ class Repo {
   }) async {
     final org = activeOrgId;
     final inv = await _db.from('invoices').select('org_id').eq('id', invoiceId).single();
-    await insertOnce('payments', {
+    await insertOnce(target: 'invoice:$invoiceId', 'payments', {
       'org_id': (inv['org_id'] as String?) ?? org,
       'invoice_id': invoiceId,
       'user_id': _uid,
@@ -514,4 +565,16 @@ class Repo {
       await _db.auth.signOut(scope: SignOutScope.local);
     } catch (_) {}
   }
+}
+
+
+/// Almacén cifrado del teléfono (mismo mecanismo que el cobro pendiente del POS).
+class _SecureIntentStorage implements IntentStorage {
+  static const _s = FlutterSecureStorage(aOptions: AndroidOptions(encryptedSharedPreferences: true));
+  @override
+  Future<String?> read(String key) => _s.read(key: key);
+  @override
+  Future<void> write(String key, String value) => _s.write(key: key, value: value);
+  @override
+  Future<void> delete(String key) => _s.delete(key: key);
 }
