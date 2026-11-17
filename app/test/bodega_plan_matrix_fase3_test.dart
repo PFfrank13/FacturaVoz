@@ -1,4 +1,5 @@
 import 'package:facturavoz/access.dart';
+import 'package:facturavoz/permissions.dart';
 import 'package:facturavoz/screens/retail_basic_modules.dart';
 import 'package:facturavoz/screens/shell.dart' show bodegaDrawerIds;
 import 'package:facturavoz/ui/theme.dart';
@@ -102,6 +103,10 @@ void main() {
         expect(find.text('FacturaVoz · Plan ${plan == 'PRO' ? 'Pro' : 'Empresa'}'), findsOneWidget);
         expect(find.byKey(const ValueKey('retail-module-pos')), findsOneWidget);
         expect(find.byKey(const ValueKey('retail-plan-modules')), findsOneWidget);
+        // Pro/Empresa no pierden acceso al historial ni a los reportes.
+        expect(find.byKey(const ValueKey('retail-module-reportes')), findsOneWidget);
+        expect(find.byKey(const ValueKey('retail-module-clientes')), findsOneWidget);
+        expect(find.byKey(const ValueKey('retail-plan-premium')), findsOneWidget);
         expect(find.text('Nueva venta'), findsOneWidget);
         expect(find.text('Ver todas'), findsNothing);
         expect(find.text('Todas mis funciones'), findsNothing);
@@ -111,6 +116,34 @@ void main() {
       });
     }
   }
+
+  test('Matriz completa de seis roles: planes no alteran permisos del usuario', () {
+    const roles = ['owner', 'admin', 'finanzas', 'cajero', 'vendedor', 'tecnico'];
+    const core = {'facturar', 'cobros', 'clientes', 'stock', 'fiados', 'caja', 'reportes'};
+    const premium = {'cotizaciones', 'precios', 'comisiones', 'recurrentes'};
+    for (final plan in ['BASICO', 'PRO', 'EMPRESA']) {
+      final has = (String feature) => core.contains(feature) ||
+          (plan != 'BASICO' && premium.contains(feature));
+      for (final role in roles) {
+        final m = previewPermissions(role, has);
+        expect(m.allowed.toSet().intersection(m.denied.toSet()), isEmpty,
+            reason: '$plan / $role no puede duplicar permisos contradictorios');
+        if (role == 'tecnico') {
+          expect(m.denied, containsAll(['Registrar ventas', 'Registrar cobros']));
+        }
+        if (role == 'cajero') {
+          expect(m.allowed, containsAll(['Registrar ventas', 'Abrir caja']));
+          expect(m.denied, contains('Ver ganancia y márgenes'));
+        }
+        if (role == 'admin') {
+          expect(m.denied, contains('Pagar o cambiar el plan'));
+        }
+        if (role == 'owner') {
+          expect(m.allowed, contains('Pagar o cambiar el plan'));
+        }
+      }
+    }
+  });
 
   testWidgets('Sin licencia verificada no existe tablero ni acceso operativo', (tester) async {
     final a = Access.instance;
