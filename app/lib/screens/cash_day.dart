@@ -19,6 +19,7 @@ import '../ui/ds.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import 'client_profile.dart' show shortDateTime;
+import 'pos_payment_logic.dart' show parsePosCents;
 
 class CashDayScreen extends StatefulWidget {
   const CashDayScreen({super.key, this.embedded = false});
@@ -155,12 +156,11 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
         ],
       ),
     );
-    final a = parseDecimal(amount.text);
+    final cents = parsePosCents(amount.text);
     final n = note.text;
     disposeAfterClose([amount, note]);
     if (ok != true || !_canCommit(ticket, day)) return;
-    if (a == null || !a.isFinite || a <= 0 ||
-        ((a * 100) - (a * 100).round()).abs() > 0.00001) {
+    if (cents == null || cents <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Ingresa un importe válido, mayor que cero y con máximo dos decimales.'),
       ));
@@ -169,7 +169,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     setState(() => _busy = true);
     try {
       if (!_canCommit(ticket, day)) return;
-      await V2Repo.addCashMove(kind: kind, amount: a, note: n);
+      await V2Repo.addCashMove(kind: kind, amount: cents / 100, note: n);
       if (!_canCommit(ticket, day)) return;
       showSuccess(context, 'Movimiento guardado');
       await _load();
