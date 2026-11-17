@@ -145,6 +145,23 @@ void main() {
     }
   });
 
+  testWidgets('Un técnico no recibe atajos financieros aunque Empresa los contrate', (tester) async {
+    final a = Access.instance;
+    a.license = _lic('EMPRESA', extras: true, copilot: true);
+    a.role = 'tecnico';
+    a.isAdmin = false;
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: SingleChildScrollView(child: RetailPlanModules())),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('retail-module-pos')), findsNothing);
+    expect(find.byKey(const ValueKey('retail-module-comprobantes')), findsNothing);
+    expect(find.byKey(const ValueKey('retail-module-reportes')), findsNothing);
+    expect(find.byKey(const ValueKey('retail-extra-comisiones')), findsNothing);
+    expect(find.byIcon(Icons.lock_rounded), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Sin licencia verificada no existe tablero ni acceso operativo', (tester) async {
     final a = Access.instance;
     a.licenseCheckedOnline = false;
