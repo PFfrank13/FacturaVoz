@@ -772,7 +772,44 @@ class _PosScreenState extends State<PosScreen> {
       }
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is AppException ? e.message : 'Cobro sin confirmar. Reintenta con el mismo método; si el servidor ya lo registró no creará una venta duplicada. ${friendly(e)}')));
+      // PostgreSQL 22023 from our stock guard is a definite ROLLBACK, not an
+      // uncertain network failure. Allow the cashier to correct the cart
+      // instead of locking the immutable retry key indefinitely.
+      if (isConfirmedStockRejection(e) &&
+          _pendingCheckout != null &&
+          operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+              Supabase.instance.client.auth.currentUser?.id)) {
+        final rejected = _pendingCheckout!;
+        try {
+          await PendingCheckoutStore.clear(rejected);
+          if (!mounted || !operationScope.permitsMutation(dataScope.value,
+              Repo.activeOrgId, Supabase.instance.client.auth.currentUser?.id)) {
+            return;
+          }
+          setState(() {
+            _pendingCheckout = null;
+            _chargeRequestId = null;
+            _chargeMethod = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(friendly(e)),
+          ));
+        } catch (_) {
+          // Fail closed: if secure storage is unavailable the immutable
+          // request remains recoverable, never issue another sale blindly.
+          if (mounted && operationScope.permitsMutation(dataScope.value,
+              Repo.activeOrgId, Supabase.instance.client.auth.currentUser?.id)) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('La venta fue rechazada por stock. No se pudo liberar la recuperación local; vuelve a abrir la caja para revisar el cobro pendiente.'),
+            ));
+          }
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e is AppException ? e.message
+              : 'Cobro sin confirmar. Reintenta con el mismo método; si el servidor ya lo registró no creará una venta duplicada. ${friendly(e)}'),
+        ));
+      }
     } finally {
       if (mounted) setState(() => _charging = false);
     }
