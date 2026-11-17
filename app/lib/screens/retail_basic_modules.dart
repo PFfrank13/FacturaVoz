@@ -1,17 +1,49 @@
 import 'package:flutter/material.dart';
 
 import '../access.dart';
+import '../permissions.dart';
+import '../ui/theme.dart';
 import 'catalog.dart';
 
-/// Inicio operativo de Bodega Básico. La navegación principal está exclusivamente
-/// en el NavigationDrawer del MainShell; aquí solo hay acciones directas de trabajo.
-/// Ningún acceso aparece si no está autorizado por el Hub y el rol del usuario.
+/// Entrada histórica para Básico: mantiene el contrato de navegación y tests.
+/// No dibuja nada para Pro, Empresa o licencias no verificadas.
 class RetailBasicModules extends StatelessWidget {
   const RetailBasicModules({super.key});
 
-  static const _actions = <({String id, String label, String detail, IconData icon})>[
+  @override
+  Widget build(BuildContext context) =>
+      Access.instance.license.plan == 'BASICO'
+          ? const _RetailPlanDashboard(basic: true)
+          : const SizedBox.shrink();
+}
+
+/// El mismo diseño operativo para Pro y Empresa. La elección de accesos
+/// se basa SOLO en funciones concedidas por Hub y permisos reales del rol.
+class RetailPlanModules extends StatelessWidget {
+  const RetailPlanModules({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      Access.instance.license.plan != 'BASICO'
+          ? const _RetailPlanDashboard(basic: false)
+          : const SizedBox.shrink();
+}
+
+typedef _RetailAction = ({
+  String id,
+  String label,
+  String detail,
+  IconData icon,
+});
+
+class _RetailPlanDashboard extends StatelessWidget {
+  const _RetailPlanDashboard({required this.basic});
+
+  final bool basic;
+
+  static const _common = <_RetailAction>[
     (id: 'comprobantes', label: 'Comprobantes',
-      detail: 'Emitidos e historial', icon: Icons.receipt_long_rounded),
+      detail: 'Historial y emisión', icon: Icons.receipt_long_rounded),
     (id: 'compras', label: 'Compras',
       detail: 'Recibir mercadería', icon: Icons.local_shipping_rounded),
     (id: 'reportes', label: 'Reportes',
@@ -20,123 +52,163 @@ class RetailBasicModules extends StatelessWidget {
       detail: 'Historial de compras', icon: Icons.people_alt_rounded),
   ];
 
+  static const _extra = <_RetailAction>[
+    (id: 'cotizaciones', label: 'Cotizaciones',
+      detail: 'Presupuestos y pedidos', icon: Icons.request_quote_rounded),
+    (id: 'precios', label: 'Promociones',
+      detail: 'Ofertas y descuentos', icon: Icons.local_offer_rounded),
+    (id: 'recurrentes', label: 'Recurrentes',
+      detail: 'Facturación periódica', icon: Icons.event_repeat_rounded),
+    (id: 'comisiones', label: 'Comisiones',
+      detail: 'Ventas por vendedor', icon: Icons.emoji_events_rounded),
+    (id: 'tienda', label: 'Tienda en línea',
+      detail: 'Catálogo y pedidos', icon: Icons.storefront_rounded),
+    (id: 'clientes360', label: 'Análisis de clientes',
+      detail: 'Actividad y segmentos', icon: Icons.insights_rounded),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final a = Access.instance;
-    if (a.rubro != 'bodega' || a.license.plan != 'BASICO') {
+    if (a.rubro != 'bodega' || !a.licenseReady ||
+        (basic && a.license.plan != 'BASICO') ||
+        (!basic && a.license.plan == 'BASICO')) {
       return const SizedBox.shrink();
     }
     final pos = featureById('pos');
-    final actions = [
-      for (final action in _actions)
-        if (featureById(action.id) case final f? when f.allowed)
-          (action: action, feature: f),
+    List<({ _RetailAction action, FeatureEntry feature })> allowed(List<_RetailAction> actions) => [
+      for (final action in actions)
+        // El catálogo legado no exige permiso explícito para Comprobantes
+        // ni Comisiones. No ofrecer accesos que el rol no puede operar.
+        if ((action.id != 'comprobantes' || a.allows('sales.read')) &&
+            (action.id != 'comisiones' || a.can('sell') || a.can('finance')))
+          if (featureById(action.id) case final f? when f.allowed)
+            (action: action, feature: f),
     ];
-    final t = Theme.of(context);
-    final dark = t.brightness == Brightness.dark;
-    final foreground = t.colorScheme.onSurface;
-    final subtle = t.colorScheme.onSurfaceVariant;
-    const accent = Color(0xFF6366F1);
+    final common = allowed(_common);
+    final premium = basic ? <({ _RetailAction action, FeatureEntry feature })>[] : allowed(_extra);
+    // Las cuatro funciones operativas no desaparecen al contratar Pro/Empresa.
+    // Las herramientas adicionales viven en un carrusel discreto, no en otro menú.
+    final actions = common.take(4).toList();
+    final theme = Theme.of(context);
+    final colors = DsColors.of(context);
+    final title = switch (a.license.plan) {
+      'BASICO' => 'Básico',
+      'PRO' => 'Pro',
+      'EMPRESA' => 'Empresa',
+      final other => other,
+    };
+    final compactWidth = MediaQuery.sizeOf(context).width < 370;
+    final foreground = theme.colorScheme.onPrimary;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 44, height: 44,
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: dark ? .20 : .10),
-              borderRadius: BorderRadius.circular(14),
+              color: colors.elevated,
+              borderRadius: BorderRadius.circular(Radii.md),
             ),
-            child: const Icon(Icons.storefront_rounded, color: accent, size: 24),
+            child: Icon(Icons.storefront_rounded, color: colors.primaryText, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: Gap.md),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Tu bodega, en control',
-              style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -.5)),
-            const SizedBox(height: 2),
-            Text('FacturaVoz · Plan Básico', style: t.textTheme.bodySmall?.copyWith(color: subtle)),
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: colors.ink, fontWeight: FontWeight.w800, letterSpacing: -.4)),
+            const SizedBox(height: Gap.xs),
+            Text('FacturaVoz · Plan $title',
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
           ])),
         ]),
         if (pos != null && pos.allowed) ...[
           const SizedBox(height: 20),
           Material(
-            color: accent,
-            borderRadius: BorderRadius.circular(17),
+            color: colors.primary,
+            borderRadius: BorderRadius.circular(Radii.lg),
             child: InkWell(
               key: const ValueKey('retail-module-pos'),
-              borderRadius: BorderRadius.circular(17),
+              borderRadius: BorderRadius.circular(Radii.lg),
               onTap: () => openFeature(context, pos),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
                 child: Row(children: [
                   Container(
-                    height: 47, width: 47,
+                    height: 46, width: 46,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(13),
-                      color: Colors.white.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      color: foreground.withValues(alpha: .15),
                     ),
-                    child: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 26),
+                    child: Icon(Icons.point_of_sale_rounded, color: foreground, size: 25),
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Nueva venta', style: TextStyle(color: Colors.white,
-                      fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -.3)),
-                    SizedBox(height: 3),
-                    Text('Escanea, cobra y registra en un solo flujo',
-                      style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 12)),
+                  const SizedBox(width: Gap.md),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Nueva venta', style: theme.textTheme.titleMedium?.copyWith(
+                      color: foreground, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: Gap.xs),
+                    Text(compactWidth ? 'Escanea, cobra y registra' :
+                      'Escanea, cobra y registra en un solo flujo',
+                      style: theme.textTheme.bodySmall?.copyWith(color: foreground.withValues(alpha: .90))),
                   ])),
-                  const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                  Icon(Icons.arrow_forward_rounded, color: foreground),
                 ]),
               ),
             ),
           ),
         ],
         if (actions.isNotEmpty) ...[
-          const SizedBox(height: 25),
-          Text('Acciones rápidas', style: t.textTheme.titleMedium?.copyWith(
-            color: foreground, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('Operaciones frecuentes, sin menús intermedios',
-            style: t.textTheme.bodySmall?.copyWith(color: subtle)),
-          const SizedBox(height: 13),
-          LayoutBuilder(builder: (context, c) {
-            final columns = c.maxWidth >= 720 ? 4 : (c.maxWidth >= 480 ? 3 : 2);
+          const SizedBox(height: 24),
+          Text('Acciones rápidas',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colors.ink, fontWeight: FontWeight.w800)),
+          const SizedBox(height: Gap.xs),
+          Text('Operaciones frecuentes del negocio',
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+          const SizedBox(height: Gap.md),
+          LayoutBuilder(builder: (context, layout) {
+            final columns = layout.maxWidth >= 720 ? 4
+                : (layout.maxWidth >= 480 ? 3 : 2);
+            final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
             return GridView.builder(
-              key: const ValueKey('retail-basic-modules'),
+              key: ValueKey(basic ? 'retail-basic-modules' : 'retail-plan-modules'),
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: actions.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                mainAxisExtent: 124,
+                mainAxisExtent: largeText ? 152 : 124,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
-              itemBuilder: (context, index) {
-                final entry = actions[index];
+              itemBuilder: (context, i) {
+                final entry = actions[i];
                 return Material(
-                  color: t.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(15),
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(Radii.md),
                   child: InkWell(
                     key: ValueKey('retail-module-${entry.action.id}'),
-                    borderRadius: BorderRadius.circular(15),
                     onTap: () => openFeature(context, entry.feature),
+                    borderRadius: BorderRadius.circular(Radii.md),
                     child: Container(
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: dark ? Colors.white12 : const Color(0xFFE3E7EF)),
+                        borderRadius: BorderRadius.circular(Radii.md),
+                        border: Border.all(color: colors.line),
                       ),
-                      padding: const EdgeInsets.all(13),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Icon(entry.action.icon, color: accent, size: 24),
+                        Icon(entry.action.icon, color: colors.primaryText, size: 23),
                         const Spacer(),
-                        Text(entry.action.label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 2),
-                        Text(entry.action.detail, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.bodySmall?.copyWith(color: subtle, fontSize: 11)),
+                        Text(entry.action.label, maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: colors.ink, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: Gap.xs),
+                        Text(entry.action.detail, maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.muted, fontSize: 11)),
                       ]),
                     ),
                   ),
@@ -144,6 +216,63 @@ class RetailBasicModules extends StatelessWidget {
               },
             );
           }),
+        ],
+        if (premium.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text('Herramientas de tu plan',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colors.ink, fontWeight: FontWeight.w800)),
+          const SizedBox(height: Gap.xs),
+          Text('Funciones adicionales incluidas en tu licencia',
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+          const SizedBox(height: Gap.md),
+          SizedBox(
+            height: MediaQuery.textScalerOf(context).scale(1) > 1.25 ? 168 : 142,
+            child: ListView.separated(
+              key: const ValueKey('retail-plan-premium'),
+              scrollDirection: Axis.horizontal,
+              itemCount: premium.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                final entry = premium[i];
+                return SizedBox(
+                  width: 174,
+                  child: Material(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(Radii.md),
+                    child: InkWell(
+                      key: ValueKey('retail-extra-${entry.action.id}'),
+                      onTap: () => openFeature(context, entry.feature),
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      child: Container(
+                        padding: const EdgeInsets.all(13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(Radii.md),
+                          border: Border.all(color: colors.line),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(entry.action.icon, color: colors.primaryText, size: 23),
+                            const Spacer(),
+                            Text(entry.action.label, maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: colors.ink, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: Gap.xs),
+                            Text(entry.action.detail, maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.muted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ]),
     );

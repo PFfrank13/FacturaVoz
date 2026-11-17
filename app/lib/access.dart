@@ -133,7 +133,13 @@ class Access extends ChangeNotifier {
   /// Rubro de la empresa activa (lo fija la estructura principal al leer los ajustes).
   String? rubro;
 
-  bool has(String feature) => licenseReady && planHas(license, feature, rubro: rubro);
+  // Nunca presentar Copiloto en Bodega Básico, aunque una licencia antigua del Hub
+  // entregue por error el flag. Es una restricción visual adicional, no un grant.
+  bool has(String feature) =>
+      licenseReady &&
+      !(rubro == 'bodega' && license.plan == 'BASICO' &&
+          (feature == 'copiloto' || feature == 'copiloto_agente')) &&
+      planHas(license, feature, rubro: rubro);
   int limit(String feature) => licenseReady ? planLimit(license, feature) : 0;
   int _generation = 0;
 

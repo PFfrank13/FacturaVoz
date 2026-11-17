@@ -90,7 +90,8 @@ bool _destAllowed(String id, Access a) => switch (id) {
       'collect' => a.can('collect') && a.has('cobros'),
       'fiados' => a.can('collect') && a.has('fiados'),
       'cash' => a.can('collect') && a.has('caja'),
-      'stock' => a.has('stock'),
+      'stock' => a.has('stock') && (a.rubro != 'bodega' ||
+          a.can('sell') || a.can('products_edit')),
       'business' => a.can('finance') && a.has('reportes'),
       'jobs' => a.can('jobs') && a.has('trabajos'),
       'agenda' => a.can('jobs') && a.has('agenda'),
