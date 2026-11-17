@@ -22,7 +22,7 @@ class ReleasePreflightTests(unittest.TestCase):
         (self.project / "android/app/src/main").mkdir(parents=True)
         (self.project / "pubspec.yaml").write_text("name: facturavoz\nversion: 3.3.0+8\n", encoding="utf-8")
         (self.project / "android/app/build.gradle.kts").write_text(
-            'val hasReleaseSigning = true\napplicationId = "dev.solvexsoftware.facturavoz"\n'
+            'val hasSafeReleaseSigning = true\napplicationId = "dev.solvexsoftware.facturavoz"\n'
             'signingConfig = signingConfigs.getByName("release")\n',
             encoding="utf-8",
         )
@@ -104,7 +104,7 @@ class ReleasePreflightTests(unittest.TestCase):
     def test_debug_signing_or_wrong_app_id_fails_source_gate(self):
         gradle = self.project / "android/app/build.gradle.kts"
         gradle.write_text('applicationId = "com.example.demo"\n'
-                          'val hasReleaseSigning = true\n'
+                          'val hasSafeReleaseSigning = true\n'
                           'signingConfig = signingConfigs.getByName("debug")\n', encoding="utf-8")
         problems = source_errors(self.project)
         self.assertTrue(any("applicationId" in p for p in problems))
