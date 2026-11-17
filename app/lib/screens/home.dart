@@ -609,11 +609,14 @@ class HomeHeader extends StatelessWidget {
     this.todayCount,
     this.onMenu,
     this.onSale,
+    this.compact = false,
   });
   final double? todayTotal;
   final int? todayCount;
   final VoidCallback? onMenu;
   final VoidCallback? onSale;
+  /// Compacta el resumen de ventas bajo el único AppBar del shell de Bodega.
+  final bool compact;
   final String name;
   final String currency;
   final double total;
@@ -630,7 +633,7 @@ class HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
+    final top = compact ? 0.0 : MediaQuery.of(context).padding.top;
     final sym = currencySymbols[currency] ?? currency;
     String fmt(double v) {
       final parts = v.toStringAsFixed(2).split('.');
@@ -640,10 +643,12 @@ class HomeHeader extends StatelessWidget {
     final g = goal == null || goal! <= 0 ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
     final white85 = Colors.white.withValues(alpha: 0.85);
     return Aurora(
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(40)),
+      borderRadius: compact ? BorderRadius.circular(22) : const BorderRadius.vertical(bottom: Radius.circular(40)),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(24, top + 12, 24, 26),
+        padding: compact ? const EdgeInsets.fromLTRB(20, 18, 20, 22)
+            : EdgeInsets.fromLTRB(24, top + 12, 24, 26),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (!compact) ...[
           Reveal(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               // Fila 1: saludo (todo el ancho que sobra) + buscar + perfil. Nunca se aprieta el saludo.
@@ -706,6 +711,7 @@ class HomeHeader extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 22),
+          ],
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(
               child: !showMonth ? const SizedBox.shrink() : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
