@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Detectar y proponer parches del backend automáticamente cuando upstream
+  # publique una versión segura. Nunca actualizar lockfile a ciegas en main.
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 5
