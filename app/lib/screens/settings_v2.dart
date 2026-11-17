@@ -18,7 +18,6 @@ import '../ui/widgets.dart';
 import 'branding.dart';
 import 'catalog.dart';
 import 'license_gate.dart';
-import 'menu.dart' show upgradeLabel;
 import 'owner_control.dart';
 import 'rubro_picker.dart';
 import 'team.dart';
@@ -328,6 +327,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 padding: EdgeInsets.zero,
                 child: Column(children: [
                   for (final e in allModules.entries)
+                    if (featureCatalog().any((f) => f.allowed && (f.module == e.key || f.id == e.key)))
                     SwitchListTile(
                       value: s.shows(e.key),
                       onChanged: (v) => _toggle(e.key, v),
@@ -525,7 +525,7 @@ class _JobFlowScreenState extends State<JobFlowScreen> {
 
 /// Ajustes → Seguridad (E): alertas del dueño, bitácora, PIN, papelera y bloqueo con huella en un solo lugar.
 void showSecuritySheet(BuildContext context) {
-  final items = [for (final id in const ['alertas', 'bitacora', 'pin', 'papelera', 'seguridad']) if (featureById(id) case final f? when f.roleOk) f];
+  final items = [for (final id in const ['alertas', 'bitacora', 'pin', 'papelera', 'seguridad']) if (featureById(id) case final f? when f.allowed) f];
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -533,16 +533,12 @@ void showSecuritySheet(BuildContext context) {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         for (final f in items)
           ListTile(
-            leading: Icon(f.planOk ? f.icon : Icons.lock_rounded),
+            leading: Icon(f.icon),
             title: Text(f.title),
-            subtitle: Text(f.planOk ? f.subtitle : upgradeLabel(f)),
+            subtitle: Text(f.subtitle),
             onTap: () {
               Navigator.pop(c);
-              if (f.planOk) {
-                openFeature(context, f);
-              } else {
-                pushPremium(context, const PlanScreen());
-              }
+              if (f.allowed) openFeature(context, f);
             },
           ),
       ]),
