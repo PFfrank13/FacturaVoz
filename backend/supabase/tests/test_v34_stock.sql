@@ -4,8 +4,10 @@ insert into auth.users(id,email) values ('11111111-1111-1111-1111-111111111111',
 select org_id as org from public.organization_members where user_id='11111111-1111-1111-1111-111111111111' \gset
 select org_id as org2 from public.organization_members where user_id='22222222-2222-2222-2222-222222222222' \gset
 -- For this test company the business rule is strict Bodega/Tienda stock.
-update public.org_settings set business_type='bodega' where org_id=:'org';
-update public.org_settings set business_type='salon' where org_id=:'org2';
+insert into public.org_settings(org_id,business_type) values (:'org','bodega')
+  on conflict (org_id) do update set business_type = excluded.business_type;
+insert into public.org_settings(org_id,business_type) values (:'org2','salon')
+  on conflict (org_id) do update set business_type = excluded.business_type;
 create or replace function pg_temp.chk(p_name text, p_ok boolean) returns void language plpgsql as $$
 begin if not coalesce(p_ok,false) then raise exception 'FALLO: %', p_name; end if; raise notice 'ok: %', p_name; end $$;
 set role authenticated;
