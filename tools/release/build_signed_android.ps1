@@ -3,6 +3,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$DefinesFile,
+    [Parameter(Mandatory = $true)][string]$ExpectedSignerSha256,
     [switch]$InstallOnDevice
 )
 $ErrorActionPreference = 'Stop'
@@ -39,8 +40,9 @@ $buildTools = @(Get-ChildItem (Join-Path $androidSdk 'build-tools') -Directory |
 if ($buildTools.Count -eq 0) { throw "Faltan Android SDK Build Tools." }
 $apksigner = Join-Path $buildTools[0].FullName 'apksigner.bat'
 if (-not (Test-Path $apksigner)) { throw "No se encontró apksigner.bat en Android SDK Build Tools." }
-if (-not (Get-Command jarsigner -ErrorAction SilentlyContinue)) {
-    throw "Instala un JDK con jarsigner y agrégalo a PATH."
+if (-not (Get-Command jarsigner -ErrorAction SilentlyContinue) -or
+    -not (Get-Command keytool -ErrorAction SilentlyContinue)) {
+    throw "Instala un JDK con jarsigner y keytool y agrégalo a PATH."
 }
 
 Push-Location $project
@@ -60,12 +62,40 @@ foreach ($artifact in @($apk, $aab)) {
     if (-not (Test-Path $artifact)) { throw "Falta el artefacto esperado: $artifact" }
     if ((Get-Item $artifact).Length -le 0) { throw "Artefacto de distribución vacío." }
 }
-# Comprobar firmas usando herramientas oficiales. No se pasa la contraseña a comandos.
-Run-Tool $apksigner @('verify', '--verbose', '--print-certs', $apk)
+# Comprobar validez criptográfica de ambas firmas y continuidad del
+# certificado autorizado. Ninguna contraseña se pasa a estos comandos.
+$apkVerify = & $apksigner 'verify' '--verbose' '--print-certs' $apk 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "La firma criptográfica del APK no pudo validarse."
+}
 $aabVerify = & jarsigner '-J-Duser.language=en' '-verify' $aab 2>&1
 if ($LASTEXITCODE -ne 0 -or (($aabVerify -join ' ') -notmatch 'jar verified')) {
     throw "La firma JAR del Android App Bundle no pudo validarse."
 }
+$aabCert = & keytool '-J-Duser.language=en' '-printcert' '-jarfile' $aab 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo extraer el certificado de firma del Android App Bundle."
+}
+$apkLog = Join-Path $project 'build/fase5-apk-signer.tmp'
+$aabLog = Join-Path $project 'build/fase5-aab-signer.tmp'
+$verifier = Join-Path $PSScriptRoot 'verify_certificate.py'
+try {
+    ($apkVerify -join [Environment]::NewLine) | Set-Content $apkLog -Encoding UTF8
+    ($aabCert -join [Environment]::NewLine) | Set-Content $aabLog -Encoding UTF8
+    $fingerprintArgs = @($verifier, '--expected', $ExpectedSignerSha256,
+                          '--apk-log', $apkLog, '--aab-log', $aabLog)
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3 @fingerprintArgs
+    } else {
+        & python @fingerprintArgs
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Firma válida, pero el certificado no coincide con el autorizado. Distribución bloqueada."
+    }
+} finally {
+    Remove-Item $apkLog, $aabLog -Force -ErrorAction SilentlyContinue
+}
+$approvedSigner = ($ExpectedSignerSha256 -replace ':', '').Trim().ToUpperInvariant()
 
 $versionLine = Get-Content (Join-Path $project 'pubspec.yaml') |
     Where-Object { $_ -match '^version:\s*\d+\.\d+\.\d+\+\d+' } | Select-Object -First 1
@@ -79,12 +109,14 @@ $releaseManifest = [ordered]@{
     aab_sha256 = (Get-FileHash $aab -Algorithm SHA256).Hash
     apk_signature_verified = $true
     aab_signature_verified = $true
+    signer_sha256 = $approvedSigner
+    signer_identity_approved = $true
     physical_tests_complete = $false
     sunat_live_verified = $false
 }
 $manifestPath = Join-Path $project 'build/fase5-release-evidence.json'
 $releaseManifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
-Write-Host "OK: APK y AAB firmados y firmas comprobadas. Evidencia: $manifestPath"
+Write-Host "OK: APK/AAB firmados; ambas firmas coinciden con la huella autorizada. Evidencia: $manifestPath"
 
 if ($InstallOnDevice) {
     if (-not (Get-Command adb -ErrorAction SilentlyContinue)) {

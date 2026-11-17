@@ -6,6 +6,12 @@ on:
       - 'app/lib/**'
       - 'app/integration_test/**'
       - 'app/pubspec.yaml'
+      # Security-sensitive native and release changes must be exercised on Android,
+      # not only Flutter widgets or generic CI.
+      - 'app/android/**'
+      - 'app/tool/**'
+      - 'tools/release/**'
+      - '.github/workflows/ci.yml'
       - '.github/workflows/android-bodega-emulator.yml'
   workflow_dispatch:
 

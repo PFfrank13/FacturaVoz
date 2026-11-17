@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import ipaddress
 import json
 import re
 import sys
@@ -76,18 +77,47 @@ def _public_jwt(value: str) -> bool:
 
 
 def _https_public(url: str) -> bool:
+    """Reject test, local and credential-bearing endpoints in distributed apps.
+
+    This checks URL syntax and obvious reserved/private destinations; it does
+    not claim DNS ownership, deployment health or TLS certificate verification.
+    """
     try:
+        if not isinstance(url, str) or url != url.strip() or any(ch.isspace() for ch in url):
+            return False
         parts = urlsplit(url)
-        host = (parts.hostname or "").lower()
-        return (
-            parts.scheme == "https" and bool(host) and "." in host
-            and not (parts.username or parts.password)
-            and host not in {"example.com", "example.vercel.app", "example.supabase.co"}
-            and not (host.startswith("example.") or host.endswith(".example")
-                     or host in {"localhost", "127.0.0.1"}
-                     or host.endswith(".local"))
+        host = (parts.hostname or "").lower().rstrip(".")
+        # No username, query tokens, fragments, cleartext or protocol-relative URLs.
+        if (parts.scheme != "https" or not parts.netloc or not host or
+                "@" in parts.netloc or parts.query or parts.fragment):
+            return False
+        port = parts.port  # raises ValueError on invalid ports
+        if port is not None and (port < 1 or port > 65535):
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            ip = None
+        if ip is not None:
+            return ip.is_global
+        if "." not in host or not all(
+            re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+            for label in host.split(".")
+        ):
+            return False
+        reserved_suffixes = (
+            "example", "example.com", "example.net", "example.org",
+            "test", "invalid", "localhost", "local", "internal", "home.arpa",
         )
-    except ValueError:
+        # Common SDK scaffolding values look public but never identify the
+        # customer's actual backend. Block them explicitly.
+        if host.startswith("example.") or host in {
+            "example.vercel.app", "example.supabase.co",
+        }:
+            return False
+        return not any(host == suffix or host.endswith("." + suffix)
+                       for suffix in reserved_suffixes)
+    except (ValueError, TypeError):
         return False
 
 

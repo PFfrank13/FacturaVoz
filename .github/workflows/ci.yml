@@ -78,6 +78,23 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Fase 5 - rechazar APK release sin firma privada en CI
+        shell: bash
+        run: |
+          set +e
+          flutter build apk --release --dart-define=SUPABASE_URL=https://example.supabase.co --dart-define=SUPABASE_ANON_KEY=ci --dart-define=API_BASE_URL=https://example.vercel.app > "$RUNNER_TEMP/fase5-unsigned-release.log" 2>&1
+          result=$?
+          set -e
+          if [ "$result" -eq 0 ]; then
+            echo "ERROR: Android permitió compilar release sin keystore privado."
+            exit 1
+          fi
+          if ! grep -q "Firma release bloqueada:" "$RUNNER_TEMP/fase5-unsigned-release.log"; then
+            echo "ERROR: El release falló por una causa distinta de la guarda de firma."
+            tail -n 60 "$RUNNER_TEMP/fase5-unsigned-release.log"
+            exit 1
+          fi
+          echo "OK: Gradle bloqueó expresamente la compilación release sin firma privada."
       - run: >
           flutter build web --release
           --dart-define=SUPABASE_URL=https://example.supabase.co
