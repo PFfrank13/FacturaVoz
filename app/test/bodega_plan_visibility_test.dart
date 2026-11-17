@@ -5,6 +5,8 @@ import 'package:facturavoz/access.dart';
 import 'package:facturavoz/screens/catalog.dart';
 import 'package:facturavoz/screens/home.dart' show CopilotCards;
 import 'package:facturavoz/screens/menu.dart';
+import 'package:facturavoz/screens/shell.dart' show bodegaDrawerIds;
+import 'package:facturavoz/screens/retail_basic_modules.dart';
 import 'package:facturavoz/screens/settings_v2.dart' show showSecuritySheet;
 
 void main() {
@@ -54,6 +56,34 @@ void main() {
     expect(featureById('agente')!.allowed, isFalse);
     expect(featureById('productos')!.allowed, isFalse);
     expect(featureById('fiados')!.allowed, isFalse);
+  });
+
+  test('El Drawer no muestra módulos fuera del plan ni Copiloto en Básico', () {
+    final a = Access.instance;
+    expect(bodegaDrawerIds(a), ['home', 'sell', 'cash', 'settings']);
+    a.license = const LicenseInfo(
+      source: 'hub', mode: 'full', status: 'activa', activated: true,
+      enforced: true, plan: 'BASICO',
+      features: {
+        'facturar': true, 'caja': true, 'fiados': true, 'stock': true,
+        'voz': true, 'copiloto': false,
+      },
+    );
+    expect(bodegaDrawerIds(a), [
+      'home', 'sell', 'fiados', 'cash', 'stock', 'settings',
+    ]);
+  });
+
+  testWidgets('Inicio Básico elimina Ver todas y Más herramientas', (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: SingleChildScrollView(child: RetailBasicModules())),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('retail-module-pos')), findsOneWidget);
+    expect(find.text('Ver todas'), findsNothing);
+    expect(find.text('Más herramientas'), findsNothing);
+    expect(find.text('Nueva venta'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('El menú Básico no muestra candados, Copiloto ni upsell', (tester) async {
