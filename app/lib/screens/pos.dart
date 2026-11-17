@@ -983,10 +983,10 @@ class _PosScreenState extends State<PosScreen> {
                                                     alignment: Alignment.center,
                                                     child: retail
                                                         ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                                            Icon(placeholderIcon, size: 42, color: const Color(0xFFB49BFF)),
+                                                            Icon(placeholderIcon, size: 42, color: t.colorScheme.primary),
                                                             const SizedBox(height: 7),
-                                                            const Text('Foto por añadir', style: TextStyle(
-                                                              fontSize: 10, color: Color(0xFFB7B1CE))),
+                                                            Text('Foto por añadir', style: t.textTheme.labelSmall?.copyWith(
+                                                              color: t.colorScheme.onSurfaceVariant)),
                                                           ])
                                                         : em == null
                                                             ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
@@ -1001,7 +1001,7 @@ class _PosScreenState extends State<PosScreen> {
                                               child: Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                 decoration: BoxDecoration(color: t.colorScheme.primary, borderRadius: BorderRadius.circular(Radii.pill)),
-                                                child: Text(qtyText(n), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w800)),
+                                                child: Text(qtyText(n), style: TextStyle(fontFamily: 'Inter', color: t.colorScheme.onPrimary, fontWeight: FontWeight.w800)),
                                               ),
                                             ),
                                           if (p.tracksStock && (p.stock ?? 0) <= 0)
@@ -1028,10 +1028,10 @@ class _PosScreenState extends State<PosScreen> {
                   if (retail && widget.embedded && lines.isNotEmpty)
                     Container(
                       key: const ValueKey('retail-pos-checkout-bar'),
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 94),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF1B214A),
-                        border: Border(top: BorderSide(color: Color(0xFF57418E))),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      decoration: BoxDecoration(
+                        color: t.colorScheme.surface,
+                        border: Border(top: BorderSide(color: t.colorScheme.outline)),
                       ),
                       child: Row(children: [
                         Expanded(
@@ -1043,9 +1043,11 @@ class _PosScreenState extends State<PosScreen> {
                               children: [
                                 Text('${qtyText(count)} productos · Ver carrito',
                                   maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12, color: Color(0xFFE3D6FF))),
+                                  style: t.textTheme.bodySmall?.copyWith(
+                                      color: t.colorScheme.onSurfaceVariant)),
                                 Text(money(totals.total, _cur),
-                                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Colors.white)),
+                                  style: t.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)),
                               ],
                             ),
                           ),
@@ -1055,8 +1057,8 @@ class _PosScreenState extends State<PosScreen> {
                           key: const ValueKey('retail-pos-charge'),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 50),
-                            backgroundColor: const Color(0xFF9658FA),
-                            foregroundColor: Colors.white,
+                            backgroundColor: t.colorScheme.primary,
+                            foregroundColor: t.colorScheme.onPrimary,
                           ),
                           onPressed: _charging || _savingOrder || _chargeRequestId != null
                               ? null : _reviewRetailCart,
