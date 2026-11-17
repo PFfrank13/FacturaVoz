@@ -820,12 +820,8 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final retail = Access.instance.rubro == 'bodega';
-    final t = retail
-        ? ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF9658FA), brightness: Brightness.dark),
-            scaffoldBackgroundColor: const Color(0xFF0B1030),
-          )
-        : Theme.of(context);
+    // El POS no redefine el tema del usuario: se integra al unico shell.
+    final t = Theme.of(context);
     final all = _products ?? const <Product>[];
     final cats = {for (final x in _extra.values) if ((x['category'] ?? '').toString().isNotEmpty) x['category'].toString()}.toList()..sort();
     final q = _q.text.trim().toLowerCase();
@@ -847,10 +843,8 @@ class _PosScreenState extends State<PosScreen> {
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
     return Theme(data: t, child: Scaffold(
-      backgroundColor: retail ? const Color(0xFF0B1030) : null,
       appBar: widget.embedded ? null : AppBar(
         title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'),
-        backgroundColor: retail ? const Color(0xFF0B1030) : null,
         actions: actions,
       ),
       body: (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
@@ -891,24 +885,14 @@ class _PosScreenState extends State<PosScreen> {
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
                       child: RetailVisual.journey(step: 1, label: 'Elegir productos'),
                     ),
-                  if (retail && Access.instance.license.plan == 'BASICO')
+
+                  if (widget.embedded && actions.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
-                      child: Center(child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFF5530A0), Color(0xFF7D4DD7)]),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: const Color(0xFFB49AFF)),
-                        ),
-                        child: const Text('Plan Básico · Bodega / Tienda',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-                      )),
-                    ),
-                  if (widget.embedded)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 8, 8, 0),
-                      child: Row(children: [Expanded(child: Text(_restaurant ? 'Tomar pedido' : 'Vender', style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), ...actions]),
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+                      ),
                     ),
                   if (_restaurant)
                     Padding(
