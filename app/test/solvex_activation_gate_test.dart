@@ -38,15 +38,15 @@ void main() {
     expect(planHas(const LicenseInfo(enforced: true, source: 'hub', mode: 'blocked', features: {'stock': true}), 'stock'), isFalse);
   });
 
-  test('modo local verificado mantiene permisos por plan y no habilita Pro', () {
+  test('v3.4: una licencia local ya no concede NADA, aunque diga full', () {
     const license = LicenseInfo(
       enforced: true, source: 'local', mode: 'full', plan: 'BASICO',
       features: {'stock': true, 'fiados': true, 'caja': true, 'copiloto': false, 'max_users': 1},
     );
-    expect(planHas(license, 'stock'), isTrue);
-    expect(planHas(license, 'fiados'), isTrue);
-    expect(planHas(license, 'copiloto'), isFalse);
-    expect(planLimit(license, 'max_users'), 1);
+    for (final k in ['stock', 'fiados', 'caja', 'facturar']) {
+      expect(planHas(license, k), isFalse, reason: k);
+    }
+    expect(planLimit(license, 'max_users'), 0);
     expect(planHas(const LicenseInfo(enforced: true, source: 'local', mode: 'blocked', features: {'stock': true}), 'stock'), isFalse);
     expect(planHas(const LicenseInfo(enforced: true, source: 'local', mode: 'full', stale: true, features: {'stock': true}), 'stock'), isFalse);
   });

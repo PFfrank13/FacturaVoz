@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../access.dart';
 import '../app_state.dart';
+import '../rubros.dart' show planName;
 import '../services/repo.dart';
 import '../services/v2_api.dart';
 import '../ui/motion.dart';
@@ -62,6 +63,39 @@ Future<void> openPayUrl(BuildContext context, String url) async {
   }
 }
 
+/// Cambio de plan (orden de producción §10): confirmar la intención antes de ir a pagar. El plan nuevo NO se
+/// activa por volver del navegador: lo activa Solvex Hub (webhook/sincronización) y la app lo lee de la base.
+Future<void> confirmPlanChange(BuildContext context, String plan, String payUrl) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text('Cambiar a ${planName(plan)}'),
+      content: Text('Te llevamos a la página de pago de tu licencia en Solvex. Indica allí que quieres el plan ${planName(plan)}.\n\n'
+          'Las funciones nuevas aparecerán cuando Solvex Hub confirme el pago (puedes tocar "Comprobar con Solvex Hub" en Mi plan).'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ir a pagar')),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) await openPayUrl(context, payUrl);
+}
+
+/// Motivo exacto por el que la empresa no puede operar (Prompt de producción §3: sin mensajes genéricos).
+String licenseBlockReason(Access a, [String hub = '']) {
+  final l = a.license;
+  final parts = <String>[
+    if (a.licenseError != null) a.licenseError!
+    else if (l.reconciling) 'Tu licencia anterior está en verificación con Solvex Hub.'
+    else if (!l.activated) 'Falta activar el código de licencia de esta empresa.'
+    else if (l.stale) 'La licencia guardada venció y no se pudo renovar desde Solvex Hub.'
+    else if (l.mode == 'blocked') 'Solvex Hub indica que el plan está ${l.status.isEmpty ? 'inactivo' : l.status}.'
+    else if (l.mode == 'restricted') 'Plan en modo solo lectura (${l.status}). Solo el propietario o administrador puede entrar.',
+    if (hub.isNotEmpty) hub,
+  ];
+  return parts.isEmpty ? 'No se pudo confirmar la licencia.' : parts.join(' ');
+}
+
 /// Tras iniciar sesión, el propietario introduce la licencia entregada por Solvex.
 /// La pantalla nunca confía en la clave: el backend valida firma, empresa y plan.
 class LicenseGateScreen extends StatefulWidget {
@@ -100,13 +134,20 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     }
   }
 
+  /// Consulta Solvex Hub a través del backend y luego relee la licencia que aplicó la base.
+  /// Siempre muestra el motivo exacto si no hay acceso (nunca un mensaje genérico).
   Future<void> _refresh() async {
     setState(() { _busy = true; _error = ''; });
+    String hub = '';
+    try {
+      final r = await V2Api.refreshLicense();
+      hub = r.message;
+    } catch (e) {
+      hub = e.toString().replaceFirst('AppException: ', '');
+    }
     try {
       await Access.instance.load();
-      if (mounted && !Access.instance.canEnter) {
-        setState(() => _error = 'Todavía no vemos una licencia activa para esta empresa.');
-      }
+      if (mounted && !Access.instance.canEnter) setState(() => _error = licenseBlockReason(Access.instance, hub));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -118,8 +159,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     final a = Access.instance;
     final l = a.license;
     final org = Repo.activeOrgId;
-    final localDevelopment = l.source == 'local';
-    final pending = !localDevelopment && (!l.enforced || l.dev || l.source != 'hub' || l.status == 'pendiente');
+    final pending = !l.enforced || l.dev || l.source != 'hub' || l.status == 'pendiente';
     return Scaffold(
       body: SafeArea(child: Center(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -132,17 +172,17 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
               child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 48),
             )),
             const SizedBox(height: 20),
-            Text(localDevelopment ? 'Comprobar acceso local' : pending ? 'Activa tu FacturaVoz' : 'Tu licencia requiere atención',
+            Text(l.reconciling ? 'Estamos verificando tu licencia' : pending ? 'Activa tu FacturaVoz' : 'Tu licencia requiere atención',
               style: t.textTheme.headlineSmall, textAlign: TextAlign.center),
             const SizedBox(height: 9),
-            Text(localDevelopment
-              ? 'La empresa usa el Plan Básico de desarrollo. No necesita un código del Hub. Revisa tu conexión y vuelve a comprobar el acceso en línea.'
+            Text(l.reconciling
+              ? 'Tu empresa pasa a la licencia oficial de Solvex Hub. Toca "Comprobar con Solvex Hub": si tu licencia ya está asignada, se activa sola; si no, introduce el código que te dio Solvex.'
               : pending
                 ? 'Cuenta creada correctamente. Para empezar a vender, introduce la licencia asignada a tu negocio.'
                 : (l.message.isNotEmpty ? l.message : 'Tu plan no está activo. Puedes renovarlo o introducir un código actualizado.'),
               style: t.textTheme.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 24),
-            if (org != null && !localDevelopment) ...[
+            if (org != null) ...[
               Text('Identificador de tu empresa', style: t.textTheme.labelLarge),
               const SizedBox(height: 7),
               OutlinedButton.icon(
@@ -162,7 +202,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                 style: t.textTheme.bodySmall),
             ],
             const SizedBox(height: 20),
-            if (!localDevelopment && a.isAdmin) ...[
+            if (a.isAdmin) ...[
               TextField(
                 controller: _key, enabled: !_busy, obscureText: _hide,
                 autocorrect: false, enableSuggestions: false,
@@ -191,7 +231,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                 TextButton.icon(onPressed: () => openPayUrl(context, l.payUrl),
                   icon: const Icon(Icons.payments_rounded), label: const Text('Renovar mi plan')),
               ],
-            ] else if (!localDevelopment)
+            ] else
               const SoftCard(child: Text('Pídele al propietario o administrador de esta empresa que active la licencia.')),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -208,7 +248,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
             ],
             const SizedBox(height: 12),
             OutlinedButton.icon(onPressed: _busy ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded), label: Text(localDevelopment ? 'Reintentar acceso al Plan Básico' : 'Ya activé: comprobar licencia')),
+              icon: const Icon(Icons.refresh_rounded), label: const Text('Comprobar con Solvex Hub')),
             if (AppState.instance.orgs.length > 1)
               TextButton.icon(onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const OrgsScreen())),
@@ -333,12 +373,10 @@ class _PlanScreenState extends State<PlanScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(l.source == 'local' ? 'Plan ${l.plan} · Local' : l.dev ? 'Pendiente de activación' : 'Plan ${l.plan}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text(l.dev || !l.activated ? 'Pendiente de activación' : 'Plan ${planName(l.plan)}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(
-                      l.source == 'local'
-                          ? 'Desarrollo independiente · funciones del plan habilitadas para pruebas'
-                          : l.dev
+                      l.dev || !l.activated
                               ? 'Activación de la licencia pendiente.'
                               : [
                               if (l.isTrial) 'Prueba gratis' else 'Estado: ${l.status}',
@@ -354,7 +392,7 @@ class _PlanScreenState extends State<PlanScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              if (l.source != 'local' && a.allows('subscription.manage') && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
+              if (a.allows('subscription.manage') && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
               const SizedBox(height: 18),
               const SectionTitle('Incluido en tu plan'),
               SoftCard(
@@ -367,17 +405,16 @@ class _PlanScreenState extends State<PlanScreen> {
               PlanCompare(
                 rubro: a.rubro,
                 currentPlan: l.plan,
-                onChoose: l.source != 'local' && a.allows('subscription.manage') && l.payUrl.isNotEmpty ? (_) => openPayUrl(context, l.payUrl) : null,
+                onChoose: a.allows('subscription.manage') && l.payUrl.isNotEmpty ? (plan) => confirmPlanChange(context, plan, l.payUrl) : null,
               ),
               if (!a.allows('subscription.manage')) ...[
                 const SizedBox(height: 8),
                 Text('Solo el propietario de la empresa puede cambiar o pagar el plan.', style: t.textTheme.bodySmall, textAlign: TextAlign.center),
               ],
               const SizedBox(height: 18),
-              SectionTitle(l.source == 'local' ? 'Modo de desarrollo' : 'Gestión de tu suscripción'),
-              SoftCard(child: Text(l.source == 'local'
-                ? 'Esta empresa usa temporalmente planes locales. Solo se muestran las funciones de su plan y se mantienen los permisos de usuario, la seguridad y la separación de empresas. No requiere activación comercial durante el desarrollo.'
-                : 'Las funciones y los límites dependen de la licencia activa. Para ampliar el plan, contacta con el proveedor.',
+              const SectionTitle('Gestión de tu suscripción'),
+              const SoftCard(child: Text(
+                'Las funciones y los límites los fija tu licencia de Solvex Hub. Un plan nuevo se activa solo cuando Solvex Hub confirma el pago; volver del navegador no cambia nada por sí solo.',
               )),
               const SizedBox(height: 14),
               Text('Tu rol en esta empresa: ${a.roleLabel}.', style: t.textTheme.bodySmall, textAlign: TextAlign.center),
