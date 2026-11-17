@@ -82,10 +82,9 @@ class _RetailPlanDashboard extends StatelessWidget {
     ];
     final common = allowed(_common);
     final premium = basic ? <({ _RetailAction action, FeatureEntry feature })>[] : allowed(_extra);
-    // Cuatro operaciones por pantalla como máximo; nada de un segundo menú masivo.
-    final actions = basic
-        ? common.take(4).toList()
-        : [...common.take(2), ...premium.take(2), ...common.skip(2)].take(4).toList();
+    // Las cuatro funciones operativas no desaparecen al contratar Pro/Empresa.
+    // Las herramientas adicionales viven en un carrusel discreto, no en otro menú.
+    final actions = common.take(4).toList();
     final theme = Theme.of(context);
     final colors = DsColors.of(context);
     final title = switch (a.license.plan) {
@@ -212,6 +211,63 @@ class _RetailPlanDashboard extends StatelessWidget {
               },
             );
           }),
+        ],
+        if (premium.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text('Herramientas de tu plan',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colors.ink, fontWeight: FontWeight.w800)),
+          const SizedBox(height: Gap.xs),
+          Text('Funciones adicionales incluidas en tu licencia',
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+          const SizedBox(height: Gap.md),
+          SizedBox(
+            height: MediaQuery.textScalerOf(context).scale(1) > 1.25 ? 168 : 142,
+            child: ListView.separated(
+              key: const ValueKey('retail-plan-premium'),
+              scrollDirection: Axis.horizontal,
+              itemCount: premium.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                final entry = premium[i];
+                return SizedBox(
+                  width: 174,
+                  child: Material(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(Radii.md),
+                    child: InkWell(
+                      key: ValueKey('retail-extra-${entry.action.id}'),
+                      onTap: () => openFeature(context, entry.feature),
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      child: Container(
+                        padding: const EdgeInsets.all(13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(Radii.md),
+                          border: Border.all(color: colors.line),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(entry.action.icon, color: colors.primaryText, size: 23),
+                            const Spacer(),
+                            Text(entry.action.label, maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: colors.ink, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: Gap.xs),
+                            Text(entry.action.detail, maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.muted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ]),
     );
