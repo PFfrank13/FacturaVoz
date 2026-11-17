@@ -1,0 +1,61 @@
+name: Android Bodega UI emulator
+
+on:
+  pull_request:
+    paths:
+      - 'app/lib/**'
+      - 'app/integration_test/**'
+      - 'app/pubspec.yaml'
+      - '.github/workflows/android-bodega-emulator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-bodega-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator-smoke:
+    name: Android emulator smoke (offline fixtures)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.9
+          channel: stable
+          cache: true
+      - name: Prepare Flutter Android project
+        working-directory: app
+        run: |
+          flutter create --org com.example --project-name facturavoz --platforms=android,ios,web .
+          dart run tool/post_create.dart
+          flutter pub get
+      - name: Enable KVM hardware acceleration
+        run: |
+          sudo chmod 666 /dev/kvm
+      - name: Run Bodega UI on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_4
+          disable-animations: true
+          emulator-options: '-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim'
+          script: >-
+            cd app &&
+            flutter test integration_test/bodega_emulator_smoke_test.dart
+            -d emulator-5554
+            --dart-define=SUPABASE_URL=https://example.supabase.co
+            --dart-define=SUPABASE_ANON_KEY=ci
+            --dart-define=API_BASE_URL=https://example.vercel.app
