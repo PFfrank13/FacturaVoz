@@ -62,6 +62,16 @@ void main() {
     ]);
   });
 
+  test('Los otros ocho rubros conservan la autorización previa del Hub', () {
+    final a = Access.instance;
+    a.license = _lic('BASICO', copilot: true);
+    a.rubro = 'mayorista';
+    expect(a.has('copiloto'), isTrue,
+        reason: 'La restricción comercial de Bodega no altera otros rubros');
+    a.rubro = 'bodega';
+    expect(a.has('copiloto'), isFalse);
+  });
+
   test('El Drawer se restringe al rol y contrato reales', () {
     final a = Access.instance;
     a.role = 'tecnico';
