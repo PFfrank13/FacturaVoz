@@ -7,9 +7,9 @@ export const maxDuration = 60;
 
 /**
  * Sincronización con Solvex Hub (Vercel Cron, 1 vez al día; el webhook cubre el tiempo real).
- *  - Sin Hub configurado → modo desarrollo: el control de licencias queda APAGADO (todo funciona, marcado "desarrollo").
- *  - Con Hub → enciende el control, trae el token de cada empresa (tolera webhooks perdidos), pide las pruebas
- *    gratis pendientes (empresas con RUC que aún usan la prueba local) y envía el "sigo vivo".
+ *  - Sin Hub configurado → 503: el control de licencias NUNCA se apaga (todas las empresas quedan bloqueadas).
+ *  - Con Hub → trae el token firmado de cada empresa (tolera webhooks perdidos), lo verifica (Ed25519, audiencia,
+ *    tenant) y lo aplica con license_sync_apply; envía el "sigo vivo".
  */
 export async function GET(req: Request) {
   if (!hasCronSecret(req)) return NextResponse.json({ error: "No autorizado (revisa CRON_SECRET)" }, { status: 401 });
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Solvex Hub no configurado; activación obligatoria" }, { status: 503 });
   }
 
-  const out = { applied: 0, stale: 0, unknown: 0, bad_tokens: 0, trials: 0, trials_used: 0, trial_errors: 0, error: "" };
+  const out = { applied: 0, reconciled: 0, stale: 0, unknown: 0, bad_tokens: 0, trials: 0, trials_used: 0, trial_errors: 0, error: "" };
   try {
     const { ok, bad } = await syncAll(cfg);
     out.bad_tokens = bad;
@@ -30,11 +30,10 @@ export async function GET(req: Request) {
         out.unknown++;
         continue;
       }
-      // Standalone development tenants must not be overwritten by external sync.
-      const { data: license } = await admin.from("org_licenses").select("source").eq("org_id", t.tenant).maybeSingle();
-      if (license?.source === "local") continue;
-      const { data } = await admin.rpc("license_apply", { p_org: t.tenant, p_payload: t.payload, p_token: t.token });
+      // v3.4: todas las empresas se sincronizan con el Hub (no hay excepción local).
+      const { data } = await admin.rpc("license_sync_apply", { p_org: t.tenant, p_payload: t.payload, p_token: t.token });
       if (data === "ok") out.applied++;
+      else if (data === "reconciled") { out.applied++; out.reconciled++; }
       else if (data === "stale") out.stale++;
       else out.unknown++;
     }

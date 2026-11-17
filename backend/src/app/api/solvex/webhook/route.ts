@@ -51,10 +51,9 @@ export async function POST(req: Request) {
     const payload = verifyToken(evt.data.token, await publicKeys(cfg), { audience: cfg.instanceId });
     const tenant = payload.tenant ?? (typeof evt.data.tenant_ref === "string" ? evt.data.tenant_ref : null);
     if (!isOrgId(tenant)) return json({ ok: true, ignored: "tenant" });
-    // Do not reactivate external license management on an opted-in local tenant.
-    const { data: license } = await admin.from("org_licenses").select("source").eq("org_id", tenant).maybeSingle();
-    if (license?.source === "local") return json({ ok: true, ignored: "standalone_tenant" });
-    const { data, error } = await admin.rpc("license_apply", { p_org: tenant, p_payload: payload, p_token: evt.data.token });
+    // v3.4: no existen licencias locales. license_sync_apply aplica el token verificado y, si la empresa venía del
+    // modo local heredado y el código firmado coincide, registra la activación (ver 20261209).
+    const { data, error } = await admin.rpc("license_sync_apply", { p_org: tenant, p_payload: payload, p_token: evt.data.token });
     if (error) throw new Error(error.code ?? "rpc");
     return json({ ok: true, result: data });
   } catch (e) {
