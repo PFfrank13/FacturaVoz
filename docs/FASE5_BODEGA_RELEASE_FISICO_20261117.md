@@ -34,13 +34,14 @@ No cambiar migraciones, RLS, licencias de Solvex Hub, planes comerciales ni los 
    }
    ```
    Los textos de ejemplo **no pasan** las comprobaciones reales. NUNCA incluir `service_role`, contraseñas, URL de base de datos, claves de Groq o secretos de infraestructura: los `dart-defines` se compilan en la app.
-5. Desde la raíz del repositorio, lanzar:
+5. Obtener y **verificar contra una fuente autorizada** la huella SHA-256 del certificado: desde el APK publicado previamente con `apksigner verify --print-certs APK_ANTERIOR.apk` o, para un lanzamiento por Google Play, desde el certificado de *upload key* mostrado en Play Console. Distinguir `app signing key` y `upload key` si se usa Play App Signing; el APK distribuido directamente debe usar la firma histórica que exige el dispositivo. En un primer lanzamiento, aprobar expresamente la nueva huella antes de compilar.
+6. Desde la raíz del repositorio, lanzar (sustituye la huella por la real, sin copiar una huella de prueba):
    ```powershell
-   powershell -ExecutionPolicy Bypass -File .\tools\release\build_signed_android.ps1 -DefinesFile .\app\dart_defines.json
+   powershell -ExecutionPolicy Bypass -File .\tools\release\build_signed_android.ps1 -DefinesFile .\app\dart_defines.json -ExpectedSignerSha256 "64_CARACTERES_HEX_DE_LA_HUELLA_APROBADA"
    ```
    Para instalar automáticamente en **un único teléfono ADB autorizado** usar además `-InstallOnDevice`. No conectarse a dispositivos no autorizados.
 
-El script ejecuta preflight, Flutter analyze/test, construye `app-release.apk` y `app-release.aab`, verifica la firma APK mediante `apksigner verify`, la firma del AAB mediante `jarsigner -verify`, y genera `app/build/fase5-release-evidence.json` con hashes SHA-256 y versión (no contiene contraseñas).
+El script ejecuta preflight, Flutter analyze/test, construye `app-release.apk` y `app-release.aab`, verifica criptográficamente el APK mediante `apksigner verify` y el AAB mediante `jarsigner -verify`. **Además compara la identidad SHA-256 de ambos certificados con la huella expresamente autorizada** mediante `keytool` y `verify_certificate.py`. Sin coincidencia, no instala ni genera la evidencia aprobatoria. Genera `app/build/fase5-release-evidence.json` con hashes SHA-256, versión y huella pública del firmante (no contiene contraseñas).
 
 **Importante:** una firma verificada es necesaria, pero no garantiza que el certificado sea el histórico correcto. Comparar el SHA-256 del certificado de firma con el del APK/AAB oficial anterior o la identidad de upload key de Play Console. Si no coincide, **detener actualización y distribución**. Para instalación directa, el APK debe estar firmado con el certificado que el dispositivo espera para actualizar la app.
 
@@ -64,7 +65,7 @@ En Bodega, el SQL actual **permite stock negativo** cuando se vende sin existenc
 ## D. Reglas de seguridad antes de publicar
 
 - Confirmar `npm audit --omit=dev` sin HIGH/CRITICAL y revisar alertas del resto de la cadena. La excepción temporal `picomatch` dev-only caduca el 31-12-2026 y **no** prueba que haya parche upstream.
-- Verificar versiones, APK/AAB, package ID `dev.solvexsoftware.facturavoz`, huella del certificado y checksum contra la lista de distribución.
+- Verificar versiones, APK/AAB, package ID `dev.solvexsoftware.facturavoz`, huella del certificado **contra un origen confiable, no solo contra la huella que genere el propio script** y checksum contra la lista de distribución. El CI también comprueba que Gradle rechace release sin claves reales.
 - Ejecutar pruebas de permisos Básico/Pro/Empresa y roles de Bodega sin dar acceso a Copiloto en Básico.
 - Mantener la nueva configuración de impresora por empresa. **Cada negocio debe elegir y probar de nuevo su ticketera una vez**; no se importan ajustes antiguos compartidos para evitar fugas de comprobantes.
 - No iniciar ventas reales, emitir en SUNAT producción o subir paquetes a Play Store sin cuentas, autorización, plan de rollback y evidencia firmada.
