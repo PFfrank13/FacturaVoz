@@ -122,7 +122,7 @@ void main() {
     const core = {'facturar', 'cobros', 'clientes', 'stock', 'fiados', 'caja', 'reportes'};
     const premium = {'cotizaciones', 'precios', 'comisiones', 'recurrentes'};
     for (final plan in ['BASICO', 'PRO', 'EMPRESA']) {
-      final has = (String feature) => core.contains(feature) ||
+      bool has(String feature) => core.contains(feature) ||
           (plan != 'BASICO' && premium.contains(feature));
       for (final role in roles) {
         final m = previewPermissions(role, has);
