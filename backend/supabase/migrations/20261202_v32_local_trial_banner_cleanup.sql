@@ -1,12 +1,5 @@
--- Standalone Bodega development: remove expired Hub trial copy.
--- Only modifies the single backed-up test company; production tenant guard stays enforced.
-begin;
-update public.org_licenses l set status='activa', period_end=null, grace_end=null, cut_at=null, auto_cut=false,
-  message='Plan Básico local de desarrollo; sin vencimiento comercial externo'
-from private.standalone_license_backups b
-join public.org_settings s on s.org_id=b.org_id
-where l.org_id=b.org_id and l.source='local' and l.plan='BASICO'
-  and s.business_type='bodega'
-  and (select count(*) from public.organizations)=1;
-commit;
-notify pgrst, 'reload schema';
+-- v3.4: RETIRADO del recorrido comercial (sin efecto). Antes quitaba el vencimiento de la licencia local de la
+-- única empresa de prueba (period_end/grace_end/cut_at = null, sin corte automático). En producción ya se aplicó como
+-- 20261108223858 "bodega_local_remove_stale_hub_trial_banner_20261108"; 20261209_v34_licencias_solo_hub.sql respalda
+-- y revierte ese estado hacia una licencia del Hub verificada.
+select 1;

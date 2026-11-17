@@ -14,9 +14,9 @@ echo "migraciones: OK ($(ls migrations/*.sql | wc -l) en orden)"
 fail=0
 # test_lic.sql y test_v31_planes.sql son anteriores a 20261124/20261125 (activación obligatoria y Hub manda):
 # sus expectativas ya no aplican; la cobertura vigente es test_hub_precedence.sql.
-for t in test_fase0 test_sunat test_crm test_roles test_mod1 test_mod2 test_v3_rubros test_v3_voz test_v3_rls_audit test_v33_idempotencia test_v33_suscripcion test_v33_rls_funciones test_hub_precedence; do
+for t in test_fase0 test_sunat test_crm test_roles test_mod1 test_mod2 test_v3_rubros test_v3_voz test_v3_rls_audit test_v33_idempotencia test_v33_suscripcion test_v33_rls_funciones test_v34_stock test_v34_licencias test_hub_precedence; do
   psql -q -c "drop database if exists fv_t" -c "create database fv_t template fv_base" >/dev/null
-  [ "$t" != test_hub_precedence ] && $P -d fv_t -f tests/local/01_licencia_hub_sintetica.sql >/dev/null
+  [ "$t" != test_hub_precedence ] && [ "$t" != test_v34_licencias ] && $P -d fv_t -f tests/local/01_licencia_hub_sintetica.sql >/dev/null
   if psql -q -d fv_t -v ON_ERROR_STOP=1 -f "tests/$t.sql" >/tmp/fv_$t.out 2>&1; then echo "PASA  $t"; else echo "FALLA $t"; grep -m1 ERROR /tmp/fv_$t.out; fail=1; fi
 done
 exit $fail

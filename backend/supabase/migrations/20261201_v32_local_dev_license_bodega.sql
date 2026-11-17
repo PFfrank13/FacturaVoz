@@ -1,3 +1,4 @@
+-- v3.4: sin efecto sobre datos (ver nota abajo). El efecto de función lo reemplaza 20261209.
 -- Independent, tenant-scoped development mode. Hub enforcement stays ON globally.
 -- A restorable snapshot is kept in private, with no API grants.
 begin;
@@ -50,20 +51,9 @@ begin
 end;
 $$;
 
--- Only the existing test bodega, never unrelated tenants.
-insert into private.standalone_license_backups(org_id,snapshot)
-select l.org_id,to_jsonb(l) from public.org_licenses l
-join public.org_settings s on s.org_id=l.org_id
-where s.business_type='bodega' and l.plan='BASICO' and l.source='hub'
-  and (select count(*) from public.organizations)=1
-on conflict(org_id) do nothing;
-
-update public.org_licenses l set
-  source='local', mode='full',
-  period_end=null, message='Plan Básico local de desarrollo (sin sincronización externa)',
-  auto_cut=false
-from private.standalone_license_backups b
-where b.org_id=l.org_id and l.source='hub' and l.plan='BASICO'
-  and (select count(*) from public.organizations)=1;
+-- v3.4: RETIRADO del recorrido comercial. Esta migración convertía una licencia Hub en licencia local permanente
+-- cuando existía una sola empresa. Las licencias locales ya no existen (20261209_v34_licencias_solo_hub.sql).
+-- En producción ya se aplicó como 20261108223032 "isolated_bodega_local_plan_20261108"; aquí queda sin efecto
+-- sobre datos para que una instalación nueva nunca otorgue acceso local.
 commit;
 notify pgrst, 'reload schema';
