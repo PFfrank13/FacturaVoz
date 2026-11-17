@@ -446,7 +446,9 @@ class _MainShellState extends State<MainShell> {
               ),
             ]),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-            floatingActionButton: isBodega && !keyboard && (canCopilot || canVoiceSell)
+            // Evitar que el micrófono cubra Cobrar en el POS o Abrir/Cerrar caja.
+            floatingActionButton: isBodega && !keyboard &&
+                _tab != 'sell' && _tab != 'cash' && (canCopilot || canVoiceSell)
                 ? Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
