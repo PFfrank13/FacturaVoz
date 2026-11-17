@@ -19,6 +19,8 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../logic/escpos.dart';
 import '../../models.dart';
+import '../repo.dart';
+import 'printer_scope.dart';
 import 'net_print_stub.dart' if (dart.library.io) 'net_print_io.dart';
 
 // ═════════════════════════ Configuración guardada en el teléfono ═════════════════════════
@@ -58,21 +60,32 @@ class PrinterConfig {
 }
 
 class PrinterStore {
-  static const _key = 'fv_printer_v2';
   static const _s = FlutterSecureStorage();
 
-  static Future<PrinterConfig> load({int? orgWidth}) async {
+  /// No tenant = PDF only. Legacy global printer settings are intentionally NOT
+  /// imported; that shared key could belong to another company on this phone.
+  static Future<PrinterConfig> load({int? orgWidth, String? orgId}) async {
+    final key = printerStorageKey(orgId ?? Repo.activeOrgId);
+    if (key == null) return PrinterConfig(width: orgWidth == 58 ? 58 : 80);
     try {
-      final raw = await _s.read(key: _key);
-      if (raw != null && raw.isNotEmpty) return PrinterConfig.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
-    } catch (_) {}
+      final raw = await _s.read(key: key);
+      if (raw != null && raw.isNotEmpty) {
+        return PrinterConfig.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      }
+    } catch (_) {
+      // Corrupt/unreadable settings must NOT fall back to a different tenant's
+      // printer. Default to a safe local PDF and require reconfiguration.
+    }
     return PrinterConfig(width: orgWidth == 58 ? 58 : 80);
   }
 
-  static Future<void> save(PrinterConfig c) async {
-    try {
-      await _s.write(key: _key, value: jsonEncode(c.toJson()));
-    } catch (_) {}
+  /// Persist before claiming the printer was configured; storage errors matter.
+  static Future<void> save(PrinterConfig c, {String? orgId}) async {
+    final key = printerStorageKey(orgId ?? Repo.activeOrgId);
+    if (key == null) {
+      throw StateError('Selecciona una empresa antes de configurar su impresora.');
+    }
+    await _s.write(key: key, value: jsonEncode(c.toJson()));
   }
 }
 
