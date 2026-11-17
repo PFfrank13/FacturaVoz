@@ -133,7 +133,7 @@ class Access extends ChangeNotifier {
   /// Rubro de la empresa activa (lo fija la estructura principal al leer los ajustes).
   String? rubro;
 
-  // Nunca presentar Copiloto en Básico, aunque una licencia antigua del Hub
+  // Nunca presentar Copiloto en Bodega Básico, aunque una licencia antigua del Hub
   // entregue por error el flag. Es una restricción visual adicional, no un grant.
   bool has(String feature) =>
       licenseReady &&
