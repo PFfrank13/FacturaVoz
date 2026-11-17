@@ -177,7 +177,7 @@ class _MainShellState extends State<MainShell> {
       case 'search':
         openUniversalSearch(context);
       case 'copilot':
-        openCopilot(context);
+        if (Access.instance.has('copiloto')) openCopilot(context);
       case 'fiados':
         final f = featureById('fiados');
         if (f != null && f.allowed) openFeature(context, f);
