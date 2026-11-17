@@ -28,7 +28,6 @@ import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'invoice_detail.dart';
 import 'role_home.dart';
 import 'retail_basic_modules.dart';
-import 'menu.dart';
 import 'jobs.dart' show JobDetailScreen, showJobForm;
 import 'new_invoice.dart' show NewInvoiceScreen;
 import '../nav/navigation_contract.dart';
