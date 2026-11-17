@@ -18,7 +18,9 @@ import '../ui/retail_visual.dart';
 import 'client_profile.dart' show shortDateTime;
 
 class CashDayScreen extends StatefulWidget {
-  const CashDayScreen({super.key});
+  const CashDayScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<CashDayScreen> createState() => _CashDayScreenState();
@@ -259,7 +261,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     final s = _sum;
     final isToday = _day == todayIso();
     return Scaffold(
-      appBar: AppBar(title: const Text('Caja del día'), actions: [
+      appBar: widget.embedded ? null : AppBar(title: const Text('Caja del día'), actions: [
         TextButton.icon(onPressed: _pickDay, icon: const Icon(Icons.calendar_today_rounded, size: 18), label: Text(isToday ? 'Hoy' : displayDate(_day))),
       ]),
       // Acción principal SIEMPRE visible (Prompt §11/§12): abrir caja si aún no hay apertura; si no, cerrar con arqueo.

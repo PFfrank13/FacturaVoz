@@ -112,7 +112,9 @@ class _ProductPickerState extends State<_ProductPicker> {
 
 /// Catálogo de la empresa activa: crear, editar, archivar y borrar.
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -750,7 +752,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final q = _q.trim().toLowerCase();
     final list = (all ?? const <Product>[]).where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Productos y servicios'), actions: [
+      appBar: widget.embedded ? null : AppBar(title: const Text('Productos y servicios'), actions: [
         if (Access.instance.has('stock') && Access.instance.can('products_edit'))
           IconButton(
             tooltip: 'Compras y recepción', icon: const Icon(Icons.local_shipping_outlined),
@@ -760,7 +762,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             },
           ),
       ]),
-      floatingActionButton: _canManageProducts
+      floatingActionButton: !widget.embedded && _canManageProducts
           ? FloatingActionButton.extended(
               onPressed: () => _edit(),
               icon: const Icon(Icons.add_rounded),
@@ -774,6 +776,19 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
+            if (widget.embedded && _canManageProducts) ...[
+              FilledButton.icon(
+                key: const ValueKey('bodega-new-product'),
+                onPressed: () => _edit(),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Agregar producto'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
             SectorPhotoBanner(rubro: Access.instance.rubro,
               title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
             const SizedBox(height: 16),

@@ -20,7 +20,9 @@ import 'trash.dart';
 String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
 
 class FiadosScreen extends StatefulWidget {
-  const FiadosScreen({super.key});
+  const FiadosScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<FiadosScreen> createState() => _FiadosScreenState();
@@ -104,8 +106,8 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
     final total = (_list ?? const <CreditBalance>[]).fold(0.0, (s, b) => s + (b.balance > 0 ? b.balance : 0));
     final today = todayIso();
     return Scaffold(
-      appBar: AppBar(title: const Text('Fiados')),
-      floatingActionButton: FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.add_rounded), label: const Text('Anotar fiado')),
+      appBar: widget.embedded ? null : AppBar(title: const Text('Fiados')),
+      floatingActionButton: widget.embedded ? null : FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.add_rounded), label: const Text('Anotar fiado')),
       body: _error != null
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : _list == null

@@ -27,7 +27,7 @@ import 'goal_sheet.dart';
 import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'invoice_detail.dart';
 import 'role_home.dart';
-import 'menu.dart';
+import 'retail_basic_modules.dart';
 import 'jobs.dart' show JobDetailScreen, showJobForm;
 import 'new_invoice.dart' show NewInvoiceScreen;
 import '../nav/navigation_contract.dart';
@@ -249,6 +249,8 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final a = Access.instance;
     final spec = rubroFor(a.rubro);
     final guide = experienceFor(spec?.id);
+    final isBodega = a.rubro == 'bodega';
+    final isBodegaBasic = isBodega && a.license.plan == 'BASICO';
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final seeMoney = a.can('finance') || a.can('collect');
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
@@ -265,7 +267,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
         edgeOffset: 140,
         child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
           SliverToBoxAdapter(
-            child: HomeHeader(
+            child: Padding(
+              padding: isBodega
+                  ? const EdgeInsets.fromLTRB(16, 12, 16, 0)
+                  : EdgeInsets.zero,
+              child: HomeHeader(
+              compact: isBodega,
               name: AppState.instance.activeOrg?.name ?? '',
               currency: cur,
               total: seeMoney ? monthTotal : 0,
@@ -279,13 +286,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               onGoal: () => _setGoal(monthTotal),
               todayTotal: seeMoney && _today != null ? todayTotal : null,
               todayCount: todayCount,
-              onMenu: () => pushPremium(context, const MenuScreen()),
-              onSale: a.rubro == 'bodega' && a.can('sell') && a.has('facturar')
-                  ? () {
-                      final pos = featureById('pos');
-                      if (pos != null && pos.allowed) openFeature(context, pos);
-                    }
-                  : null,
+              // La navegación y las acciones de voz viven únicamente en MainShell.
+              onMenu: null,
+              onSale: null,
+              ),
             ),
           ),
           if (_primary(a) case final p?)
@@ -305,7 +309,11 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
             ),
-          if (spec != null)
+          // Para Bodega Básico se muestra el tablero operativo real; antes estaba conectado
+          // únicamente al HomeScreen heredado y nunca aparecía en el Inicio de producción.
+          if (isBodegaBasic)
+            const SliverToBoxAdapter(child: RetailBasicModules())
+          else if (spec != null)
             SliverToBoxAdapter(
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: SectorPhotoBanner(
@@ -314,10 +322,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   subtitle: guide.homeSubtitle,
                 )),
             ),
-          // Inicio por rol (motor rubro × plan × rol). Reemplaza el tablero Básico de bodega y el carrusel de accesos.
+          // Conservar las métricas, tareas pendientes y avisos de operaciones no confirmadas,
+          // pero sin duplicar el menú de accesos del tablero específico de Bodega Básico.
           SliverToBoxAdapter(
             child: RoleHomePanel(
               key: ValueKey('role-home-${Repo.activeOrgId}-${a.role}-${a.license.plan}'),
+              showLinks: !isBodegaBasic,
               exclude: {if (a.rubro == 'bodega' || primaryActionFor(a.rubro)?.featureId == 'pos') 'sell_cta'},
             ),
           ),

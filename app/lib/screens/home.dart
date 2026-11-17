@@ -410,13 +410,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         colors: const [Color(0xFFB58BF5), Color(0xFF8E5CF2)],
                         onTap: () => _push(const RecurringScreen()),
                       ),
-                      QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
+                      if (Access.instance.has('copiloto'))
+                        QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
                     ],
                   ),
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
+            if (Access.instance.has('copiloto'))
+              SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
@@ -607,11 +609,14 @@ class HomeHeader extends StatelessWidget {
     this.todayCount,
     this.onMenu,
     this.onSale,
+    this.compact = false,
   });
   final double? todayTotal;
   final int? todayCount;
   final VoidCallback? onMenu;
   final VoidCallback? onSale;
+  /// Compacta el resumen de ventas bajo el único AppBar del shell de Bodega.
+  final bool compact;
   final String name;
   final String currency;
   final double total;
@@ -628,7 +633,7 @@ class HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
+    final top = compact ? 0.0 : MediaQuery.of(context).padding.top;
     final sym = currencySymbols[currency] ?? currency;
     String fmt(double v) {
       final parts = v.toStringAsFixed(2).split('.');
@@ -638,10 +643,12 @@ class HomeHeader extends StatelessWidget {
     final g = goal == null || goal! <= 0 ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
     final white85 = Colors.white.withValues(alpha: 0.85);
     return Aurora(
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(40)),
+      borderRadius: compact ? BorderRadius.circular(22) : const BorderRadius.vertical(bottom: Radius.circular(40)),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(24, top + 12, 24, 26),
+        padding: compact ? const EdgeInsets.fromLTRB(20, 18, 20, 22)
+            : EdgeInsets.fromLTRB(24, top + 12, 24, 26),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (!compact) ...[
           Reveal(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               // Fila 1: saludo (todo el ancho que sobra) + buscar + perfil. Nunca se aprieta el saludo.
@@ -704,6 +711,7 @@ class HomeHeader extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 22),
+          ],
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(
               child: !showMonth ? const SizedBox.shrink() : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -982,6 +990,8 @@ class CopilotCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final a = Access.instance;
+    // No mostrar ni promocionar el Copiloto dentro del flujo operativo Básico.
+    if (!a.has('copiloto')) return const SizedBox.shrink();
     final org = AppState.instance.activeOrg?.name ?? 'tu negocio';
     final cards = <Widget>[
       if (a.has('copiloto'))

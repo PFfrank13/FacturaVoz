@@ -28,6 +28,7 @@ import 'kitchen.dart';
 import 'license_gate.dart';
 import 'new_invoice.dart';
 import 'pos.dart';
+import 'products.dart';
 import 'profit.dart';
 import 'quotes.dart';
 import 'rubro_picker.dart';
@@ -62,6 +63,10 @@ const _dBusiness = _Dest('business', Icons.insights_rounded, 'Negocio', 'Mi nego
 const _dSettings = _Dest('settings', Icons.settings_rounded, 'Ajustes', 'Ajustes');
 const _dJobs = _Dest('jobs', Icons.assignment_rounded, 'Trabajos', 'Mis trabajos');
 const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda');
+const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
+const _dCash = _Dest('cash', Icons.account_balance_wallet_rounded, 'Caja', 'Caja');
+const _dStock = _Dest('stock', Icons.inventory_2_rounded, 'Inventario', 'Inventario');
+const _dBodegaSettings = _Dest('settings', Icons.settings_rounded, 'Configuración', 'Configuración');
 
 /// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
 const _rubroIcons = <String, IconData>{
@@ -85,6 +90,7 @@ bool _destAllowed(String id, Access a) => switch (id) {
       'collect' => a.can('collect') && a.has('cobros'),
       'fiados' => a.can('collect') && a.has('fiados'),
       'cash' => a.can('collect') && a.has('caja'),
+      'stock' => a.has('stock'),
       'business' => a.can('finance') && a.has('reportes'),
       'jobs' => a.can('jobs') && a.has('trabajos'),
       'agenda' => a.can('jobs') && a.has('agenda'),
@@ -93,7 +99,19 @@ bool _destAllowed(String id, Access a) => switch (id) {
       _ => true,
     };
 
+/// Navegación visible de Bodega según la licencia y el rol verificados.
+/// Es la fuente única tanto del Drawer como de sus pruebas de regresión.
+List<String> bodegaDrawerIds(Access access) => [
+  'home',
+  if (_destAllowed('sell', access)) 'sell',
+  if (_destAllowed('fiados', access)) 'fiados',
+  if (_destAllowed('cash', access)) 'cash',
+  if (_destAllowed('stock', access)) 'stock',
+  'settings',
+];
+
 class _MainShellState extends State<MainShell> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _tab = ''; // se resuelve al construir: la app abre donde se vende
   final Set<String> _built = {};
   OrgSettings? _settings;
@@ -177,7 +195,7 @@ class _MainShellState extends State<MainShell> {
       case 'search':
         openUniversalSearch(context);
       case 'copilot':
-        openCopilot(context);
+        if (Access.instance.has('copiloto')) openCopilot(context);
       case 'fiados':
         final f = featureById('fiados');
         if (f != null && f.allowed) openFeature(context, f);
@@ -187,6 +205,19 @@ class _MainShellState extends State<MainShell> {
   List<_Dest> _dests() {
     final a = Access.instance;
     final simple = _settings?.simpleMode ?? false;
+    // Una sola navegación para Bodega, independientemente del plan. Cada destino
+    // procede del entitlement firmado por el Hub y de los permisos del rol.
+    if ((a.rubro ?? _settings?.businessType) == 'bodega') {
+      const destinations = <String, _Dest>{
+        'home': _dHome,
+        'sell': _dSell,
+        'fiados': _dFiados,
+        'cash': _dCash,
+        'stock': _dStock,
+        'settings': _dBodegaSettings,
+      };
+      return [for (final id in bodegaDrawerIds(a)) destinations[id]!];
+    }
     if (a.role == 'tecnico') return [for (final d in const [_dJobs, _dAgenda, _dClients, _dSettings]) if (_destAllowed(d.id, a)) d];
     // v3: cada rubro tiene su barra (4 destinos + micrófono) y sus palabras.
     final spec = rubroFor(_settings?.businessType);
@@ -279,11 +310,74 @@ class _MainShellState extends State<MainShell> {
         'jobs' => JobsScreen(embedded: true, mine: Access.instance.role == 'tecnico'),
         'agenda' => const AgendaScreen(embedded: true),
         'quotes' => const QuotesScreen(embedded: true),
-        'fiados' => const FiadosScreen(),
-        'cash' => const CashDayScreen(),
+        'fiados' => FiadosScreen(embedded: Access.instance.rubro == 'bodega'),
+        'cash' => CashDayScreen(embedded: Access.instance.rubro == 'bodega'),
+        'stock' => const ProductsScreen(embedded: true),
         'tables' => const KitchenScreen(),
         _ => const SettingsScreen(embedded: true),
       };
+
+  Widget _bodegaNavigation(List<_Dest> destinations) {
+    final selected = destinations.indexWhere((d) => d.id == _tab);
+    final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0B0E17),
+        border: Border(right: BorderSide(color: Colors.white10, width: 1)),
+      ),
+      child: NavigationDrawer(
+        key: const ValueKey('bodega-navigation-drawer'),
+        backgroundColor: const Color(0xFF0B0E17),
+        indicatorColor: const Color(0xFF252849),
+        selectedIndex: selected < 0 ? 0 : selected,
+        onDestinationSelected: (index) {
+          Navigator.of(context).pop();
+          if (index >= 0 && index < destinations.length) _go(destinations[index].id);
+        },
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 22, 20),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('FACTURAVOZ', style: TextStyle(
+                  color: Color(0xFF818CF8), fontWeight: FontWeight.w900,
+                  letterSpacing: 2.1, fontSize: 12)),
+                const SizedBox(height: 16),
+                Text(orgName, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 21,
+                    fontWeight: FontWeight.w800, letterSpacing: -.5)),
+                const SizedBox(height: 7),
+                Text('Bodega / Tienda  ·  ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
+                  style: const TextStyle(color: Color(0xFF969BB0), fontSize: 12)),
+              ]),
+            ),
+          ),
+          const Divider(height: 1, color: Colors.white10),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(27, 25, 20, 10),
+            child: Text('ESPACIO DE TRABAJO', style: TextStyle(
+              color: Color(0xFF757D99), fontSize: 10, letterSpacing: 1.5,
+              fontWeight: FontWeight.w800)),
+          ),
+          for (final d in destinations)
+            NavigationDrawerDestination(
+              icon: Icon(d.icon, color: Colors.white70, size: 21),
+              selectedIcon: Icon(d.icon, color: const Color(0xFFA5B4FC), size: 21),
+              label: Text(d.label, style: const TextStyle(color: Colors.white,
+                fontWeight: FontWeight.w600, fontSize: 14)),
+            ),
+          const SizedBox(height: 24),
+          const Divider(height: 1, color: Colors.white10),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(27, 18, 20, 20),
+            child: Text('Solo las funciones incluidas en tu licencia.',
+              style: TextStyle(color: Color(0xFF7D849C), fontSize: 11)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -292,16 +386,47 @@ class _MainShellState extends State<MainShell> {
       listenable: Access.instance,
       builder: (context, _) {
         final dests = _dests();
+        final isBodega = (Access.instance.rubro ?? _settings?.businessType) == 'bodega';
         if (!dests.any((d) => d.id == _tab)) _tab = _landing(dests);
         _built.add(_tab);
         final first = _landing(dests);
+        final activeTitle = dests.firstWhere((d) => d.id == _tab, orElse: () => dests.first).label;
+        final canVoiceSell = Access.instance.has('voz') &&
+            Access.instance.has('facturar') && Access.instance.can('sell');
+        final canCopilot = Access.instance.has('copiloto');
         return PopScope(
           canPop: _tab == first,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) _go(first); // "atrás" vuelve a la primera pestaña antes de salir
+            if (!didPop) _go(first);
           },
           child: Scaffold(
-            extendBody: true,
+            key: _scaffoldKey,
+            // La navegación de Bodega tiene un único dueño: este Scaffold.
+            drawer: isBodega ? _bodegaNavigation(dests) : null,
+            appBar: isBodega ? AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              elevation: 0,
+              leading: IconButton(
+                key: const ValueKey('bodega-open-menu'),
+                tooltip: 'Abrir menú',
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
+              title: Text(activeTitle,
+                style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -.35)),
+              actions: [
+                if (canCopilot)
+                  IconButton(
+                    key: const ValueKey('bodega-open-copilot'),
+                    tooltip: 'Copiloto IA',
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    onPressed: () => openCopilot(context),
+                  ),
+                const SizedBox(width: 8),
+              ],
+            ) : null,
             body: Column(children: [
               const LicenseBanner(),
               Expanded(
@@ -311,13 +436,41 @@ class _MainShellState extends State<MainShell> {
                   child: Stack(children: [
                     for (final d in dests)
                       if (_built.contains(d.id))
-                        // Clave estable: al construir otra pestaña no se pierde el estado de las demás.
-                        _TabSlot(key: ValueKey('tab-${d.id}'), active: d.id == _tab, child: RepaintBoundary(child: _page(d.id))),
+                        _TabSlot(
+                          key: ValueKey('tab-${d.id}'),
+                          active: d.id == _tab,
+                          child: RepaintBoundary(child: _page(d.id)),
+                        ),
                   ]),
                 ),
               ),
             ]),
-            bottomNavigationBar: AnimatedSlide(
+            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+            floatingActionButton: isBodega && !keyboard && (canCopilot || canVoiceSell)
+                ? Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(
+                        color: const Color(0xFF6366F1).withValues(alpha: .32),
+                        blurRadius: 21,
+                        offset: const Offset(0, 7),
+                      )],
+                    ),
+                    child: FloatingActionButton.small(
+                      key: const ValueKey('bodega-voice-action'),
+                      heroTag: 'bodega-voice-action',
+                      tooltip: canCopilot ? 'Hablar con Copiloto IA' : 'Vender por voz',
+                      elevation: 0,
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onPressed: canCopilot ? () => openCopilot(context) : _newInvoice,
+                      child: const Icon(Icons.mic_rounded),
+                    ),
+                  )
+                : null,
+            // Los otros ocho rubros conservan su shell hasta su rediseño propio.
+            bottomNavigationBar: isBodega ? null : AnimatedSlide(
               offset: keyboard ? const Offset(0, 1.4) : Offset.zero,
               duration: Motion.d(context, Motion.fast),
               curve: Motion.standard,

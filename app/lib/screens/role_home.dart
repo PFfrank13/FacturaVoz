@@ -25,10 +25,13 @@ import '../ui/motion.dart' show pushPremium, showSuccess;
 const _statBlocks = {'today_sales', 'cash_status', 'fiados_total', 'stock_low'};
 
 class RoleHomePanel extends StatefulWidget {
-  const RoleHomePanel({super.key, this.exclude = const {}});
+  const RoleHomePanel({super.key, this.exclude = const {}, this.showLinks = true});
 
   /// Bloques que la pantalla ya muestra de otra forma (p. ej. el botón principal).
   final Set<String> exclude;
+
+  /// Oculta los enlaces duplicados cuando Inicio muestra el tablero especializado del rubro.
+  final bool showLinks;
 
   @override
   State<RoleHomePanel> createState() => _RoleHomePanelState();
@@ -227,8 +230,9 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
               const DsSection('Hoy'),
               DsStatGrid(children: stats),
             ],
-            DsSection('Tu trabajo · ${roleForUser(a.rubro, a.role).label}'),
-            Material(
+            if (widget.showLinks) ...[
+              DsSection('Tu trabajo · ${roleForUser(a.rubro, a.role).label}'),
+              Material(
               color: DsColors.of(context).surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: DsColors.of(context).line)),
               clipBehavior: Clip.antiAlias,
@@ -236,7 +240,8 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
                 for (final b in links) DsRow(title: _linkTitle(b), leading: _icon(b.id), onTap: () => _open(b.route)),
                 DsRow(title: 'Todas mis funciones', leading: Icons.apps_rounded, onTap: () => pushPremium(context, const MenuScreen())),
               ]),
-            ),
+              ),
+            ],
           ]),
         );
       },
