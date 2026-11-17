@@ -28,4 +28,24 @@ void main() {
     expect(second, isNot(first));
     expect(printerStorageKey('org-A'), first);
   });
+  test('red ESC/POS conserva host/puerto real y el default 9100', () {
+    final defaultPort = parsePrinterEndpoint('192.168.1.50');
+    expect(defaultPort.host, '192.168.1.50');
+    expect(defaultPort.port, 9100);
+    final custom = parsePrinterEndpoint(' printer.local:9101 ');
+    expect(custom.host, 'printer.local');
+    expect(custom.port, 9101);
+  });
+
+  test('red rechaza IP vacía y puertos incorrectos sin fallback silencioso', () {
+    for (final address in [
+      '', '   ', '192.168.0.1:0', '192.168.0.1:65536',
+      '192.168.0.1:abc', '192.168.0.1:9100:extra',
+      'some host:9100', '192.168.0.1/-x',
+    ]) {
+      expect(() => parsePrinterEndpoint(address), throwsStateError,
+          reason: 'No enviar datos a un host/puerto no validado: $address');
+    }
+  });
+
 }
