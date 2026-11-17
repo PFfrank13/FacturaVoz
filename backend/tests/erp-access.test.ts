@@ -28,14 +28,14 @@ describe("ERP: Hub is authoritative across all nine sectors", () => {
     }
     expect(hasFeature({ ...active, mode: "warning" }, "stock")).toBe(true);
   });
-  it("accepts verified local basic features, but not missing, blocked or stale ones", () => {
+  it("during the Hub transition a verified local license keeps its plan features; blocked or stale never", () => {
     const local = { ...active, source: "local", plan: "BASICO", features: { stock: true, fiados: true, caja: true, copiloto: false, max_users: 1 } };
     expect(hasFeature(local, "stock")).toBe(true);
-    expect(hasFeature(local, "fiados")).toBe(true);
     expect(hasFeature(local, "copiloto")).toBe(false);
     expect(featureLimit(local, "max_users")).toBe(1);
     expect(hasFeature({ ...local, mode: "blocked" }, "stock")).toBe(false);
     expect(hasFeature({ ...local, stale: true }, "stock")).toBe(false);
+    expect(hasFeature({ ...local, source: "dev" }, "stock")).toBe(false);
   });
   it("numeric limits never unlock boolean features", () => {
     for (const value of [-1, 0, 1, 4, "true", "false", null]) expect(hasFeature({ ...active, features: { stock: value } }, "stock")).toBe(false);

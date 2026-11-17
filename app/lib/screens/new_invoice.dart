@@ -20,6 +20,7 @@ import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../logic/credit.dart';
+import '../logic/catalog_link.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'products.dart';
@@ -323,6 +324,11 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
         profile: _profile,
       );
       _lastAudio = null;
+      // Dictado: solo las descripciones IGUALES al nombre de un producto quedan vinculadas al inventario
+      // (visible en cada línea). Si el catálogo no carga, las líneas quedan como texto libre y no mueven stock.
+      try {
+        draft.items = linkToCatalog(draft.items, await Repo.listProducts(activeOnly: true));
+      } catch (_) {}
       if (!mounted) return;
       _loadDraft(draft);
       HapticFeedback.lightImpact();
@@ -1042,6 +1048,8 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
             labelText: 'Servicio o producto',
             counterText: '',
             errorText: _submitted ? _descError(r) : null,
+            // Vinculada al inventario: al emitir descuenta stock de ESE producto. Si cambias el texto, se desvincula.
+            helperText: r.productId != null && r.desc.text.trim() == r.initialDescription.trim() ? 'Vinculado al inventario' : null,
           ),
           onChanged: (_) => _touch(),
         ),

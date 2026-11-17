@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNext } from "@/lib/safe-next";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -26,6 +27,10 @@ export async function middleware(request: NextRequest) {
   if (!user && !p.startsWith("/login") && !p.startsWith("/auth")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "";
+    // Volver al enlace de la empresa tras iniciar sesión (solo rutas internas validadas en safeNext).
+    const next = safeNext(p);
+    if (next) url.searchParams.set("next", next);
     return NextResponse.redirect(url);
   }
   return response;

@@ -3,6 +3,8 @@
 //   Access.instance.has('tienda')   → ¿el plan incluye la tienda?       (oculta lo que no se contrató)
 //   Access.instance.can('finance')  → ¿este rol puede ver dinero?        (oculta lo que el rol no permite)
 // Ojo: esto solo ORDENA la pantalla. Los permisos reales se aplican en la base de datos (RLS y disparadores).
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -25,12 +27,14 @@ class LicenseInfo {
     this.isTrial = false,
     this.trialRequested = false,
     this.stale = false,
+    this.activated = false,
+    this.reconciling = false,
   });
 
   final String mode; // full | warning | restricted | blocked
   final String plan; // BASICO | PRO | EMPRESA
   final String status;
-  final String source; // local | hub | dev
+  final String source; // 'hub' (y 'local' solo hasta la FASE B de v3.4); none = no se pudo leer
   final bool dev;
   final bool enforced;
   final Map<String, dynamic> features;
@@ -41,6 +45,12 @@ class LicenseInfo {
   final bool isTrial;
   final bool trialRequested;
   final bool stale;
+
+  /// La empresa activó el código de licencia del Hub (requisito de la base para operar).
+  final bool activated;
+
+  /// Venía del modo local heredado y espera que el backend verifique su licencia con el Hub.
+  final bool reconciling;
 
   bool get usable => mode == 'full' || mode == 'warning';
 
@@ -69,22 +79,27 @@ class LicenseInfo {
         isTrial: j['is_trial'] == true,
         trialRequested: j['trial_requested'] == true,
         stale: j['stale'] == true,
+        activated: j['activated'] == true,
+        reconciling: j['reconciling'] == true,
       );
 }
+
+/// Fuente comercial aceptada: el Hub y, solo durante la transición v3.4, la licencia local heredada (la FASE B la elimina).
+bool _commercialSource(String s) => s == 'hub' || s == 'local';
 
 /// Funciones básicas que todo plan incluye.
 const coreFeatures = {'facturar', 'clientes', 'cobros', 'voz'};
 
-/// The backend computes effective per-tenant features for Hub and standalone modes.
+/// The backend computes effective per-tenant features from the Solvex Hub license.
 /// Never accept an unverified cached or expired license as authorization.
 bool planHas(LicenseInfo l, String key, {String? rubro}) {
-  if (!l.enforced || l.dev || l.stale || !const {'hub', 'local'}.contains(l.source) || !l.usable) return false;
+  if (!l.enforced || l.dev || l.stale || !_commercialSource(l.source) || !l.usable) return false;
   return l.features[key] == true;
 }
 
 /// Límite numérico del plan (-1 = sin límite).
 int planLimit(LicenseInfo l, String key) {
-  if (!l.enforced || l.dev || l.stale || !const {'hub', 'local'}.contains(l.source) || !l.usable) return 0;
+  if (!l.enforced || l.dev || l.stale || !_commercialSource(l.source) || !l.usable) return 0;
   final v = l.features[key];
   return v is num && v.isFinite && v == v.truncateToDouble() && v >= -1 ? v.toInt() : 0;
 }
@@ -103,10 +118,15 @@ class Access extends ChangeNotifier {
   /// No se entra con una licencia cacheada sin validar la sesión ante Supabase.
   bool licenseCheckedOnline = false;
   bool licenseChecking = true;
+  // v3.4: Solvex Hub es la única fuente comercial. 'local' solo existe hasta la FASE B (20261210), que la base
+  // garantiza que no deja ninguna; aceptarla mientras tanto evita cortar el servicio durante la transición.
   bool get licenseReady => licenseCheckedOnline && license.enforced && !license.dev &&
-      !license.stale && const {'hub', 'local'}.contains(license.source) && license.usable;
+      !license.stale && _commercialSource(license.source) && license.usable;
   bool get canEnter => licenseReady || (licenseCheckedOnline && license.enforced &&
-      !license.dev && const {'hub', 'local'}.contains(license.source) && license.mode == 'restricted' && isAdmin);
+      !license.dev && _commercialSource(license.source) && license.mode == 'restricted' && isAdmin);
+
+  /// Por qué no se pudo leer la licencia (null = se leyó). Se muestra tal cual; nunca da acceso.
+  String? licenseError;
 
 
   bool can(String what) => _can[what] ?? isAdmin;
@@ -162,6 +182,8 @@ class Access extends ChangeNotifier {
     licenseChecking = false;
     loaded = true;
     notifyListeners();
+    // Al tener sesión y licencia: comprobar los cobros/abonos/movimientos que quedaron pendientes de confirmar.
+    if (licenseReady) unawaited(Repo.resolvePendingFinancial().catchError((_) => 0));
   }
 
   /// Últimas respuestas crudas de la base (para el arranque instantáneo).
@@ -212,16 +234,25 @@ class Access extends ChangeNotifier {
       if (l is Map) {
         _applyLicense(Map<String, dynamic>.from(l));
         licenseCheckedOnline = true;
+        licenseError = null;
       } else {
         license = const LicenseInfo();
         rawLicense = null;
+        licenseError = 'El servidor no devolvió la licencia.';
       }
-    } catch (_) {
+    } catch (e) {
       if (generation != _generation || org != Repo.activeOrgId) return;
-      // Fallar cerrado: no se permite operar con una licencia inventada.
+      // Fallar cerrado: no se permite operar con una licencia inventada, pero se dice POR QUÉ.
       licenseCheckedOnline = false;
       license = const LicenseInfo();
       rawLicense = null;
+      licenseError = switch (e) {
+        PostgrestException(code: '42501') => 'Tu usuario no pertenece a esta empresa.',
+        PostgrestException(code: 'PGRST202') => 'El servidor no tiene la función de licencias actualizada.',
+        PostgrestException(:final message) => 'Error del servidor al leer la licencia: $message',
+        AuthException() => 'Tu sesión expiró. Vuelve a iniciar sesión.',
+        _ => 'No hay conexión con el servidor. Revisa tu internet.',
+      };
     }
   }
 

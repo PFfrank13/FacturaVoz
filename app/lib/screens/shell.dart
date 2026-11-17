@@ -89,7 +89,7 @@ bool _destAllowed(String id, Access a) => switch (id) {
       'jobs' => a.can('jobs') && a.has('trabajos'),
       'agenda' => a.can('jobs') && a.has('agenda'),
       'clients' => a.can('clients') && a.has('clientes'),
-      'tables' => a.has('carta_qr'),
+      'tables' => a.can('sell') && a.has('carta_qr'),
       _ => true,
     };
 

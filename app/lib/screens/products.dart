@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../access.dart';
+import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../growth.dart';
@@ -122,6 +123,16 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Map<String, Map<String, dynamic>> _catalogExtras = const {};
   String? _error;
   String _q = '';
+  final TextEditingController _search = TextEditingController();
+  String? _activeOrg;
+  int _loadGeneration = 0;
+
+  /// A stock viewer must not see editing, deletion or stock mutation controls.
+  /// The database remains the final authority for every write.
+  bool get _canManageProducts =>
+      Access.instance.licenseReady &&
+      Access.instance.can('products_edit') &&
+      (Access.instance.rubro != 'bodega' || Access.instance.has('stock'));
 
   @override
   List<String> get liveTables => const ['products'];
@@ -132,28 +143,55 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
     _all = LiveCache.get<List<Product>>('products.all');
+    AppState.instance.addListener(_onCompanyChange);
     _load();
     startLive(); // tiempo real
   }
 
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || _activeOrg == org) return;
+    _activeOrg = org;
+    _loadGeneration++;
+    _search.clear();
+    setState(() {
+      _all = null;
+      _catalogExtras = const {};
+      _error = null;
+      _q = '';
+    });
+    LiveHub.instance.start();
+    _load();
+  }
+
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
+    _search.dispose();
     stopLive();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final orgAtStart = Repo.activeOrgId;
+    final generation = ++_loadGeneration;
     setState(() => _error = null);
     try {
-      final orgAtStart = Repo.activeOrgId;
       final r = await Repo.listProducts();
       final extras = await V2Repo.productExtras();
-      if (!mounted || orgAtStart != Repo.activeOrgId) return;
+      if (!mounted || orgAtStart != Repo.activeOrgId ||
+          generation != _loadGeneration) {
+        return;
+      }
       LiveCache.put('products.all', r);
       setState(() { _all = r; _catalogExtras = extras; });
     } catch (e) {
-      if (mounted) setState(() => _error = friendly(e));
+      if (mounted && orgAtStart == Repo.activeOrgId &&
+          generation == _loadGeneration) {
+        setState(() => _error = friendly(e));
+      }
     }
   }
 
@@ -162,6 +200,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     ..showSnackBar(SnackBar(content: Text(m)));
 
   Future<void> _edit([Product? p]) async {
+    if (!_canManageProducts) return;
     final name = TextEditingController(text: p?.name ?? '');
     final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(p.unitPrice));
     final guided = p == null && Access.instance.rubro == 'bodega';
@@ -606,6 +645,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   }
 
   Future<void> _more(Product p) async {
+    if (!_canManageProducts) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -632,6 +672,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
         ]),
       ),
     );
+    if (!_canManageProducts) return;
     try {
       switch (action) {
         case 'edit':
@@ -653,6 +694,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
 
   /// Entrada (compra) o salida (merma, uso interno) de stock. Atómico en la base de datos.
   Future<void> _adjust(Product p) async {
+    if (!_canManageProducts) return;
     final qty = TextEditingController();
     var inbound = true;
     final ok = await showModalBottomSheet<bool>(
@@ -718,7 +760,13 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             },
           ),
       ]),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')),
+      floatingActionButton: _canManageProducts
+          ? FloatingActionButton.extended(
+              onPressed: () => _edit(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Nuevo'),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -757,6 +805,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 ],
               )),
             TextField(
+              controller: _search,
               onChanged: (v) => setState(() => _q = v),
               decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded), isDense: true),
             ),
@@ -785,7 +834,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     child: Opacity(
                       opacity: p.active ? 1 : .5,
                       child: Pressable(
-                        onTap: () => _more(p),
+                        onTap: _canManageProducts ? () => _more(p) : null,
                         child: SoftCard(
                           padding: const EdgeInsets.all(14),
                           child: Row(children: [

@@ -2,6 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:facturavoz/screens/pos_payment_logic.dart';
 
 void main() {
+  test('cash input reflects the company currency', () {
+    expect(posCurrencyPrefix('PEN'), 'S/ ');
+    expect(posCurrencyPrefix('USD'), 'USD ');
+    expect(posCurrencyPrefix('EUR'), 'EUR ');
+    expect(posCurrencyPrefix('COP'), 'COP ');
+  });
+
   test('parses PEN cents exactly without floating point', () {
     expect(parsePosCents('12.5'), 1250);
     expect(parsePosCents('12,50'), 1250);

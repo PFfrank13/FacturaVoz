@@ -422,7 +422,7 @@ class _PressableState extends State<Pressable> {
 
 /// Tarjeta blanda con sombra difusa (reemplaza al borde duro).
 class SoftCard extends StatelessWidget {
-  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(18), this.radius = 24, this.color});
+  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius = Radii.lg, this.color});
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double radius;
@@ -451,7 +451,8 @@ class SoftCard extends StatelessWidget {
   }
 }
 
-/// Botón principal con degradado, sombra suave y rebote al pulsar.
+/// Botón de la acción principal (nombre heredado: ya no lleva degradado, §11). Relleno sólido del primario,
+/// altura mínima 56 (crece con letra grande) y el texto se ajusta en vez de desbordar.
 class GradientButton extends StatelessWidget {
   const GradientButton({super.key, required this.label, required this.icon, required this.onPressed, this.busy = false});
   final String label;
@@ -461,30 +462,31 @@ class GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onPressed,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: onPressed == null ? 0.7 : 1,
-        child: Container(
-          height: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: Brand.heroGradient,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: Brand.softShadow(false, a: 0.35),
+    final ds = DsColors.of(context);
+    return Semantics(
+      button: true,
+      enabled: onPressed != null && !busy,
+      label: label,
+      child: Pressable(
+        onTap: busy ? null : onPressed,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          opacity: onPressed == null ? 0.55 : 1,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: ds.primary, borderRadius: BorderRadius.circular(16)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              busy
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: ds.onPrimary))
+                  : Icon(icon, color: ds.onPrimary, size: 22),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Inter', color: ds.onPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+            ]),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (c, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: c)),
-              child: busy
-                  ? const SizedBox(key: ValueKey('busy'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                  : Icon(icon, key: const ValueKey('icon'), color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-          ]),
         ),
       ),
     );

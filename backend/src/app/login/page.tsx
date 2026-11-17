@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/safe-next";
 
 export default function Login() {
   const router = useRouter();
@@ -10,11 +11,12 @@ export default function Login() {
   const [sent, setSent] = useState(false);
   const [msg, setMsg] = useState("");
   const [pending, setPending] = useState(false);
+  const next = () => safeNext(new URLSearchParams(location.search).get("next"));
   async function send() {
     if (pending) return;
     setPending(true); setMsg("");
     try {
-      const { error } = await createClient().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: `${location.origin}/auth/callback`, shouldCreateUser: false } });
+      const { error } = await createClient().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: `${location.origin}/auth/callback${next() ? `?next=${encodeURIComponent(next()!)}` : ""}`, shouldCreateUser: false } });
       if (error) { setMsg("No se pudo enviar el acceso. Comprueba el correo o consulta con tu administrador."); return; }
       setSent(true); setMsg("Revisa tu correo. Abre el enlace en este navegador o introduce el código recibido.");
     } catch { setMsg("No pudimos conectar. Comprueba tu conexión y vuelve a intentarlo."); }
@@ -26,7 +28,7 @@ export default function Login() {
     try {
       const { error } = await createClient().auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
       if (error) { setMsg("El código es incorrecto o ha caducado. Solicita uno nuevo."); return; }
-      router.replace("/"); router.refresh();
+      router.replace(next() ?? "/"); router.refresh();
     } catch { setMsg("No pudimos verificar el código. Inténtalo de nuevo."); }
     finally { setPending(false); }
   }

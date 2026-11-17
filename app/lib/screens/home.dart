@@ -32,6 +32,7 @@ import 'invoice_detail.dart';
 import 'new_invoice.dart';
 import 'products.dart';
 import 'recurring.dart';
+import 'retail_basic_modules.dart';
 import 'scan.dart';
 import 'store.dart';
 
@@ -367,6 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 onGoal: () => _setGoal(m.total),
               ),
             ),
+            if (Access.instance.rubro == 'bodega' &&
+                Access.instance.license.plan == 'BASICO')
+              const SliverToBoxAdapter(child: RetailBasicModules()),
             SliverToBoxAdapter(
               child: Reveal(
                 index: 1,
@@ -595,6 +599,7 @@ class HomeHeader extends StatelessWidget {
     required this.drafts,
     required this.draftsTotal,
     required this.loaded,
+    this.showMonth = true,
     required this.goal,
     required this.series,
     required this.onGoal,
@@ -614,6 +619,9 @@ class HomeHeader extends StatelessWidget {
   final int drafts;
   final double draftsTotal;
   final bool loaded;
+
+  /// Solo quien ve reportes ve el total del mes (Prompt §6: el cajero ve su caja, no las ventas del negocio).
+  final bool showMonth;
   final double? goal;
   final List<double> series;
   final VoidCallback onGoal;
@@ -698,7 +706,7 @@ class HomeHeader extends StatelessWidget {
           const SizedBox(height: 22),
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child: !showMonth ? const SizedBox.shrink() : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Reveal(
                   index: 1,
                   child: Text('Vendido este mes (con IGV)', style: TextStyle(fontFamily: 'Inter', color: white85, fontSize: 14, fontWeight: FontWeight.w500)),

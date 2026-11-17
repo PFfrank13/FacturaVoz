@@ -487,7 +487,7 @@ class Product {
   final String unit; // NIU producto | ZZ servicio
   final bool active;
 
-  /// Stock actual (null = no se controla). Se descuenta solo al emitir una venta con ese nombre.
+  /// Stock actual (null = no se controla). Se descuenta al emitir una venta cuya línea tenga ESTE product_id.
   final double? stock;
   final double? reorderPoint;
   bool get tracksStock => stock != null;

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../errors.dart';
+import '../app_state.dart';
+import '../ui/retail_visual.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../services/retail_purchase.dart';
@@ -24,15 +26,30 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
   bool _busy = false;
   bool _loading = true;
   String? _error;
+  String? _initialOrg;
+  String? _initialUser;
+  bool _sessionChanged = false;
+
+  void _onCompanyChange() {
+    if (!mounted || _sessionChanged) return;
+    if (_initialOrg != Repo.activeOrgId ||
+        _initialUser != Supabase.instance.client.auth.currentUser?.id) {
+      setState(() => _sessionChanged = true);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _initialOrg = Repo.activeOrgId;
+    _initialUser = Supabase.instance.client.auth.currentUser?.id;
+    AppState.instance.addListener(_onCompanyChange);
     _restore();
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     _reference.dispose();
     super.dispose();
   }
@@ -71,11 +88,17 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
     // An uncertain settlement must remain retryable with its original ID,
     // even after a network error. Only block creating a NEW payment while
     // local recovery is broken.
-    if (_busy || _loading || (_error != null && _pending == null)) return;
+    if (_sessionChanged || _busy || _loading ||
+        (_error != null && _pending == null)) {
+      return;
+    }
     if (_pending == null && !_confirmed) return;
     final org = Repo.activeOrgId;
     final user = Supabase.instance.client.auth.currentUser?.id;
-    if (org == null || user == null) return;
+    if (org == null || user == null || org != _initialOrg ||
+        user != _initialUser) {
+      return;
+    }
     final p = _pending;
     if (p == null && widget.receipt?['payment_method'] != 'pendiente') return;
     final receiptId = widget.receipt?['id'] as String?;
@@ -94,7 +117,10 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
         // replaying the SAME request ID is safe and cannot record another expense.
         await RetailSettlementStore.save(checkout);
       }
-      if (!mounted) return;
+      if (!mounted || _sessionChanged || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user) {
+        return;
+      }
       setState(() => _pending = checkout);
       final id = await RetailSettlementRepo.settle(checkout);
       await RetailSettlementStore.clear(checkout);
@@ -118,12 +144,28 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_sessionChanged) {
+      return const Scaffold(body: Center(child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Text('La empresa o la sesión cambió. Vuelve a Compras para consultar los pagos de la nueva empresa.',
+          textAlign: TextAlign.center),
+      )));
+    }
     final p = _pending;
     final receipt = widget.receipt;
     final amount = ((receipt?['total_cents'] as num?) ?? 0).toDouble() / 100;
     final currency = (receipt?['currency'] ?? 'PEN') as String;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pago al proveedor')),
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: RetailVisual.navy,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: RetailVisual.violet, brightness: Brightness.dark),
+      ),
+      child: Scaffold(
+      backgroundColor: RetailVisual.navy,
+      appBar: AppBar(backgroundColor: RetailVisual.navy,
+        title: const Text('Pago al proveedor',
+          style: TextStyle(fontWeight: FontWeight.w900))),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null && p == null
@@ -137,6 +179,18 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                RetailVisual.hero(
+                  context: context,
+                  eyebrow: 'Plan Básico · Compras',
+                  title: p == null ? 'Paga a tu proveedor' : 'Recupera el pago',
+                  subtitle: p == null
+                      ? 'Liquida una compra registrada. El stock no se volverá a ingresar.'
+                      : 'La solicitud anterior se conserva para evitar un pago duplicado.',
+                  icon: Icons.account_balance_wallet_rounded,
+                  footer: receipt == null ? null :
+                    RetailVisual.microStat('Total de compra', money(amount, currency)),
+                ),
+                const SizedBox(height: 18),
                 if (p != null) ...[
                   const Icon(Icons.sync_lock_rounded, size: 44),
                   const SizedBox(height: 12),
@@ -166,7 +220,9 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
                   const SizedBox(height: 12),
                   const Text('Se registrará un único pago completo. '
                       'La mercadería ya ingresó y no volverá a sumarse al stock.'),
-                  const SizedBox(height: 16),
+                  RetailVisual.section(number: 1, title: 'Medio de pago',
+                    subtitle: 'Confirma el egreso real antes de guardar',
+                    icon: Icons.payments_rounded),
                   DropdownButtonFormField<String>(
                     initialValue: _method,
                     items: const [
@@ -201,11 +257,15 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
                         : 'Confirmación manual. No se comprueba con el banco.'),
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.icon(
+                  SizedBox(width: double.infinity, height: 54, child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: RetailVisual.violet, foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     onPressed: _busy || !_confirmed ? null : _pay,
                     icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Registrar pago'),
-                  ),
+                    label: const Text('Registrar pago',
+                      style: TextStyle(fontWeight: FontWeight.w900)),
+                  )),
                 ] else ...[
                   const Center(child: Text('No hay pagos pendientes de recuperación.')),
                   TextButton(onPressed: () => Navigator.pop(context),
@@ -213,6 +273,6 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
                 ],
               ],
             ),
-    );
+    ));
   }
 }

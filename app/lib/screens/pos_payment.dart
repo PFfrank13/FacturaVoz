@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
+import '../ui/retail_visual.dart';
 import '../models_pro.dart';
 import '../services/pro_repo.dart';
 import 'client_profile.dart' show StorageImage;
@@ -280,6 +281,9 @@ class _PaymentFlowState extends State<_PaymentFlow> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
             children: [
+              RetailVisual.journey(step: 3,
+                label: method == null ? 'Elegir medio de pago' : 'Verificar y confirmar'),
+              const SizedBox(height: 15),
               _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('Total a cobrar', style: TextStyle(color: Color(0xFFB8B7D4))),
                 const SizedBox(height: 5),
@@ -370,7 +374,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       controller: _tender,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(prefixText: 'S/ ', border: OutlineInputBorder()),
+                      decoration: InputDecoration(prefixText: posCurrencyPrefix(widget.currency),
+                        border: const OutlineInputBorder()),
                     ),
                     const SizedBox(height: 12),
                     Text(_sufficient

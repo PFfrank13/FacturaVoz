@@ -166,6 +166,19 @@ class V2Api {
     return (plan: (body['plan'] ?? '') as String, mode: (body['mode'] ?? '') as String);
   }
 
+  /// Pide al backend que traiga AHORA la licencia de esta empresa desde Solvex Hub (firma Ed25519 verificada en el
+  /// servidor). Devuelve el mensaje para mostrar; nunca concede acceso por sí misma: después hay que releer my_license.
+  static Future<({bool found, String message})> refreshLicense() async {
+    final org = Repo.activeOrgId;
+    if (org == null) throw AppException('Primero crea o selecciona tu empresa.');
+    final (status, body) = await _post('/api/license/refresh', {'org_id': org}, seconds: 35);
+    if (status == 200 && body['ok'] == true) {
+      return (found: true, message: 'Solvex Hub: plan ${body['plan'] ?? ''}, estado ${body['status'] ?? ''}.');
+    }
+    if (status == 404) return (found: false, message: (body['error'] ?? 'Solvex Hub no tiene una licencia para esta empresa.') as String);
+    throw AppException((body['error'] ?? 'No se pudo consultar Solvex Hub.') as String);
+  }
+
   /// Cierre del día: guarda y envía el reporte al dueño por correo.
   static Future<({bool emailed, DaySummary summary})> closeDay({required String day, double? counted, String note = ''}) async {
     final (status, body) = await _post('/api/day-close', {'org_id': Repo.activeOrgId, 'day': day, 'counted': counted, 'note': note});

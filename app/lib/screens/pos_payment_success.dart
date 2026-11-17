@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../ui/retail_visual.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'retail_receipts.dart';
@@ -58,12 +59,14 @@ class PosPaymentSuccessScreen extends StatelessWidget {
       data: ThemeData.dark().copyWith(scaffoldBackgroundColor: bg),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Pago confirmado'),
+          title: const Text('Cobro registrado'),
           backgroundColor: bg,
         ),
         body: SafeArea(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: ListView(padding: const EdgeInsets.all(16), children: [
+            RetailVisual.journey(step: 4, label: 'Comprobante y ticket'),
+            const SizedBox(height: 15),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
               decoration: BoxDecoration(
@@ -90,13 +93,18 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 Text(money(total, currency), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 36)),
                 const SizedBox(height: 8),
                 Container(
-                  decoration: BoxDecoration(color: accent.withValues(alpha: .2), borderRadius: BorderRadius.circular(50)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  width: double.infinity,
+                  decoration: BoxDecoration(color: accent.withValues(alpha: .2), borderRadius: BorderRadius.circular(18)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(children: [
                     PosPaymentBrand(method, size: 30),
-                    const SizedBox(width: 8),
-                    Text('Cobrado con ${posMethodLabel(method)}',
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(method == 'efectivo'
+                      ? 'Cobrado con Efectivo'
+                      : '${posMethodLabel(method)} · verificado por el cajero',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700))),
                   ]),
                 ),
               ]),
@@ -123,6 +131,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               ))),
             const SizedBox(height: 24),
             const Text(
+              'El cobro se registró tras la verificación del cajero; no se comprueba automáticamente con el banco. '
               'El pago registrado no equivale a la emisión SUNAT. '
               'Para emitir boleta o factura electrónica se necesitan RUC, SOL, '
               'certificado y configuración tributaria. Si falta alguno, se abrirá la configuración.',

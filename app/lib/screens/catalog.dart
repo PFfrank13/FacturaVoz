@@ -109,7 +109,12 @@ class FeatureEntry {
   bool get allowed => roleOk && planOk;
 
   /// ¿El rol lo permite (y la plataforma)? Si no, no se muestra.
-  bool get roleOk => rubroShows(rubroFor(Access.instance.rubro), id) && (perm == null || Access.instance.can(perm!)) && !(mobileOnly && kIsWeb);
+  bool get roleOk => rubroShows(rubroFor(Access.instance.rubro), id) &&
+      (perm == null || Access.instance.can(perm!)) &&
+      // Receiving and supplier-payment flow currently requires administrator access.
+      // Do not advertise a shortcut that the underlying screen will reject.
+      (id != 'compras' || Access.instance.isAdmin) &&
+      !(mobileOnly && kIsWeb);
 
   /// ¿Hub lo incluye? Los menús filtran por allowed y omiten lo no contratado.
   bool get planOk => feature == null || Access.instance.has(feature!);
@@ -176,8 +181,8 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'credito', feature: 'fiados', title: 'Crédito por cliente', subtitle: 'Límite, lo usado y quién se pasó', icon: Icons.credit_score_rounded, group: 'Cobrar y pagar', perm: 'finance', keywords: const ['credito', 'limite', 'linea'], builder: (_) => const CreditScreen()),
       FeatureEntry(id: 'morosidad', title: 'Pensiones pendientes', subtitle: 'Morosidad por grupo y aviso al apoderado', icon: Icons.school_rounded, group: 'Cobrar y pagar', feature: 'recurrentes', perm: 'collect', keywords: const ['pension', 'moroso', 'apoderado', 'alumno'], builder: (_) => const MorosityScreen()),
       // ───── Mi negocio ─────
-      FeatureEntry(id: 'negocio_hub', feature: 'reportes', title: 'Mi negocio (todo junto)', subtitle: 'Ganancia, cuánto me queda, reportes y comisiones', icon: Icons.dashboard_rounded, group: 'Mi negocio', perm: 'finance', keywords: const ['resumen', 'ganancia', 'reportes'], builder: (_) => const BusinessHubScreen()),
-      FeatureEntry(id: 'negocio', feature: 'reportes', title: 'Mi negocio', subtitle: 'Ganancia real, flujo de caja y stock', icon: Icons.insights_rounded, group: 'Mi negocio', perm: 'finance', keywords: const ['ganancia', 'utilidad', 'rentabilidad'], builder: (_) => const ProfitScreen()),
+      FeatureEntry(id: 'negocio_hub', feature: 'reportes', title: 'Mi negocio', subtitle: 'Ganancia, cuánto me queda, reportes y comisiones', icon: Icons.dashboard_rounded, group: 'Mi negocio', perm: 'finance', keywords: const ['resumen', 'ganancia', 'reportes'], builder: (_) => const BusinessHubScreen()),
+      FeatureEntry(id: 'negocio', feature: 'reportes', title: 'Ganancia real', subtitle: 'Margen, flujo de caja y stock', icon: Icons.insights_rounded, group: 'Mi negocio', perm: 'finance', keywords: const ['ganancia', 'utilidad', 'rentabilidad'], builder: (_) => const ProfitScreen()),
       FeatureEntry(id: 'impuestos', title: '¿Cuánto me queda?', subtitle: 'Impuestos estimados y lo que debes guardar', icon: Icons.savings_rounded, group: 'Mi negocio', module: 'impuestos', feature: 'reportes', perm: 'finance', keywords: const ['igv', 'renta', 'sunat', 'impuesto', 'rus', 'mype'], builder: (_) => const TaxesScreen()),
       FeatureEntry(id: 'reportes', title: 'Reportes', subtitle: 'Ventas por mes y exportar a Excel', icon: Icons.table_view_rounded, group: 'Mi negocio', feature: 'reportes', perm: 'finance', keywords: const ['excel', 'exportar', 'contador'], builder: (_) => const ReportsScreen()),
       FeatureEntry(id: 'comisiones', title: 'Ventas por vendedor', subtitle: 'Ranking, metas y comisiones', icon: Icons.emoji_events_rounded, group: 'Mi negocio', module: 'comisiones', feature: 'comisiones', keywords: const ['comision', 'vendedor', 'meta', 'ranking'], builder: (_) => const CommissionsScreen()),
@@ -196,7 +201,7 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'sunat', title: 'SUNAT', subtitle: 'Usuario SOL, certificado y series', icon: Icons.verified_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['sol', 'certificado', 'serie', 'electronica'], builder: (_) => const FiscalSetupScreen()),
       FeatureEntry(id: 'marca', title: 'Logo y comprobantes', subtitle: 'Tu logo, diseño del PDF y ticket', icon: Icons.palette_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['logo', 'pdf', 'plantilla', 'diseno', 'ticket'], builder: (_) => const BrandingScreen()),
       FeatureEntry(id: 'impresora', title: 'Impresora de tickets', subtitle: 'Bluetooth o red, 58 u 80 mm', icon: Icons.print_rounded, group: 'Ajustes', keywords: const ['ticketera', 'bluetooth', 'termica', 'imprimir'], builder: (_) => const PrinterSettingsScreen()),
-      FeatureEntry(id: 'medios', title: 'Medios de cobro', subtitle: 'Yape, Plin, banco y cobranza automática', icon: Icons.qr_code_2_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['yape', 'plin', 'cuenta', 'mercado pago'], builder: (_) => const PaySettingsScreen()),
+      FeatureEntry(id: 'medios', title: 'Medios de cobro', subtitle: 'Yape, Plin y banco; verificación manual del pago', icon: Icons.qr_code_2_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['yape', 'plin', 'cuenta', 'mercado pago'], builder: (_) => const PaySettingsScreen()),
       FeatureEntry(id: 'tipo', title: 'Cambiar de rubro', subtitle: 'Bodega, restaurante, taller… con vista previa', icon: Icons.dashboard_customize_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['rubro', 'tipo de negocio', 'plantilla', 'giro'], builder: (_) => RubroPickerScreen(current: Access.instance.rubro)),
       FeatureEntry(id: 'presentacion', title: 'Ver la presentación otra vez', subtitle: 'Rubro y modo Fácil paso a paso', icon: Icons.slideshow_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['onboarding', 'presentacion', 'inicio', 'facil'], builder: (ctx) => BusinessSetupScreen(reopened: true, onDone: () => Navigator.of(ctx).pop())),
       FeatureEntry(id: 'modulos', title: 'Funciones a la vista', subtitle: 'Elige qué se ve primero', icon: Icons.tune_rounded, group: 'Ajustes', perm: 'settings', keywords: const ['modulos', 'ocultar', 'mostrar'], builder: (_) => const ModulesScreen()),

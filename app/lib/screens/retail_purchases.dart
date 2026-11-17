@@ -9,6 +9,7 @@ import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/retail_purchase.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'pos_payment_logic.dart';
 import 'products.dart';
 import 'retail_settlements.dart';
@@ -35,6 +36,36 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   bool _saving = false;
   String _search = '';
   String _method = 'pendiente';
+  String? _activeOrg;
+  String? _activeUser;
+  int _loadGeneration = 0;
+  int _restoreGeneration = 0;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    final user = Supabase.instance.client.auth.currentUser?.id;
+    if (!mounted || (org == _activeOrg && user == _activeUser)) return;
+    _activeOrg = org;
+    _activeUser = user;
+    _loadGeneration++;
+    _restoreGeneration++;
+    _supplier.clear();
+    _reference.clear();
+    setState(() {
+      _products = null;
+      _history = const [];
+      _lines.clear();
+      _pending = null;
+      _error = null;
+      _recoveryError = null;
+      _recovering = true;
+      _saving = false;
+      _search = '';
+      _method = 'pendiente';
+    });
+    _restore();
+    _load();
+  }
 
   bool get _allowed => Access.instance.has('stock') && Access.instance.isAdmin;
   String get _currency => AppState.instance.profile?.currency.isNotEmpty == true
@@ -44,39 +75,55 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    _activeUser = Supabase.instance.client.auth.currentUser?.id;
+    AppState.instance.addListener(_onCompanyChange);
     _restore();
     _load();
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     _supplier.dispose();
     _reference.dispose();
     super.dispose();
   }
 
   Future<void> _restore() async {
+    final user = Supabase.instance.client.auth.currentUser?.id;
+    final org = Repo.activeOrgId;
+    final generation = ++_restoreGeneration;
     try {
-      final user = Supabase.instance.client.auth.currentUser?.id;
-      final org = Repo.activeOrgId;
       if (user == null || org == null) throw const FormatException('Inicia sesión y elige una empresa');
       final pending = await RetailPurchaseStore.load(user, org);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user ||
+          generation != _restoreGeneration) {
+        return;
+      }
       setState(() {
         _pending = pending;
         _recoveryError = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _recoveryError = 'No se pudo comprobar la compra pendiente: $e');
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == user && generation == _restoreGeneration) {
+        setState(() => _recoveryError = 'No se pudo comprobar la compra pendiente: $e');
+      }
     } finally {
-      if (mounted) setState(() => _recovering = false);
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == user && generation == _restoreGeneration) {
+        setState(() => _recovering = false);
+      }
     }
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final generation = ++_loadGeneration;
     if (!_allowed) return;
     try {
-      final org = Repo.activeOrgId;
       if (org == null) throw AppException('Selecciona una empresa.');
       final products = await Repo.listProducts(activeOnly: true);
       // A missing receipt table is a missing migration, not an empty history.
@@ -86,14 +133,14 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
           .eq('org_id', org)
           .order('created_at', ascending: false)
           .limit(30);
-      if (!mounted || Repo.activeOrgId != org) return;
+      if (!mounted || Repo.activeOrgId != org || generation != _loadGeneration) return;
       setState(() {
         _products = products.where((p) => !p.isService).toList();
         _history = [for (final row in rows) Map<String, dynamic>.from(row)];
         _error = null;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && Repo.activeOrgId == org && generation == _loadGeneration) {
         setState(() => _error =
           'No se pudo cargar compras. Revisa la migración de recepción en staging. ${friendly(e)}');
       }
@@ -101,6 +148,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
   }
 
   Future<void> _editLine(Product product) async {
+    final org = Repo.activeOrgId;
     if (_saving || _recovering || _pending != null || _recoveryError != null) return;
     final existing = _lines[product.id];
     final qty = TextEditingController(text: existing?.quantity.toStringAsFixed(2) ?? '1');
@@ -157,11 +205,15 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       ),
     );
     disposeAfterClose([qty, cost]);
-    if (item != null && mounted) setState(() => _lines[product.id] = item);
+    if (item != null && mounted && Repo.activeOrgId == org && _allowed) {
+      setState(() => _lines[product.id] = item);
+    }
   }
 
   Future<void> _submit({PendingRetailPurchase? retry}) async {
-    if (_saving || _recovering || _recoveryError != null) return;
+    final originOrg = Repo.activeOrgId;
+    final originUser = Supabase.instance.client.auth.currentUser?.id;
+    if (!_allowed || _saving || _recovering || _recoveryError != null) return;
     if (retry == null && (_lines.isEmpty || _supplier.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Indica el proveedor y al menos un producto.')),
@@ -183,13 +235,18 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
           ],
         ),
       );
-      if (confirmation != true || !mounted) return;
+      if (confirmation != true || !mounted || Repo.activeOrgId != originOrg ||
+          Supabase.instance.client.auth.currentUser?.id != originUser) {
+        return;
+      }
     }
     setState(() => _saving = true);
     try {
       final user = Supabase.instance.client.auth.currentUser?.id;
       final org = Repo.activeOrgId;
-      if (user == null || org == null) throw AppException('Sesión o empresa no válida');
+      if (user == null || org == null || org != originOrg || user != originUser) {
+        throw AppException('Sesión o empresa no válida');
+      }
       final purchase = retry ?? PendingRetailPurchase(
         orgId: org, userId: user, requestId: Repo.newRequestId(),
         supplier: _supplier.text.trim(), reference: _reference.text.trim(),
@@ -199,11 +256,17 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
         throw AppException('No se puede reintentar una compra de otra cuenta.');
       }
       if (retry == null) await RetailPurchaseStore.save(purchase);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user) {
+        return;
+      }
       setState(() => _pending = purchase);
       final receiptId = await RetailPurchaseRepo.receive(purchase);
       await RetailPurchaseStore.clear(purchase);
-      if (!mounted) return;
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != user) {
+        return;
+      }
       setState(() {
         _pending = null;
         _lines.clear();
@@ -218,7 +281,8 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       );
       await _load();
     } catch (e) {
-      if (mounted) {
+      if (mounted && Repo.activeOrgId == originOrg &&
+          Supabase.instance.client.auth.currentUser?.id == originUser) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Recepción sin confirmar. Reintenta con la misma solicitud. ${friendly(e)}')),
         );
@@ -249,9 +313,22 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     final products = (_products ?? const <Product>[])
         .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
         .toList();
-    return Scaffold(
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: RetailVisual.navy,
+        colorScheme: ColorScheme.fromSeed(seedColor: RetailVisual.violet, brightness: Brightness.dark),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true, fillColor: RetailVisual.surface,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF4B4C80))),
+        ),
+      ),
+      child: Scaffold(
+      backgroundColor: RetailVisual.navy,
       appBar: AppBar(
-        title: const Text('Compras y recepción'),
+        backgroundColor: RetailVisual.navy,
+        title: const Text('Compras y recepción', style: TextStyle(fontWeight: FontWeight.w900)),
         actions: [
           IconButton(
             onPressed: () => _openSettlement(),
@@ -297,7 +374,20 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
                   children: [
-                    const Text('1. ¿A quién compraste?'),
+                    RetailVisual.hero(
+                       context: context,
+                       eyebrow: 'Plan Básico · Compras',
+                       title: 'Recibe mercadería',
+                       subtitle: 'Registra proveedor, cantidades y costos reales. El stock se actualiza al confirmar.',
+                       icon: Icons.local_shipping_rounded,
+                       footer: Row(children: [
+                         Expanded(child: RetailVisual.microStat('Productos', '${_lines.length} seleccionados')),
+                         const SizedBox(width: 12),
+                         Expanded(child: RetailVisual.microStat('Importe', money(_total / 100, _currency))),
+                       ]),
+                     ),
+                     RetailVisual.section(number: 1, title: 'Proveedor',
+                       subtitle: 'Identifica de quién recibiste mercadería', icon: Icons.storefront_rounded),
                     TextField(
                       controller: _supplier,
                       maxLength: 120,
@@ -309,7 +399,9 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                       decoration: const InputDecoration(labelText: 'Documento del proveedor (opcional)'),
                     ),
                     const SizedBox(height: 12),
-                    const Text('2. Productos recibidos'),
+                    RetailVisual.section(number: 2, title: 'Productos recibidos',
+                       subtitle: 'Busca un producto y registra las unidades que ingresan',
+                       icon: Icons.inventory_2_rounded),
                     TextField(
                       decoration: const InputDecoration(
                         prefixIcon: Icon(Icons.search),
@@ -320,17 +412,23 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     if (products.isEmpty)
                       const Padding(padding: EdgeInsets.all(12), child: Text('No se encontraron productos. Agrégalos al catálogo.')),
                     for (final p in products.take(40))
-                      ListTile(
-                        title: Text(p.name),
+                      Card(color: RetailVisual.surface,
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15),
+                          side: const BorderSide(color: Color(0xFF474777))),
+                        child: ListTile(
+                        title: Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
                         subtitle: Text('Stock: ${p.stock == null ? 'sin control' : qtyText(p.stock!)}'
                             ' · Costo anterior: ${money(p.unitCost ?? 0, _currency)}'),
                         trailing: IconButton(
                           tooltip: 'Agregar a recepción',
                           onPressed: () => _editLine(p),
-                          icon: Icon(_lines.containsKey(p.id) ? Icons.check_circle_rounded : Icons.add_circle_outline),
+                          icon: Icon(_lines.containsKey(p.id) ? Icons.check_circle_rounded : Icons.add_circle_outline,
+                            color: const Color(0xFF61E3D0)),
                         ),
                         onTap: () => _editLine(p),
-                      ),
+                      )),
                     TextButton.icon(
                       onPressed: () async {
                         await Navigator.of(context).push(MaterialPageRoute<void>(
@@ -343,7 +441,8 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     ),
                     if (_lines.isNotEmpty) ...[
                       const Divider(),
-                      const Text('Esta recepción'),
+                      RetailVisual.section(number: 3, title: 'Resumen de recepción',
+                         subtitle: 'Confirma cantidades y costo', icon: Icons.fact_check_rounded),
                       for (final entry in _lines.entries)
                         ListTile(
                           title: Text((_products ?? []).where((p) => p.id == entry.key).firstOrNull?.name ?? entry.key),
@@ -354,11 +453,18 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                             onPressed: () => setState(() => _lines.remove(entry.key)),
                           ),
                         ),
-                      Text('Total de compra: ${money(_total / 100, _currency)}',
-                          style: Theme.of(context).textTheme.titleLarge),
+                      RetailVisual.panel(context, child: Row(children: [
+                         const Expanded(child: Text('TOTAL DE COMPRA', style: TextStyle(
+                           color: Color(0xFFBDB3E0), fontWeight: FontWeight.w800, fontSize: 11))),
+                         Flexible(child: Text(money(_total / 100, _currency),
+                           textAlign: TextAlign.end, style: const TextStyle(
+                             color: Color(0xFF6FEBD4), fontWeight: FontWeight.w900, fontSize: 19))),
+                       ])),
                     ],
                     const SizedBox(height: 20),
-                    const Text('3. ¿Ya se pagó?'),
+                    RetailVisual.section(number: 4, title: '¿Ya pagaste al proveedor?',
+                       subtitle: 'La deuda pendiente no es un egreso de caja',
+                       icon: Icons.account_balance_wallet_rounded),
                     DropdownButtonFormField<String>(
                       initialValue: _method,
                       items: const [
@@ -377,15 +483,24 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                         : 'Se ingresa el stock y se registra el gasto; el efectivo también se descuenta del saldo de caja.',
                         style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: _saving || _lines.isEmpty || _total <= 0 ? null : _submit,
-                      icon: const Icon(Icons.inventory_rounded),
-                      label: const Text('Confirmar recepción'),
-                    ),
+                    SizedBox(width: double.infinity, height: 54, child: FilledButton.icon(
+                       key: const ValueKey('purchase-confirm-receipt'),
+                       style: FilledButton.styleFrom(
+                         backgroundColor: RetailVisual.violet, foregroundColor: Colors.white,
+                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                       onPressed: _saving || _lines.isEmpty || _total <= 0 ? null : _submit,
+                       icon: Icon(_saving ? Icons.hourglass_top_rounded : Icons.inventory_rounded),
+                       label: Text(_saving ? 'Registrando recepción…' : 'Confirmar recepción',
+                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                     )),
                     const SizedBox(height: 24),
-                    Text('Recepciones recientes', style: Theme.of(context).textTheme.titleMedium),
+                    RetailVisual.section(number: 5, title: 'Recepciones recientes',
+                       subtitle: 'Historial y pagos pendientes', icon: Icons.history_rounded),
                     for (final receipt in _history)
-                      ListTile(
+                      Card(color: RetailVisual.surface,
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        child: ListTile(
                         leading: const Icon(Icons.receipt_long_outlined),
                         title: Text((receipt['supplier_name'] ?? '') as String),
                         subtitle: Text('${(receipt['created_at'] ?? '').toString().split('T').first} · ${receipt['payment_method']}'),
@@ -400,9 +515,9 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                               )),
                         onTap: receipt['payment_method'] == 'pendiente'
                             ? () => _openSettlement(receipt) : null,
-                      ),
+                      )),
                   ],
                 ),
-    );
+    ));
   }
 }

@@ -13,6 +13,17 @@ void main() {
     }
   });
 
+  test('límites y días de prueba de la app coinciden con docs/facturavoz-planes.json', () {
+    final j = jsonDecode(File('../docs/facturavoz-planes.json').readAsStringSync()) as Map<String, dynamic>;
+    for (final p in j['plans'] as List) {
+      final m = p as Map<String, dynamic>;
+      final f = m['features'] as Map<String, dynamic>;
+      expect(planLimits[m['code']]!.users, f['max_users'], reason: 'usuarios ${m['code']}');
+      expect(planLimits[m['code']]!.branches, f['max_branches'], reason: 'sucursales ${m['code']}');
+      expect(planTrialDays[m['code']], m['trial_days'], reason: 'prueba ${m['code']}');
+    }
+  });
+
   test('texto de precio', () {
     expect(planPriceText('BASICO'), 'S/ 29 al mes');
     expect(planPriceText('EMPRESA'), 'S/ 119 al mes');

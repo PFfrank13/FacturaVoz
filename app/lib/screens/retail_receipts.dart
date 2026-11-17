@@ -59,9 +59,33 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
   int _limit = 100;
   bool _showHistoryOnly = false;
   final ScrollController _listController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String? _activeOrg;
+  int _fetchGeneration = 0;
+
+  /// Clear prior-tenant records immediately, even before a new network read.
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (org == _activeOrg || !mounted) return;
+    _activeOrg = org;
+    _fetchGeneration++;
+    _searchController.clear();
+    setState(() {
+      _invoices = const [];
+      _query = '';
+      _filter = 'all';
+      _error = null;
+      _limit = 100;
+      _showHistoryOnly = false;
+      _loading = true;
+    });
+    _refresh();
+  }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
+    _searchController.dispose();
     _listController.dispose();
     super.dispose();
   }
@@ -75,6 +99,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
 
   Future<void> _shareExisting() async {
     if (_loading || _error != null) return;
+    final org = Repo.activeOrgId;
     if (_invoices.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Todavía no hay comprobantes que compartir. Registra una venta primero.'),
@@ -118,7 +143,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
         ),
       ),
     );
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted || Repo.activeOrgId != org) return;
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => InvoiceDetailScreen(invoiceId: selected.id, autoSharePdf: true),
     ));
@@ -128,18 +153,23 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
     _refresh();
   }
 
   Future<void> _refresh() async {
     final org = Repo.activeOrgId;
+    final generation = ++_fetchGeneration;
     setState(() { _loading = true; _error = null; });
     try {
       final entries = await Repo.listInvoices(limit: _limit);
-      if (!mounted || Repo.activeOrgId != org) return;
+      if (!mounted || generation != _fetchGeneration || Repo.activeOrgId != org) return;
       setState(() { _invoices = entries; _loading = false; });
     } catch (e) {
-      if (mounted) setState(() { _error = friendly(e); _loading = false; });
+      if (mounted && generation == _fetchGeneration && Repo.activeOrgId == org) {
+        setState(() { _error = friendly(e); _loading = false; });
+      }
     }
   }
 
@@ -373,6 +403,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                 const SizedBox(height: 10),
                 TextField(
                   key: const ValueKey('receipt-search'),
+                  controller: _searchController,
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search_rounded),
                     hintText: 'Cliente, DNI/RUC o número',

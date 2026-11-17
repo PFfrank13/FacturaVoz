@@ -5,9 +5,11 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'access.dart';
+import 'logic/data_scope.dart';
 import 'errors.dart';
 import 'models.dart';
 import 'services/boot_cache.dart';
+import 'services/app_lock.dart' show appNavigatorKey;
 import 'services/live.dart';
 import 'services/repo.dart';
 import 'services/v2_repo.dart';
@@ -127,6 +129,10 @@ class AppState extends ChangeNotifier {
 
   /// Cambia de empresa y lo recuerda en la cuenta (user_metadata).
   Future<void> switchOrg(Org o) async {
+    // §9: ninguna pantalla de la empresa anterior queda abierta (sus respuestas tardías se descartan porque el
+    // widget ya no está montado) y el Inicio se reconstruye con la clave de la nueva empresa (main.dart).
+    appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+    dataScope.value++;
     Access.instance.invalidateLicenseCheck();
     Repo.activeOrgId = o.id;
     V2Repo.forgetSettings();
@@ -158,6 +164,7 @@ class AppState extends ChangeNotifier {
   }
 
   void clear() {
+    dataScope.value++;
     BootCache.wipe();
     LiveHub.instance.stop();
     LiveCache.clear();

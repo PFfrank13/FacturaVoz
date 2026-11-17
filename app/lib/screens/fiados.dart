@@ -8,10 +8,12 @@ import '../errors.dart';
 import '../models.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
+import '../services/repo.dart';
 import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'client_profile.dart';
 import 'trash.dart';
 
@@ -29,6 +31,22 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
   String? _error;
   String _q = '';
   bool _all = false;
+  String? _activeOrg;
+  int _fetchGeneration = 0;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || org == _activeOrg) return;
+    _activeOrg = org;
+    _fetchGeneration++;
+    setState(() {
+      _list = null;
+      _error = null;
+      _q = '';
+      _all = false;
+    });
+    _load();
+  }
 
   @override
   List<String> get liveTables => const ['credit_ledger', 'clients'];
@@ -39,6 +57,8 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
     _list = LiveCache.get<List<CreditBalance>>('fiados.list');
     _load();
     startLive(); // tiempo real
@@ -46,13 +66,17 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     stopLive();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final generation = ++_fetchGeneration;
     try {
       final r = await V2Repo.creditBalances();
+      if (!mounted || Repo.activeOrgId != org || generation != _fetchGeneration) return;
       LiveCache.put('fiados.list', r);
       if (mounted) {
         setState(() {
@@ -61,7 +85,9 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = V2Repo.missingHint(e));
+      if (mounted && Repo.activeOrgId == org && generation == _fetchGeneration) {
+        setState(() => _error = V2Repo.missingHint(e));
+      }
     }
   }
 
@@ -88,13 +114,17 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
                     Reveal(
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26)),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Te deben en fiados', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
-                          CountUp(value: total, builder: (_, v) => Text(money(v, _cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800))),
-                          Text('${list.where((b) => b.balance > 0).length} clientes con saldo', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
+                      child: RetailVisual.hero(
+                        context: context,
+                        eyebrow: 'Plan Básico · Fiados',
+                        title: 'Tus fiados, al día',
+                        subtitle: 'Consulta deudas, registra abonos y da seguimiento con el historial real.',
+                        icon: Icons.menu_book_rounded,
+                        footer: Row(children: [
+                          Expanded(child: RetailVisual.microStat('Total por cobrar', money(total, _cur))),
+                          const SizedBox(width: 10),
+                          Expanded(child: RetailVisual.microStat('Clientes con saldo',
+                            '${list.where((b) => b.balance > 0).length}')),
                         ]),
                       ),
                     ),

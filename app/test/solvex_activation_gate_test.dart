@@ -38,17 +38,17 @@ void main() {
     expect(planHas(const LicenseInfo(enforced: true, source: 'hub', mode: 'blocked', features: {'stock': true}), 'stock'), isFalse);
   });
 
-  test('modo local verificado mantiene permisos por plan y no habilita Pro', () {
+  test('v3.4 transición: la licencia local heredada mantiene su plan hasta la FASE B; bloqueada, vencida o dev nunca', () {
     const license = LicenseInfo(
       enforced: true, source: 'local', mode: 'full', plan: 'BASICO',
       features: {'stock': true, 'fiados': true, 'caja': true, 'copiloto': false, 'max_users': 1},
     );
     expect(planHas(license, 'stock'), isTrue);
-    expect(planHas(license, 'fiados'), isTrue);
     expect(planHas(license, 'copiloto'), isFalse);
     expect(planLimit(license, 'max_users'), 1);
     expect(planHas(const LicenseInfo(enforced: true, source: 'local', mode: 'blocked', features: {'stock': true}), 'stock'), isFalse);
     expect(planHas(const LicenseInfo(enforced: true, source: 'local', mode: 'full', stale: true, features: {'stock': true}), 'stock'), isFalse);
+    expect(planHas(const LicenseInfo(enforced: true, source: 'dev', mode: 'full', features: {'stock': true}), 'stock'), isFalse);
   });
 
   test('sólo el Hub concede funciones activas incluidas en el plan', () {

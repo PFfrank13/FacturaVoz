@@ -9,9 +9,12 @@ import '../models_v2.dart';
 import '../services/v2_api.dart';
 import '../services/v2_repo.dart';
 import '../services/live.dart';
+import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/ds.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_visual.dart';
 import 'client_profile.dart' show shortDateTime;
 
 class CashDayScreen extends StatefulWidget {
@@ -28,6 +31,23 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
   Map<String, dynamic>? _closing;
   String? _error;
   bool _busy = false;
+  String? _activeOrg;
+  int _loadGeneration = 0;
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || org == _activeOrg) return;
+    _activeOrg = org;
+    _loadGeneration++;
+    setState(() {
+      _day = todayIso();
+      _sum = null;
+      _moves = const [];
+      _closing = null;
+      _error = null;
+    });
+    _load();
+  }
 
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
 
@@ -40,6 +60,8 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
   @override
   void initState() {
     super.initState();
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
     _sum = LiveCache.get<DaySummary>('cash.$_day.sum');
     _moves = LiveCache.get<List<CashMove>>('cash.$_day.moves') ?? const [];
     _closing = LiveCache.get<Map<String, dynamic>>('cash.$_day.closing');
@@ -49,15 +71,20 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     stopLive();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final org = Repo.activeOrgId;
+    final day = _day;
+    final generation = ++_loadGeneration;
     try {
-      final s = await V2Repo.daySummary(_day);
-      final m = await V2Repo.cashMoves(_day);
-      final c = await V2Repo.dayClosing(_day);
+      final s = await V2Repo.daySummary(day);
+      final m = await V2Repo.cashMoves(day);
+      final c = await V2Repo.dayClosing(day);
+      if (!mounted || Repo.activeOrgId != org || _day != day || generation != _loadGeneration) return;
       LiveCache.put('cash.$_day.sum', s);
       LiveCache.put('cash.$_day.moves', m);
       LiveCache.put('cash.$_day.closing', c);
@@ -70,7 +97,9 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = V2Repo.missingHint(e));
+      if (mounted && Repo.activeOrgId == org && _day == day && generation == _loadGeneration) {
+        setState(() => _error = V2Repo.missingHint(e));
+      }
     }
   }
 
@@ -80,6 +109,9 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     setState(() {
       _day = todayIso(d);
       _sum = null;
+      _moves = const [];
+      _closing = null;
+      _error = null;
     });
     _load();
   }
@@ -230,8 +262,14 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
       appBar: AppBar(title: const Text('Caja del día'), actions: [
         TextButton.icon(onPressed: _pickDay, icon: const Icon(Icons.calendar_today_rounded, size: 18), label: Text(isToday ? 'Hoy' : displayDate(_day))),
       ]),
+      // Acción principal SIEMPRE visible (Prompt §11/§12): abrir caja si aún no hay apertura; si no, cerrar con arqueo.
+      bottomNavigationBar: _error == null && s != null && isToday && _closing == null
+          ? (_opened
+              ? DsActionBar(label: 'Cerrar caja (arqueo)', icon: Icons.lock_clock_rounded, busy: _busy, onPressed: _busy ? null : _close)
+              : DsActionBar(label: 'Abrir caja', icon: Icons.lock_open_rounded, busy: _busy, onPressed: _busy ? null : () => _move('apertura')))
+          : null,
       body: _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          ? Center(child: DsStateView.error(message: _error!, onRetry: _load))
           : s == null
               ? const SkeletonList(count: 4)
               : AbsorbPointer(
@@ -240,19 +278,21 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                     onRefresh: _load,
                     child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                       Reveal(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26)),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('Vendido ${isToday ? 'hoy' : 'ese día'}', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85))),
-                            CountUp(value: s.salesTotal, builder: (_, v) => Text(money(v, _cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800))),
-                            Text(
-                              '${s.salesCount} ${s.salesCount == 1 ? 'venta' : 'ventas'}${s.draftsCount > 0 ? ' · ${s.draftsCount} sin emitir' : ''}',
-                              style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.9)),
-                            ),
+                        child: RetailVisual.hero(
+                          context: context,
+                          eyebrow: isToday ? 'Caja · Hoy' : 'Caja · Histórico',
+                          title: 'Control de caja',
+                          subtitle: 'Registra movimientos y cierra con un arqueo ciego. El saldo esperado solo se muestra después del cierre.',
+                          icon: Icons.account_balance_wallet_rounded,
+                          footer: Row(children: [
+                            Expanded(child: RetailVisual.microStat('Ventas del día', money(s.salesTotal, _cur))),
+                            const SizedBox(width: 10),
+                            Expanded(child: RetailVisual.microStat('Operaciones', '${s.salesCount} ventas')),
                           ]),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      if (isToday) _steps(context),
                       const SizedBox(height: 12),
                       Reveal(
                         index: 1,
@@ -298,7 +338,6 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                       const SizedBox(height: 12),
                       if (isToday && _closing == null)
                         Wrap(spacing: 8, runSpacing: 8, children: [
-                          OutlinedButton.icon(onPressed: () => _move('apertura'), icon: const Icon(Icons.lock_open_rounded), label: const Text('Apertura')),
                           OutlinedButton.icon(onPressed: () => _move('ingreso'), icon: const Icon(Icons.south_west_rounded), label: const Text('Entra efectivo')),
                           OutlinedButton.icon(onPressed: () => _move('egreso'), icon: const Icon(Icons.north_east_rounded), label: const Text('Sale efectivo')),
                         ]),
@@ -315,9 +354,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                           ),
                       ],
                       const SizedBox(height: 18),
-                      if (_closing == null)
-                        GradientButton(label: 'Cerrar la caja y enviar reporte', icon: Icons.lock_clock_rounded, busy: _busy, onPressed: _busy ? null : _close)
-                      else
+                      if (_closing != null)
                         SoftCard(
                           color: Brand.ok.withValues(alpha: 0.10),
                           child: Row(children: [
@@ -331,6 +368,21 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                   ),
                 ),
     );
+  }
+
+  /// ¿Hay apertura registrada hoy? (monto de apertura o movimiento de apertura)
+  bool get _opened => (_sum?.opening ?? 0) > 0 || _moves.any((m) => m.kind == 'apertura');
+
+  /// Apertura → Movimientos → Arqueo → Cierre. Antes del cierre no se muestran montos (arqueo ciego).
+  Widget _steps(BuildContext context) {
+    final closed = _closing != null;
+    final moves = _moves.where((m) => m.kind != 'apertura').length;
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      DsStatus(_opened ? 'Apertura hecha' : '1 · Apertura pendiente', tone: _opened ? DsTone.ok : DsTone.pending),
+      DsStatus(moves == 0 ? '2 · Sin movimientos' : '2 · $moves movimiento${moves == 1 ? '' : 's'}', tone: DsTone.info),
+      DsStatus(closed ? 'Arqueo hecho' : '3 · Arqueo al cerrar', tone: closed ? DsTone.ok : DsTone.info),
+      DsStatus(closed ? 'Caja cerrada' : '4 · Cierre', tone: closed ? DsTone.ok : DsTone.info),
+    ]);
   }
 
   Widget _line(BuildContext context, String label, double v, {bool bold = false, bool signed = false}) {

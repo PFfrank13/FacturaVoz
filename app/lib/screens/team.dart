@@ -15,6 +15,9 @@ import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/ds.dart';
+import '../permissions.dart';
+import '../nav/role_matrix.dart';
 
 /// Mensaje claro de la base de datos (límite del plan, permisos) o el genérico.
 String dbMessage(Object e) {
@@ -241,6 +244,7 @@ class _InviteSheetState extends State<_InviteSheet> {
               ]),
             ),
           ),
+        _EffectivePermissions(role: _role),
         if (_msg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_msg, style: const TextStyle(color: Brand.bad))),
         const SizedBox(height: 12),
         GradientButton(label: 'Invitar', icon: Icons.send_rounded, busy: _busy, onPressed: _busy ? null : _send),
@@ -328,6 +332,7 @@ class _MemberSheetState extends State<_MemberSheet> {
         ]),
         const SizedBox(height: 6),
         Text(staffRoles[_role]?.$2 ?? 'Todo, incluso invitar y cambiar permisos.', style: t.textTheme.bodySmall),
+        _EffectivePermissions(role: _role),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: TextField(controller: _pct, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Comisión %'))),
@@ -451,6 +456,40 @@ class _CommissionsScreenState extends State<CommissionsScreen> {
                         ]),
         ),
       ]),
+    );
+  }
+}
+
+/// Ficha "Permisos efectivos" (Prompt §5): rol del rubro + lo que podrá y no podrá hacer con el plan contratado.
+class _EffectivePermissions extends StatelessWidget {
+  const _EffectivePermissions({required this.role});
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final a = Access.instance;
+    final p = previewPermissions(role, a.has);
+    final rubroRole = roleForUser(a.rubro, role);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: Text('Permisos efectivos (${p.allowed.length})', style: t.textTheme.titleSmall),
+        subtitle: Text(rubroRole.exact ? 'En tu rubro: ${rubroRole.label}' : 'En tu rubro: ${rubroRole.label} (aproximado)', style: t.textTheme.bodySmall),
+        children: [
+          Align(alignment: Alignment.centerLeft, child: Wrap(spacing: 6, runSpacing: 6, children: [for (final l in p.allowed) DsStatus(l, tone: DsTone.ok)])),
+          if (p.denied.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Align(alignment: Alignment.centerLeft, child: Text('No podrá', style: t.textTheme.labelLarge)),
+            const SizedBox(height: 6),
+            Align(alignment: Alignment.centerLeft, child: Wrap(spacing: 6, runSpacing: 6, children: [for (final l in p.denied) DsStatus(l, tone: DsTone.pending)])),
+          ],
+          if (!rubroRole.exact) Padding(padding: const EdgeInsets.only(top: 8), child: Text(rubroRole.gap, style: t.textTheme.bodySmall)),
+          const SizedBox(height: 8),
+          Text('La base de datos aplica estos permisos aunque la pantalla cambie.', style: t.textTheme.bodySmall),
+        ],
+      ),
     );
   }
 }
