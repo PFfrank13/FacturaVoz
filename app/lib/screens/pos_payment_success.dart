@@ -125,7 +125,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 builder: (_) => const RetailReceiptsScreen(),
               ))),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'El cobro se registró tras la verificación del cajero; no se comprueba automáticamente con el banco. '
               'El pago registrado no equivale a la emisión SUNAT. '
               'Para emitir boleta o factura electrónica se necesitan RUC, SOL, '
