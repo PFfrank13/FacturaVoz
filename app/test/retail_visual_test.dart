@@ -82,6 +82,14 @@ void main() {
         ));
         await tester.pumpAndSettle();
         expect(find.text('Recibe mercadería'), findsOneWidget);
+        // En 320 px y fuente grande, el ListView construye la etapa 3
+        // solo al desplazarla a pantalla; no es un error de renderizado.
+        await tester.scrollUntilVisible(
+          find.text('Paso 3 de 4'),
+          170,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
         expect(find.text('Paso 3 de 4'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
