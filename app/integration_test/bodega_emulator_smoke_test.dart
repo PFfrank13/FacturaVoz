@@ -1,6 +1,7 @@
 import 'package:facturavoz/access.dart';
 import 'package:facturavoz/models.dart';
 import 'package:facturavoz/screens/pos_cart_review.dart';
+import 'package:facturavoz/screens/pos_payment.dart';
 import 'package:facturavoz/screens/retail_basic_modules.dart';
 import 'package:facturavoz/screens/retail_receipts.dart';
 import 'package:facturavoz/ui/theme.dart';
@@ -128,4 +129,39 @@ void main() {
     expect(lines.first.quantity, 2);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('Android valida efectivo insuficiente y vuelto sin registrar ventas',
+      (tester) async {
+    PosPaymentApproval? result;
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.light),
+      home: Builder(builder: (context) => Scaffold(body: Center(
+        child: FilledButton(
+          key: const ValueKey('phase4-open-cash'),
+          onPressed: () async {
+            result = await confirmPosPayment(context,
+                method: 'efectivo', currency: 'PEN', total: 7.85);
+          },
+          child: const Text('Abrir prueba de cobro'),
+        ),
+      ))),
+    ));
+    await tester.tap(find.byKey(const ValueKey('phase4-open-cash')));
+    await tester.pumpAndSettle();
+    expect(find.text('Cobro efectivo'), findsOneWidget);
+    final confirm = find.widgetWithText(FilledButton, 'Confirmar pago');
+    await tester.enterText(find.byType(TextField).first, '7.84');
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    await tester.enterText(find.byType(TextField).first, '10.00');
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+    expect(find.textContaining('Vuelto: S/ 2.15'), findsWidgets);
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(result?.method, 'efectivo');
+    expect(result?.note, contains('Vuelto:'));
+    expect(tester.takeException(), isNull);
+  });
+
 }
