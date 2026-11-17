@@ -292,7 +292,14 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     final c = _c;
     if (c == null || org == null || _activeOrg != org) return;
     // A test must not read an earlier company's printer after an org switch.
-    await _printerWrite;
+    try {
+      await _printerWrite;
+    } catch (_) {
+      if (mounted && Repo.activeOrgId == org) {
+        setState(() => _msg = 'No se pudo guardar la impresora; no se hará la prueba.');
+      }
+      return;
+    }
     if (!mounted || Repo.activeOrgId != org) return;
     final data = TicketData(
       issuerName: 'PRUEBA DE IMPRESIÓN',
