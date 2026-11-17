@@ -267,7 +267,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
         edgeOffset: 140,
         child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
           SliverToBoxAdapter(
-            child: HomeHeader(
+            child: Padding(
+              padding: isBodegaBasic
+                  ? const EdgeInsets.fromLTRB(16, 12, 16, 0)
+                  : EdgeInsets.zero,
+              child: HomeHeader(
+              compact: isBodegaBasic,
               name: AppState.instance.activeOrg?.name ?? '',
               currency: cur,
               total: seeMoney ? monthTotal : 0,
@@ -281,13 +286,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               onGoal: () => _setGoal(monthTotal),
               todayTotal: seeMoney && _today != null ? todayTotal : null,
               todayCount: todayCount,
-              onMenu: () => pushPremium(context, const MenuScreen()),
-              onSale: !isBodegaBasic && a.rubro == 'bodega' && a.can('sell') && a.has('facturar')
-                  ? () {
-                      final pos = featureById('pos');
-                      if (pos != null && pos.allowed) openFeature(context, pos);
-                    }
-                  : null,
+              // La navegación y las acciones de voz viven únicamente en MainShell.
+              onMenu: null,
+              onSale: null,
+              ),
             ),
           ),
           if (_primary(a) case final p?)
