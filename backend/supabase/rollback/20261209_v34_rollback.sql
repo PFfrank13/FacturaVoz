@@ -1,4 +1,4 @@
--- ROLLBACK de 20261209_v34_licencias_solo_hub.sql (solo si la verificación posterior falla).
+-- ROLLBACK de la FASE B (20261210) y de la reconciliación de la FASE A (20261209), solo si la verificación posterior falla.
 -- Restaura EXACTAMENTE el estado de licencias anterior desde private.license_v34_backups y la lógica previa de
 -- org_mode/effective_features/license_enforced que tenía producción. No toca datos de negocio.
 -- Probado en PostgreSQL 17 sobre la réplica de producción (tests/upgrade/run_upgrade.sh --rollback).
@@ -72,6 +72,42 @@ begin
   end loop;
   return coalesce(l.features,'{}'::jsonb) || out;
 end $$;
+-- my_license de la FASE A (stale solo para licencias del Hub, enforced/dev según la configuración).
+create or replace function private.my_license_impl(p_org uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare
+  l public.org_licenses;
+  v_admin boolean;
+  v_owner boolean;
+begin
+  if not exists (select 1 from public.organization_members m where m.org_id = p_org and m.user_id = (select auth.uid())) then
+    raise exception 'Sin acceso' using errcode = '42501';
+  end if;
+  v_admin := private.is_org_admin(p_org);
+  v_owner := exists (select 1 from public.organization_members m where m.org_id = p_org and m.user_id = (select auth.uid()) and m.role = 'owner');
+  select * into l from public.org_licenses where org_id = p_org;
+  return jsonb_build_object(
+    'enforced', private.license_enforced(),
+    'dev', not private.license_enforced(),
+    'source', l.source,
+    'mode', private.org_mode(p_org),
+    'plan', coalesce(l.plan, 'BASICO'),
+    'status', coalesce(l.status, 'pendiente'),
+    'features', private.effective_features(p_org),
+    'message', l.message,
+    'pay_url', case when v_owner then l.pay_url end,
+    'period_end', l.period_end,
+    'grace_end', l.grace_end,
+    'cut_at', coalesce(l.cut_at, l.grace_end),
+    'is_trial', l.status = 'prueba',
+    'last_sync_at', case when v_admin then l.last_sync_at end,
+    'stale', l.source = 'hub' and l.token_exp is not null and l.token_exp < now(),
+    'activated', exists (select 1 from private.org_license_activations a where a.org_id = p_org and a.license_code = l.license_code),
+    'reconciling', exists (select 1 from private.license_reconcile_pending r where r.org_id = p_org),
+    'trial_requested', l.trial_requested_at is not null,
+    'is_admin', v_admin);
+end $$;
+
 -- apply_stock_on_issue y license_sync_apply se dejan: son correcciones (la primera evita "min(uuid)") y no dan acceso.
 commit;
 notify pgrst, 'reload schema';
