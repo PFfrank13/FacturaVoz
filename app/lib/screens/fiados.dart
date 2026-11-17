@@ -118,7 +118,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                     Reveal(
                       child: RetailVisual.hero(
                         context: context,
-                        eyebrow: 'Plan Básico · Fiados',
+                        eyebrow: 'Clientes · Cuentas por cobrar',
                         title: 'Tus fiados, al día',
                         subtitle: 'Consulta deudas, registra abonos y da seguimiento con el historial real.',
                         icon: Icons.menu_book_rounded,
