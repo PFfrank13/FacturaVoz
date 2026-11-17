@@ -677,7 +677,7 @@ class _PosScreenState extends State<PosScreen> {
     final recovering = _pendingCheckout != null;
     if (!recovering && _restaurant && !await _persistKitchenOrder()) return;
     if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
-        Supabase.instance.client.auth.currentUser?.id)) return;
+        Supabase.instance.client.auth.currentUser?.id)) { return; }
     final pending = _pendingCheckout;
     final lines = recovering ? pending!.items : _lines();
     if (lines.isEmpty) return;
@@ -710,7 +710,7 @@ class _PosScreenState extends State<PosScreen> {
       // The local recovery record belongs to the original company. If the
       // session changed during secure storage I/O, do not issue a remote sale.
       if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
-          Supabase.instance.client.auth.currentUser?.id)) return;
+          Supabase.instance.client.auth.currentUser?.id)) { return; }
       setState(() {
         _pendingCheckout = checkout;
         _chargeRequestId = checkout.requestId;
@@ -722,7 +722,7 @@ class _PosScreenState extends State<PosScreen> {
       // If navigation switched tenants while awaiting the response, preserve
       // the original idempotent recovery key; never link or clear the new tenant.
       if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
-          Supabase.instance.client.auth.currentUser?.id)) return;
+          Supabase.instance.client.auth.currentUser?.id)) { return; }
       // PostgreSQL confirmed the transaction. Never clear a pending key before this response.
       String? kitchenLinkError;
       if (_restaurant && _savedOrderId != null) {
@@ -788,7 +788,7 @@ class _PosScreenState extends State<PosScreen> {
     }
     if (_restaurant && !await _persistKitchenOrder()) return;
     if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
-        Supabase.instance.client.auth.currentUser?.id)) return;
+        Supabase.instance.client.auth.currentUser?.id)) { return; }
     final lines = _lines();
     if (lines.isEmpty) return;
     final p = AppState.instance.profile;
@@ -801,7 +801,7 @@ class _PosScreenState extends State<PosScreen> {
     );
     final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft, startAsCredit: credit)));
     if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
-        Supabase.instance.client.auth.currentUser?.id)) return;
+        Supabase.instance.client.auth.currentUser?.id)) { return; }
     AppState.instance.bump();
     if (id != null && mounted) {
       if (_restaurant && _savedOrderId != null) {
@@ -814,7 +814,7 @@ class _PosScreenState extends State<PosScreen> {
       if (!mounted) return;
       await _clearStoredCart(operationScope.user!, operationScope.org!);
       if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
-          Supabase.instance.client.auth.currentUser?.id)) return;
+          Supabase.instance.client.auth.currentUser?.id)) { return; }
       setState(() {
         _cart.clear();
         _coupon = null;
