@@ -354,22 +354,76 @@ Future<List<BtDevice>> pairedPrinters() async {
   return [for (final b in list) BtDevice(b.name, b.macAdress)];
 }
 
-/// Envía los bytes ESC/POS. Lanza un error con mensaje claro si algo falla (la pantalla ofrece el PDF).
-Future<void> sendEscPos(PrinterConfig c, Uint8List bytes) async {
+/// No two print jobs can disconnect/connect the same Bluetooth radio at once.
+Future<void> _printerQueue = Future<void>.value();
+
+/// La impresión se vincula a la empresa ACTIVA en el momento del intento.
+/// Un cambio de sesión antes de enviar bytes bloquea el envío en vez de usar
+/// la conexión Bluetooth que haya dejado abierta el negocio anterior.
+Future<void> sendEscPos(PrinterConfig c, Uint8List bytes) {
+  final org = Repo.activeOrgId;
+  if (org == null) {
+    throw StateError('Selecciona una empresa antes de imprimir.');
+  }
+  final job = _printerQueue.catchError((Object _) {}).then(
+      (_) => _sendEscPosScoped(c, bytes, org));
+  _printerQueue = job;
+  return job;
+}
+
+Future<void> _sendEscPosScoped(PrinterConfig c, Uint8List bytes, String org) async {
+  void checkScope() {
+    if (Repo.activeOrgId != org) {
+      throw StateError('Se cambió de empresa durante la impresión. Revisa el ticket antes de reintentar.');
+    }
+  }
+  checkScope();
   switch (c.kind) {
     case 'bt':
-      if (!bluetoothSupported) throw StateError('Bluetooth no disponible aquí. Usa "Ticket en PDF".');
+      if (!bluetoothSupported) {
+        throw StateError('Bluetooth no disponible aquí. Usa "Ticket en PDF".');
+      }
+      if (c.address.trim().isEmpty) {
+        throw StateError('Selecciona y guarda una impresora Bluetooth para esta empresa.');
+      }
       await _ensureBtPermission();
-      if (!await PrintBluetoothThermal.bluetoothEnabled) throw StateError('Enciende el Bluetooth del teléfono.');
-      var connected = await PrintBluetoothThermal.connectionStatus;
-      if (!connected) connected = await PrintBluetoothThermal.connect(macPrinterAddress: c.address);
-      if (!connected) throw StateError('No se pudo conectar con la impresora ${c.name}. ¿Está encendida y emparejada?');
+      checkScope();
+      if (!await PrintBluetoothThermal.bluetoothEnabled) {
+        throw StateError('Enciende el Bluetooth del teléfono.');
+      }
+      // connectionStatus proves only that SOME printer is connected. It does
+      // not prove that it belongs to the selected company. Never reuse it.
+      if (await PrintBluetoothThermal.connectionStatus) {
+        final released = await PrintBluetoothThermal.disconnect;
+        if (!released) {
+          throw StateError('No se pudo desconectar la impresora anterior. No se envió el ticket.');
+        }
+      }
+      checkScope();
+      final connected = await PrintBluetoothThermal.connect(
+          macPrinterAddress: c.address);
+      if (!connected) {
+        throw StateError('No se pudo conectar con la impresora ${c.name}. ¿Está encendida y emparejada?');
+      }
+      checkScope();
       final ok = await PrintBluetoothThermal.writeBytes(bytes.toList());
-      if (!ok) throw StateError('La impresora no recibió el ticket. Inténtalo de nuevo.');
+      if (!ok) {
+        throw StateError('La impresora no recibió el ticket. Inténtalo de nuevo.');
+      }
     case 'net':
-      if (!networkSupported) throw StateError('La impresión por red no está disponible en la web.');
-      final parts = c.address.split(':');
-      await sendToNetworkPrinter(parts.first, parts.length > 1 ? int.tryParse(parts[1]) ?? 9100 : 9100, bytes);
+      if (!networkSupported) {
+        throw StateError('La impresión por red no está disponible en la web.');
+      }
+      final parts = c.address.trim().split(':');
+      final host = parts.first.trim();
+      final port = parts.length == 2 ? int.tryParse(parts[1]) : 9100;
+      if (parts.length > 2 || host.isEmpty ||
+          !RegExp(r'^[a-zA-Z0-9.-]+).hasMatch(host) ||
+          port == null || port < 1 || port > 65535) {
+        throw StateError('IP o puerto de la impresora inválidos. Revísalos en Ajustes.');
+      }
+      checkScope();
+      await sendToNetworkPrinter(host, port, bytes);
     default:
       throw StateError('Elige una impresora Bluetooth o de red, o usa el ticket en PDF.');
   }
