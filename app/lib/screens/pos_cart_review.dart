@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../ui/retail_visual.dart';
+import '../ui/theme.dart';
 import 'client_profile.dart' show StorageImage;
 
 enum RetailCartAction { collect, credit }
@@ -31,26 +32,14 @@ class PosCartReviewScreen extends StatefulWidget {
 }
 
 class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
-  static const _background = Color(0xFF0B1030);
-  static const _surface = Color(0xFF1B214A);
-  static const _purple = Color(0xFF9658FA);
-
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
     final items = widget.lines();
     final total = computeTotals(items, widget.taxRate);
     final count = items.fold<double>(0, (sum, item) => sum + item.quantity);
-    return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: _background,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _purple,
-          brightness: Brightness.dark,
-        ),
-      ),
-      child: Scaffold(
+    return Scaffold(
         appBar: AppBar(
-          backgroundColor: _background,
           title: const Text('Carrito de venta'),
           actions: [
             IconButton(
@@ -100,12 +89,13 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                 ),
                 Expanded(
                   child: items.isEmpty
-                    ? const Center(child: Column(
+                    ? Center(child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.remove_shopping_cart_outlined, size: 54, color: Color(0xFFC0A6FF)),
-                          SizedBox(height: 14),
-                          Text('El carrito está vacío.'),
+                          Icon(Icons.remove_shopping_cart_outlined, size: 54,
+                            color: t.colorScheme.primary),
+                          const SizedBox(height: 14),
+                          const Text('El carrito está vacío.'),
                         ],
                       ))
                     : ListView.separated(
@@ -119,9 +109,9 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                           return Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: _surface,
-                              borderRadius: BorderRadius.circular(17),
-                              border: Border.all(color: const Color(0xFF655B98)),
+                              color: t.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(Radii.lg),
+                              border: Border.all(color: t.colorScheme.outline),
                             ),
                             child: Row(children: [
                               SizedBox(
@@ -129,9 +119,10 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(11),
                                   child: imagePath.isEmpty
-                                    ? const ColoredBox(
-                                        color: Color(0xFF343066),
-                                        child: Icon(Icons.inventory_2_outlined, color: Color(0xFFC9B9FF)),
+                                    ? ColoredBox(
+                                        color: t.colorScheme.surfaceContainerHigh,
+                                        child: Icon(Icons.inventory_2_outlined,
+                                          color: t.colorScheme.primary),
                                       )
                                     : StorageImage(path: imagePath),
                                 ),
@@ -146,7 +137,8 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                                   const SizedBox(height: 6),
                                   Text(money(item.unitPrice, widget.currency),
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFFBAB6D7))),
+                                    style: t.textTheme.bodySmall?.copyWith(
+                                      color: t.colorScheme.onSurfaceVariant)),
                                   const SizedBox(height: 7),
                                   Row(children: [
                                     SizedBox(
@@ -192,9 +184,10 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                       ),
                 ),
                 Container(
-                  decoration: const BoxDecoration(
-                    color: _surface,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                  decoration: BoxDecoration(
+                    color: t.colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                    border: Border(top: BorderSide(color: t.colorScheme.outline)),
                   ),
                   padding: const EdgeInsets.fromLTRB(18, 17, 18, 18),
                   child: Column(children: [
@@ -222,8 +215,8 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                       child: FilledButton.icon(
                         key: const ValueKey('retail-continue-payment'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: _purple,
-                          foregroundColor: Colors.white,
+                          backgroundColor: t.colorScheme.primary,
+                          foregroundColor: t.colorScheme.onPrimary,
                         ),
                         onPressed: items.isEmpty ? null : () => Navigator.of(context).pop(RetailCartAction.collect),
                         icon: const Icon(Icons.arrow_forward_rounded),
@@ -237,7 +230,6 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 
