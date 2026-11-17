@@ -109,6 +109,12 @@ def _https_public(url: str) -> bool:
             "example", "example.com", "example.net", "example.org",
             "test", "invalid", "localhost", "local", "internal", "home.arpa",
         )
+        # Common SDK scaffolding values look public but never identify the
+        # customer's actual backend. Block them explicitly.
+        if host.startswith("example.") or host in {
+            "example.vercel.app", "example.supabase.co",
+        }:
+            return False
         return not any(host == suffix or host.endswith("." + suffix)
                        for suffix in reserved_suffixes)
     except (ValueError, TypeError):
