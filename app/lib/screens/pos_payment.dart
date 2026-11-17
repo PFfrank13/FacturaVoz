@@ -328,7 +328,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   label: const Text('Transferencia bancaria'),
                 ),
                 const SizedBox(height: 14),
-                const Text('El efectivo calcula el vuelto. Yape, Plin y tarjeta necesitan confirmación del cajero.',
+                Text('El efectivo calcula el vuelto. Yape, Plin y tarjeta necesitan confirmación del cajero.',
                   textAlign: TextAlign.center,
                   style: t.textTheme.bodySmall?.copyWith(color: c.muted)),
               ] else ...[
@@ -360,12 +360,12 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       padding: const EdgeInsets.all(8),
                       child: StorageImage(path: _qrPath),
                     ),
-                    const Text('QR de cobro configurado por el negocio',
+                    Text('QR de cobro configurado por el negocio',
                       style: t.textTheme.bodySmall?.copyWith(color: c.muted)),
                   ],
                   if (_requiresAccount && _account.isEmpty && _qrPath.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 14),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
                       child: Text('Primero configura el medio de cobro en Ajustes. No se generará un QR ficticio.',
                         textAlign: TextAlign.center, style: TextStyle(color: c.bad)),
                     ),
