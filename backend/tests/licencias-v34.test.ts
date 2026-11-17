@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { safeNext } from "../src/lib/safe-next";
+import { evaluatePreflight } from "../src/lib/license-preflight";
 
 // ───────────── Enlace del Hub /solvex/ir/{org} y regreso tras iniciar sesión ─────────────
 const nav = vi.hoisted(() => ({
@@ -40,21 +41,27 @@ describe("safeNext: sin redirecciones abiertas", () => {
 describe("v3.4: el Hub es la única fuente comercial", () => {
   const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
   it("webhook y sincronización ya no saltan empresas 'local' y usan license_sync_apply", () => {
-    for (const f of ["../src/app/api/solvex/webhook/route.ts", "../src/app/api/cron/solvex-sync/route.ts", "../src/app/api/license/refresh/route.ts"]) {
+    for (const f of ["../src/app/api/solvex/webhook/route.ts", "../src/app/api/cron/solvex-sync/route.ts", "../src/app/api/license/refresh/route.ts"]) { // preflight solo lee
       const src = read(f);
       expect(src).not.toMatch(/source\s*===\s*"local"/);
       expect(src).toContain('"license_sync_apply"');
     }
   });
-  it("el ERP web no acepta source local", () => {
-    expect(read("../src/lib/erp/access.ts")).not.toContain('"local"');
+  it("el ERP web acepta local solo durante la transición (la FASE B lo elimina en la base)", () => {
+    expect(read("../src/lib/erp/access.ts")).toContain("FASE B");
   });
-  it("la migración v3.4 fija el control, quita local/dev y no otorga acceso al convertir", () => {
-    const sql = read("../supabase/migrations/20261209_v34_licencias_solo_hub.sql");
-    expect(sql).toMatch(/private\.license_enforced\(\)\s*returns boolean language sql immutable set search_path = '' as \$\$ select true \$\$/);
-    expect(sql).toContain("check (source = 'hub')");
-    expect(sql).toMatch(/status = 'pendiente', mode = 'blocked', features = '\{\}'::jsonb,\s*token = null/);
-    expect(sql).not.toMatch(/'local'\s*,\s*'dev'\)\s*then\s*return\s*'full'/);
+  it("FASE A no cambia el acceso de nadie; FASE B es estricta y se niega si alguien quedaría bloqueado", () => {
+    const a = read("../supabase/migrations/20261209_v34a_transicion_hub_sin_corte.sql");
+    expect(a).not.toMatch(/function private\.org_mode/);
+    expect(a).not.toMatch(/function private\.effective_features/);
+    expect(a).not.toMatch(/function private\.license_enforced/);
+    expect(a).not.toMatch(/^\s*update\s+public\.org_licenses/im);
+    expect(a).toContain("pending_code_mismatch");
+    const b = read("../supabase/migrations/20261210_v34b_licencias_solo_hub.sql");
+    expect(b).toContain("FASE B detenida para no bloquear empresas");
+    expect(b).toMatch(/private\.license_enforced\(\)\s*returns boolean language sql immutable set search_path = '' as \$\$ select true \$\$/);
+    expect(b).toContain("check (source = 'hub')");
+    expect(b).not.toMatch(/'local'\s*,\s*'dev'\)\s*then\s*return\s*'full'/);
   });
   it("las migraciones locales heredadas ya no modifican datos", () => {
     const a = read("../supabase/migrations/20261201_v32_local_dev_license_bodega.sql");
@@ -136,5 +143,36 @@ describe("POST /api/license/refresh", () => {
     db.role = "cajero";
     db.rpc.mockImplementation(async () => ({ data: false, error: null }));
     expect((await call({ org_id: ORG })).status).toBe(429);
+  });
+});
+
+// ───────────── Preflight (solo lectura) ─────────────
+
+describe("evaluatePreflight: GO solo si la reconciliación activaría la empresa", () => {
+  const base = { iss: "solvex-hub", aud: INSTANCE, tenant: ORG, lic: "LIC-PRUEBA-0001", iat: now, exp: now + 86400, plan: "BASICO", status: "prueba", mode: "full" as const, period_end: new Date(Date.now() + 7 * 86400e3).toISOString(), features: { max_users: 2 } };
+  const local = { source: "local", license_code: "LIC-PRUEBA-0001", pending_code: "LIC-PRUEBA-0001", activated_code: null };
+  const tok = (p: Record<string, unknown>) => ({ tenant: ORG, token: "x", payload: p as never });
+  it("GO: token vigente, mismo código, tenant e instancia correctos", () => {
+    const r = evaluatePreflight(ORG, [tok(base)], 0, local);
+    expect(r.verdict).toBe("GO");
+    expect(r.token).toMatchObject({ plan: "BASICO", status: "prueba", lic_last4: "0001", max_users: 2 });
+    expect(JSON.stringify(r)).not.toContain("LIC-PRUEBA-0001");
+  });
+  it("NO-GO: el Hub no tiene licencia para la empresa", () => {
+    expect(evaluatePreflight(ORG, [], 3, local)).toMatchObject({ verdict: "NO-GO", rejected_tokens_in_instance: 3 });
+  });
+  it("NO-GO: código distinto (habría que activar a mano)", () => {
+    const r = evaluatePreflight(ORG, [tok({ ...base, lic: "NUEVO-9999" })], 0, local);
+    expect(r.verdict).toBe("NO-GO");
+    expect(r.checks.codigo_coincide_con_el_de_la_empresa).toBe(false);
+  });
+  it("NO-GO: período vencido, suspendida o token vencido", () => {
+    expect(evaluatePreflight(ORG, [tok({ ...base, period_end: "2026-11-11T04:59:59Z", grace_end: "2026-11-11T04:59:59Z" })], 0, local).verdict).toBe("NO-GO");
+    expect(evaluatePreflight(ORG, [tok({ ...base, mode: "blocked", status: "suspendida" })], 0, local).verdict).toBe("NO-GO");
+    expect(evaluatePreflight(ORG, [tok({ ...base, exp: now - 10 })], 0, local).verdict).toBe("NO-GO");
+  });
+  it("toma el token más reciente del tenant", () => {
+    const r = evaluatePreflight(ORG, [tok({ ...base, iat: now - 100, plan: "BASICO" }), tok({ ...base, iat: now, plan: "PRO" })], 0, local);
+    expect(r.token?.plan).toBe("PRO");
   });
 });

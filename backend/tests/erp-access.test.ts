@@ -28,14 +28,14 @@ describe("ERP: Hub is authoritative across all nine sectors", () => {
     }
     expect(hasFeature({ ...active, mode: "warning" }, "stock")).toBe(true);
   });
-  it("v3.4: a local license grants nothing, even if it says full (Hub is the only source)", () => {
+  it("during the Hub transition a verified local license keeps its plan features; blocked or stale never", () => {
     const local = { ...active, source: "local", plan: "BASICO", features: { stock: true, fiados: true, caja: true, copiloto: false, max_users: 1 } };
-    for (const k of ["stock", "fiados", "caja", "facturar"]) expect(hasFeature(local, k)).toBe(false);
-    expect(featureLimit(local, "max_users")).toBe(0);
-    const hub = { ...local, source: "hub" };
-    expect(hasFeature(hub, "stock")).toBe(true);
-    expect(hasFeature({ ...hub, mode: "blocked" }, "stock")).toBe(false);
-    expect(hasFeature({ ...hub, stale: true }, "stock")).toBe(false);
+    expect(hasFeature(local, "stock")).toBe(true);
+    expect(hasFeature(local, "copiloto")).toBe(false);
+    expect(featureLimit(local, "max_users")).toBe(1);
+    expect(hasFeature({ ...local, mode: "blocked" }, "stock")).toBe(false);
+    expect(hasFeature({ ...local, stale: true }, "stock")).toBe(false);
+    expect(hasFeature({ ...local, source: "dev" }, "stock")).toBe(false);
   });
   it("numeric limits never unlock boolean features", () => {
     for (const value of [-1, 0, 1, 4, "true", "false", null]) expect(hasFeature({ ...active, features: { stock: value } }, "stock")).toBe(false);

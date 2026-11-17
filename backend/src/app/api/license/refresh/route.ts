@@ -45,6 +45,9 @@ export async function POST(req: Request) {
       result = String(data);
     }
     const last = mine[mine.length - 1].payload;
+    if (result === "pending_code_mismatch") {
+      return json({ ok: false, found: true, result, error: "Solvex Hub tiene una licencia para esta empresa con un código distinto al anterior. Introduce el código nuevo en \"Activar mi licencia\"; tu empresa sigue operando mientras tanto." }, 409);
+    }
     return json({ ok: true, found: true, result, plan: last.plan, status: last.status, mode: last.mode, period_end: last.period_end ?? null });
   } catch {
     // Sin registrar tokens, códigos ni datos del cliente.

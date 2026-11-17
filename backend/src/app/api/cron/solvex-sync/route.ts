@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Solvex Hub no configurado; activación obligatoria" }, { status: 503 });
   }
 
-  const out = { applied: 0, reconciled: 0, stale: 0, unknown: 0, bad_tokens: 0, trials: 0, trials_used: 0, trial_errors: 0, error: "" };
+  const out = { applied: 0, reconciled: 0, code_mismatch: 0, stale: 0, unknown: 0, bad_tokens: 0, trials: 0, trials_used: 0, trial_errors: 0, error: "" };
   try {
     const { ok, bad } = await syncAll(cfg);
     out.bad_tokens = bad;
@@ -34,6 +34,7 @@ export async function GET(req: Request) {
       const { data } = await admin.rpc("license_sync_apply", { p_org: t.tenant, p_payload: t.payload, p_token: t.token });
       if (data === "ok") out.applied++;
       else if (data === "reconciled") { out.applied++; out.reconciled++; }
+      else if (data === "pending_code_mismatch") out.code_mismatch++;
       else if (data === "stale") out.stale++;
       else out.unknown++;
     }
