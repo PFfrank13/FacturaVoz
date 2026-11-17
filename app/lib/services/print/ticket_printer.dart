@@ -19,6 +19,8 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../logic/escpos.dart';
 import '../../models.dart';
+import '../repo.dart';
+import 'printer_scope.dart';
 import 'net_print_stub.dart' if (dart.library.io) 'net_print_io.dart';
 
 // ═════════════════════════ Configuración guardada en el teléfono ═════════════════════════
@@ -58,21 +60,32 @@ class PrinterConfig {
 }
 
 class PrinterStore {
-  static const _key = 'fv_printer_v2';
   static const _s = FlutterSecureStorage();
 
-  static Future<PrinterConfig> load({int? orgWidth}) async {
+  /// No tenant = PDF only. Legacy global printer settings are intentionally NOT
+  /// imported; that shared key could belong to another company on this phone.
+  static Future<PrinterConfig> load({int? orgWidth, String? orgId}) async {
+    final key = printerStorageKey(orgId ?? Repo.activeOrgId);
+    if (key == null) return PrinterConfig(width: orgWidth == 58 ? 58 : 80);
     try {
-      final raw = await _s.read(key: _key);
-      if (raw != null && raw.isNotEmpty) return PrinterConfig.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
-    } catch (_) {}
+      final raw = await _s.read(key: key);
+      if (raw != null && raw.isNotEmpty) {
+        return PrinterConfig.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      }
+    } catch (_) {
+      // Corrupt/unreadable settings must NOT fall back to a different tenant's
+      // printer. Default to a safe local PDF and require reconfiguration.
+    }
     return PrinterConfig(width: orgWidth == 58 ? 58 : 80);
   }
 
-  static Future<void> save(PrinterConfig c) async {
-    try {
-      await _s.write(key: _key, value: jsonEncode(c.toJson()));
-    } catch (_) {}
+  /// Persist before claiming the printer was configured; storage errors matter.
+  static Future<void> save(PrinterConfig c, {String? orgId}) async {
+    final key = printerStorageKey(orgId ?? Repo.activeOrgId);
+    if (key == null) {
+      throw StateError('Selecciona una empresa antes de configurar su impresora.');
+    }
+    await _s.write(key: key, value: jsonEncode(c.toJson()));
   }
 }
 
@@ -341,22 +354,69 @@ Future<List<BtDevice>> pairedPrinters() async {
   return [for (final b in list) BtDevice(b.name, b.macAdress)];
 }
 
-/// Envía los bytes ESC/POS. Lanza un error con mensaje claro si algo falla (la pantalla ofrece el PDF).
-Future<void> sendEscPos(PrinterConfig c, Uint8List bytes) async {
+/// No two print jobs can disconnect/connect the same Bluetooth radio at once.
+Future<void> _printerQueue = Future<void>.value();
+
+/// La impresión se vincula a la empresa ACTIVA en el momento del intento.
+/// Un cambio de sesión antes de enviar bytes bloquea el envío en vez de usar
+/// la conexión Bluetooth que haya dejado abierta el negocio anterior.
+Future<void> sendEscPos(PrinterConfig c, Uint8List bytes) {
+  final org = Repo.activeOrgId;
+  if (org == null) {
+    throw StateError('Selecciona una empresa antes de imprimir.');
+  }
+  final job = _printerQueue.catchError((Object _) {}).then(
+      (_) => _sendEscPosScoped(c, bytes, org));
+  _printerQueue = job;
+  return job;
+}
+
+Future<void> _sendEscPosScoped(PrinterConfig c, Uint8List bytes, String org) async {
+  void checkScope() {
+    if (Repo.activeOrgId != org) {
+      throw StateError('Se cambió de empresa durante la impresión. Revisa el ticket antes de reintentar.');
+    }
+  }
+  checkScope();
   switch (c.kind) {
     case 'bt':
-      if (!bluetoothSupported) throw StateError('Bluetooth no disponible aquí. Usa "Ticket en PDF".');
+      if (!bluetoothSupported) {
+        throw StateError('Bluetooth no disponible aquí. Usa "Ticket en PDF".');
+      }
+      if (c.address.trim().isEmpty) {
+        throw StateError('Selecciona y guarda una impresora Bluetooth para esta empresa.');
+      }
       await _ensureBtPermission();
-      if (!await PrintBluetoothThermal.bluetoothEnabled) throw StateError('Enciende el Bluetooth del teléfono.');
-      var connected = await PrintBluetoothThermal.connectionStatus;
-      if (!connected) connected = await PrintBluetoothThermal.connect(macPrinterAddress: c.address);
-      if (!connected) throw StateError('No se pudo conectar con la impresora ${c.name}. ¿Está encendida y emparejada?');
+      checkScope();
+      if (!await PrintBluetoothThermal.bluetoothEnabled) {
+        throw StateError('Enciende el Bluetooth del teléfono.');
+      }
+      // connectionStatus proves only that SOME printer is connected. It does
+      // not prove that it belongs to the selected company. Never reuse it.
+      if (await PrintBluetoothThermal.connectionStatus) {
+        final released = await PrintBluetoothThermal.disconnect;
+        if (!released) {
+          throw StateError('No se pudo desconectar la impresora anterior. No se envió el ticket.');
+        }
+      }
+      checkScope();
+      final connected = await PrintBluetoothThermal.connect(
+          macPrinterAddress: c.address);
+      if (!connected) {
+        throw StateError('No se pudo conectar con la impresora ${c.name}. ¿Está encendida y emparejada?');
+      }
+      checkScope();
       final ok = await PrintBluetoothThermal.writeBytes(bytes.toList());
-      if (!ok) throw StateError('La impresora no recibió el ticket. Inténtalo de nuevo.');
+      if (!ok) {
+        throw StateError('La impresora no recibió el ticket. Inténtalo de nuevo.');
+      }
     case 'net':
-      if (!networkSupported) throw StateError('La impresión por red no está disponible en la web.');
-      final parts = c.address.split(':');
-      await sendToNetworkPrinter(parts.first, parts.length > 1 ? int.tryParse(parts[1]) ?? 9100 : 9100, bytes);
+      if (!networkSupported) {
+        throw StateError('La impresión por red no está disponible en la web.');
+      }
+      final endpoint = parsePrinterEndpoint(c.address);
+      checkScope();
+      await sendToNetworkPrinter(endpoint.host, endpoint.port, bytes);
     default:
       throw StateError('Elige una impresora Bluetooth o de red, o usa el ticket en PDF.');
   }

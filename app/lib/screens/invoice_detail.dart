@@ -113,8 +113,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   }
 
   Future<void> _autoPrintTicket() async {
-    final cfg = await PrinterStore.load();
-    if (cfg.kind == 'pdf' || !mounted) return; // sin impresora configurada no se abre el diálogo de PDF en cada venta
+    final org = Repo.activeOrgId;
+    if (org == null) return;
+    final cfg = await PrinterStore.load(orgId: org);
+    if (cfg.kind == 'pdf' || !mounted || Repo.activeOrgId != org) return; // sin impresora configurada no se abre el diálogo de PDF en cada venta
     await _printTicket();
   }
 
@@ -135,18 +137,25 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   /// Ticket térmico 58/80 mm: Bluetooth o red (ESC/POS) o PDF de rollo. Si la impresora falla, ofrece el PDF.
   Future<void> _printTicket() async {
+    final org = Repo.activeOrgId;
+    if (org == null || _inv == null) return;
     final inv = _inv!;
     setState(() => _busy = true);
     try {
       final brand = await _loadBrand();
-      final cfg = await PrinterStore.load(orgWidth: (_branding['ticket_width'] as num?)?.toInt());
+      if (!mounted || Repo.activeOrgId != org) return;
+      final cfg = await PrinterStore.load(
+          orgId: org, orgWidth: (_branding['ticket_width'] as num?)?.toInt());
+      if (!mounted || Repo.activeOrgId != org) return;
       final f = _fiscal;
       final data = f != null && f.status != 'rejected' ? ticketFromFiscal(f) : ticketFromInternal(inv, AppState.instance.profile!);
       if (cfg.kind == 'pdf') {
         final pdf = await buildTicketPdf(data, width: cfg.width, logo: brand.logo);
+        if (!mounted || Repo.activeOrgId != org) return;
         await Printing.layoutPdf(name: 'ticket-${f?.number ?? inv.number}.pdf', onLayout: (_) => pdf);
       } else {
         final logo = await logoRaster(brand.logo, cfg.width == 58 ? 256 : 384);
+        if (!mounted || Repo.activeOrgId != org) return;
         await sendEscPos(cfg, buildEscPosTicket(data, width: cfg.width, logo: logo, nativeQr: cfg.nativeQr, openDrawer: cfg.openDrawer));
         if (mounted) showSuccess(context, 'Ticket impreso', icon: Icons.print_rounded);
       }

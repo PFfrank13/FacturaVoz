@@ -71,6 +71,10 @@ jobs:
       # Si ya subiste android/ ios/ web/ al repo, estos dos pasos no cambian nada.
       - run: flutter create --org com.example --project-name facturavoz --platforms=android,ios,web .
       - run: dart run tool/post_create.dart
+      - name: Fase 5 - probar política de entrega sin exponer secretos
+        run: python3 -m unittest discover -s ../tools/release -p 'test_*.py'
+      - name: Fase 5 - bloquear release inseguro desde el código
+        run: python3 ../tools/release/preflight.py --source --project .
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test

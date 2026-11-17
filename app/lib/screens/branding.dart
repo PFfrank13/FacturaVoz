@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:printing/printing.dart';
 
 import '../access.dart';
+import '../app_state.dart';
+import '../services/repo.dart';
 import '../errors.dart';
 import '../services/print/ticket_printer.dart';
 import '../services/v2_repo.dart';
@@ -193,29 +195,74 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   final _ip = TextEditingController();
   String _msg = '';
   bool _busy = false;
+  String? _activeOrg;
+  int _loadGeneration = 0;
+  Future<void> _printerWrite = Future<void>.value();
+
+  void _onCompanyChange() {
+    final org = Repo.activeOrgId;
+    if (!mounted || _activeOrg == org) return;
+    _activeOrg = org;
+    _loadGeneration++;
+    _ip.clear();
+    setState(() {
+      _c = null;
+      _devices = const [];
+      _msg = '';
+    });
+    _loadPrinter();
+  }
+
+  Future<void> _loadPrinter() async {
+    final org = Repo.activeOrgId;
+    final generation = ++_loadGeneration;
+    try {
+      final brand = await V2Repo.branding();
+      if (!mounted || Repo.activeOrgId != org || generation != _loadGeneration) return;
+      final c = await PrinterStore.load(
+          orgId: org, orgWidth: (brand['ticket_width'] as num?)?.toInt());
+      if (!mounted || Repo.activeOrgId != org || generation != _loadGeneration) return;
+      setState(() {
+        _c = c;
+        _ip.text = c.kind == 'net' ? c.address : '';
+      });
+    } catch (_) {
+      if (!mounted || Repo.activeOrgId != org || generation != _loadGeneration) return;
+      setState(() {
+        _c = const PrinterConfig();
+        _msg = 'No se pudo cargar la configuración; se usará PDF hasta comprobar la impresora.';
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    V2Repo.branding().then((b) async {
-      final c = await PrinterStore.load(orgWidth: (b['ticket_width'] as num?)?.toInt());
-      if (!mounted) return;
-      setState(() {
-        _c = c;
-        if (c.kind == 'net') _ip.text = c.address;
-      });
-    });
+    _activeOrg = Repo.activeOrgId;
+    AppState.instance.addListener(_onCompanyChange);
+    _loadPrinter();
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_onCompanyChange);
     _ip.dispose();
     super.dispose();
   }
 
-  Future<void> _set(PrinterConfig c) async {
-    setState(() => _c = c);
-    await PrinterStore.save(c);
+  void _set(PrinterConfig c) {
+    final org = Repo.activeOrgId;
+    if (org == null || _activeOrg != org) return;
+    setState(() { _c = c; _msg = ''; });
+    // Writes are serialized: typing a second IP cannot be overwritten by an
+    // earlier slow secure-storage write. The key always belongs to this org.
+    _printerWrite = _printerWrite.catchError((Object _) {})
+        .then((_) => PrinterStore.save(c, orgId: org));
+    _printerWrite.catchError((Object _) {
+      if (mounted && Repo.activeOrgId == org) {
+        setState(() => _msg = 'No se guardó la impresora. Revisa el almacenamiento del teléfono.');
+      }
+    });
   }
 
   Future<void> _scanBt() async {
@@ -224,20 +271,36 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       _msg = '';
     });
     try {
+      final org = Repo.activeOrgId;
       final d = await pairedPrinters();
+      if (!mounted || Repo.activeOrgId != org) return;
       setState(() {
         _devices = d;
         _msg = d.isEmpty ? 'No hay impresoras emparejadas. Empareja la impresora en Ajustes → Bluetooth del teléfono (PIN usual: 0000 o 1234).' : '';
       });
     } catch (e) {
-      setState(() => _msg = e is StateError ? e.message : 'No se pudo usar el Bluetooth: revisa el permiso "Dispositivos cercanos".');
+      if (mounted) {
+        setState(() => _msg = e is StateError ? e.message : 'No se pudo usar el Bluetooth: revisa el permiso "Dispositivos cercanos".');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _test() async {
+    final org = Repo.activeOrgId;
     final c = _c;
-    if (c == null) return;
+    if (c == null || org == null || _activeOrg != org) return;
+    // A test must not read an earlier company's printer after an org switch.
+    try {
+      await _printerWrite;
+    } catch (_) {
+      if (mounted && Repo.activeOrgId == org) {
+        setState(() => _msg = 'No se pudo guardar la impresora; no se hará la prueba.');
+      }
+      return;
+    }
+    if (!mounted || Repo.activeOrgId != org) return;
     final data = TicketData(
       issuerName: 'PRUEBA DE IMPRESIÓN',
       issuerRuc: '',
@@ -260,8 +323,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     try {
       if (c.kind == 'pdf') {
         final pdf = await buildTicketPdf(data, width: c.width);
+        if (!mounted || Repo.activeOrgId != org) return;
         await Printing.layoutPdf(name: 'ticket-prueba.pdf', onLayout: (_) => pdf);
       } else {
+        if (!mounted || Repo.activeOrgId != org) return;
         await sendEscPos(c, buildEscPosTicket(data, width: c.width, nativeQr: c.nativeQr, openDrawer: c.openDrawer));
         _msg = '¡Listo! Si el QR no salió, desactiva "QR nativo".';
       }
