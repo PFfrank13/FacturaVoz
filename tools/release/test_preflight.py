@@ -36,7 +36,7 @@ class ReleasePreflightTests(unittest.TestCase):
         self.values = {
             "SUPABASE_URL": "https://real-project.supabase.co",
             "SUPABASE_ANON_KEY": "sb_publishable_" + "X" * 20,
-            "API_BASE_URL": "https://facturavoz.example.org",
+            "API_BASE_URL": "https://app.facturavozperu.pe",
             "APP_VERSION": "3.3.0",
         }
         self._save()
@@ -95,6 +95,35 @@ class ReleasePreflightTests(unittest.TestCase):
         self.values["API_BASE_URL"] = "https://example.vercel.app"
         self._save()
         self.assertEqual(2, len(defines_errors(self.defines, "3.3.0")))
+
+    def test_reserved_domains_and_private_hosts_are_not_release_destinations(self):
+        for endpoint in [
+            "https://example.org",
+            "https://api.example.com",
+            "https://app.example.net",
+            "https://company.test",
+            "https://demo.invalid",
+            "https://printer.local",
+            "https://api.internal",
+            "https://192.168.1.5",
+            "https://127.0.0.1",
+            "https://10.0.0.10",
+            "https://[::1]",
+            "https://user:pass@api.facturavozperu.pe",
+            "https://api.facturavozperu.pe/?token=accidental",
+            "https://api.facturavozperu.pe/#token",
+            "https://api.facturavozperu.pe:abc",
+        ]:
+            with self.subTest(endpoint=endpoint):
+                self.values["API_BASE_URL"] = endpoint
+                self._save()
+                problems = defines_errors(self.defines, "3.3.0")
+                self.assertTrue(any("API_BASE_URL" in p for p in problems))
+
+    def test_public_looking_urls_are_syntactically_allowed_without_claiming_reachability(self):
+        self.values["API_BASE_URL"] = "https://api.facturavozperu.pe"
+        self._save()
+        self.assertEqual([], defines_errors(self.defines, "3.3.0"))
 
     def test_app_version_cannot_differ_from_pubspec(self):
         self.values["APP_VERSION"] = "3.1.0"
