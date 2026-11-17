@@ -59,6 +59,14 @@ void main() {
         expect(find.text('Cobro registrado'), findsOneWidget);
         expect(find.text('Venta registrada y cobrada'), findsOneWidget);
         expect(find.text('Emitir boleta'), findsOneWidget);
+        // Lista perezosa: en pantallas estrechas, el botón de impresión se
+        // construye al desplazar la vista. Debe seguir siendo alcanzable.
+        await tester.scrollUntilVisible(
+          find.text('Imprimir ticket'),
+          175,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
         expect(find.text('Imprimir ticket'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
