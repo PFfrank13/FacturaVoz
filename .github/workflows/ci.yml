@@ -27,6 +27,30 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci.ci.ci
 
+  database:
+    # PostgreSQL 17 (la versión del proyecto Supabase). Instalación nueva + actualización desde el estado real de producción.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: psql -Atc "select version()"
+      - name: Migraciones desde cero + pruebas SQL
+        run: bash backend/supabase/tests/local/run_all.sh
+      - name: Actualización desde producción (local → Hub, stock, suscripción, RLS)
+        run: bash backend/supabase/tests/upgrade/run_upgrade.sh
+
   app:
     runs-on: ubuntu-latest
     defaults:
