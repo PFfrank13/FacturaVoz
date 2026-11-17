@@ -49,7 +49,7 @@ def source_errors(project: Path) -> list[str]:
     id_match = APP_ID_RE.search(gradle)
     if id_match is None or id_match.group(1) != APP_ID:
         problems.append("El applicationId Android no corresponde al producto autorizado.")
-    if "hasReleaseSigning" not in gradle or 'signingConfigs.getByName("release")' not in gradle:
+    if "hasSafeReleaseSigning" not in gradle or 'signingConfigs.getByName("release")' not in gradle:
         problems.append("Falta la firma release explícita de Gradle.")
     # Never permit a distribution signed with Android's default debug key.
     if 'signingConfig = signingConfigs.getByName("debug")' in gradle:
