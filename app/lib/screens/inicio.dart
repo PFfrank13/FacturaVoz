@@ -249,7 +249,8 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final a = Access.instance;
     final spec = rubroFor(a.rubro);
     final guide = experienceFor(spec?.id);
-    final isBodegaBasic = a.rubro == 'bodega' && a.license.plan == 'BASICO';
+    final isBodega = a.rubro == 'bodega';
+    final isBodegaBasic = isBodega && a.license.plan == 'BASICO';
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final seeMoney = a.can('finance') || a.can('collect');
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
@@ -267,11 +268,11 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
         child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: isBodegaBasic
+              padding: isBodega
                   ? const EdgeInsets.fromLTRB(16, 12, 16, 0)
                   : EdgeInsets.zero,
               child: HomeHeader(
-              compact: isBodegaBasic,
+              compact: isBodega,
               name: AppState.instance.activeOrg?.name ?? '',
               currency: cur,
               total: seeMoney ? monthTotal : 0,
