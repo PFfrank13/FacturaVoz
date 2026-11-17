@@ -27,6 +27,7 @@ import 'goal_sheet.dart';
 import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'invoice_detail.dart';
 import 'role_home.dart';
+import 'retail_basic_modules.dart';
 import 'menu.dart';
 import 'jobs.dart' show JobDetailScreen, showJobForm;
 import 'new_invoice.dart' show NewInvoiceScreen;
@@ -249,6 +250,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final a = Access.instance;
     final spec = rubroFor(a.rubro);
     final guide = experienceFor(spec?.id);
+    final isBodegaBasic = a.rubro == 'bodega' && a.license.plan == 'BASICO';
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final seeMoney = a.can('finance') || a.can('collect');
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
@@ -280,7 +282,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               todayTotal: seeMoney && _today != null ? todayTotal : null,
               todayCount: todayCount,
               onMenu: () => pushPremium(context, const MenuScreen()),
-              onSale: a.rubro == 'bodega' && a.can('sell') && a.has('facturar')
+              onSale: !isBodegaBasic && a.rubro == 'bodega' && a.can('sell') && a.has('facturar')
                   ? () {
                       final pos = featureById('pos');
                       if (pos != null && pos.allowed) openFeature(context, pos);
@@ -305,7 +307,11 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
             ),
-          if (spec != null)
+          // Para Bodega Básico se muestra el tablero operativo real; antes estaba conectado
+          // únicamente al HomeScreen heredado y nunca aparecía en el Inicio de producción.
+          if (isBodegaBasic)
+            const SliverToBoxAdapter(child: RetailBasicModules())
+          else if (spec != null)
             SliverToBoxAdapter(
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: SectorPhotoBanner(
@@ -314,10 +320,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   subtitle: guide.homeSubtitle,
                 )),
             ),
-          // Inicio por rol (motor rubro × plan × rol). Reemplaza el tablero Básico de bodega y el carrusel de accesos.
+          // Conservar las métricas, tareas pendientes y avisos de operaciones no confirmadas,
+          // pero sin duplicar el menú de accesos del tablero específico de Bodega Básico.
           SliverToBoxAdapter(
             child: RoleHomePanel(
               key: ValueKey('role-home-${Repo.activeOrgId}-${a.role}-${a.license.plan}'),
+              showLinks: !isBodegaBasic,
               exclude: {if (a.rubro == 'bodega' || primaryActionFor(a.rubro)?.featureId == 'pos') 'sell_cta'},
             ),
           ),
