@@ -393,8 +393,11 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                   const SizedBox(height: 20),
                   Icon(Icons.receipt_long_outlined, color: c.muted, size: 48),
                   const SizedBox(height: 8),
-                  const Text('No hay comprobantes para este filtro',
-                    textAlign: TextAlign.center),
+                  Text(_invoices.isEmpty
+                    ? 'Todavía no hay comprobantes registrados.'
+                    : 'No hay comprobantes para este filtro.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium),
                 ] else for (final inv in entries) ...[
                   _receiptTile(inv),
                   const SizedBox(height: 8),
