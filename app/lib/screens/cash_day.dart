@@ -134,7 +134,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     if (_busy || _closing != null || _day != todayIso()) return;
     final ticket = _operationTicket();
     final day = _day;
-    if (!_canCommit(ticket, day)) return;
+    if (!mounted || !_canCommit(ticket, day)) return;
     final amount = TextEditingController(), note = TextEditingController();
     final title = switch (kind) { 'apertura' => 'Apertura de caja', 'ingreso' => 'Entra efectivo', _ => 'Sale efectivo' };
     final ok = await showDialog<bool>(
@@ -159,7 +159,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     final cents = parsePosCents(amount.text);
     final n = note.text;
     disposeAfterClose([amount, note]);
-    if (ok != true || !_canCommit(ticket, day)) return;
+    if (ok != true || !mounted || !_canCommit(ticket, day)) return;
     if (cents == null || cents <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Ingresa un importe válido, mayor que cero y con máximo dos decimales.'),
@@ -168,13 +168,13 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     }
     setState(() => _busy = true);
     try {
-      if (!_canCommit(ticket, day)) return;
+      if (!mounted || !_canCommit(ticket, day)) return;
       await V2Repo.addCashMove(kind: kind, amount: cents / 100, note: n);
-      if (!_canCommit(ticket, day)) return;
+      if (!mounted || !_canCommit(ticket, day)) return;
       showSuccess(context, 'Movimiento guardado');
       await _load();
     } catch (e) {
-      if (_canCommit(ticket, day)) {
+      if (mounted && _canCommit(ticket, day)) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(V2Repo.missingHint(e))));
       }
     } finally {
@@ -186,7 +186,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
     if (_sum == null || _closing != null || _busy || _day != todayIso()) return;
     final ticket = _operationTicket();
     final day = _day;
-    if (!_canCommit(ticket, day)) return;
+    if (!mounted || !_canCommit(ticket, day)) return;
     // Blind cash close: do not expose the expected balance while counting.
     // Peruvian bill/coin values are in integer cents.
     const values = [20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10];
@@ -251,14 +251,14 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
       ),
     );
     disposeAfterClose([...countFields.values, note]);
-    if (answer == null || !_canCommit(ticket, day)) return;
+    if (answer == null || !mounted || !_canCommit(ticket, day)) return;
     setState(() => _busy = true);
     try {
-      if (!_canCommit(ticket, day)) return;
+      if (!mounted || !_canCommit(ticket, day)) return;
       final r = await V2Api.closeDay(
         day: day, counted: answer.cents / 100, note: answer.note,
       );
-      if (!_canCommit(ticket, day)) return;
+      if (!mounted || !_canCommit(ticket, day)) return;
       final diff = answer.cents / 100 - r.summary.expectedCash;
       Haptics.success();
       await showDialog<void>(
@@ -276,7 +276,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
       );
       if (_canCommit(ticket, day)) await _load();
     } catch (e) {
-      if (_canCommit(ticket, day)) {
+      if (mounted && _canCommit(ticket, day)) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('No se cerró caja: $e'),
         ));
