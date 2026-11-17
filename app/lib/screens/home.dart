@@ -410,13 +410,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         colors: const [Color(0xFFB58BF5), Color(0xFF8E5CF2)],
                         onTap: () => _push(const RecurringScreen()),
                       ),
-                      QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
+                      if (Access.instance.has('copiloto'))
+                        QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
                     ],
                   ),
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
+            if (Access.instance.has('copiloto'))
+              SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
@@ -982,6 +984,8 @@ class CopilotCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final a = Access.instance;
+    // No mostrar ni promocionar el Copiloto dentro del flujo operativo Básico.
+    if (!a.has('copiloto')) return const SizedBox.shrink();
     final org = AppState.instance.activeOrg?.name ?? 'tu negocio';
     final cards = <Widget>[
       if (a.has('copiloto'))
