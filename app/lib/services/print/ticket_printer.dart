@@ -414,16 +414,9 @@ Future<void> _sendEscPosScoped(PrinterConfig c, Uint8List bytes, String org) asy
       if (!networkSupported) {
         throw StateError('La impresión por red no está disponible en la web.');
       }
-      final parts = c.address.trim().split(':');
-      final host = parts.first.trim();
-      final port = parts.length == 2 ? int.tryParse(parts[1]) : 9100;
-      if (parts.length > 2 || host.isEmpty ||
-          !RegExp(r'^[a-zA-Z0-9.-]+).hasMatch(host) ||
-          port == null || port < 1 || port > 65535) {
-        throw StateError('IP o puerto de la impresora inválidos. Revísalos en Ajustes.');
-      }
+      final endpoint = parsePrinterEndpoint(c.address);
       checkScope();
-      await sendToNetworkPrinter(host, port, bytes);
+      await sendToNetworkPrinter(endpoint.host, endpoint.port, bytes);
     default:
       throw StateError('Elige una impresora Bluetooth o de red, o usa el ticket en PDF.');
   }
