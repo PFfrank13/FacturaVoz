@@ -18,6 +18,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - name: Verificar árbol completo de dependencias del backend (producción)
+        run: npm ls --omit=dev --all
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run audit:test

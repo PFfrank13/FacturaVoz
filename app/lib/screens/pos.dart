@@ -7,6 +7,7 @@ import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
+import '../logic/data_scope.dart';
 import '../logic/pos_kitchen.dart';
 import '../logic/sample_catalog.dart';
 import '../models.dart';
@@ -658,6 +659,8 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _fastCharge(String method, {String? paymentEvidence}) async {
+    final operationScope = ScopeTicket(dataScope.value, Repo.activeOrgId,
+        Supabase.instance.client.auth.currentUser?.id);
     // An immutable pending charge must be recoverable even if its unrelated
     // editable cart backup is damaged. Never allow a NEW charge in that case.
     if (_charging || _recoveringCheckout || _restoringCart ||
@@ -673,7 +676,8 @@ class _PosScreenState extends State<PosScreen> {
     // must be reused exactly even when the current catalog or cart changed.
     final recovering = _pendingCheckout != null;
     if (!recovering && _restaurant && !await _persistKitchenOrder()) return;
-    if (!mounted) return;
+    if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+        Supabase.instance.client.auth.currentUser?.id)) { return; }
     final pending = _pendingCheckout;
     final lines = recovering ? pending!.items : _lines();
     if (lines.isEmpty) return;
@@ -703,7 +707,10 @@ class _PosScreenState extends State<PosScreen> {
       if (!recovering) {
         await PendingCheckoutStore.save(checkout);
       }
-      if (!mounted) return;
+      // The local recovery record belongs to the original company. If the
+      // session changed during secure storage I/O, do not issue a remote sale.
+      if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+          Supabase.instance.client.auth.currentUser?.id)) { return; }
       setState(() {
         _pendingCheckout = checkout;
         _chargeRequestId = checkout.requestId;
@@ -712,6 +719,10 @@ class _PosScreenState extends State<PosScreen> {
       final id = await Repo.fastCheckoutAtomic(
         draft: checkout.toDraft(), method: checkout.method, requestId: checkout.requestId,
       );
+      // If navigation switched tenants while awaiting the response, preserve
+      // the original idempotent recovery key; never link or clear the new tenant.
+      if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+          Supabase.instance.client.auth.currentUser?.id)) { return; }
       // PostgreSQL confirmed the transaction. Never clear a pending key before this response.
       String? kitchenLinkError;
       if (_restaurant && _savedOrderId != null) {
@@ -768,13 +779,16 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _checkout({bool credit = false}) async {
+    final operationScope = ScopeTicket(dataScope.value, Repo.activeOrgId,
+        Supabase.instance.client.auth.currentUser?.id);
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
         _checkoutRecoveryError != null || _chargeRequestId != null || _charging) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Primero confirma o recupera el cobro rápido pendiente.')));
       return;
     }
     if (_restaurant && !await _persistKitchenOrder()) return;
-    if (!mounted) return;
+    if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+        Supabase.instance.client.auth.currentUser?.id)) { return; }
     final lines = _lines();
     if (lines.isEmpty) return;
     final p = AppState.instance.profile;
@@ -786,6 +800,8 @@ class _PosScreenState extends State<PosScreen> {
       transcript: p == null ? null : 'Venta rápida',
     );
     final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NewInvoiceScreen(initial: draft, startAsCredit: credit)));
+    if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+        Supabase.instance.client.auth.currentUser?.id)) { return; }
     AppState.instance.bump();
     if (id != null && mounted) {
       if (_restaurant && _savedOrderId != null) {
@@ -796,11 +812,9 @@ class _PosScreenState extends State<PosScreen> {
         }
       }
       if (!mounted) return;
-      await _clearStoredCart(
-        Supabase.instance.client.auth.currentUser?.id ?? '',
-        Repo.activeOrgId ?? '',
-      );
-      if (!mounted) return;
+      await _clearStoredCart(operationScope.user!, operationScope.org!);
+      if (!mounted || !operationScope.permitsMutation(dataScope.value, Repo.activeOrgId,
+          Supabase.instance.client.auth.currentUser?.id)) { return; }
       setState(() {
         _cart.clear();
         _coupon = null;

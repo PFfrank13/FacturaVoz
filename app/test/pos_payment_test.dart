@@ -15,6 +15,11 @@ void main() {
     expect(parsePosCents('0.01'), 1);
     expect(parsePosCents('150'), 15000);
     expect(parsePosCents('1.234'), isNull);
+    expect(parsePosCents(' 7,85 '), 785);
+    expect(parsePosCents('0'), 0);
+    expect(parsePosCents('12.345'), isNull); // caja: no redondear dinero
+    expect(parsePosCents('1e3'), isNull); // no aceptar notación científica
+    expect(parsePosCents('1000000000'), isNull); // importe fuera de límite
     expect(parsePosCents('-1.00'), isNull);
     expect(parsePosCents('NaN'), isNull);
     expect(parsePosCents(''), isNull);
