@@ -6,6 +6,7 @@ import '../models.dart';
 import '../services/repo.dart';
 import '../services/live.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_layout.dart';
 
 /// Clientes de la empresa activa: buscar y corregir nombre, documento, correo y dirección.
 class ClientsScreen extends StatefulWidget {
@@ -126,7 +127,7 @@ class _ClientsScreenState extends State<ClientsScreen> with LiveReload<ClientsSc
     final list = (all ?? const <ClientCard>[])
         .where((c) => q.isEmpty || c.name.toLowerCase().contains(q) || c.taxId.contains(q) || c.email.toLowerCase().contains(q))
         .toList();
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1200, child: Scaffold(
       appBar: AppBar(title: const Text('Clientes')),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -155,8 +156,17 @@ class _ClientsScreenState extends State<ClientsScreen> with LiveReload<ClientsSc
             else if (list.isEmpty)
               Padding(padding: const EdgeInsets.only(top: 40), child: Text('Nada coincide con tu búsqueda.', textAlign: TextAlign.center, style: t.textTheme.bodyMedium))
             else
-              for (final (i, c) in list.indexed)
-                Padding(
+              LayoutBuilder(builder: (context, available) {
+                final columns = retailCardColumnCount(
+                  available.maxWidth, twoColumnMinWidth: 860);
+                final itemWidth = (available.maxWidth -
+                    (columns - 1) * 12) / columns;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 0,
+                  children: [
+                    for (final (i, c) in list.indexed)
+                      SizedBox(width: itemWidth, child: Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Reveal(
                     key: ValueKey(c.ids.first),
@@ -188,11 +198,14 @@ class _ClientsScreenState extends State<ClientsScreen> with LiveReload<ClientsSc
                       ),
                     ),
                   ),
-                ),
+                )),
+                  ],
+                );
+              }),
           ],
         ),
       ),
-    );
+    ));
   }
 }
 
