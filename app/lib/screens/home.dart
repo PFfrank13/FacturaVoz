@@ -631,8 +631,205 @@ class HomeHeader extends StatelessWidget {
   final List<double> series;
   final VoidCallback onGoal;
 
+  /// Tablero comercial compacto: cifras reales, contraste alto y una sola acción.
+  /// Exclusivo de Bodega; otros rubros conservan su cabecera hasta su fase.
+  Widget _retailOverview(BuildContext context) {
+    final t = Theme.of(context);
+    final dark = t.brightness == Brightness.dark;
+    final white = Colors.white;
+    final secondary = white.withValues(alpha: 0.78);
+    final progress = goal == null || goal! <= 0
+        ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
+    final symbol = currencySymbols[currency] ?? currency;
+
+    return Semantics(
+      container: true,
+      label: 'Resumen operativo de la bodega',
+      child: Container(
+        key: const ValueKey('bodega-enterprise-overview'),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF102C3C), Color(0xFF155D60)],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF2B7072)),
+          boxShadow: Brand.softShadow(dark, a: .16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: white.withValues(alpha: .13),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: white.withValues(alpha: .17)),
+                  ),
+                  child: const Icon(Icons.storefront_rounded, color: Color(0xFFB5F3E6), size: 23),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('RESUMEN DEL NEGOCIO',
+                      style: TextStyle(color: secondary, fontWeight: FontWeight.w800,
+                        fontSize: 10.5, letterSpacing: 1.4)),
+                    const SizedBox(height: 3),
+                    Text(name.isEmpty ? 'Tu bodega' : name, maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 18.5,
+                        letterSpacing: -.5, fontWeight: FontWeight.w800)),
+                  ],
+                )),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: loaded ? 'Cifras cargadas desde el servidor' : 'Cargando resumen',
+                  child: Icon(loaded ? Icons.verified_rounded : Icons.schedule_rounded,
+                    color: loaded ? const Color(0xFF9BECBE) : secondary, size: 20),
+                ),
+              ]),
+              const SizedBox(height: 23),
+              Text(showMonth ? 'VENTAS DE ESTE MES' : 'TU ACTIVIDAD',
+                style: TextStyle(color: secondary, fontSize: 11,
+                  fontWeight: FontWeight.w800, letterSpacing: 1.35)),
+              const SizedBox(height: 5),
+              if (showMonth)
+                if (loaded)
+                  Semantics(
+                    liveRegion: true,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 5),
+                          child: Text(symbol, style: const TextStyle(
+                            color: Color(0xFFB5F3E6), fontSize: 17,
+                            fontWeight: FontWeight.w800)),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(child: CountUp(
+                          value: total,
+                          builder: (context, v) => FittedBox(
+                            alignment: Alignment.centerLeft,
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              v.toStringAsFixed(2),
+                              style: const TextStyle(color: Colors.white,
+                                fontSize: 38, fontWeight: FontWeight.w800,
+                                letterSpacing: -1.4,
+                                fontFeatures: [FontFeature.tabularFigures()]),
+                            ),
+                          ),
+                        )),
+                      ],
+                    ),
+                  )
+                else
+                  Text('—', style: t.textTheme.headlineMedium?.copyWith(color: white))
+              else
+                const Text('Todo en un solo lugar',
+                  style: TextStyle(color: Colors.white, fontSize: 25,
+                    fontWeight: FontWeight.w800, letterSpacing: -.6)),
+              const SizedBox(height: 14),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                if (loaded)
+                  _RetailOverviewFact(
+                    icon: Icons.receipt_long_rounded,
+                    label: count == 1 ? '1 venta emitida' : '$count ventas emitidas',
+                  ),
+                if (todayTotal != null)
+                  _RetailOverviewFact(
+                    icon: Icons.today_rounded,
+                    label: 'Hoy ${money(todayTotal!, currency)}',
+                  )
+                else if (todayCount != null && !showMonth)
+                  _RetailOverviewFact(
+                    icon: Icons.today_rounded,
+                    label: 'Ventas de hoy: $todayCount',
+                  ),
+                if (loaded && drafts > 0)
+                  _RetailOverviewFact(
+                    icon: Icons.edit_note_rounded,
+                    label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}',
+                  ),
+              ]),
+              if (showMonth && loaded && series.length > 1 && series.any((v) => v > 0)) ...[
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(13, 12, 13, 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: white.withValues(alpha: .12)),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Tendencia · últimos 14 días',
+                      style: TextStyle(color: secondary, fontSize: 11,
+                        fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Sparkline(values: series, height: 40,
+                      color: const Color(0xFF9CEBDD)),
+                  ]),
+                ),
+              ],
+              if (showMonth) ...[
+                const SizedBox(height: 14),
+                if (progress == null)
+                  TextButton.icon(
+                    onPressed: onGoal,
+                    icon: const Icon(Icons.flag_outlined, size: 17),
+                    label: const Text('Establecer meta del mes'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFB5F3E6),
+                      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 5)),
+                  )
+                else
+                  Semantics(
+                    button: true,
+                    label: 'Meta mensual al ${(progress.percent * 100).round()} por ciento. Editar meta.',
+                    child: InkWell(
+                      onTap: onGoal,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Expanded(child: Text('Meta mensual',
+                              style: TextStyle(color: secondary, fontSize: 12, fontWeight: FontWeight.w700))),
+                            Text('${(progress.percent * 100).round()}%',
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+                          ]),
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: progress.percent.clamp(0.0, 1.0),
+                            minHeight: 5,
+                            borderRadius: BorderRadius.circular(8),
+                            backgroundColor: white.withValues(alpha: .17),
+                            color: const Color(0xFF9CEBDD),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (compact && Access.instance.rubro == 'bodega') {
+      return _retailOverview(context);
+    }
     final top = compact ? 0.0 : MediaQuery.of(context).padding.top;
     final sym = currencySymbols[currency] ?? currency;
     String fmt(double v) {
@@ -807,6 +1004,29 @@ class HomeHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Píldora compacta con ícono + texto, siempre basada en datos de la empresa.
+class _RetailOverviewFact extends StatelessWidget {
+  const _RetailOverviewFact({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(color: Colors.white.withValues(alpha: .16)),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 14, color: const Color(0xFFB5F3E6)),
+      const SizedBox(width: 6),
+      Text(label, style: const TextStyle(color: Colors.white,
+        fontSize: 11.5, fontWeight: FontWeight.w700)),
+    ]),
+  );
 }
 
 /// Botón del encabezado (Copiloto / Menú): ocupa su mitad del ancho y centra ícono + texto.

@@ -329,7 +329,7 @@ class _MainShellState extends State<MainShell> {
       child: NavigationDrawer(
         key: const ValueKey('bodega-navigation-drawer'),
         backgroundColor: const Color(0xFF0B0E17),
-        indicatorColor: const Color(0xFF252849),
+        indicatorColor: const Color(0xFF174B49),
         selectedIndex: selected < 0 ? 0 : selected,
         onDestinationSelected: (index) {
           Navigator.of(context).pop();
@@ -342,7 +342,7 @@ class _MainShellState extends State<MainShell> {
               padding: const EdgeInsets.fromLTRB(24, 28, 22, 20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('FACTURAVOZ', style: TextStyle(
-                  color: Color(0xFF818CF8), fontWeight: FontWeight.w900,
+                  color: Color(0xFF7AE2D0), fontWeight: FontWeight.w900,
                   letterSpacing: 2.1, fontSize: 12)),
                 const SizedBox(height: 16),
                 Text(orgName, maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -350,7 +350,7 @@ class _MainShellState extends State<MainShell> {
                     fontWeight: FontWeight.w800, letterSpacing: -.5)),
                 const SizedBox(height: 7),
                 Text('Bodega / Tienda  ·  ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
-                  style: const TextStyle(color: Color(0xFF969BB0), fontSize: 12)),
+                  style: const TextStyle(color: Color(0xFFBCCBCF), fontSize: 12)),
               ]),
             ),
           ),
@@ -358,13 +358,13 @@ class _MainShellState extends State<MainShell> {
           const Padding(
             padding: EdgeInsets.fromLTRB(27, 25, 20, 10),
             child: Text('ESPACIO DE TRABAJO', style: TextStyle(
-              color: Color(0xFF757D99), fontSize: 10, letterSpacing: 1.5,
+              color: Color(0xFF90AAA9), fontSize: 10, letterSpacing: 1.5,
               fontWeight: FontWeight.w800)),
           ),
           for (final d in destinations)
             NavigationDrawerDestination(
               icon: Icon(d.icon, color: Colors.white70, size: 21),
-              selectedIcon: Icon(d.icon, color: const Color(0xFFA5B4FC), size: 21),
+              selectedIcon: Icon(d.icon, color: const Color(0xFF94F0DC), size: 21),
               label: Text(d.label, style: const TextStyle(color: Colors.white,
                 fontWeight: FontWeight.w600, fontSize: 14)),
             ),
@@ -373,7 +373,7 @@ class _MainShellState extends State<MainShell> {
           const Padding(
             padding: EdgeInsets.fromLTRB(27, 18, 20, 20),
             child: Text('Solo las funciones incluidas en tu licencia.',
-              style: TextStyle(color: Color(0xFF7D849C), fontSize: 11)),
+              style: TextStyle(color: Color(0xFFA8C2C4), fontSize: 11)),
           ),
         ],
       ),
@@ -405,10 +405,14 @@ class _MainShellState extends State<MainShell> {
             // La navegación de Bodega tiene un único dueño: este Scaffold.
             drawer: isBodega ? _bodegaNavigation(dests) : null,
             appBar: isBodega ? AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
+              shape: Border(bottom: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                width: 0.8,
+              )),
               leading: IconButton(
                 key: const ValueKey('bodega-open-menu'),
                 tooltip: 'Abrir menú',
@@ -454,7 +458,7 @@ class _MainShellState extends State<MainShell> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [BoxShadow(
-                        color: const Color(0xFF6366F1).withValues(alpha: .32),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: .18),
                         blurRadius: 21,
                         offset: const Offset(0, 7),
                       )],
@@ -464,8 +468,8 @@ class _MainShellState extends State<MainShell> {
                       heroTag: 'bodega-voice-action',
                       tooltip: canCopilot ? 'Hablar con Copiloto IA' : 'Vender por voz',
                       elevation: 0,
-                      backgroundColor: const Color(0xFF6366F1),
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       onPressed: canCopilot ? () => openCopilot(context) : _newInvoice,
                       child: const Icon(Icons.mic_rounded),
