@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'design_tokens.dart';
+import 'motion.dart';
 
 /// Tarjeta POS sin lógica de negocio. La pantalla propietaria mantiene
 /// _add, precios, promociones, stock, permisos e idempotencia de cobro.
@@ -40,7 +41,8 @@ class FvPosProductCard extends StatelessWidget {
     return Semantics(
       container: true,
       label: '$name, $price, ${stockLabel ?? 'stock no indicado'}',
-      child: AnimatedContainer(
+      child: FvTactileScale(
+        child: AnimatedContainer(
         duration: MediaQuery.of(context).disableAnimations
             ? Duration.zero : FvTokens.micro,
         decoration: BoxDecoration(
@@ -157,6 +159,7 @@ class FvPosProductCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
