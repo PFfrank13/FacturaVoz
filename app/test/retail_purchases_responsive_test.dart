@@ -7,6 +7,9 @@ void main() {
     expect(retailPurchaseHorizontalInset(360), 16);
     expect(retailPurchaseHorizontalInset(768), 16);
     expect(retailPurchaseHorizontalInset(960), 16);
+    expect(retailPurchaseHorizontalInset(970), 16);
+    expect(retailPurchaseHorizontalInset(980), 16);
+    expect(retailPurchaseHorizontalInset(992), 16);
   });
 
   test('compras limita formularios a 960 dp en escritorio y ultrawide', () {
