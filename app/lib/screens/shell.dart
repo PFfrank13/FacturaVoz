@@ -100,6 +100,9 @@ bool _destAllowed(String id, Access a) => switch (id) {
       _ => true,
     };
 
+/// Punto de corte para usar la navegación lateral fija en escritorio/tablet.
+bool bodegaUsesPermanentSidebar(double width) => width >= 980;
+
 /// Navegación visible de Bodega según la licencia y el rol verificados.
 /// Es la fuente única tanto del Drawer como de sus pruebas de regresión.
 List<String> bodegaDrawerIds(Access access) => [
@@ -318,7 +321,7 @@ class _MainShellState extends State<MainShell> {
         _ => const SettingsScreen(embedded: true),
       };
 
-  Widget _bodegaNavigation(List<_Dest> destinations) {
+  Widget _bodegaNavigation(List<_Dest> destinations, {bool pinned = false}) {
     final selected = destinations.indexWhere((d) => d.id == _tab);
     final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
     return Container(
@@ -332,7 +335,8 @@ class _MainShellState extends State<MainShell> {
         indicatorColor: const Color(0xFF174B49),
         selectedIndex: selected < 0 ? 0 : selected,
         onDestinationSelected: (index) {
-          Navigator.of(context).pop();
+          // El menú fijo en escritorio no es una ruta modal. No hacer pop.
+          if (!pinned) Navigator.of(context).pop();
           if (index >= 0 && index < destinations.length) _go(destinations[index].id);
         },
         children: [
@@ -388,6 +392,8 @@ class _MainShellState extends State<MainShell> {
       builder: (context, _) {
         final dests = _dests();
         final isBodega = (Access.instance.rubro ?? _settings?.businessType) == 'bodega';
+        final pinnedSidebar = isBodega &&
+            bodegaUsesPermanentSidebar(MediaQuery.sizeOf(context).width);
         if (!dests.any((d) => d.id == _tab)) _tab = _landing(dests);
         _built.add(_tab);
         final first = _landing(dests);
@@ -403,8 +409,10 @@ class _MainShellState extends State<MainShell> {
           child: Scaffold(
             key: _scaffoldKey,
             // La navegación de Bodega tiene un único dueño: este Scaffold.
-            drawer: isBodega ? _bodegaNavigation(dests) : null,
+            drawer: isBodega && !pinnedSidebar
+                ? _bodegaNavigation(dests) : null,
             appBar: isBodega ? AppBar(
+              automaticallyImplyLeading: !pinnedSidebar,
               backgroundColor: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
@@ -413,7 +421,7 @@ class _MainShellState extends State<MainShell> {
                 color: Theme.of(context).colorScheme.outlineVariant,
                 width: 0.8,
               )),
-              leading: IconButton(
+              leading: pinnedSidebar ? null : IconButton(
                 key: const ValueKey('bodega-open-menu'),
                 tooltip: 'Abrir menú',
                 icon: const Icon(Icons.menu_rounded),
@@ -432,23 +440,30 @@ class _MainShellState extends State<MainShell> {
                 const SizedBox(width: 8),
               ],
             ) : null,
-            body: Column(children: [
-              const LicenseBanner(),
-              Expanded(
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeTop: licenseBannerInfo(Access.instance.license) != null,
-                  child: Stack(children: [
-                    for (final d in dests)
-                      if (_built.contains(d.id))
-                        _TabSlot(
-                          key: ValueKey('tab-${d.id}'),
-                          active: d.id == _tab,
-                          child: RepaintBoundary(child: _page(d.id)),
-                        ),
-                  ]),
+            body: Row(children: [
+              if (pinnedSidebar)
+                SizedBox(
+                  width: 284,
+                  child: _bodegaNavigation(dests, pinned: true),
                 ),
-              ),
+              Expanded(child: Column(children: [
+                const LicenseBanner(),
+                Expanded(
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: licenseBannerInfo(Access.instance.license) != null,
+                    child: Stack(children: [
+                      for (final d in dests)
+                        if (_built.contains(d.id))
+                          _TabSlot(
+                            key: ValueKey('tab-${d.id}'),
+                            active: d.id == _tab,
+                            child: RepaintBoundary(child: _page(d.id)),
+                          ),
+                    ]),
+                  ),
+                ),
+              ])),
             ]),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
             // Evitar que el micrófono cubra Cobrar en el POS o Abrir/Cerrar caja.
