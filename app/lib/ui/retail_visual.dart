@@ -34,7 +34,7 @@ abstract final class RetailVisual {
         boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: .06),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 14 : 20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(
@@ -54,7 +54,7 @@ abstract final class RetailVisual {
             ),
           ]),
           const SizedBox(height: 18),
-          Text(title, style: t.textTheme.headlineSmall?.copyWith(
+          Text(title, softWrap: true, style: t.textTheme.headlineSmall?.copyWith(
             color: c.ink, fontWeight: FontWeight.w800,
             letterSpacing: -.45)),
           const SizedBox(height: 8),
