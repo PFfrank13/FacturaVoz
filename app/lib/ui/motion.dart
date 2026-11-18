@@ -73,15 +73,86 @@ class FadeThrough extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => AnimatedSwitcher(
-        duration: const Duration(milliseconds: 360),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (c, a) => FadeTransition(
-          opacity: a,
-          child: ScaleTransition(scale: Tween<double>(begin: 0.97, end: 1).animate(a), child: c),
+  Widget build(BuildContext context) {
+    final still = reduceMotion(context);
+    return AnimatedSwitcher(
+      duration: still ? Duration.zero : Motion.medium,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (c, a) => still
+          ? c
+          : FadeTransition(
+              opacity: a,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.98, end: 1).animate(a),
+                child: c,
+              ),
+            ),
+      child: child,
+    );
+  }
+}
+
+/// Respuesta táctil discreta para tarjetas y acciones, sin cambiar sus callbacks.
+/// Se cancela al desplazarse para evitar que un scroll parezca una pulsación.
+/// Sólo transforma la capa visual: no altera el tamaño, el hit testing ni la lógica.
+class FvTactileScale extends StatefulWidget {
+  const FvTactileScale({
+    super.key,
+    required this.child,
+    this.pressedScale = 0.985,
+    this.enabled = true,
+  });
+
+  final Widget child;
+  final double pressedScale;
+  final bool enabled;
+
+  @override
+  State<FvTactileScale> createState() => _FvTactileScaleState();
+}
+
+class _FvTactileScaleState extends State<FvTactileScale> {
+  int? _pointer;
+  Offset? _start;
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !mounted) return;
+    setState(() => _pressed = value);
+  }
+
+  void _end(int pointer) {
+    if (_pointer != pointer) return;
+    _pointer = null;
+    _start = null;
+    _setPressed(false);
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+        behavior: HitTestBehavior.deferToChild,
+        onPointerDown: (event) {
+          if (!widget.enabled || _pointer != null) return;
+          _pointer = event.pointer;
+          _start = event.position;
+          _setPressed(true);
+        },
+        onPointerMove: (event) {
+          if (_pointer != event.pointer) return;
+          if (_start != null && (event.position - _start!).distance > 12) {
+            _setPressed(false);
+          }
+        },
+        onPointerUp: (event) => _end(event.pointer),
+        onPointerCancel: (event) => _end(event.pointer),
+        child: AnimatedScale(
+          scale: widget.enabled && !reduceMotion(context) && _pressed
+              ? widget.pressedScale : 1,
+          duration: Motion.d(context, Motion.instant),
+          curve: Curves.easeOutCubic,
+          child: widget.child,
         ),
-        child: child,
       );
 }
 
