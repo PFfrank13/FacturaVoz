@@ -354,7 +354,10 @@ class _MainShellState extends State<MainShell> {
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
     final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
-    return NavigationDrawer(
+    return FvGlassSurface(
+      radius: 24,
+      blur: 18,
+      child: NavigationDrawer(
       key: const ValueKey('bodega-navigation-drawer'),
       backgroundColor: Colors.transparent,
       indicatorColor: cs.primary.withValues(alpha: 0.12),
@@ -412,6 +415,7 @@ class _MainShellState extends State<MainShell> {
             style: t.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
       ],
+      ),
     );
   }
 
@@ -420,12 +424,9 @@ class _MainShellState extends State<MainShell> {
     final t = Theme.of(context);
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        border: Border(right: BorderSide(
-          color: cs.outlineVariant.withValues(alpha: 0.45))),
-      ),
+    return FvGlassSurface(
+      radius: 0,
+      blur: 16,
       child: NavigationRail(
         key: const ValueKey('bodega-navigation-rail'),
         backgroundColor: Colors.transparent,
@@ -568,7 +569,16 @@ class _MainShellState extends State<MainShell> {
                 ? _bodegaNavigation(dests) : null,
             appBar: isBodega ? AppBar(
               automaticallyImplyLeading: !pinnedSidebar,
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surface.withValues(
+                      alpha: MediaQuery.highContrastOf(context) ? 1 : .76),
+                  ),
+                ),
+              ),
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
