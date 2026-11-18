@@ -327,7 +327,12 @@ class PremiumScrollBehavior extends MaterialScrollBehavior {
   const PremiumScrollBehavior();
 
   @override
-  ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  ScrollPhysics getScrollPhysics(BuildContext context) => switch (Theme.of(context).platform) {
+        // Rebote tipo iPhone en móvil; en escritorio, rueda/trackpad precisos.
+        TargetPlatform.android || TargetPlatform.iOS =>
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        _ => const ClampingScrollPhysics(),
+      };
 
   @override
   Set<PointerDeviceKind> get dragDevices => {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.stylus, PointerDeviceKind.trackpad};
