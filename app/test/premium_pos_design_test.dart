@@ -67,7 +67,7 @@ void main() {
       ))),
     ));
     final button = tester.widget<IconButton>(
-        find.byTooltip('Añadir Leche'));
+        find.byType(IconButton));
     expect(button.onPressed, isNull);
     expect(additions, 0);
   });
