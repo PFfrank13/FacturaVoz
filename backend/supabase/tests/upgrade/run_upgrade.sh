@@ -39,6 +39,7 @@ apply fv_rep '*20261209_v34a_*' || exit 1
 $P -d fv_rep -f tests/upgrade/check_fase_a.sql >/tmp/fv_a.out 2>&1 || { echo "FALLA fase A"; grep -m3 -E "FALLO|ERROR" /tmp/fv_a.out; exit 1; }
 echo "PASA  FASE A sin corte + reconciliación verificada ($(grep -c 'ok:' /tmp/fv_a.out) comprobaciones)"
 apply fv_rep '*20261210_v34b_*' || exit 1
+apply fv_rep '*20261211_v35_bodega_stock_*' || exit 1
 $P -d fv_rep -f tests/upgrade/check_fase_b.sql >/tmp/fv_b.out 2>&1 || { echo "FALLA fase B"; grep -m3 -E "FALLO|ERROR" /tmp/fv_b.out; exit 1; }
 echo "PASA  FASE B estricta: renovación, suspensión, reactivación ($(grep -c 'ok:' /tmp/fv_b.out) comprobaciones)"
 
@@ -61,6 +62,7 @@ before=$(state fv_rb)
 apply fv_rb '*2026120[678]_*' && apply fv_rb '*20261209_v34a_*' || exit 1
 $P -d fv_rb -f tests/upgrade/check_fase_a.sql >/dev/null 2>&1 || { echo "FALLA preparando rollback"; exit 1; }
 apply fv_rb '*20261210_v34b_*' || exit 1
+apply fv_rb '*20261211_v35_bodega_stock_*' || exit 1
 $P -d fv_rb -f rollback/20261209_v34_rollback.sql >/dev/null || { echo "FALLA rollback"; exit 1; }
 after=$(state fv_rb)
 [ "$before" = "$after" ] && echo "PASA  rollback restaura el estado exacto ($after)" || { echo "FALLA rollback: antes=$before después=$after"; exit 1; }

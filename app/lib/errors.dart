@@ -13,11 +13,22 @@ class AppException implements Exception {
   String toString() => message;
 }
 
+/// Solo el rechazo transaccional de stock (SQLSTATE 22023 y mensaje propio)
+/// garantiza que la venta NO fue confirmada. Errores de red NO permiten borrar
+/// la solicitud idempotente porque el servidor pudo haber cobrado.
+bool isConfirmedStockRejection(Object error) =>
+    error is PostgrestException &&
+    error.code == '22023' &&
+    error.message.startsWith('Stock insuficiente para ');
+
 /// Mensaje para el usuario. Explica la causa probable y deja un código corto para soporte;
 /// nunca incluye claves, tokens ni respuestas completas del servidor.
 String friendly(Object e) {
   if (e is AppException) return e.code == null ? e.message : '${e.message} (${e.code})';
   if (e is PostgrestException) {
+    if (isConfirmedStockRejection(e)) {
+      return 'Stock insuficiente. Revisa existencias y cantidades del carrito o registra una compra antes de cobrar.';
+    }
     final c = e.code ?? '';
     if (c == '42P01' || c == 'PGRST205' || c == 'PGRST200') {
       return 'Falta preparar la base de datos: ejecuta las migraciones SQL en Supabase. ($c)';

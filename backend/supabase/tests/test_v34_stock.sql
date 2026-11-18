@@ -3,6 +3,11 @@
 insert into auth.users(id,email) values ('11111111-1111-1111-1111-111111111111','dueno@a.pe'),('22222222-2222-2222-2222-222222222222','otro@b.pe');
 select org_id as org from public.organization_members where user_id='11111111-1111-1111-1111-111111111111' \gset
 select org_id as org2 from public.organization_members where user_id='22222222-2222-2222-2222-222222222222' \gset
+-- For this test company the business rule is strict Bodega/Tienda stock.
+insert into public.org_settings(org_id,business_type) values (:'org','bodega')
+  on conflict (org_id) do update set business_type = excluded.business_type;
+insert into public.org_settings(org_id,business_type) values (:'org2','salon')
+  on conflict (org_id) do update set business_type = excluded.business_type;
 create or replace function pg_temp.chk(p_name text, p_ok boolean) returns void language plpgsql as $$
 begin if not coalesce(p_ok,false) then raise exception 'FALLO: %', p_name; end if; raise notice 'ok: %', p_name; end $$;
 set role authenticated;
@@ -31,14 +36,62 @@ select invoice_id as inv2 from public.create_invoice('Cliente',null,18,'PEN',nul
   '[{"description":"Agua","quantity":2,"unit_price":1},{"description":"Instalación","quantity":1,"unit_price":50}]'::jsonb, :'org') \gset
 update public.invoices set status='sent' where id=:'inv2';
 select pg_temp.chk('emisión solo texto libre funciona y no toca stock', (select status from public.invoices where id=:'inv2') = 'sent' and (select stock from public.products where id=:'agua') = 8);
--- 3) Stock insuficiente: se permite (venta de mostrador), queda negativo y trazado
+-- 3) Bodega: venta con inventario insuficiente BLOQUEADA.
+-- La factura ya creada en draft no se envía; no hay salida ni pago.
 select invoice_id as inv3 from public.create_invoice('Cliente',null,18,'PEN',null,null,
   jsonb_build_array(jsonb_build_object('description','Agua','quantity',20,'unit_price',1,'product_id',:'agua')), :'org') \gset
+\set ON_ERROR_STOP 0
 update public.invoices set status='sent' where id=:'inv3';
-select pg_temp.chk('stock insuficiente queda negativo y trazado', (select stock from public.products where id=:'agua') = -12 and (select stock_before from public.retail_sale_stock_events where invoice_id=:'inv3') = 8);
--- 4) Reintento / transición repetida: no vuelve a descontar
-update public.invoices set status='sent' where id=:'inv3';
-select pg_temp.chk('repetir la transición no descuenta dos veces', (select stock from public.products where id=:'agua') = -12 and (select count(*) from public.retail_sale_stock_events where invoice_id=:'inv3') = 1);
+\set ON_ERROR_STOP 1
+select pg_temp.chk('venta insuficiente no cambia stock ni estado ni eventos',
+  (select stock from public.products where id=:'agua') = 8
+  and (select status from public.invoices where id=:'inv3') = 'draft'
+  and (select count(*) from public.retail_sale_stock_events where invoice_id=:'inv3') = 0);
+-- 4) Venta válida, reintento mismo documento no duplica evento.
+select invoice_id as inv5 from public.create_invoice('Cliente',null,18,'PEN',null,null,
+  jsonb_build_array(jsonb_build_object('description','Agua','quantity',2,'unit_price',1,'product_id',:'agua')), :'org') \gset
+update public.invoices set status='sent' where id=:'inv5';
+select pg_temp.chk('venta válida descuenta 2 y deja stock 6',
+  (select stock from public.products where id=:'agua') = 6
+  and (select count(*) from public.retail_sale_stock_events where invoice_id=:'inv5') = 1);
+update public.invoices set status='sent' where id=:'inv5';
+select pg_temp.chk('reintentar transición no descuenta dos veces',
+  (select stock from public.products where id=:'agua') = 6
+  and (select count(*) from public.retail_sale_stock_events where invoice_id=:'inv5') = 1);
+-- 4b) RPC cobro rápido: una sobreventa revierte factura, pago, solicitud y stock.
+select set_config('fv.test_org', :'org', false);
+select set_config('fv.test_product', :'agua', false);
+do $$
+declare
+  v_org uuid := current_setting('fv.test_org')::uuid;
+  v_product uuid := current_setting('fv.test_product')::uuid;
+  v_request uuid := gen_random_uuid();
+  v_invoices integer;
+  v_payments integer;
+  v_rejected boolean := false;
+begin
+  select count(*) into v_invoices from public.invoices where org_id = v_org;
+  select count(*) into v_payments from public.payments where org_id = v_org;
+  begin
+    perform * from public.fast_checkout_atomic(
+      v_org, v_request,
+      jsonb_build_array(jsonb_build_object(
+        'description','Agua','quantity',999,'unit_price',1,'product_id',v_product
+      )),
+      18,'PEN','efectivo','stock insufficient rollback test'
+    );
+  exception when sqlstate '22023' then
+    v_rejected := true;
+  end;
+  if not v_rejected
+    or (select count(*) from public.invoices where org_id = v_org) <> v_invoices
+    or (select count(*) from public.payments where org_id = v_org) <> v_payments
+    or (select count(*) from public.fast_checkout_requests
+          where org_id = v_org and request_id = v_request) <> 0
+    or (select stock from public.products where id = v_product) <> 6 then
+      raise exception 'FALLO: cobro rapido insuficiente tuvo efectos parciales';
+  end if;
+end $$;
 -- 5) Producto de otra empresa: rechazado
 \set ON_ERROR_STOP 0
 select invoice_id as inv4 from public.create_invoice('Cliente',null,18,'PEN',null,null,
@@ -46,3 +99,17 @@ select invoice_id as inv4 from public.create_invoice('Cliente',null,18,'PEN',nul
 \set ON_ERROR_STOP 1
 reset role;
 select pg_temp.chk('el producto ajeno no se tocó', (select stock from public.products where id=:'ajeno') = 9);
+-- 6) Ni siquiera una actualización SQL directa puede dejar un SKU de bodega negativo.
+\set ON_ERROR_STOP 0
+update public.products set stock=-2 where id=:'agua';
+\set ON_ERROR_STOP 1
+select pg_temp.chk('modificación directa bloqueada; saldo anterior intacto',
+  (select stock from public.products where id=:'agua') = 6);
+-- 7) Stock nulo significa SKU sin seguimiento: permite servicios sin descontar existencias.
+select pg_temp.chk('servicio sin seguimiento conserva stock NULL',
+  (select stock from public.products where id=:'serv') is null);
+-- 8) Otros rubros mantienen su política anterior (no cambiar nueve rubros).
+update public.products set stock=-1 where id=:'ajeno';
+select pg_temp.chk('salon no recibe restricción exclusiva de Bodega',
+  (select stock from public.products where id=:'ajeno') = -1);
+
