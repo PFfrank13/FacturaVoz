@@ -14,6 +14,8 @@ import '../services/live.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_layout.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 
 /// Reportes de ventas por mes + exportación CSV para el contador.
@@ -141,7 +143,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
     final r = cur == null ? null : report[cur];
     final org = AppState.instance.activeOrg?.name;
 
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1220, child: Scaffold(
       appBar: AppBar(title: const Text('Reportes')),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -215,7 +217,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _monthBar(ThemeData t) => SoftCard(
@@ -245,8 +247,9 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: t.colorScheme.surface,
-          borderRadius: BorderRadius.circular(Radii.lg),
-          border: Border.all(color: t.colorScheme.outline),
+          borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+          border: Border.all(color: t.colorScheme.outline.withValues(alpha: .2)),
+          boxShadow: FvTokens.shadow(t.brightness),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Ventas del mes', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
