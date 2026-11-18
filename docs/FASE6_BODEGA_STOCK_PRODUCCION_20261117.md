@@ -18,7 +18,8 @@ Inspección de Supabase productivo FacturaVoz antes del cambio (solo agregados):
 - `stock IS NULL` indica *sin seguimiento de inventario*, no equivale a cero. Permanece válido para servicios y artículos todavía no configurados. No asignar stock cero automáticamente a esos 9 registros.
 - No cambia la política de los demás rubros (salón, consultorio, restaurante, etc.). El historial de ventas y stock no se reescribe.
 - La guarda se instala en la **base de datos** como trigger, no solo en la interfaz. Protege venta rápida, facturación convencional, ajustes y escrituras directas.
-- La salida de inventario bloquea la fila del producto `FOR UPDATE` antes de descontar. Si dos cajas compiten por las últimas unidades, la segunda operación que intenta dejar inventario negativo falla en la misma transacción.
+- Antes de abrir la confirmación de pago (efectivo, Yape, Plin o tarjeta), el POS comprueba el stock más reciente por SKU en Supabase. Si no alcanza, impide continuar; evita pedir dinero para una venta que ya se sabe imposible.
+- La salida de inventario bloquea la fila del producto `FOR UPDATE` antes de descontar. Si dos cajas compiten por las últimas unidades, la segunda operación que intenta dejar inventario negativo falla en la misma transacción. La comprobación previa NO reserva inventario: una carrera todavía puede requerir conciliación manual si hubo transferencia externa.
 - La factura, el cobro, la solicitud idempotente y los eventos de stock se revierten si la venta rápida falla por existencias. No se debe crear un cargo nuevo por una desconexión de red.
 - Si el error SQL es **explícito y transaccional** `22023` con el prefijo propio de insuficiencia, Flutter libera la solicitud local para corregir cantidades. Errores de red o ambiguos mantienen la clave idempotente.
 
