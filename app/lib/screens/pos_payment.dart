@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../models_pro.dart';
 import '../services/pro_repo.dart';
 import 'client_profile.dart' show StorageImage;
@@ -274,7 +275,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
           ),
         ),
         body: Center(child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
+          constraints: const BoxConstraints(maxWidth: 720),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
             children: [
@@ -310,17 +311,22 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 14),
-                GridView.builder(
-                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisExtent: MediaQuery.textScalerOf(context).scale(1.0) > 1.3 ? 150 : 128,
-                    mainAxisSpacing: 10, crossAxisSpacing: 10,
-                  ),
-                  itemCount: 4,
-                  itemBuilder: (context, i) =>
-                    _methodTile(const ['efectivo', 'yape', 'plin', 'tarjeta'][i]),
-                ),
+                LayoutBuilder(builder: (context, layout) {
+                  final columns = layout.maxWidth >= 620 ? 4
+                      : layout.maxWidth >= 460 ? 3 : 2;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisExtent: MediaQuery.textScalerOf(context).scale(1.0) > 1.3 ? 150 : 128,
+                      mainAxisSpacing: 12, crossAxisSpacing: 12,
+                    ),
+                    itemCount: 4,
+                    itemBuilder: (context, i) =>
+                      _methodTile(const ['efectivo', 'yape', 'plin', 'tarjeta'][i]),
+                  );
+                }),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: () => setState(() { _method = 'transferencia'; _verified = false; }),
@@ -379,8 +385,10 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       controller: _tender,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(prefixText: posCurrencyPrefix(widget.currency),
-                        border: const OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        prefixText: posCurrencyPrefix(widget.currency),
+                        hintText: 'Monto recibido',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(_sufficient
@@ -403,8 +411,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
-                    backgroundColor: t.colorScheme.primary,
-                    foregroundColor: t.colorScheme.onPrimary,
+                    backgroundColor: FvTokens.emerald,
+                    foregroundColor: Colors.white,
                   ),
                   onPressed: _canConfirm ? _confirm : null,
                   icon: const Icon(Icons.check_rounded),
