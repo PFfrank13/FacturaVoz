@@ -8,6 +8,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
 import '../logic/bodega_stock_preflight.dart';
+import '../logic/retail_cart_stock.dart';
 import '../logic/data_scope.dart';
 import '../logic/pos_kitchen.dart';
 import '../logic/sample_catalog.dart';
@@ -24,6 +25,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_pos_workspace.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
@@ -295,6 +297,13 @@ class _PosScreenState extends State<PosScreen> {
     }
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este pedido ya se guardó en Comandas. Pulsa Nuevo pedido para agregar más platos.')));
+      return;
+    }
+    if (Access.instance.rubro == 'bodega' &&
+        exceedsKnownRetailStock(p, _cart[p.id] ?? 0, n)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Stock insuficiente de "${p.name}". Disponibles: ${qtyText(p.stock!)}.'),
+      ));
       return;
     }
     Haptics.tap();
@@ -991,7 +1000,12 @@ class _PosScreenState extends State<PosScreen> {
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : _products == null
               ? const SkeletonList()
-              : Column(children: [
+              : LayoutBuilder(builder: (context, body) {
+                  // Medir el espacio del POS, descontando el Drawer lateral fijo
+                  // en PC. La cuadrícula y la barra móvil comparten este dato.
+                  final desktopCart = retail && widget.embedded &&
+                      retailPosUseSideCart(body.maxWidth);
+                  return Column(children: [
                   if (retail)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
@@ -1034,7 +1048,9 @@ class _PosScreenState extends State<PosScreen> {
                       ]),
                     ),
                   Expanded(
-                    child: all.isEmpty
+                    child: LayoutBuilder(builder: (context, workspace) {
+                      final showSideCart = desktopCart;
+                      final Widget catalog = all.isEmpty
                         ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
                             SectorPhotoBanner(
                               rubro: Access.instance.rubro,
@@ -1063,7 +1079,8 @@ class _PosScreenState extends State<PosScreen> {
                                 final n = _cart[p.id] ?? 0;
                                 final img = _extra[p.id]?['image_path'] as String?;
                                 final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
-                                final category = '${p.name} ${_extra[p.id]?['category'] ?? ''}'.toLowerCase();
+                                final categoryLabel = (_extra[p.id]?['category'] ?? '').toString().trim();
+                                final category = '${p.name} $categoryLabel'.toLowerCase();
                                 final placeholderIcon =
                                     category.contains('agua') || category.contains('bebida')
                                         ? Icons.water_drop_rounded
@@ -1097,8 +1114,10 @@ class _PosScreenState extends State<PosScreen> {
                                                         ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                                                             Icon(placeholderIcon, size: 42, color: t.colorScheme.primary),
                                                             const SizedBox(height: 7),
-                                                            Text('Foto por añadir', style: t.textTheme.labelSmall?.copyWith(
-                                                              color: t.colorScheme.onSurfaceVariant)),
+                                                            Text(categoryLabel.isEmpty ? 'Producto' : categoryLabel,
+                                                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                                                              style: t.textTheme.labelSmall?.copyWith(
+                                                                color: t.colorScheme.onSurfaceVariant)),
                                                           ])
                                                         : em == null
                                                             ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
@@ -1116,8 +1135,11 @@ class _PosScreenState extends State<PosScreen> {
                                                 child: Text(qtyText(n), style: TextStyle(fontFamily: 'Inter', color: t.colorScheme.onPrimary, fontWeight: FontWeight.w800)),
                                               ),
                                             ),
-                                          if (p.tracksStock && (p.stock ?? 0) <= 0)
-                                            const Positioned(left: 6, top: 6, child: TagChip('Sin stock', color: Brand.bad)),
+                                          if (retail && p.tracksStock && p.stock! <= 0)
+                                            const Positioned(left: 6, top: 6, child: TagChip('Sin stock', color: Brand.bad))
+                                          else if (retail && p.lowStock && p.stock! > 0)
+                                            Positioned(left: 6, top: 6, child: TagChip(
+                                              'Quedan ${qtyText(p.stock!)}', color: Brand.warn)),
                                         ]),
                                       ),
                                       Padding(
@@ -1135,9 +1157,26 @@ class _PosScreenState extends State<PosScreen> {
                                 );
                               },
                             );
-                          }),
+                          });
+                      if (!showSideCart) return catalog;
+                      return Row(children: [
+                        Expanded(child: catalog),
+                        RetailPosCartPane(
+                          lines: lines,
+                          totals: totals,
+                          currency: _cur,
+                          onReview: _charging || _savingOrder ||
+                                  _recoveringCheckout || _restoringCart ||
+                                  _cartStorageError != null ||
+                                  _checkoutRecoveryError != null ||
+                                  _chargeRequestId != null
+                              ? null : _reviewRetailCart,
+                        ),
+                      ]);
+                    }),
                   ),
-                  if (retail && widget.embedded && lines.isNotEmpty)
+                  if (retail && widget.embedded && lines.isNotEmpty &&
+                      !desktopCart)
                     Container(
                       key: const ValueKey('retail-pos-checkout-bar'),
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -1179,7 +1218,8 @@ class _PosScreenState extends State<PosScreen> {
                         ),
                       ]),
                     ),
-                ]),
+                ]);
+              }),
       bottomNavigationBar: retail && widget.embedded ? null : AnimatedSize(
         duration: Motion.d(context, Motion.medium),
         curve: Motion.standard,
