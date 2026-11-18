@@ -1,6 +1,5 @@
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'design_tokens.dart';
 
@@ -60,10 +59,7 @@ class FvPosProductCard extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: disabled ? null : () {
-                HapticFeedback.lightImpact();
-                onAdd();
-              },
+              onTap: disabled ? null : onAdd,
               onLongPress: onRemove,
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -147,10 +143,7 @@ class FvPosProductCard extends StatelessWidget {
                         dimension: 43,
                         child: IconButton.filled(
                           tooltip: 'Añadir $name',
-                          onPressed: disabled ? null : () {
-                            HapticFeedback.lightImpact();
-                            onAdd();
-                          },
+                          onPressed: disabled ? null : onAdd,
                           icon: const Icon(Icons.add_rounded, size: 23),
                           style: IconButton.styleFrom(
                             backgroundColor: FvTokens.ink,
