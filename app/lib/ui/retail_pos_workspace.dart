@@ -6,7 +6,7 @@ import 'theme.dart';
 /// Usa el espacio realmente disponible (no la resolución física del dispositivo).
 /// El panel se muestra solamente en Bodega/Tienda integrada al MainShell.
 bool retailPosUseSideCart(double availableWidth) =>
-    availableWidth.isFinite && availableWidth >= 1040;
+    availableWidth.isFinite && availableWidth >= 900;
 
 /// Vista de lectura del carrito actual. No crea pagos, no cambia inventario ni
 /// altera los identificadores idempotentes; siempre utiliza la revisión POS.
