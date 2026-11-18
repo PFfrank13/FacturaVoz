@@ -565,7 +565,7 @@ class _HeroBackdrop extends StatelessWidget {
         Image.asset('assets/photos/mini_market.webp', fit: BoxFit.cover, alignment: Alignment.center),
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          colors: [Color(0x9E0C1339), Color(0x5826226E), Color(0xCE0C1238)],
+          colors: [Color(0xB00A1520), Color(0x58145E5D), Color(0xE10A1520)],
           stops: [0, 0.55, 1],
         ))),
       ]);
