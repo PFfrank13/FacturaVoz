@@ -12,6 +12,7 @@ import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 import 'assistant.dart';
 import 'catalog.dart' show AvatarButton, FeatureStrip;
@@ -405,31 +406,33 @@ class _ProfitScreenState extends State<ProfitScreen> with LiveReload<ProfitScree
       ]);
 
   Widget _hero(BuildContext context, ProfitSummary p, String cur) {
+    final t = Theme.of(context);
     final positive = p.profit >= 0;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: positive ? Brand.heroGradient : const LinearGradient(colors: [Color(0xFFD94A5E), Color(0xFFFF8A7A)]),
-        borderRadius: BorderRadius.circular(Radii.xl),
-        boxShadow: Brand.softShadow(false, a: 0.25),
+        color: t.colorScheme.surface,
+        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+        border: Border.all(color: t.colorScheme.outlineVariant.withValues(alpha: .22)),
+        boxShadow: FvTokens.shadow(t.brightness),
       ),
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(positive ? 'Ganancia del mes' : 'Pérdida del mes', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13.5)),
+            Text(positive ? 'Ganancia del mes' : 'Pérdida del mes', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
             CountUp(
               value: p.profit,
               builder: (c, v) => FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(money(v, cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -1)),
+                child: Text(money(v, cur), style: t.textTheme.headlineMedium?.copyWith(color: positive ? t.colorScheme.onSurface : t.colorScheme.error, fontWeight: FontWeight.w800, fontFeatures: const [FontFeature.tabularFigures()])), 
               ),
             ),
             const SizedBox(height: 6),
             Text(
               p.invoiceCount == 0 ? 'Aún sin ventas este mes' : '${p.invoiceCount} ventas · flujo de caja ${p.netCash >= 0 ? '+' : ''}${money(p.netCash, cur)}',
-              style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5),
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
           ]),
         ),
@@ -437,10 +440,10 @@ class _ProfitScreenState extends State<ProfitScreen> with LiveReload<ProfitScree
           value: p.margin.clamp(0, 1).toDouble(),
           size: 82,
           stroke: 9,
-          color: Colors.white,
+          color: positive ? FvTokens.emerald : t.colorScheme.error,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('${(p.margin * 100).round()}%', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w700, fontSize: 17)),
-            Text('margen', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.8), fontSize: 10.5)),
+            Text('${(p.margin * 100).round()}%', style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text('margen', style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ]),
         ),
       ]),
