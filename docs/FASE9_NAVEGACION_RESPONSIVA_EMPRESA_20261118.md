@@ -4,7 +4,7 @@
 Una sola fuente de navegación Bodega/Tienda para móviles, tabletas y escritorios, con continuidad de sesión y permisos.
 
 - Hasta 979 px: `Scaffold.drawer` lateral superpuesto; AppBar con botón de menú.
-- Desde 980 px: mismo `NavigationDrawer` permanente de 284 px dentro del `Scaffold.body`; no se crea un segundo menú ni `BottomNavigationBar`.
+- Desde 980 px: mismo `NavigationDrawer` permanente de 304 px dentro del `Scaffold.body`; no se crea un segundo menú ni `BottomNavigationBar`.
 - Al elegir un destino desde el menú fijo **no** se ejecuta `Navigator.pop()` (de lo contrario se cerraría indebidamente la pantalla actual). El overlay móvil sí se cierra.
 - Mismo `bodegaDrawerIds(Access.instance)`: el rol y el plan siguen filtrando destinos, sin exponer módulos prohibidos.
 - `LicenseBanner`, vistas y botón flotante conservan su lógica; los cambios son exclusivamente de presentación.
