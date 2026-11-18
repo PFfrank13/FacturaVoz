@@ -51,12 +51,13 @@ class _FvScrollRevealState extends State<FvScrollReveal>
     final target = context.findRenderObject();
     if (target is! RenderBox || !target.attached || !target.hasSize) return;
 
-    final viewport = RenderAbstractViewport.maybeOf(target);
-    if (viewport is RenderBox && viewport.attached && viewport.hasSize) {
+    final RenderBox? viewportBox =
+        RenderAbstractViewport.maybeOf(target) as RenderBox?;
+    if (viewportBox != null && viewportBox.attached && viewportBox.hasSize) {
       final top = target.localToGlobal(Offset.zero).dy;
       final bottom = top + target.size.height;
-      final visibleTop = viewport.localToGlobal(Offset.zero).dy;
-      final visibleBottom = visibleTop + viewport.size.height;
+      final visibleTop = viewportBox.localToGlobal(Offset.zero).dy;
+      final visibleBottom = visibleTop + viewportBox.size.height;
       if (bottom <= visibleTop + 12 || top >= visibleBottom - 12) return;
     }
     _shown = true;
