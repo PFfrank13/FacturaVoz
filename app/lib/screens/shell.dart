@@ -104,6 +104,10 @@ bool _destAllowed(String id, Access a) => switch (id) {
 /// Punto de corte para usar la navegación lateral fija en escritorio/tablet.
 bool bodegaUsesPermanentSidebar(double width) => FvTokens.isWide(width);
 
+/// Desktop multirrubro: el dock movil se reemplaza por un solo rail.
+bool usesMultirubroRail(String? rubro, double width) =>
+    rubro != 'bodega' && FvTokens.isWide(width);
+
 /// Navegación visible de Bodega según la licencia y el rol verificados.
 /// Es la fuente única tanto del Drawer como de sus pruebas de regresión.
 List<String> bodegaDrawerIds(Access access) => [
@@ -436,6 +440,80 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  /// Rail para salón, restaurante, consultorio, taller y los demás rubros.
+  /// Los destinos provienen de los mismos permisos y licencias que el dock.
+  Widget _multirubroRail(List<_Dest> destinations, {
+    required bool canVoiceSell,
+    required bool canCopilot,
+  }) {
+    final t = Theme.of(context);
+    final cs = t.colorScheme;
+    final selected = destinations.indexWhere((d) => d.id == _tab);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(right: BorderSide(
+          color: cs.outlineVariant.withValues(alpha: 0.45))),
+      ),
+      child: NavigationRail(
+        key: const ValueKey('multirubro-navigation-rail'),
+        backgroundColor: cs.surface,
+        selectedIndex: selected < 0 ? 0 : selected,
+        labelType: NavigationRailLabelType.selected,
+        groupAlignment: -1,
+        scrollable: true,
+        useIndicator: true,
+        indicatorColor: cs.primary.withValues(alpha: .09),
+        selectedIconTheme: IconThemeData(color: cs.primary, size: 22),
+        unselectedIconTheme: IconThemeData(
+          color: cs.onSurfaceVariant, size: 22),
+        selectedLabelTextStyle: t.textTheme.labelSmall?.copyWith(
+          color: cs.onSurface, fontWeight: FontWeight.w800),
+        leading: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 16, 0, 20),
+          child: Tooltip(
+            message: 'FacturaVoz',
+            child: Icon(Icons.auto_graph_rounded,
+              color: cs.onSurface, size: 27),
+          ),
+        ),
+        trailing: Padding(
+          padding: const EdgeInsets.only(top: 18, bottom: 8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (canVoiceSell)
+              IconButton(
+                key: const ValueKey('multirubro-voice-action'),
+                tooltip: 'Vender por voz',
+                onPressed: _newInvoice,
+                icon: const Icon(Icons.mic_rounded),
+              ),
+            if (canCopilot)
+              IconButton(
+                key: const ValueKey('multirubro-copilot-action'),
+                tooltip: 'Copiloto IA',
+                onPressed: () => openCopilot(context),
+                icon: const Icon(Icons.auto_awesome_rounded),
+              ),
+          ]),
+        ),
+        destinations: [
+          for (final d in destinations)
+            NavigationRailDestination(
+              icon: Tooltip(message: d.semantics, child: Icon(d.icon)),
+              selectedIcon: Icon(d.icon),
+              label: Text(d.label),
+              padding: const EdgeInsets.symmetric(vertical: 2),
+            ),
+        ],
+        onDestinationSelected: (index) {
+          if (index >= 0 && index < destinations.length) {
+            _go(destinations[index].id);
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
@@ -444,8 +522,10 @@ class _MainShellState extends State<MainShell> {
       builder: (context, _) {
         final dests = _dests();
         final isBodega = (Access.instance.rubro ?? _settings?.businessType) == 'bodega';
-        final pinnedSidebar = isBodega &&
-            bodegaUsesPermanentSidebar(MediaQuery.sizeOf(context).width);
+        final width = MediaQuery.sizeOf(context).width;
+        final pinnedSidebar = isBodega && bodegaUsesPermanentSidebar(width);
+        final workstationRail = usesMultirubroRail(
+          Access.instance.rubro ?? _settings?.businessType, width);
         if (!dests.any((d) => d.id == _tab)) _tab = _landing(dests);
         _built.add(_tab);
         final first = _landing(dests);
@@ -494,7 +574,10 @@ class _MainShellState extends State<MainShell> {
             ) : null,
             body: Row(children: [
               if (pinnedSidebar)
-                _bodegaRail(dests),
+                _bodegaRail(dests)
+              else if (workstationRail)
+                _multirubroRail(
+                  dests, canVoiceSell: canVoiceSell, canCopilot: canCopilot),
               Expanded(child: Column(children: [
                 const LicenseBanner(),
                 Expanded(
@@ -541,7 +624,7 @@ class _MainShellState extends State<MainShell> {
                   )
                 : null,
             // Los otros ocho rubros conservan su shell hasta su rediseño propio.
-            bottomNavigationBar: isBodega ? null : AnimatedSlide(
+            bottomNavigationBar: isBodega || workstationRail ? null : AnimatedSlide(
               offset: keyboard ? const Offset(0, 1.4) : Offset.zero,
               duration: Motion.d(context, Motion.fast),
               curve: Motion.standard,
