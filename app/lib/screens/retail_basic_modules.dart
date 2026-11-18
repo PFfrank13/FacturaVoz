@@ -5,6 +5,14 @@ import '../permissions.dart';
 import '../ui/theme.dart';
 import 'catalog.dart';
 
+/// Altura mínima de las tarjetas del tablero. Se incrementa con el escalado
+/// accesible y conserva espacio para dos líneas de título y descripción.
+double retailDashboardCardExtent(double availableWidth, double textScale) {
+  final compact = availableWidth < 360;
+  final scale = textScale.clamp(1.0, 3.0);
+  return (compact ? 188.0 : 164.0) + (scale - 1) * 140;
+}
+
 /// Entrada histórica para Básico: mantiene el contrato de navegación y tests.
 /// No dibuja nada para Pro, Empresa o licencias no verificadas.
 class RetailBasicModules extends StatelessWidget {
@@ -186,9 +194,8 @@ class _RetailPlanDashboard extends StatelessWidget {
             final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
             // Reservar altura para etiquetas multilínea en móviles compactos
             // y para escalado de accesibilidad sin cortar contenido.
-            final compactCard = layout.maxWidth < 360;
-            final cardExtent = (compactCard ? 188.0 : 164.0) +
-                (textScale > 1 ? (textScale - 1) * 140 : 0);
+            final cardExtent = retailDashboardCardExtent(
+              layout.maxWidth, textScale);
             return GridView.builder(
               key: ValueKey(basic ? 'retail-basic-modules' : 'retail-plan-modules'),
               shrinkWrap: true,
