@@ -474,15 +474,12 @@ class _MainShellState extends State<MainShell> {
     final t = Theme.of(context);
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        border: Border(right: BorderSide(
-          color: cs.outlineVariant.withValues(alpha: 0.45))),
-      ),
+    return FvGlassSurface(
+      radius: 0,
+      blur: 16,
       child: NavigationRail(
         key: const ValueKey('multirubro-navigation-rail'),
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.transparent,
         selectedIndex: selected < 0 ? 0 : selected,
         labelType: NavigationRailLabelType.selected,
         groupAlignment: -1,
