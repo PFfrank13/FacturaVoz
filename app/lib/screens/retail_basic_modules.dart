@@ -5,6 +5,14 @@ import '../permissions.dart';
 import '../ui/theme.dart';
 import 'catalog.dart';
 
+/// Altura mínima de las tarjetas del tablero. Se incrementa con el escalado
+/// accesible y conserva espacio para dos líneas de título y descripción.
+double retailDashboardCardExtent(double availableWidth, double textScale) {
+  final compact = availableWidth < 360;
+  final scale = textScale.clamp(1.0, 3.0);
+  return (compact ? 188.0 : 164.0) + (scale - 1) * 140;
+}
+
 /// Entrada histórica para Básico: mantiene el contrato de navegación y tests.
 /// No dibuja nada para Pro, Empresa o licencias no verificadas.
 class RetailBasicModules extends StatelessWidget {
@@ -128,7 +136,7 @@ class _RetailPlanDashboard extends StatelessWidget {
           ),
           const SizedBox(width: Gap.md),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Tu negocio, al día',
+            Text('Tu negocio, al día', maxLines: 2, overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleLarge?.copyWith(
                 color: colors.ink, fontWeight: FontWeight.w800, letterSpacing: -.4)),
             const SizedBox(height: Gap.xs),
@@ -183,7 +191,11 @@ class _RetailPlanDashboard extends StatelessWidget {
           LayoutBuilder(builder: (context, layout) {
             final columns = layout.maxWidth >= 720 ? 4
                 : (layout.maxWidth >= 480 ? 3 : 2);
-            final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+            final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            // Reservar altura para etiquetas multilínea en móviles compactos
+            // y para escalado de accesibilidad sin cortar contenido.
+            final cardExtent = retailDashboardCardExtent(
+              layout.maxWidth, textScale);
             return GridView.builder(
               key: ValueKey(basic ? 'retail-basic-modules' : 'retail-plan-modules'),
               shrinkWrap: true,
@@ -191,7 +203,7 @@ class _RetailPlanDashboard extends StatelessWidget {
               itemCount: actions.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                mainAxisExtent: largeText ? 194 : 152,
+                mainAxisExtent: cardExtent,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
@@ -255,7 +267,7 @@ class _RetailPlanDashboard extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
           const SizedBox(height: Gap.md),
           SizedBox(
-            height: MediaQuery.textScalerOf(context).scale(1) > 1.25 ? 208 : 176,
+            height: retailDashboardCardExtent(320, MediaQuery.textScalerOf(context).scale(14) / 14),
             child: ListView.separated(
               key: const ValueKey('retail-plan-premium'),
               scrollDirection: Axis.horizontal,
@@ -265,7 +277,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                 final entry = premium[i];
                 final tone = _toneFor(entry.action.id);
                 return SizedBox(
-                  width: 184,
+                  width: MediaQuery.sizeOf(context).width < 360 ? 156 : 184,
                   child: Material(
                     color: colors.surface,
                     borderRadius: BorderRadius.circular(Radii.md),
