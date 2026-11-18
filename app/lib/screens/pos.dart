@@ -24,6 +24,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_pos_workspace.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
@@ -1034,7 +1035,10 @@ class _PosScreenState extends State<PosScreen> {
                       ]),
                     ),
                   Expanded(
-                    child: all.isEmpty
+                    child: LayoutBuilder(builder: (context, workspace) {
+                      final showSideCart = retail && widget.embedded &&
+                          retailPosUseSideCart(workspace.maxWidth);
+                      final Widget catalog = all.isEmpty
                         ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
                             SectorPhotoBanner(
                               rubro: Access.instance.rubro,
@@ -1135,9 +1139,26 @@ class _PosScreenState extends State<PosScreen> {
                                 );
                               },
                             );
-                          }),
+                          });
+                      if (!showSideCart) return catalog;
+                      return Row(children: [
+                        Expanded(child: catalog),
+                        RetailPosCartPane(
+                          lines: lines,
+                          totals: totals,
+                          currency: _cur,
+                          onReview: _charging || _savingOrder ||
+                                  _recoveringCheckout || _restoringCart ||
+                                  _cartStorageError != null ||
+                                  _checkoutRecoveryError != null ||
+                                  _chargeRequestId != null
+                              ? null : _reviewRetailCart,
+                        ),
+                      ]);
+                    }),
                   ),
-                  if (retail && widget.embedded && lines.isNotEmpty)
+                  if (retail && widget.embedded && lines.isNotEmpty &&
+                      !retailPosUseSideCart(MediaQuery.sizeOf(context).width))
                     Container(
                       key: const ValueKey('retail-pos-checkout-bar'),
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
