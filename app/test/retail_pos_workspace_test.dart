@@ -9,7 +9,7 @@ void main() {
     for (final width in [320.0, 360.0, 600.0, 840.0, 899.0]) {
       expect(retailPosUseSideCart(width), isFalse, reason: 'ancho $width');
     }
-    for (final width in [1040.0, 1280.0, 1440.0]) {
+    for (final width in [900.0, 1040.0, 1280.0, 1440.0]) {
       expect(retailPosUseSideCart(width), isTrue, reason: 'ancho $width');
     }
     expect(retailPosUseSideCart(double.infinity), isFalse);
