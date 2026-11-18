@@ -16,6 +16,7 @@ import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
+import '../ui/scroll_reveal.dart';
 import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
@@ -371,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             if (Access.instance.rubro == 'bodega' &&
                 Access.instance.license.plan == 'BASICO')
-              const SliverToBoxAdapter(child: RetailBasicModules()),
+              const SliverToBoxAdapter(child: FvScrollReveal(child: RetailBasicModules())),
             SliverToBoxAdapter(
               child: Reveal(
                 index: 1,
@@ -419,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             if (Access.instance.has('copiloto'))
-              SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
+              SliverToBoxAdapter(child: FvScrollReveal(child: CopilotCards(alerts: _alerts, onChanged: _load))),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
