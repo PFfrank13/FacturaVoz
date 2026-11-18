@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/ui/retail_layout.dart';
+import 'package:facturavoz/ui/retail_layout.dart';
 
 void main() {
   test('Tarjetas: un panel estrecho, dos columnas si caben', () {
