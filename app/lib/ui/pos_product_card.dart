@@ -42,6 +42,7 @@ class FvPosProductCard extends StatelessWidget {
       container: true,
       label: '$name, $price, ${stockLabel ?? 'stock no indicado'}',
       child: FvTactileScale(
+        enabled: !disabled,
         child: AnimatedContainer(
           duration: MediaQuery.of(context).disableAnimations
               ? Duration.zero : FvTokens.micro,
