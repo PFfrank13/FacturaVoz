@@ -101,7 +101,7 @@ class PendingRetailPurchase {
 class RetailPurchaseStore {
   RetailPurchaseStore._();
   static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
   );
   static String _key(String user, String org) => 'fv_purchase_pending_v1_${user}_$org';
 
@@ -206,7 +206,7 @@ class PendingRetailSettlement {
 class RetailSettlementStore {
   RetailSettlementStore._();
   static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
   );
   static String _key(String user, String org) => 'fv_settle_pending_v1_${user}_$org';
 

@@ -30,7 +30,7 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
   /// Tiempo en segundo plano a partir del cual se vuelve a pedir el PIN.
   static const background = Duration(seconds: 20);
 
-  final _store = const FlutterSecureStorage(aOptions: AndroidOptions(encryptedSharedPreferences: true));
+  final _store = const FlutterSecureStorage(aOptions: AndroidOptions());
   final _auth = LocalAuthentication();
 
   LockStatus status = LockStatus.off;

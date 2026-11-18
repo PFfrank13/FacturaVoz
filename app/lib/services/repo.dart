@@ -570,7 +570,7 @@ class Repo {
 
 /// Almacén cifrado del teléfono (mismo mecanismo que el cobro pendiente del POS).
 class _SecureIntentStorage implements IntentStorage {
-  static const _s = FlutterSecureStorage(aOptions: AndroidOptions(encryptedSharedPreferences: true));
+  static const _s = FlutterSecureStorage(aOptions: AndroidOptions());
   @override
   Future<String?> read(String key) => _s.read(key: key);
   @override

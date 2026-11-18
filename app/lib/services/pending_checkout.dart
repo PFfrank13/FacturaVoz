@@ -86,7 +86,7 @@ class PendingCheckoutStore {
   PendingCheckoutStore._();
 
   static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
   );
 
   static String _key(String userId, String orgId) => 'fv_pos_pending_v1_${userId}_$orgId';

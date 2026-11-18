@@ -13,7 +13,7 @@ class BootCache {
 
   static const _key = 'fv_boot_v1';
   static const _version = 1;
-  static const _store = FlutterSecureStorage(aOptions: AndroidOptions(encryptedSharedPreferences: true));
+  static const _store = FlutterSecureStorage(aOptions: AndroidOptions());
 
   static Map<String, dynamic>? _data;
 
