@@ -183,7 +183,12 @@ class _RetailPlanDashboard extends StatelessWidget {
           LayoutBuilder(builder: (context, layout) {
             final columns = layout.maxWidth >= 720 ? 4
                 : (layout.maxWidth >= 480 ? 3 : 2);
-            final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+            final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            // Reservar altura para etiquetas multilínea en móviles compactos
+            // y para escalado de accesibilidad sin cortar contenido.
+            final compactCard = layout.maxWidth < 360;
+            final cardExtent = (compactCard ? 188.0 : 164.0) +
+                (textScale > 1 ? (textScale - 1) * 140 : 0);
             return GridView.builder(
               key: ValueKey(basic ? 'retail-basic-modules' : 'retail-plan-modules'),
               shrinkWrap: true,
@@ -191,7 +196,7 @@ class _RetailPlanDashboard extends StatelessWidget {
               itemCount: actions.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                mainAxisExtent: largeText ? 194 : 152,
+                mainAxisExtent: cardExtent,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
