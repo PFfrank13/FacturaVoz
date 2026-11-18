@@ -26,7 +26,6 @@ import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/pos_product_card.dart';
 import '../ui/widgets.dart';
-import '../ui/retail_visual.dart';
 import '../ui/retail_pos_workspace.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
@@ -1226,46 +1225,57 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                   if (retail && widget.embedded && lines.isNotEmpty &&
                       !desktopCart)
-                    Container(
+                    Padding(
                       key: const ValueKey('retail-pos-checkout-bar'),
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      decoration: BoxDecoration(
-                        color: t.colorScheme.surface,
-                        border: Border(top: BorderSide(color: t.colorScheme.outline)),
-                      ),
-                      child: Row(children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: _reviewRetailCart,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${qtyText(count)} productos · Ver carrito',
-                                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: t.textTheme.bodySmall?.copyWith(
-                                      color: t.colorScheme.onSurfaceVariant)),
-                                Text(money(totals.total, _cur),
-                                  style: t.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)),
-                              ],
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: FvGlassSurface(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                        child: Row(children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: _reviewRetailCart,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Row(children: [
+                                const Icon(Icons.shopping_bag_outlined, size: 22),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text('${qtyText(count)} productos · Ver carrito',
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: t.textTheme.labelSmall?.copyWith(
+                                          color: t.colorScheme.onSurfaceVariant)),
+                                      Text(money(totals.total, _cur),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: t.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w800)),
+                                    ],
+                                  ),
+                                ),
+                              ]),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        FilledButton.icon(
-                          key: const ValueKey('retail-pos-charge'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 50),
-                            backgroundColor: t.colorScheme.primary,
-                            foregroundColor: t.colorScheme.onPrimary,
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            key: const ValueKey('retail-pos-charge'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(100, 48),
+                              backgroundColor: FvTokens.emerald,
+                              foregroundColor: Colors.white,
+                              shape: const StadiumBorder(),
+                            ),
+                            onPressed: _charging || _savingOrder || _chargeRequestId != null
+                                ? null : () {
+                                    Haptics.tap();
+                                    _reviewRetailCart();
+                                  },
+                            child: const Text('Cobrar',
+                              style: TextStyle(fontWeight: FontWeight.w800)),
                           ),
-                          onPressed: _charging || _savingOrder || _chargeRequestId != null
-                              ? null : _reviewRetailCart,
-                          icon: const Icon(Icons.shopping_cart_checkout_rounded),
-                          label: const Text('Cobrar', style: TextStyle(fontWeight: FontWeight.w800)),
-                        ),
-                      ]),
+                        ]),
+                      ),
                     ),
                 ]);
               }),
