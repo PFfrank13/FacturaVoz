@@ -874,7 +874,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 880 ? 2 : 1;
+                  final columns = retailCardColumnCount(constraints.maxWidth);
                   final itemWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
                   return Wrap(
                     spacing: 10,
