@@ -1000,7 +1000,12 @@ class _PosScreenState extends State<PosScreen> {
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : _products == null
               ? const SkeletonList()
-              : Column(children: [
+              : LayoutBuilder(builder: (context, body) {
+                  // Medir el espacio del POS, descontando el Drawer lateral fijo
+                  // en PC. La cuadrícula y la barra móvil comparten este dato.
+                  final desktopCart = retail && widget.embedded &&
+                      retailPosUseSideCart(body.maxWidth);
+                  return Column(children: [
                   if (retail)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
@@ -1044,8 +1049,7 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   Expanded(
                     child: LayoutBuilder(builder: (context, workspace) {
-                      final showSideCart = retail && widget.embedded &&
-                          retailPosUseSideCart(workspace.maxWidth);
+                      final showSideCart = desktopCart;
                       final Widget catalog = all.isEmpty
                         ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
                             SectorPhotoBanner(
@@ -1172,7 +1176,7 @@ class _PosScreenState extends State<PosScreen> {
                     }),
                   ),
                   if (retail && widget.embedded && lines.isNotEmpty &&
-                      !retailPosUseSideCart(MediaQuery.sizeOf(context).width))
+                      !desktopCart)
                     Container(
                       key: const ValueKey('retail-pos-checkout-bar'),
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -1214,7 +1218,8 @@ class _PosScreenState extends State<PosScreen> {
                         ),
                       ]),
                     ),
-                ]),
+                ]);
+              }),
       bottomNavigationBar: retail && widget.embedded ? null : AnimatedSize(
         duration: Motion.d(context, Motion.medium),
         curve: Motion.standard,
