@@ -8,8 +8,8 @@ import 'theme.dart';
 bool retailPosUseSideCart(double availableWidth) =>
     availableWidth.isFinite && availableWidth >= 900;
 
-/// Vista de lectura del carrito actual. No crea pagos, no cambia inventario ni
-/// altera los identificadores idempotentes; siempre utiliza la revisión POS.
+/// Vista del carrito con edición opcional del borrador. No crea pagos,
+/// no cambia inventario ni altera identificadores idempotentes.
 class RetailPosCartPane extends StatelessWidget {
   const RetailPosCartPane({
     super.key,
@@ -17,12 +17,15 @@ class RetailPosCartPane extends StatelessWidget {
     required this.totals,
     required this.currency,
     required this.onReview,
+    this.onQuantityChange,
   });
 
   final List<LineItem> lines;
   final Totals totals;
   final String currency;
   final VoidCallback? onReview;
+  /// El padre aplica las mismas defensas de stock y cobro para cada cambio.
+  final void Function(String productId, double delta)? onQuantityChange;
 
   @override
   Widget build(BuildContext context) {
@@ -93,8 +96,19 @@ class RetailPosCartPane extends StatelessWidget {
                       border: Border.all(color: cs.outlineVariant),
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(line.description, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Row(children: [
+                        Expanded(child: Text(line.description, maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700))),
+                        if (onQuantityChange != null && line.productId != null)
+                          IconButton(
+                            key: ValueKey('retail-pos-qty-remove-${line.productId}'),
+                            onPressed: () => onQuantityChange!(line.productId!, -line.quantity),
+                            tooltip: 'Quitar ${line.description} del carrito',
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                          ),
+                      ]),
                       const SizedBox(height: 7),
                       Row(children: [
                         Expanded(child: Text('${qtyText(line.quantity)} × ${money(line.unitPrice, currency)}',
@@ -104,6 +118,33 @@ class RetailPosCartPane extends StatelessWidget {
                         Text(money(line.amount, currency),
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
                       ]),
+                      if (onQuantityChange != null && line.productId != null) ...[
+                        const SizedBox(height: 7),
+                        Row(children: [
+                          Expanded(child: Text('Cantidad',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant))),
+                          IconButton.filledTonal(
+                            key: ValueKey('retail-pos-qty-minus-${line.productId}'),
+                            tooltip: 'Reducir ${line.description}',
+                            onPressed: () => onQuantityChange!(line.productId!,
+                              line.quantity < 1 ? -line.quantity : -1.0),
+                            icon: const Icon(Icons.remove_rounded),
+                            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(qtyText(line.quantity),
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+                          ),
+                          IconButton.filledTonal(
+                            key: ValueKey('retail-pos-qty-plus-${line.productId}'),
+                            tooltip: 'Aumentar ${line.description}',
+                            onPressed: () => onQuantityChange!(line.productId!, 1.0),
+                            icon: const Icon(Icons.add_rounded),
+                            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                          ),
+                        ]),
+                      ],
                     ]),
                   );
                 },
