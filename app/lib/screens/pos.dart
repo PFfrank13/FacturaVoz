@@ -23,6 +23,8 @@ import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
+import '../ui/pos_product_card.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_pos_workspace.dart';
@@ -956,8 +958,8 @@ class _PosScreenState extends State<PosScreen> {
     final totals = computeTotals(lines, _rate);
     final count = _cart.values.fold(0.0, (a, b) => a + b);
     final actions = <Widget>[
-      if (retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
-      if (retail && Access.instance.has('stock') && Access.instance.can('products_edit'))
+      if (!retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
+      if (!retail && Access.instance.has('stock') && Access.instance.can('products_edit'))
         IconButton(
           tooltip: 'Editar catálogo y fotos de productos',
           icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -965,7 +967,7 @@ class _PosScreenState extends State<PosScreen> {
             builder: (_) => const ProductsScreen(),
           )),
         ),
-      IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
+      if (!retail) IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
     return Theme(data: t, child: Scaffold(
@@ -1013,8 +1015,19 @@ class _PosScreenState extends State<PosScreen> {
                   return Column(children: [
                   if (retail)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
-                      child: RetailVisual.journey(step: 1, label: 'Elegir productos'),
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Punto de venta',
+                            style: t.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                          const SizedBox(height: 4),
+                          Text('Escanea o selecciona un producto para vender',
+                            style: t.textTheme.bodySmall?.copyWith(
+                              color: t.colorScheme.onSurfaceVariant)),
+                        ],
+                      ),
                     ),
 
                   if (widget.embedded && actions.isNotEmpty)
@@ -1040,7 +1053,17 @@ class _PosScreenState extends State<PosScreen> {
                         onChanged: (_) => setState(() {}),
                         onSubmitted: _submit,
                         textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(hintText: 'Busca o pasa el lector de código de barras', prefixIcon: Icon(Icons.search_rounded), isDense: true),
+                        decoration: InputDecoration(
+                          hintText: retail ? 'Buscar producto o escanear' : 'Busca o pasa el lector de código de barras',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: retail ? IconButton(
+                            key: const ValueKey('retail-pos-barcode-scan'),
+                            tooltip: 'Escanear código de barras',
+                            onPressed: _scan,
+                            icon: const Icon(Icons.qr_code_scanner_rounded),
+                          ) : null,
+                          isDense: true,
+                        ),
                       ),
                     ),
                   ),
@@ -1074,10 +1097,10 @@ class _PosScreenState extends State<PosScreen> {
                               ),
                           ])
                         : LayoutBuilder(builder: (context, c) {
-                            final cols = (c.maxWidth / 150).floor().clamp(2, 6);
+                            final cols = retail ? FvTokens.productColumns(c.maxWidth) : (c.maxWidth / 150).floor().clamp(2, 6);
                             return GridView.builder(
-                              padding: EdgeInsets.fromLTRB(12, 8, 12, retail && widget.embedded ? 8 : widget.embedded ? 210 : 120),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(200)),
+                              padding: EdgeInsets.fromLTRB(12, 10, 12, retail && widget.embedded ? 12 : widget.embedded ? 210 : 120),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 12, crossAxisSpacing: 12, mainAxisExtent: MediaQuery.textScalerOf(context).scale(retail ? 244 : 200)),
                               itemCount: list.length,
                               itemBuilder: (context, i) {
                                 final p = list[i];
@@ -1097,6 +1120,24 @@ class _PosScreenState extends State<PosScreen> {
                                                     ? Icons.cleaning_services_rounded
                                                     : Icons.inventory_2_rounded;
                                 final pr = _price(p, n == 0 ? 1 : n);
+                                if (retail) {
+                                  return FvPosProductCard(
+                                    key: ValueKey('retail-product-${p.id}'),
+                                    name: p.name,
+                                    price: money(pr.unitPrice, _cur),
+                                    icon: placeholderIcon,
+                                    category: categoryLabel,
+                                    photo: img == null || img.isEmpty
+                                        ? null : StorageImage(path: img),
+                                    stockLabel: p.tracksStock
+                                        ? (p.stock! <= 0 ? 'Sin stock' : 'Stock: ${qtyText(p.stock!)}')
+                                        : null,
+                                    soldOut: p.tracksStock && p.stock! <= 0,
+                                    quantity: n > 0 ? qtyText(n) : null,
+                                    onAdd: () => _add(p),
+                                    onRemove: n > 0 ? () => _add(p, -1) : null,
+                                  );
+                                }
                                 return Pressable(
                                   onTap: () => _add(p),
                                   onLongPress: n > 0 ? () => _add(p, -1) : null,
