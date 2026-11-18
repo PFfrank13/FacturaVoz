@@ -6,6 +6,8 @@ import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_layout.dart';
+import '../ui/design_tokens.dart';
 import '../ui/theme.dart';
 import 'fiscal_setup.dart';
 import 'branding.dart';
@@ -248,7 +250,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
     final entries = _invoices.where((i) => retailReceiptMatches(i, _filter, _query)).toList();
     final c = DsColors.of(context);
     final t = Theme.of(context);
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 960, child: Scaffold(
         appBar: AppBar(
           title: const Text('Comprobantes'),
           actions: [
@@ -260,7 +262,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
           ],
         ),
         body: SafeArea(child: Center(child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
+          constraints: const BoxConstraints(maxWidth: 800),
           child: RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
@@ -409,7 +411,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
             ),
           ),
         ))),
-    );
+    ));
   }
 
   Widget _receiptTile(InvoiceRecord inv) {
@@ -435,13 +437,13 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
       : c.muted;
     return Material(
       color: c.surface,
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(FvTokens.cardRadius),
       child: ListTile(
         key: ValueKey('receipt-${inv.id}'),
         onTap: () => _openDetail(inv),
         shape: RoundedRectangleBorder(
           side: BorderSide(color: c.line),
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(FvTokens.cardRadius),
         ),
         leading: Icon(kind == 'factura' ? Icons.description_rounded
           : Icons.receipt_long_rounded, color: c.primaryText, size: 28),

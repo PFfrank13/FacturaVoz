@@ -20,6 +20,7 @@ import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_layout.dart';
 import '../ui/work_queue.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
@@ -263,7 +264,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     // Inicio muestra un resumen: la búsqueda completa corresponde a Comprobantes.
     final activity = isBodega ? list.take(4).toList() : list;
     final buyers = _todayBuyers();
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1200, child: Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,
         edgeOffset: 140,
@@ -456,6 +457,6 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
           ],
         ]),
       ),
-    );
+    ));
   }
 }

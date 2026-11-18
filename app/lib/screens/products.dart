@@ -13,6 +13,7 @@ import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_layout.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
@@ -772,7 +773,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           : null,
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
+        child: RetailResponsiveFrame(maxWidth: 1160, child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -871,8 +872,16 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             else if (list.isEmpty)
               Padding(padding: const EdgeInsets.only(top: 40), child: Text('Nada coincide con tu búsqueda.', textAlign: TextAlign.center, style: t.textTheme.bodyMedium))
             else
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = retailCardColumnCount(constraints.maxWidth);
+                  final itemWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
               for (final (i, p) in list.indexed)
-                Padding(
+                SizedBox(width: itemWidth, child: Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Reveal(
                     key: ValueKey(p.id),
@@ -927,9 +936,13 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                       ),
                     ),
                   ),
-                ),
+                )),
+                    ],
+                  );
+                },
+              ),
           ],
-        ),
+        )),
       ),
     );
   }

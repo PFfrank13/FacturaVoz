@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../access.dart';
 import '../permissions.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import 'catalog.dart';
 
 /// Altura mínima de las tarjetas del tablero. Se incrementa con el escalado
@@ -148,10 +149,10 @@ class _RetailPlanDashboard extends StatelessWidget {
           const SizedBox(height: 20),
           Material(
             color: colors.primary,
-            borderRadius: BorderRadius.circular(Radii.lg),
+            borderRadius: BorderRadius.circular(FvTokens.cardRadius),
             child: InkWell(
               key: const ValueKey('retail-module-pos'),
-              borderRadius: BorderRadius.circular(Radii.lg),
+              borderRadius: BorderRadius.circular(FvTokens.cardRadius),
               onTap: () => openFeature(context, pos),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
@@ -173,7 +174,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                       'Escanea, cobra y registra en un solo flujo',
                       style: theme.textTheme.bodySmall?.copyWith(color: foreground.withValues(alpha: .92))),
                   ])),
-                  Icon(Icons.arrow_forward_rounded, color: foreground),
+                  Icon(Icons.qr_code_scanner_rounded, color: foreground, size: 25),
                 ]),
               ),
             ),
@@ -212,19 +213,19 @@ class _RetailPlanDashboard extends StatelessWidget {
                 final tone = _toneFor(entry.action.id);
                 return Material(
                   color: colors.surface,
-                  borderRadius: BorderRadius.circular(Radii.md),
+                  borderRadius: BorderRadius.circular(FvTokens.cardRadius),
                   child: InkWell(
                     key: ValueKey('retail-module-${entry.action.id}'),
                     onTap: () => openFeature(context, entry.feature),
                     hoverColor: colors.primary.withValues(alpha: .05),
                     splashColor: colors.primary.withValues(alpha: .10),
-                    borderRadius: BorderRadius.circular(Radii.md),
+                    borderRadius: BorderRadius.circular(FvTokens.cardRadius),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(Radii.md),
-                        border: Border.all(color: colors.line),
-                        boxShadow: Brand.softShadow(theme.brightness == Brightness.dark, a: .04),
+                        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+                        border: Border.all(color: colors.line.withValues(alpha: .24)),
+                        boxShadow: FvTokens.shadow(theme.brightness),
                       ),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
