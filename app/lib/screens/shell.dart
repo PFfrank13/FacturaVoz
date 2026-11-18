@@ -443,7 +443,7 @@ class _MainShellState extends State<MainShell> {
             body: Row(children: [
               if (pinnedSidebar)
                 SizedBox(
-                  width: 284,
+                  width: 304,
                   child: _bodegaNavigation(dests, pinned: true),
                 ),
               Expanded(child: Column(children: [
