@@ -8,6 +8,7 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
 import '../logic/bodega_stock_preflight.dart';
+import '../logic/retail_cart_stock.dart';
 import '../logic/data_scope.dart';
 import '../logic/pos_kitchen.dart';
 import '../logic/sample_catalog.dart';
@@ -296,6 +297,13 @@ class _PosScreenState extends State<PosScreen> {
     }
     if (_restaurant && (_kitchenRequestId != null || _savingOrder)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este pedido ya se guardó en Comandas. Pulsa Nuevo pedido para agregar más platos.')));
+      return;
+    }
+    if (Access.instance.rubro == 'bodega' &&
+        exceedsKnownRetailStock(p, _cart[p.id] ?? 0, n)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Stock insuficiente de "${p.name}". Disponibles: ${qtyText(p.stock!)}.'),
+      ));
       return;
     }
     Haptics.tap();
@@ -1067,7 +1075,8 @@ class _PosScreenState extends State<PosScreen> {
                                 final n = _cart[p.id] ?? 0;
                                 final img = _extra[p.id]?['image_path'] as String?;
                                 final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
-                                final category = '${p.name} ${_extra[p.id]?['category'] ?? ''}'.toLowerCase();
+                                final categoryLabel = (_extra[p.id]?['category'] ?? '').toString().trim();
+                                final category = '${p.name} ${categoryLabel}'.toLowerCase();
                                 final placeholderIcon =
                                     category.contains('agua') || category.contains('bebida')
                                         ? Icons.water_drop_rounded
@@ -1101,8 +1110,10 @@ class _PosScreenState extends State<PosScreen> {
                                                         ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                                                             Icon(placeholderIcon, size: 42, color: t.colorScheme.primary),
                                                             const SizedBox(height: 7),
-                                                            Text('Foto por añadir', style: t.textTheme.labelSmall?.copyWith(
-                                                              color: t.colorScheme.onSurfaceVariant)),
+                                                            Text(categoryLabel.isEmpty ? 'Producto' : categoryLabel,
+                                                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                                                              style: t.textTheme.labelSmall?.copyWith(
+                                                                color: t.colorScheme.onSurfaceVariant)),
                                                           ])
                                                         : em == null
                                                             ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
@@ -1120,8 +1131,11 @@ class _PosScreenState extends State<PosScreen> {
                                                 child: Text(qtyText(n), style: TextStyle(fontFamily: 'Inter', color: t.colorScheme.onPrimary, fontWeight: FontWeight.w800)),
                                               ),
                                             ),
-                                          if (p.tracksStock && (p.stock ?? 0) <= 0)
-                                            const Positioned(left: 6, top: 6, child: TagChip('Sin stock', color: Brand.bad)),
+                                          if (retail && p.tracksStock && p.stock! <= 0)
+                                            const Positioned(left: 6, top: 6, child: TagChip('Sin stock', color: Brand.bad))
+                                          else if (retail && p.lowStock && p.stock! > 0)
+                                            Positioned(left: 6, top: 6, child: TagChip(
+                                              'Quedan ${qtyText(p.stock!)}', color: Brand.warn)),
                                         ]),
                                       ),
                                       Padding(
