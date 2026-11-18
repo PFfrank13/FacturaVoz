@@ -16,6 +16,7 @@ import '../services/growth_repo.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
+import '../ui/scroll_reveal.dart';
 import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
@@ -33,7 +34,6 @@ import 'invoice_detail.dart';
 import 'new_invoice.dart';
 import 'products.dart';
 import 'recurring.dart';
-
 import 'scan.dart';
 import 'store.dart';
 
@@ -369,8 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onGoal: () => _setGoal(m.total),
               ),
             ),
-            // El POS y las acciones básicas están en el menú lateral único;
-            // no repetimos una cuadrícula ni un carrusel en Inicio.
+            // Venta rápida y módulos básicos viven en el menú único de Bodega.
             if (Access.instance.rubro != 'bodega')
               SliverToBoxAdapter(
               child: Reveal(
@@ -419,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             if (Access.instance.has('copiloto'))
-              SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
+              SliverToBoxAdapter(child: FvScrollReveal(child: CopilotCards(alerts: _alerts, onChanged: _load))),
             if (_items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(

@@ -12,6 +12,8 @@ import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_layout.dart';
+import '../ui/design_tokens.dart';
 import 'scan.dart';
 
 IconData expenseIcon(String c) => switch (c) {
@@ -285,7 +287,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<Expense
     final total = round2((items ?? const <Expense>[]).where((e) => e.currency == cur).fold<double>(0, (s, e) => s + e.total));
     final now = DateTime.now();
     final isCurrent = _year == now.year && _month == now.month;
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1100, child: Scaffold(
       appBar: AppBar(title: const Text('Gastos'), actions: [IconButton(onPressed: _scan, icon: const Icon(Icons.document_scanner_rounded), tooltip: 'Escanear comprobante')]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: const Text('Gasto')),
       body: RefreshIndicator(
@@ -298,10 +300,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<Expense
           ]),
           const SizedBox(height: 8),
           Reveal(
-            child: SoftCard(
-              child: Row(children: [
-                Expanded(child: Text('Total del mes', style: t.textTheme.titleSmall)),
-                CountUp(value: total, builder: (c, v) => Money(money(v, cur), size: 20, weight: FontWeight.w700)),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: t.colorScheme.surface,
+                borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+                border: Border.all(
+                  color: t.colorScheme.outlineVariant.withValues(alpha: .2)),
+                boxShadow: FvTokens.shadow(t.brightness),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Total de gastos del mes',
+                  style: t.textTheme.labelMedium?.copyWith(
+                    color: t.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 7),
+                CountUp(
+                  value: total,
+                  builder: (c, v) => Money(
+                    money(v, cur), size: 30, weight: FontWeight.w800)),
               ]),
             ),
           ),
@@ -313,8 +329,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<Expense
           else if (items.isEmpty)
             const EmptyState(title: 'Sin gastos este mes', body: 'Registra tus compras y pagos (o escanea la boleta) para saber cuánto ganas de verdad.')
           else
-            for (final (i, e) in items.indexed)
-              Padding(
+            LayoutBuilder(builder: (context, available) {
+              final columns = retailCardColumnCount(
+                available.maxWidth, twoColumnMinWidth: 820);
+              final width = (available.maxWidth - (columns - 1) * 12) / columns;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 0,
+                children: [
+                  for (final (i, e) in items.indexed)
+                    SizedBox(width: width, child: Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Reveal(
                   key: ValueKey(e.id),
@@ -376,7 +400,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<Expense
                     ),
                   ),
                 ),
-              ),
+              )),
+                ],
+              );
+            }),
           if (items != null && items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -384,6 +411,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<Expense
             ),
         ]),
       ),
-    );
+    ));
   }
 }

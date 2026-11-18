@@ -22,6 +22,7 @@ import '../ui/motion.dart';
 import '../logic/credit.dart';
 import '../logic/catalog_link.dart';
 import '../ui/theme.dart';
+import '../ui/retail_layout.dart';
 import '../ui/widgets.dart';
 import 'products.dart';
 import '../access.dart';
@@ -666,7 +667,9 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     final scheme = t.colorScheme;
     final remaining = _maxSeconds - _seconds;
     return Center(
-      child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: SingleChildScrollView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -745,6 +748,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -757,7 +761,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
     final bottom = MediaQuery.of(context).padding.bottom;
     final heard = _transcript != null && _transcript!.trim().isNotEmpty;
     final noLines = heard && _rows.length == 1 && _rows.first.desc.text.trim().isEmpty && _rows.first.price.text.trim().isEmpty;
-    return Stack(children: [
+    return RetailResponsiveFrame(maxWidth: 960, child: Stack(children: [
       ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(16, 8, 16, 150 + bottom),
@@ -823,7 +827,7 @@ class _NewInvoiceScreenState extends State<NewInvoiceScreen> {
           ),
         ),
       ),
-    ]);
+    ]));
   }
 
   Widget _section(String title, IconData icon, Widget child, {Widget? trailing}) {
