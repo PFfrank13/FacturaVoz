@@ -64,4 +64,76 @@ void main() {
     expect(button.onPressed, isNull);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('carrito lateral ajusta y retira SKU mediante el controlador protegido', (tester) async {
+    final deltas = <double>[];
+    final line = LineItem(
+      description: 'Agua sin gas', quantity: 2, unitPrice: 3.5, productId: 'sku-agua',
+    );
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.light),
+      home: Scaffold(body: Center(child: SizedBox(
+        width: 320, height: 560,
+        child: RetailPosCartPane(
+          lines: [line],
+          totals: computeTotals([line], 18),
+          currency: 'PEN',
+          onReview: null,
+          onQuantityChange: (id, delta) {
+            expect(id, 'sku-agua');
+            deltas.add(delta);
+          },
+        ),
+      ))),
+    ));
+    await tester.tap(find.byKey(const ValueKey('retail-pos-qty-plus-sku-agua')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('retail-pos-qty-minus-sku-agua')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('retail-pos-qty-remove-sku-agua')));
+    await tester.pump();
+    expect(deltas, [1.0, -1.0, -2.0]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reducir una fracción no produce cantidades negativas', (tester) async {
+    final deltas = <double>[];
+    final line = LineItem(description: 'Producto por peso',
+      quantity: 0.5, unitPrice: 10, productId: 'sku-peso');
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.light),
+      home: Scaffold(body: Center(child: SizedBox(
+        width: 320, height: 560,
+        child: RetailPosCartPane(
+          lines: [line],
+          totals: computeTotals([line], 18),
+          currency: 'PEN',
+          onReview: null,
+          onQuantityChange: (id, delta) => deltas.add(delta),
+        ),
+      ))),
+    ));
+    await tester.tap(find.byKey(const ValueKey('retail-pos-qty-minus-sku-peso')));
+    await tester.pump();
+    expect(deltas, [-0.5]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sin permiso de edición no se muestran controles de cantidad', (tester) async {
+    final line = LineItem(description: 'Agua',
+      quantity: 1, unitPrice: 2, productId: 'sku-agua');
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.dark),
+      home: Scaffold(body: Center(child: SizedBox(
+        width: 320, height: 560,
+        child: RetailPosCartPane(
+          lines: [line], totals: computeTotals([line], 18),
+          currency: 'PEN', onReview: null,
+        ),
+      ))),
+    ));
+    expect(find.byKey(const ValueKey('retail-pos-qty-plus-sku-agua')), findsNothing);
+    expect(find.byKey(const ValueKey('retail-pos-qty-remove-sku-agua')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
 }
