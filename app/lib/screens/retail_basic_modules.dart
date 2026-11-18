@@ -136,7 +136,7 @@ class _RetailPlanDashboard extends StatelessWidget {
           ),
           const SizedBox(width: Gap.md),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Tu negocio, al día',
+            Text('Tu negocio, al día', maxLines: 2, overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleLarge?.copyWith(
                 color: colors.ink, fontWeight: FontWeight.w800, letterSpacing: -.4)),
             const SizedBox(height: Gap.xs),
@@ -267,7 +267,7 @@ class _RetailPlanDashboard extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
           const SizedBox(height: Gap.md),
           SizedBox(
-            height: MediaQuery.textScalerOf(context).scale(1) > 1.25 ? 208 : 176,
+            height: retailDashboardCardExtent(320, MediaQuery.textScalerOf(context).scale(14) / 14),
             child: ListView.separated(
               key: const ValueKey('retail-plan-premium'),
               scrollDirection: Axis.horizontal,
@@ -277,7 +277,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                 final entry = premium[i];
                 final tone = _toneFor(entry.action.id);
                 return SizedBox(
-                  width: 184,
+                  width: MediaQuery.sizeOf(context).width < 360 ? 156 : 184,
                   child: Material(
                     color: colors.surface,
                     borderRadius: BorderRadius.circular(Radii.md),
