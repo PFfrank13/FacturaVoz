@@ -22,6 +22,7 @@ import '../services/v2_repo.dart';
 import '../ui/mini_map.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 import 'catalog.dart';
 import 'client_profile.dart';
@@ -32,6 +33,17 @@ import 'trash.dart';
 String get _uid => Supabase.instance.client.auth.currentUser?.id ?? '';
 
 Color _statusColor(JobStatus s) => Color(s.color);
+
+/// En escritorio aprovecha las columnas visibles; en pantallas compactas
+/// mantiene tarjetas legibles de 270dp y permite desplazamiento horizontal.
+double jobBoardColumnWidth(double availableWidth, int statusCount) {
+  if (!availableWidth.isFinite || availableWidth < 900 || statusCount <= 0) {
+    return 270;
+  }
+  final ideal = (availableWidth - 24 - statusCount * 8) / statusCount;
+  return ideal.clamp(270.0, 380.0);
+}
+
 
 // ═════════════════════════ Tablero / lista ═════════════════════════
 class JobsScreen extends StatefulWidget {
@@ -171,7 +183,9 @@ class _JobsScreenState extends State<JobsScreen> with LiveReload<JobsScreen> {
   Widget _boardView(BuildContext context, OrgSettings s, List<Job> all) {
     final t = Theme.of(context);
     final statuses = s.statuses;
-    return ListView(
+    return LayoutBuilder(builder: (context, constraints) {
+      final columnWidth = jobBoardColumnWidth(constraints.maxWidth, statuses.length);
+      return ListView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 150),
       children: [
@@ -183,7 +197,7 @@ class _JobsScreenState extends State<JobsScreen> with LiveReload<JobsScreen> {
               final items = all.where((j) => j.status == st.key || (!statuses.any((x) => x.key == j.status) && st == statuses.first)).toList();
               return AnimatedContainer(
                 duration: Motion.d(context, Motion.fast),
-                width: 270,
+                width: columnWidth,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -223,6 +237,7 @@ class _JobsScreenState extends State<JobsScreen> with LiveReload<JobsScreen> {
           ),
       ],
     );
+    });
   }
 
   Widget _listView(BuildContext context, OrgSettings s, List<Job> all) {
@@ -396,12 +411,14 @@ class _AgendaScreenState extends State<AgendaScreen> with LiveReload<AgendaScree
                   margin: const EdgeInsets.symmetric(horizontal: 3),
                   decoration: BoxDecoration(
                     color: on ? t.colorScheme.primary : t.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(Radii.lg),
-                    border: Border.all(color: DateUtils.isSameDay(d, today) ? t.colorScheme.primary : t.colorScheme.outline),
+                    borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+                    border: Border.all(color: DateUtils.isSameDay(d, today)
+                        ? t.colorScheme.primary
+                        : t.colorScheme.outlineVariant.withValues(alpha: .35)),
                   ),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Text(days[d.weekday - 1], style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: on ? Colors.white : t.colorScheme.onSurfaceVariant)),
-                    Text('${d.day}', style: TextStyle(fontFamily: 'Inter', fontSize: 20, fontWeight: FontWeight.w800, color: on ? Colors.white : t.colorScheme.onSurface)),
+                    Text(days[d.weekday - 1], style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: on ? t.colorScheme.onPrimary : t.colorScheme.onSurfaceVariant)),
+                    Text('${d.day}', style: TextStyle(fontFamily: 'Inter', fontSize: 20, fontWeight: FontWeight.w800, color: on ? t.colorScheme.onPrimary : t.colorScheme.onSurface)),
                   ]),
                 ),
               );
