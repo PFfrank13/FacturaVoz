@@ -24,7 +24,7 @@ void main() {
                     radius: 22,
                     padding: const EdgeInsets.all(16),
                     child: Text('Navegación',
-                      style: TextStyle(color: FvTokens.text(brightness))),
+                      style: TextStyle(color: brightness == Brightness.dark ? FvTokens.inkDark : FvTokens.ink)),
                   ),
                 ),
               ),
