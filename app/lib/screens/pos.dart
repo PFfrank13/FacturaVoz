@@ -7,6 +7,7 @@ import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../logic/pricing.dart';
+import '../logic/bodega_stock_preflight.dart';
 import '../logic/data_scope.dart';
 import '../logic/pos_kitchen.dart';
 import '../logic/sample_catalog.dart';
@@ -625,6 +626,61 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
+  /// Check the newest inventory before asking the customer to hand over
+  /// cash or confirm a Yape/Plin transfer. SQL is still the final authority.
+  Future<bool> _checkBodegaStockBeforePayment(
+      String org, String uid, List<LineItem> lines) async {
+    final requested = <String, double>{};
+    for (final line in lines) {
+      final id = line.productId;
+      if (id == null || id.isEmpty) continue;
+      requested.update(id, (q) => q + line.quantity,
+          ifAbsent: () => line.quantity);
+    }
+    if (requested.isEmpty) return true;
+    try {
+      final result = await Supabase.instance.client
+          .from('products')
+          .select('id,stock,active')
+          .eq('org_id', org)
+          .inFilter('id', requested.keys.toList());
+      if (!mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) {
+        return false;
+      }
+      final availability = <String, double?>{};
+      for (final row in result) {
+        if (row['active'] != true) continue;
+        final raw = row['stock'];
+        final amount = raw is num
+            ? raw.toDouble()
+            : raw == null ? null : double.tryParse(raw.toString());
+        if (raw != null && amount == null) {
+          throw const FormatException('Stock inválido recibido desde servidor.');
+        }
+        availability[row['id'].toString()] = amount;
+      }
+      final missing = firstInsufficientBodegaSku(requested, availability);
+      if (missing != null) {
+        final itemName = lines.firstWhere((line) => line.productId == missing).description;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 6),
+          content: Text('Antes del pago: no hay existencias suficientes de "$itemName". Revisa el carrito o registra una compra.'),
+        ));
+        return false;
+      }
+      return true;
+    } catch (e) {
+      if (mounted && Repo.activeOrgId == org &&
+          Supabase.instance.client.auth.currentUser?.id == uid) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('No se pudo verificar el inventario actual. No confirmes todavía el pago. ${friendly(e)}'),
+        ));
+      }
+      return false;
+    }
+  }
+
   /// Four-stage mobile POS: basket → method → verified payment → receipt.
   Future<void> _chargeSheet() async {
     if (_recoveringCheckout || _restoringCart || _cartStorageError != null ||
@@ -634,7 +690,12 @@ class _PosScreenState extends State<PosScreen> {
     final currency = _cur;
     final taxRate = _rate;
     final lines = _lines();
-    if (lines.isEmpty) { return; }
+    if (lines.isEmpty || org == null || uid == null) { return; }
+    if (Access.instance.rubro == 'bodega') {
+      final available = await _checkBodegaStockBeforePayment(org, uid, lines);
+      if (!available || !mounted || Repo.activeOrgId != org ||
+          Supabase.instance.client.auth.currentUser?.id != uid) { return; }
+    }
     final total = computeTotals(lines, taxRate).total;
     final approval = await choosePosPayment(context, currency: currency, total: total, items: lines);
     if (!mounted || approval == null || Repo.activeOrgId != org ||
