@@ -8,6 +8,8 @@ Fecha: 2026-11-18. Alcance: Flutter (Compras/recepción), pruebas y mantenimient
 - Las tarjetas del catálogo reemplazan el borde violeta fijo por `colorScheme.outlineVariant`.
 - La acción de añadir usa `colorScheme.primary`, accesible en tema claro y oscuro.
 - El historial deja de forzar una superficie oscura fija y hereda el tema.
+- **Alta de productos:** el asistente de seis pasos elimina el degradado morado heredado, utiliza `colorScheme.primaryContainer` y colores semánticos con contraste claro/oscuro.
+- **Comprobantes:** iconos de boleta y factura adoptan los roles primario y secundario del tema, en lugar de los colores púrpura/azul fijos.
 - No cambia el flujo transaccional de recepción, bloqueo de operación incierta, permisos, stock, facturación ni las tablas SQL.
 
 ## Dependencias
