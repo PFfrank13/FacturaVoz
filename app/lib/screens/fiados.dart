@@ -14,6 +14,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_workspace.dart';
 import 'client_profile.dart';
 import 'trash.dart';
 
@@ -114,7 +115,8 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
               ? const SkeletonList()
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
+                  child: RetailWorkspace(
+                    child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
                     Reveal(
                       child: RetailVisual.hero(
                         context: context,
@@ -131,13 +133,19 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _new,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Anotar fiado'),
-                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54), textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _new,
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Anotar fiado'),
+                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54), textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -199,7 +207,8 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                             ),
                           ),
                         ),
-                  ]),
+                    ]),
+                  ),
                 ),
     );
   }
