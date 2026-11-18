@@ -57,6 +57,12 @@ void main() {
       ),
     ));
     expect(find.text('Sección accesible'), findsOneWidget);
-    expect(find.byType(FadeTransition), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(FvScrollReveal),
+        matching: find.byType(FadeTransition),
+      ),
+      findsNothing,
+    );
   });
 }
