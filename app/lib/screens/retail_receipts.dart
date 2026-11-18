@@ -188,14 +188,14 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
           const SizedBox(height: 12),
           ListTile(
             key: const ValueKey('receipt-create-boleta'),
-            leading: const Icon(Icons.receipt_long_rounded, color: Color(0xFFC0A0FF)),
+            leading: Icon(Icons.receipt_long_rounded, color: Theme.of(sheetContext).colorScheme.primary),
             title: const Text('Boleta electrónica'),
             subtitle: const Text('Para consumidor final o cliente identificado'),
             onTap: () => Navigator.pop(sheetContext, '03'),
           ),
           ListTile(
             key: const ValueKey('receipt-create-factura'),
-            leading: const Icon(Icons.description_rounded, color: Color(0xFF89B8FF)),
+            leading: Icon(Icons.description_rounded, color: Theme.of(sheetContext).colorScheme.secondary),
             title: const Text('Factura electrónica'),
             subtitle: const Text('Requiere RUC y razón social del cliente'),
             onTap: () => Navigator.pop(sheetContext, '01'),
