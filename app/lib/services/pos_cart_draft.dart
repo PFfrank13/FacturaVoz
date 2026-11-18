@@ -101,7 +101,7 @@ class PosCartDraft {
 class PosCartStore {
   PosCartStore._();
   static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
   );
 
   static String _key(String user, String org) => 'fv_open_cart_v1_${user}_$org';
