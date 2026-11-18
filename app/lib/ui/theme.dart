@@ -165,8 +165,8 @@ ThemeData buildTheme(Brightness b) {
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF19453E) : const Color(0xFFD7F1E9),
-    onPrimaryContainer: dark ? const Color(0xFFBDF6E8) : const Color(0xFF07564E),
+    primaryContainer: dark ? FvTokens.fieldDark : FvTokens.field,
+    onPrimaryContainer: dark ? FvTokens.inkDark : FvTokens.ink,
   );
 
   final radius = BorderRadius.circular(FvTokens.fieldRadius);
