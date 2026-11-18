@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../errors.dart';
 import '../app_state.dart';
 import '../ui/retail_visual.dart';
+import '../ui/design_tokens.dart';
+import '../ui/retail_layout.dart';
 import '../models.dart';
 import '../services/repo.dart';
 import '../services/retail_purchase.dart';
@@ -155,15 +157,8 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
     final receipt = widget.receipt;
     final amount = ((receipt?['total_cents'] as num?) ?? 0).toDouble() / 100;
     final currency = (receipt?['currency'] ?? 'PEN') as String;
-    return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: RetailVisual.navy,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: RetailVisual.violet, brightness: Brightness.dark),
-      ),
-      child: Scaffold(
-      backgroundColor: RetailVisual.navy,
-      appBar: AppBar(backgroundColor: RetailVisual.navy,
+    return Scaffold(
+      appBar: AppBar(
         title: const Text('Pago al proveedor',
           style: TextStyle(fontWeight: FontWeight.w900))),
       body: _loading
@@ -176,7 +171,9 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
                 TextButton(onPressed: _restore, child: const Text('Reintentar lectura')),
               ]),
             ))
-          : ListView(
+          : RetailResponsiveFrame(
+              maxWidth: 800,
+              child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
                 RetailVisual.hero(
@@ -259,8 +256,8 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
                   const SizedBox(height: 12),
                   SizedBox(width: double.infinity, height: 54, child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: RetailVisual.violet, foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                      backgroundColor: FvTokens.emerald, foregroundColor: Colors.white,
+                      shape: const StadiumBorder()),
                     onPressed: _busy || !_confirmed ? null : _pay,
                     icon: const Icon(Icons.check_circle_outline),
                     label: const Text('Registrar pago',
@@ -272,7 +269,7 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
                     child: const Text('Volver a compras')),
                 ],
               ],
-            ),
-    ));
+            )),
+    );
   }
 }
