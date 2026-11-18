@@ -307,7 +307,7 @@ class _PosScreenState extends State<PosScreen> {
       ));
       return;
     }
-    Haptics.tap();
+    Haptics.soft();
     setState(() {
       final q = (_cart[p.id] ?? 0) + n;
       if (q <= 0) {
