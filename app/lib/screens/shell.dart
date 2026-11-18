@@ -13,6 +13,7 @@ import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/retail_layout.dart';
 import '../ui/design_tokens.dart';
 import 'assistant.dart';
 import 'catalog.dart';
@@ -590,7 +591,13 @@ class _MainShellState extends State<MainShell> {
                           _TabSlot(
                             key: ValueKey('tab-${d.id}'),
                             active: d.id == _tab,
-                            child: RepaintBoundary(child: _page(d.id)),
+                            child: RepaintBoundary(
+                              child: isBodega
+                                  ? _page(d.id)
+                                  : RetailResponsiveFrame(
+                                      maxWidth: 1360,
+                                      child: _page(d.id)),
+                            ),
                           ),
                     ]),
                   ),
