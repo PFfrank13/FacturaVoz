@@ -941,6 +941,11 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final retail = Access.instance.rubro == 'bodega';
+    // Los cambios de carrito siguen el mismo bloqueo que la revisión de cobro.
+    final canEditRetailCart = !_charging && !_savingOrder &&
+        !_recoveringCheckout && !_restoringCart &&
+        _cartStorageError == null && _checkoutRecoveryError == null &&
+        _chargeRequestId == null && _pendingCheckout == null;
     // El POS no redefine el tema del usuario: se integra al unico shell.
     final t = Theme.of(context);
     final all = _products ?? const <Product>[];
@@ -1165,12 +1170,15 @@ class _PosScreenState extends State<PosScreen> {
                           lines: lines,
                           totals: totals,
                           currency: _cur,
-                          onReview: _charging || _savingOrder ||
-                                  _recoveringCheckout || _restoringCart ||
-                                  _cartStorageError != null ||
-                                  _checkoutRecoveryError != null ||
-                                  _chargeRequestId != null
-                              ? null : _reviewRetailCart,
+                          onReview: canEditRetailCart ? _reviewRetailCart : null,
+                          onQuantityChange: canEditRetailCart
+                              ? (productId, delta) {
+                                  final product = _products?.where(
+                                    (item) => item.id == productId,
+                                  ).firstOrNull;
+                                  if (product != null) _add(product, delta);
+                                }
+                              : null,
                         ),
                       ]);
                     }),
