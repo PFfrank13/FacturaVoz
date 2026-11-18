@@ -101,10 +101,12 @@ class FvTactileScale extends StatefulWidget {
     super.key,
     required this.child,
     this.pressedScale = 0.985,
+    this.enabled = true,
   });
 
   final Widget child;
   final double pressedScale;
+  final bool enabled;
 
   @override
   State<FvTactileScale> createState() => _FvTactileScaleState();
@@ -131,7 +133,7 @@ class _FvTactileScaleState extends State<FvTactileScale> {
   Widget build(BuildContext context) => Listener(
         behavior: HitTestBehavior.deferToChild,
         onPointerDown: (event) {
-          if (_pointer != null) return;
+          if (!widget.enabled || _pointer != null) return;
           _pointer = event.pointer;
           _start = event.position;
           _setPressed(true);
@@ -145,7 +147,8 @@ class _FvTactileScaleState extends State<FvTactileScale> {
         onPointerUp: (event) => _end(event.pointer),
         onPointerCancel: (event) => _end(event.pointer),
         child: AnimatedScale(
-          scale: _pressed ? widget.pressedScale : 1,
+          scale: widget.enabled && !reduceMotion(context) && _pressed
+              ? widget.pressedScale : 1,
           duration: Motion.d(context, Motion.instant),
           curve: Curves.easeOutCubic,
           child: widget.child,
