@@ -18,7 +18,7 @@ import 'retail_settlements.dart';
 /// Centra el flujo de compras en pantallas anchas sin estrecharlo en móviles.
 /// Usa el espacio REAL disponible, no el tamaño físico de la pantalla.
 double retailPurchaseHorizontalInset(double availableWidth) {
-  if (!availableWidth.isFinite || availableWidth <= 960) return 16;
+  if (!availableWidth.isFinite || availableWidth <= 992) return 16;
   return (availableWidth - 960) / 2;
 }
 
