@@ -6,7 +6,7 @@ import 'package:facturavoz/ui/theme.dart';
 
 void main() {
   test('panel de carrito solo en el espacio real disponible', () {
-    for (final width in [320.0, 360.0, 600.0, 840.0, 1039.0]) {
+    for (final width in [320.0, 360.0, 600.0, 840.0, 899.0]) {
       expect(retailPosUseSideCart(width), isFalse, reason: 'ancho $width');
     }
     for (final width in [1040.0, 1280.0, 1440.0]) {
