@@ -12,6 +12,7 @@ import '../services/v2_repo.dart';
 import 'client_profile.dart' show StorageImage;
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/retail_layout.dart';
 import '../ui/widgets.dart';
 
 /// Medios de cobro (lo que ve tu cliente en el enlace de pago) y cobranza automática.
@@ -221,7 +222,7 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
     final t = Theme.of(context);
     final s = _s;
     final digits = [FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]'))];
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1000, child: Scaffold(
       appBar: AppBar(title: const Text('Cobros y recordatorios')),
       body: SafeArea(
         child: s == null
@@ -243,9 +244,34 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                       const SizedBox(height: 4),
                       Text('Esto aparece en el enlace de pago que envías a tus clientes, con botón de copiar.', style: t.textTheme.bodySmall),
                       const SizedBox(height: 14),
-                      TextField(controller: _yape, keyboardType: TextInputType.phone, inputFormatters: digits, decoration: const InputDecoration(labelText: 'Celular Yape', prefixIcon: Icon(Icons.phone_android_rounded))),
-                      const SizedBox(height: 10),
-                      TextField(controller: _plin, keyboardType: TextInputType.phone, inputFormatters: digits, decoration: const InputDecoration(labelText: 'Celular Plin', prefixIcon: Icon(Icons.phone_iphone_rounded))),
+                      LayoutBuilder(builder: (context, constraints) {
+                        final yape = TextField(
+                          controller: _yape,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: digits,
+                          decoration: const InputDecoration(
+                            labelText: 'Celular Yape',
+                            prefixIcon: Icon(Icons.phone_android_rounded)),
+                        );
+                        final plin = TextField(
+                          controller: _plin,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: digits,
+                          decoration: const InputDecoration(
+                            labelText: 'Celular Plin',
+                            prefixIcon: Icon(Icons.phone_iphone_rounded)),
+                        );
+                        if (constraints.maxWidth < 700) {
+                          return Column(children: [
+                            yape, const SizedBox(height: 10), plin,
+                          ]);
+                        }
+                        return Row(children: [
+                          Expanded(child: yape),
+                          const SizedBox(width: 12),
+                          Expanded(child: plin),
+                        ]);
+                      }),
                       const SizedBox(height: 10),
                       Text('Para mostrar un QR auténtico en Venta rápida, sube la imagen de cobro de tu propia cuenta. Nunca generamos un QR bancario inventado.', style: t.textTheme.bodySmall),
                       const SizedBox(height: 8),
@@ -351,6 +377,6 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                 GradientButton(label: _saving ? 'Guardando…' : 'Guardar', icon: Icons.check_rounded, busy: _saving, onPressed: _saving || !_isAdmin ? null : _save),
               ]),
       ),
-    );
+    ));
   }
 }

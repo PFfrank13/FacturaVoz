@@ -20,6 +20,7 @@ import 'recurring.dart';
 import 'share_sheet.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/retail_layout.dart';
 import '../access.dart';
 import '../config.dart';
 import '../services/print/ticket_printer.dart';
@@ -504,7 +505,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final inv = _inv;
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 980, child: Scaffold(
       appBar: AppBar(title: Text(_fiscal?.number ?? inv?.number ?? 'Factura')),
       body: SafeArea(
         child: inv == null
@@ -541,30 +542,23 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   // La vista previa embebida usa pdf.js en web (CDN de terceros); en web solo se descarga.
                   Reveal(
                     index: 2,
-                    child: Row(children: [
-                      if (!kIsWeb) Expanded(child: _quick(Icons.picture_as_pdf_rounded, 'Ver PDF', _preview)),
-                      if (!kIsWeb) const SizedBox(width: 10),
-                      Expanded(child: _quick(kIsWeb ? Icons.download_rounded : Icons.ios_share_rounded, kIsWeb ? 'Descargar' : 'Compartir', _share)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _quick(Icons.mail_outline_rounded, 'Correo', _email)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _quick(Icons.copy_all_rounded, 'Duplicar', _duplicate)),
+                    child: _quickActionGrid([
+                      if (!kIsWeb) _quick(Icons.picture_as_pdf_rounded, 'Ver PDF', _preview),
+                      _quick(kIsWeb ? Icons.download_rounded : Icons.ios_share_rounded,
+                        kIsWeb ? 'Descargar' : 'Compartir', _share),
+                      _quick(Icons.mail_outline_rounded, 'Correo', _email),
+                      _quick(Icons.copy_all_rounded, 'Duplicar', _duplicate),
                     ]),
                   ),
                   const SizedBox(height: 10),
                   Reveal(
                     index: 2,
-                    child: Row(children: [
-                      Expanded(child: _quick(Icons.print_rounded, 'Ticket', _printTicket)),
-                      const SizedBox(width: 10),
-                      if (Access.instance.has('portal_cliente')) ...[
-                        Expanded(child: _quick(Icons.link_rounded, 'Enlace', _portal)),
-                        const SizedBox(width: 10),
-                      ],
+                    child: _quickActionGrid([
+                      _quick(Icons.print_rounded, 'Ticket', _printTicket),
+                      if (Access.instance.has('portal_cliente'))
+                        _quick(Icons.link_rounded, 'Enlace', _portal),
                       if (Access.instance.has('encuestas') && inv.status != 'draft')
-                        Expanded(child: _quick(Icons.sentiment_satisfied_alt_rounded, 'Encuesta', _survey))
-                      else
-                        const Expanded(child: SizedBox()),
+                        _quick(Icons.sentiment_satisfied_alt_rounded, 'Encuesta', _survey),
                     ]),
                   ),
                   const SizedBox(height: 14),
@@ -650,8 +644,24 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 ],
               ),
       ),
-    );
+    ));
   }
+
+  /// Herramientas del documento: 2 columnas en móviles; hasta 4 en tablets.
+  /// Solo reorganiza botones existentes, mantiene sus permisos y callbacks.
+  Widget _quickActionGrid(List<Widget> actions) =>
+      LayoutBuilder(builder: (context, available) {
+        final columns = available.maxWidth >= 620 ? 4 : 2;
+        final itemWidth = (available.maxWidth - (columns - 1) * 10) / columns;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final action in actions)
+              SizedBox(width: itemWidth, child: action),
+          ],
+        );
+      });
 
   Widget _quick(IconData icon, String label, VoidCallback onTap) {
     final t = Theme.of(context);
