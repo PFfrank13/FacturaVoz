@@ -60,7 +60,9 @@ void main() {
 
   test('El Drawer no muestra módulos fuera del plan ni Copiloto en Básico', () {
     final a = Access.instance;
-    expect(bodegaDrawerIds(a), ['home', 'sell', 'cash', 'settings']);
+    expect(bodegaDrawerIds(a), [
+      'home', 'sell', 'comprobantes', 'cash', 'clients', 'reportes', 'settings',
+    ]);
     a.license = const LicenseInfo(
       source: 'hub', mode: 'full', status: 'activa', activated: true,
       enforced: true, plan: 'BASICO',
@@ -70,7 +72,8 @@ void main() {
       },
     );
     expect(bodegaDrawerIds(a), [
-      'home', 'sell', 'fiados', 'cash', 'stock', 'settings',
+      'home', 'sell', 'stock', 'compras', 'comprobantes',
+      'fiados', 'cash', 'settings',
     ]);
   });
 
