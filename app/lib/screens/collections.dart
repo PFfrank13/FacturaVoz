@@ -14,6 +14,7 @@ import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 import '../whatsapp.dart';
 import 'invoice_detail.dart';
@@ -284,25 +285,26 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   }
 
   Widget _summary(BuildContext context, Aging aging, String cur, CashForecast f) {
-    const colors = [Color(0xFF9B8CF5), Color(0xFFFFB454), Color(0xFFFF9376), Color(0xFFFF6F8E), Color(0xFFD94A5E)];
+    final t = Theme.of(context);
+    const colors = [Color(0xFF94A3B8), Color(0xFFF59E0B), Color(0xFFF97316), Color(0xFFEF4444), Color(0xFF991B1B)];
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.25)),
+      decoration: BoxDecoration(color: t.colorScheme.surface, borderRadius: BorderRadius.circular(FvTokens.cardRadius), border: Border.all(color: t.colorScheme.outlineVariant.withValues(alpha: .25)), boxShadow: FvTokens.shadow(t.brightness)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Te deben', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13.5)),
+        Text('Te deben', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 4),
         CountUp(
           value: aging.total,
           builder: (c, v) => FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(money(v, cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: -1)),
+            child: Text(money(v, cur), style: t.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, fontFeatures: const [FontFeature.tabularFigures()])), 
           ),
         ),
         const SizedBox(height: 4),
         Text(
           aging.overdue > 0 ? '${money(aging.overdue, cur)} ya vencidos' : 'Nada vencido. ¡Bien!',
-          style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+          style: t.textTheme.bodyMedium?.copyWith(color: aging.overdue > 0 ? t.colorScheme.error : t.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 16),
         SegmentBar(values: aging.values, colors: colors, height: 10),
@@ -313,21 +315,21 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               Row(mainAxisSize: MainAxisSize.min, children: [
                 Container(width: 8, height: 8, decoration: BoxDecoration(color: colors[i], shape: BoxShape.circle)),
                 const SizedBox(width: 5),
-                Text('${Aging.labels[i]} ${money(aging.values[i], cur)}', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.9), fontSize: 11.5)),
+                Text('${Aging.labels[i]} ${money(aging.values[i], cur)}', style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
               ]),
         ]),
         if (f.weeks.isNotEmpty) ...[
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(Radii.md)),
+            decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
             child: Row(children: [
-              const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 19),
+              Icon(Icons.auto_graph_rounded, color: t.colorScheme.onSurfaceVariant, size: 19),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Según cómo paga cada cliente, esperas cobrar ${money(f.weeks.first.inflow, cur)} esta semana y ${money(f.totalIn, cur)} en 4 semanas.',
-                  style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 12.5, height: 1.35),
+                  style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurface, height: 1.4),
                 ),
               ),
             ]),

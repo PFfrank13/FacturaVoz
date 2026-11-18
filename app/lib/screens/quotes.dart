@@ -11,6 +11,7 @@ import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 import 'invoice_detail.dart';
 import 'new_invoice.dart';
@@ -181,33 +182,37 @@ class _QuotesScreenState extends State<QuotesScreen> {
                   index: 1,
                   child: Container(
                     padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(26), boxShadow: Brand.softShadow(false, a: 0.25)),
+                    decoration: BoxDecoration(
+                      color: t.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+                      border: Border.all(color: t.colorScheme.outlineVariant.withValues(alpha: .22)),
+                      boxShadow: FvTokens.shadow(t.brightness)),
                     child: Row(children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('En negociación', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                          Text('En negociación', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                           const SizedBox(height: 4),
                           CountUp(
                             value: pipeline,
                             builder: (c, v) => FittedBox(
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
-                              child: Text(money(v, cur), style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.8)),
+                              child: Text(money(v, cur), style: t.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, fontFeatures: const [FontFeature.tabularFigures()])), 
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text('${open.length} ${open.length == 1 ? 'cotización abierta' : 'cotizaciones abiertas'}',
-                              style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5)),
+                              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)), 
                         ]),
                       ),
                       ProgressRing(
                         value: (rate ?? 0) / 100,
                         size: 74,
                         stroke: 8,
-                        color: Colors.white,
+                        color: t.colorScheme.primary,
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Text(rate == null ? '—' : '$rate%', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                          Text('cierre', style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.8), fontSize: 10.5)),
+                          Text(rate == null ? '—' : '$rate%', style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+                          Text('cierre', style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                         ]),
                       ),
                     ]),
@@ -303,8 +308,11 @@ class _QuoteRow extends StatelessWidget {
             child: Container(
               width: 46,
               height: 46,
-              decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(15)),
-              child: const Icon(Icons.request_quote_rounded, color: Colors.white),
+              decoration: BoxDecoration(
+                color: t.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(15)),
+              child: Icon(Icons.request_quote_rounded,
+                color: t.colorScheme.onSurface),
             ),
           ),
           const SizedBox(width: 14),
