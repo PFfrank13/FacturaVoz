@@ -18,6 +18,7 @@ import '../ui/theme.dart';
 import '../ui/ds.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_workspace.dart';
 import 'client_profile.dart' show shortDateTime;
 import 'pos_payment_logic.dart' show parsePosCents;
 
@@ -309,7 +310,8 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                   absorbing: _busy,
                   child: RefreshIndicator(
                     onRefresh: _load,
-                    child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
+                    child: RetailWorkspace(
+                      child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                       Reveal(
                         child: RetailVisual.hero(
                           context: context,
@@ -397,7 +399,8 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                             const Icon(Icons.lock_rounded),
                           ]),
                         ),
-                    ]),
+                      ]),
+                    ),
                   ),
                 ),
     );
