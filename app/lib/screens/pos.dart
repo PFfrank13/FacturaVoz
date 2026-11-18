@@ -1156,9 +1156,13 @@ class _PosScreenState extends State<PosScreen> {
                                     photo: img == null || img.isEmpty
                                         ? null : Padding(
                                             padding: const EdgeInsets.all(10),
-                                            child: StorageImage(
-                                              path: img,
-                                              fit: BoxFit.contain,
+                                            // En POS tocar una fotografía debe agregar el
+                                            // producto, no abrir el visor de imagen.
+                                            child: IgnorePointer(
+                                              child: StorageImage(
+                                                path: img,
+                                                fit: BoxFit.contain,
+                                              ),
                                             ),
                                           ),
                                     stockLabel: p.tracksStock
