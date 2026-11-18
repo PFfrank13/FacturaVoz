@@ -61,7 +61,7 @@ select pg_temp.chk('reintentar transición no descuenta dos veces',
 -- 4b) RPC cobro rápido: una sobreventa revierte factura, pago, solicitud y stock.
 select set_config('fv.test_org', :'org', false);
 select set_config('fv.test_product', :'agua', false);
-do $
+do $$
 declare
   v_org uuid := current_setting('fv.test_org')::uuid;
   v_product uuid := current_setting('fv.test_product')::uuid;
@@ -91,7 +91,7 @@ begin
     or (select stock from public.products where id = v_product) <> 6 then
       raise exception 'FALLO: cobro rapido insuficiente tuvo efectos parciales';
   end if;
-end $;
+end $$;
 -- 5) Producto de otra empresa: rechazado
 \set ON_ERROR_STOP 0
 select invoice_id as inv4 from public.create_invoice('Cliente',null,18,'PEN',null,null,
