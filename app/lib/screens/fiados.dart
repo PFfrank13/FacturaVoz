@@ -14,6 +14,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/retail_layout.dart';
 import 'client_profile.dart';
 import 'trash.dart';
 
@@ -114,7 +115,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
               ? const SkeletonList()
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
+                  child: RetailResponsiveFrame(maxWidth: 1040, child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
                     Reveal(
                       child: RetailVisual.hero(
                         context: context,
@@ -150,8 +151,12 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                     if (list.isEmpty)
                       const EmptyState(title: 'Nadie te debe 🎉', body: 'Cuando alguien se lleve algo fiado, toca «Anotar fiado», elige el cliente y registra el importe y la fecha de pago.')
                     else
+                      LayoutBuilder(builder: (context, constraints) {
+                        final columns = retailCardColumnCount(constraints.maxWidth, twoColumnMinWidth: 820);
+                        final itemWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
+                        return Wrap(spacing: 10, runSpacing: 0, children: [
                       for (final (i, b) in list.indexed)
-                        Reveal(
+                        SizedBox(width: itemWidth, child: Reveal(
                           key: ValueKey(b.clientId),
                           index: i < 8 ? i : 8,
                           child: Padding(
@@ -198,8 +203,10 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                               ),
                             ),
                           ),
-                        ),
-                  ]),
+                        )),
+                        ]);
+                      }),
+                  ])),
                 ),
     );
   }
