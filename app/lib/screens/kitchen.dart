@@ -16,6 +16,7 @@ import '../services/growth_repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 import 'client_profile.dart' show shortDateTime;
 import '../logic/tables.dart';
@@ -147,12 +148,24 @@ class _KitchenScreenState extends State<KitchenScreen> {
     final t = Theme.of(context);
     final orders = _orders ?? const <KitchenOrder>[];
     return Scaffold(
-      appBar: AppBar(title: SegmentedButton<String>(
-        showSelectedIcon: false,
-        segments: const [ButtonSegment(value: 'comandas', label: Text('Comandas')), ButtonSegment(value: 'mesas', label: Text('Mesas'))],
-        selected: {_view},
-        onSelectionChanged: (v) => setState(() => _view = v.first),
-      ), actions: [
+      appBar: AppBar(
+        title: const Text('Cocina y mesas'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(55),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'comandas', label: Text('Comandas')),
+                ButtonSegment(value: 'mesas', label: Text('Mesas')),
+              ],
+              selected: {_view},
+              onSelectionChanged: (v) => setState(() => _view = v.first),
+            ),
+          ),
+        ),
+        actions: [
         IconButton(tooltip: 'QR de mesas', onPressed: _qrSheet, icon: const Icon(Icons.qr_code_2_rounded)),
         IconButton(tooltip: 'Todos los pedidos', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QuotesScreen())), icon: const Icon(Icons.list_alt_rounded)),
       ]),
@@ -175,7 +188,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                           : ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: cols);
                     }),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 92),
+        padding: const EdgeInsets.only(bottom: 32),
         child: FloatingActionButton.extended(
           onPressed: () async {
             await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PosScreen(tableMode: true)));
@@ -255,7 +268,12 @@ class _KitchenScreenState extends State<KitchenScreen> {
       width: width,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: c.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: t.colorScheme.surface,
+        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+        border: Border.all(color: c.withValues(alpha: .28)),
+        boxShadow: FvTokens.shadow(t.brightness),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.all(6),

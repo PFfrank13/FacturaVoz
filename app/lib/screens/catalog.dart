@@ -24,6 +24,7 @@ import '../services/v2_api.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/retail_layout.dart';
 import '../ui/widgets.dart';
 import 'agent.dart';
 import 'api_access.dart';
@@ -247,7 +248,7 @@ class _AllFunctionsScreenState extends State<AllFunctionsScreen> {
     final t = Theme.of(context);
     final all = featureCatalog().where((f) => f.allowed).toList();
     final s = _settings;
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1320, child: Scaffold(
       appBar: AppBar(title: const Text('Todas las funciones'), actions: [
         IconButton(tooltip: 'Buscar', onPressed: () => openUniversalSearch(context), icon: const Icon(Icons.search_rounded)),
       ]),
@@ -257,36 +258,58 @@ class _AllFunctionsScreenState extends State<AllFunctionsScreen> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text('Ordenado para: ${s.template.name}. Lo marcado con ★ se ve a primera vista.', style: t.textTheme.bodySmall),
           ),
-        for (final (gi, g) in groupOrder.indexed) ...[
-          if (all.any((f) => f.group == g)) ...[
-            SectionTitle(g),
-            Reveal(
-              index: gi,
-              child: SoftCard(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(children: [
-                  for (final f in all.where((f) => f.group == g))
-                    ListTile(
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(color: (groupColors[g] ?? Brand.indigo).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
-                        child: Icon(f.icon, color: groupColors[g] ?? Brand.indigo, size: 21),
-                      ),
-                      title: Text.rich(TextSpan(children: [
-                        TextSpan(text: f.title),
-                        if (s != null && f.module != null && s.shows(f.module!)) const TextSpan(text: '  ★', style: TextStyle(color: Brand.warn)),
-                      ])),
-                      subtitle: Text(f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => openFeature(context, f),
+        LayoutBuilder(builder: (context, layout) {
+          final columns = layout.maxWidth >= 880 ? 2 : 1;
+          final itemWidth = (layout.maxWidth - (columns - 1) * 14) / columns;
+          return Wrap(
+            spacing: 14,
+            runSpacing: 12,
+            children: [
+              for (final (gi, g) in groupOrder.indexed)
+                if (all.any((f) => f.group == g))
+                  SizedBox(
+                    width: itemWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SectionTitle(g),
+                        Reveal(
+                          index: gi,
+                          child: SoftCard(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Column(children: [
+                              for (final f in all.where((f) => f.group == g))
+                                ListTile(
+                                  leading: Container(
+                                    width: 40, height: 40,
+                                    decoration: BoxDecoration(
+                                      color: (groupColors[g] ?? Brand.indigo)
+                                        .withValues(alpha: .10),
+                                      borderRadius: BorderRadius.circular(14)),
+                                    child: Icon(f.icon,
+                                      color: groupColors[g] ?? Brand.indigo, size: 21),
+                                  ),
+                                  title: Text.rich(TextSpan(children: [
+                                    TextSpan(text: f.title),
+                                    if (s != null && f.module != null &&
+                                        s.shows(f.module!))
+                                      const TextSpan(text: '  ★',
+                                        style: TextStyle(color: Brand.warn)),
+                                  ])),
+                                  subtitle: Text(f.subtitle, maxLines: 2,
+                                    overflow: TextOverflow.ellipsis),
+                                  trailing: const Icon(Icons.chevron_right_rounded),
+                                  onTap: () => openFeature(context, f),
+                                ),
+                            ]),
+                          ),
+                        ),
+                      ],
                     ),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-        ],
+                  ),
+            ],
+          );
+        }),
         const SizedBox(height: 8),
         Center(
           child: TextButton.icon(
@@ -296,7 +319,7 @@ class _AllFunctionsScreenState extends State<AllFunctionsScreen> {
           ),
         ),
       ]),
-    );
+    ));
   }
 }
 
