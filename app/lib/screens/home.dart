@@ -17,6 +17,7 @@ import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 import '../access.dart';
 import '../models_v2.dart';
@@ -633,14 +634,15 @@ class HomeHeader extends StatelessWidget {
 
   /// Tablero comercial compacto: cifras reales, contraste alto y una sola acción.
   /// Exclusivo de Bodega; otros rubros conservan su cabecera hasta su fase.
+  /// Bento operativo: cifras REALES del servidor, sin indicadores simulados.
+  /// El permiso de reportes sigue gobernando los importes mensuales.
   Widget _retailOverview(BuildContext context) {
     final t = Theme.of(context);
+    final cs = t.colorScheme;
     final dark = t.brightness == Brightness.dark;
-    final white = Colors.white;
-    final secondary = white.withValues(alpha: 0.78);
+    final symbol = currencySymbols[currency] ?? currency;
     final progress = goal == null || goal! <= 0
         ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
-    final symbol = currencySymbols[currency] ?? currency;
 
     return Semantics(
       container: true,
@@ -649,177 +651,168 @@ class HomeHeader extends StatelessWidget {
         key: const ValueKey('bodega-enterprise-overview'),
         width: double.infinity,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF102C3C), Color(0xFF155D60)],
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFF2B7072)),
-          boxShadow: Brand.softShadow(dark, a: .16),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+          boxShadow: FvTokens.shadow(t.brightness),
+          border: Border.all(color: cs.outlineVariant.withValues(
+            alpha: dark ? 0.5 : 0.2)),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Container(
-                  width: 42, height: 42,
-                  decoration: BoxDecoration(
-                    color: white.withValues(alpha: .13),
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: white.withValues(alpha: .17)),
-                  ),
-                  child: const Icon(Icons.storefront_rounded, color: Color(0xFFB5F3E6), size: 23),
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(Icons.storefront_rounded,
+                    color: cs.onSurface, size: 22),
                 ),
-                const SizedBox(width: 12),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('RESUMEN DEL NEGOCIO',
-                      style: TextStyle(color: secondary, fontWeight: FontWeight.w800,
-                        fontSize: 10.5, letterSpacing: 1.4)),
-                    const SizedBox(height: 3),
-                    Text(name.isEmpty ? 'Tu bodega' : name, maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 18.5,
-                        letterSpacing: -.5, fontWeight: FontWeight.w800)),
-                  ],
-                )),
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: loaded ? 'Cifras cargadas desde el servidor' : 'Cargando resumen',
-                  child: Icon(loaded ? Icons.verified_rounded : Icons.schedule_rounded,
-                    color: loaded ? const Color(0xFF9BECBE) : secondary, size: 20),
-                ),
-              ]),
-              const SizedBox(height: 23),
-              Text(showMonth ? 'VENTAS DE ESTE MES' : 'TU ACTIVIDAD',
-                style: TextStyle(color: secondary, fontSize: 11,
-                  fontWeight: FontWeight.w800, letterSpacing: 1.35)),
-              const SizedBox(height: 5),
-              if (showMonth)
-                if (loaded)
-                  Semantics(
-                    liveRegion: true,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 5),
-                          child: Text(symbol, style: const TextStyle(
-                            color: Color(0xFFB5F3E6), fontSize: 17,
-                            fontWeight: FontWeight.w800)),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(child: CountUp(
-                          value: total,
-                          builder: (context, v) => FittedBox(
-                            alignment: Alignment.centerLeft,
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              v.toStringAsFixed(2),
-                              style: const TextStyle(color: Colors.white,
-                                fontSize: 38, fontWeight: FontWeight.w800,
-                                letterSpacing: -1.4,
-                                fontFeatures: [FontFeature.tabularFigures()]),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('TU TIENDA HOY', style: t.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.1, fontWeight: FontWeight.w800,
+                    color: cs.onSurfaceVariant)),
+                  const SizedBox(height: 3),
+                  Text(name.isEmpty ? 'Tu negocio' : name,
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: t.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                ],
+              )),
+              Tooltip(
+                message: loaded ? 'Cifras cargadas desde el servidor' : 'Cargando resumen',
+                child: Icon(loaded ? Icons.verified_rounded : Icons.schedule_rounded,
+                  color: loaded ? FvTokens.positive(t.brightness) : cs.onSurfaceVariant, size: 21),
+              ),
+            ]),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(17, 17, 17, 15),
+              decoration: BoxDecoration(
+                color: dark ? FvTokens.fieldDark : FvTokens.field,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(showMonth ? 'Ventas de este mes' : 'Tu actividad',
+                  style: t.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurfaceVariant)),
+                const SizedBox(height: 7),
+                if (showMonth)
+                  loaded
+                    ? Semantics(
+                        liveRegion: true,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6, right: 7),
+                              child: Text(symbol, style: t.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800)),
                             ),
-                          ),
-                        )),
-                      ],
-                    ),
-                  )
+                            Flexible(child: CountUp(
+                              value: total,
+                              builder: (context, value) => FittedBox(
+                                alignment: Alignment.centerLeft,
+                                fit: BoxFit.scaleDown,
+                                child: Text(value.toStringAsFixed(2),
+                                  style: t.textTheme.displaySmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1.2,
+                                    fontFeatures: const [FontFeature.tabularFigures()])),
+                              ),
+                            )),
+                          ],
+                        ),
+                      )
+                    : Text('—', style: t.textTheme.headlineMedium)
                 else
-                  Text('—', style: t.textTheme.headlineMedium?.copyWith(color: white))
-              else
-                const Text('Todo en un solo lugar',
-                  style: TextStyle(color: Colors.white, fontSize: 25,
-                    fontWeight: FontWeight.w800, letterSpacing: -.6)),
-              const SizedBox(height: 14),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                if (loaded)
-                  _RetailOverviewFact(
-                    icon: Icons.receipt_long_rounded,
-                    label: count == 1 ? '1 venta emitida' : '$count ventas emitidas',
-                  ),
-                if (todayTotal != null)
-                  _RetailOverviewFact(
-                    icon: Icons.today_rounded,
-                    label: 'Hoy ${money(todayTotal!, currency)}',
-                  )
-                else if (todayCount != null && !showMonth)
-                  _RetailOverviewFact(
-                    icon: Icons.today_rounded,
-                    label: 'Ventas de hoy: $todayCount',
-                  ),
-                if (loaded && drafts > 0)
-                  _RetailOverviewFact(
-                    icon: Icons.edit_note_rounded,
-                    label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}',
-                  ),
+                  Text('Operaciones del negocio', style:
+                    t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               ]),
-              if (showMonth && loaded && series.length > 1 && series.any((v) => v > 0)) ...[
-                const SizedBox(height: 18),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(13, 12, 13, 10),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: .10),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: white.withValues(alpha: .12)),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Tendencia · últimos 14 días',
-                      style: TextStyle(color: secondary, fontSize: 11,
-                        fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
-                    Sparkline(values: series, height: 40,
-                      color: const Color(0xFF9CEBDD)),
-                  ]),
+            ),
+            const SizedBox(height: 14),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              if (loaded)
+                _RetailOverviewFact(
+                  icon: Icons.receipt_long_rounded,
+                  label: count == 1 ? '1 venta emitida' : '$count ventas emitidas',
                 ),
-              ],
-              if (showMonth) ...[
-                const SizedBox(height: 14),
-                if (progress == null)
-                  TextButton.icon(
-                    onPressed: onGoal,
-                    icon: const Icon(Icons.flag_outlined, size: 17),
-                    label: const Text('Establecer meta del mes'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFB5F3E6),
-                      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 5)),
-                  )
-                else
-                  Semantics(
-                    button: true,
-                    label: 'Meta mensual al ${(progress.percent * 100).round()} por ciento. Editar meta.',
-                    child: InkWell(
-                      onTap: onGoal,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [
-                            Expanded(child: Text('Meta mensual',
-                              style: TextStyle(color: secondary, fontSize: 12, fontWeight: FontWeight.w700))),
-                            Text('${(progress.percent * 100).round()}%',
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
-                          ]),
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: progress.percent.clamp(0.0, 1.0),
-                            minHeight: 5,
-                            borderRadius: BorderRadius.circular(8),
-                            backgroundColor: white.withValues(alpha: .17),
-                            color: const Color(0xFF9CEBDD),
-                          ),
+              if (todayTotal != null)
+                _RetailOverviewFact(
+                  icon: Icons.today_rounded,
+                  label: 'Hoy ${money(todayTotal!, currency)}',
+                )
+              else if (todayCount != null && !showMonth)
+                _RetailOverviewFact(
+                  icon: Icons.today_rounded,
+                  label: 'Ventas de hoy: $todayCount',
+                ),
+              if (loaded && drafts > 0)
+                _RetailOverviewFact(
+                  icon: Icons.edit_note_rounded,
+                  label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}',
+                ),
+            ]),
+            if (showMonth && loaded &&
+                series.length > 1 && series.any((v) => v > 0)) ...[
+              const SizedBox(height: 16),
+              Text('Tendencia · últimos 14 días',
+                style: t.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant)),
+              const SizedBox(height: 9),
+              Sparkline(values: series, height: 42,
+                color: FvTokens.positive(t.brightness)),
+            ],
+            if (showMonth) ...[
+              const SizedBox(height: 14),
+              if (progress == null)
+                TextButton.icon(
+                  onPressed: onGoal,
+                  icon: const Icon(Icons.flag_outlined, size: 17),
+                  label: const Text('Establecer meta del mes'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    foregroundColor: cs.onSurface),
+                )
+              else
+                Semantics(
+                  button: true,
+                  label: 'Meta mensual al ${(progress.percent * 100).round()} por ciento. Editar meta.',
+                  child: InkWell(
+                    onTap: onGoal,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 7),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Expanded(child: Text('Meta mensual',
+                            style: t.textTheme.labelMedium?.copyWith(
+                              color: cs.onSurfaceVariant))),
+                          Text('${(progress.percent * 100).round()}%',
+                            style: t.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w800)),
                         ]),
-                      ),
+                        const SizedBox(height: 9),
+                        LinearProgressIndicator(
+                          value: progress.percent.clamp(0.0, 1.0),
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(9),
+                          backgroundColor: cs.surfaceContainerHighest,
+                          color: FvTokens.positive(t.brightness),
+                        ),
+                      ]),
                     ),
                   ),
-              ],
+                ),
             ],
-          ),
+          ]),
         ),
       ),
     );
@@ -1016,14 +1009,14 @@ class _RetailOverviewFact extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .10),
-      borderRadius: BorderRadius.circular(9),
-      border: Border.all(color: Colors.white.withValues(alpha: .16)),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(99),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 14, color: const Color(0xFFB5F3E6)),
+      Icon(icon, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
       const SizedBox(width: 6),
-      Text(label, style: const TextStyle(color: Colors.white,
+      Text(label, style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 11.5, fontWeight: FontWeight.w700)),
     ]),
   );

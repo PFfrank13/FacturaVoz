@@ -437,7 +437,7 @@ class SoftCard extends StatelessWidget {
         color: color ?? Theme.of(context).colorScheme.surface,
         borderRadius: shape,
         boxShadow: Brand.softShadow(dark, a: 0.075),
-        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.34)),
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: dark ? 0.35 : 0.18)),
       ),
       // Material transparente ENCIMA del color: los ListTile/InkWell de adentro dibujan su efecto de toque aquí
       // (si no, el color de la tarjeta lo tapa y Flutter muestra "EXCEPTION CAUGHT BY FLUTTER FRAMEWORK" en depuración).
@@ -476,7 +476,7 @@ class GradientButton extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 56),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: ds.primary, borderRadius: BorderRadius.circular(16)),
+            decoration: BoxDecoration(color: ds.primary, borderRadius: BorderRadius.circular(Radii.pill)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               busy
                   ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: ds.onPrimary))

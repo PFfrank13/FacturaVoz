@@ -1,5 +1,7 @@
 import 'dart:ui' show PointerDeviceKind;
 
+import 'design_tokens.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
@@ -9,8 +11,8 @@ import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 class Radii {
   static const sm = 8.0; // chips, barras de progreso
   static const md = 14.0; // iconos en cuadro, campos
-  static const lg = 18.0; // tarjetas pequeñas
-  static const xl = 28.0; // tarjetas grandes y hojas inferiores
+  static const lg = FvTokens.cardRadius; // tarjetas del sistema
+  static const xl = FvTokens.sheetRadius; // tarjetas grandes y hojas inferiores
   static const pill = 99.0; // píldoras y botones redondos
 }
 
@@ -41,17 +43,23 @@ class DsColors {
   final Color ok, warn, bad;
 
   static const dark = DsColors(
-    bg: Color(0xFF0A1520), surface: Color(0xFF12232E), elevated: Color(0xFF1D3740), line: Color(0xFF33505A),
-    ink: Color(0xFFF1F8F7), muted: Color(0xFFAFCCCE),
-    primary: Color(0xFF42CDBA), onPrimary: Color(0xFF062E2B), primaryText: Color(0xFF83E6D9),
-    accent: Color(0xFFF2B75E), ok: Color(0xFF67D3A4), warn: Color(0xFFFFC677), bad: Color(0xFFFF8994),
+    bg: FvTokens.canvasDark, surface: FvTokens.surfaceDark,
+    elevated: FvTokens.fieldDark, line: FvTokens.strokeDark,
+    ink: FvTokens.inkDark, muted: FvTokens.mutedDark,
+    primary: FvTokens.inkDark, onPrimary: FvTokens.ink,
+    primaryText: FvTokens.inkDark,
+    accent: Color(0xFF60A5FA), ok: FvTokens.emeraldDark,
+    warn: Color(0xFFFBBF24), bad: Color(0xFFF87171),
   );
 
   static const light = DsColors(
-    bg: Color(0xFFF4F7F8), surface: Color(0xFFFFFFFF), elevated: Color(0xFFEAF1F1), line: Color(0xFFD7E2E5),
-    ink: Color(0xFF132A36), muted: Color(0xFF536A73),
-    primary: Color(0xFF087E74), onPrimary: Color(0xFFFFFFFF), primaryText: Color(0xFF076D65),
-    accent: Color(0xFFAD6416), ok: Color(0xFF167550), warn: Color(0xFF92550D), bad: Color(0xFFAD3449),
+    bg: FvTokens.canvas, surface: FvTokens.surface,
+    elevated: FvTokens.field, line: FvTokens.stroke,
+    ink: FvTokens.ink, muted: FvTokens.muted,
+    primary: FvTokens.ink, onPrimary: FvTokens.surface,
+    primaryText: FvTokens.ink,
+    accent: Color(0xFF2563EB), ok: FvTokens.emerald,
+    warn: Color(0xFFB45309), bad: Color(0xFFB91C1C),
   );
 
   static DsColors of(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? dark : light;
@@ -60,39 +68,39 @@ class DsColors {
 class Brand {
   // Compatibilidad: las pantallas antiguas leen Brand; los colores derivan de la identidad Enterprise.
   // Los nuevos componentes usan DsColors.of(context) y roles semánticos para contraste.
-  static const indigo = Color(0xFF087E74);
-  static const indigoDeep = Color(0xFF075D58);
-  static const indigoSoft = Color(0xFF83E6D9);
+  static const indigo = FvTokens.ink;
+  static const indigoDeep = FvTokens.ink;
+  static const indigoSoft = FvTokens.mutedDark;
   static const lilac = Color(0xFF3185A0);
   static const gold = Color(0xFFF0AC4A);
   static const goldDeep = Color(0xFFAD6416);
   static const onGold = Color(0xFF182B33);
 
-  static const ok = Color(0xFF167550);
+  static const ok = FvTokens.emerald;
   static const warn = Color(0xFF92550D);
   static const bad = Color(0xFFAD3449);
 
-  static const lightBg = Color(0xFFF4F7F8);
-  static const lightInk = Color(0xFF132A36);
-  static const lightMuted = Color(0xFF536A73);
-  static const lightLine = Color(0xFFD7E2E5);
+  static const lightBg = FvTokens.canvas;
+  static const lightInk = FvTokens.ink;
+  static const lightMuted = FvTokens.muted;
+  static const lightLine = FvTokens.stroke;
 
-  static const darkBg = Color(0xFF0A1520);
-  static const darkCard = Color(0xFF12232E);
-  static const darkInk = Color(0xFFF1F8F7);
-  static const darkMuted = Color(0xFFAFCCCE);
-  static const darkLine = Color(0xFF33505A);
+  static const darkBg = FvTokens.canvasDark;
+  static const darkCard = FvTokens.surfaceDark;
+  static const darkInk = FvTokens.inkDark;
+  static const darkMuted = FvTokens.mutedDark;
+  static const darkLine = FvTokens.strokeDark;
 
   // Profundidad sutil en cabeceras y acciones, sin estética púrpura/neón.
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF102D3D), Color(0xFF125B5B)],
+    colors: [Color(0xFF111827), Color(0xFF374151)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF087E74), Color(0xFF106C74)],
+    colors: [Color(0xFF111827), Color(0xFF374151)],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
@@ -103,9 +111,8 @@ class Brand {
   ];
 
   /// Sombra apenas perceptible (§11: sin sombras duras). En oscuro no hay sombra: separa el borde.
-  static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => dark
-      ? const []
-      : [BoxShadow(color: const Color(0xFF142A36).withValues(alpha: a * 0.55), blurRadius: 18, offset: const Offset(0, 5))];
+  static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) =>
+      dark ? const [] : [BoxShadow(color: const Color(0xFF111827).withValues(alpha: a * 0.4), blurRadius: 24, offset: const Offset(0, 8))];
 }
 
 const _font = 'Inter';
@@ -114,8 +121,8 @@ TextTheme _text(Color ink, Color muted) {
   TextStyle s(double size, FontWeight w, {double h = 1.3, double ls = 0, Color? c}) =>
       TextStyle(fontFamily: _font, fontSize: size, fontWeight: w, height: h, letterSpacing: ls, color: c ?? ink);
   return TextTheme(
-    displaySmall: s(40, FontWeight.w700, h: 1.1, ls: -1.2),
-    headlineMedium: s(28, FontWeight.w700, h: 1.15, ls: -0.6),
+    displaySmall: s(40, FontWeight.w700, h: 1.1, ls: -1.0),
+    headlineMedium: s(28, FontWeight.w700, h: 1.15, ls: -0.5),
     headlineSmall: s(22, FontWeight.w600, h: 1.2, ls: -0.3),
     titleLarge: s(19, FontWeight.w600, ls: -0.2),
     titleMedium: s(16, FontWeight.w600),
@@ -158,11 +165,11 @@ ThemeData buildTheme(Brightness b) {
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF19453E) : const Color(0xFFD7F1E9),
-    onPrimaryContainer: dark ? const Color(0xFFBDF6E8) : const Color(0xFF07564E),
+    primaryContainer: dark ? FvTokens.fieldDark : FvTokens.field,
+    onPrimaryContainer: dark ? FvTokens.inkDark : FvTokens.ink,
   );
 
-  final radius = BorderRadius.circular(16);
+  final radius = BorderRadius.circular(FvTokens.fieldRadius);
   OutlineInputBorder border(Color c, [double w = 1]) =>
       OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: c, width: w));
 
@@ -181,7 +188,7 @@ ThemeData buildTheme(Brightness b) {
       backgroundColor: card,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(FvTokens.sheetRadius))),
     ),
     brightness: b,
     colorScheme: scheme,
@@ -197,21 +204,21 @@ ThemeData buildTheme(Brightness b) {
       scrolledUnderElevation: 0,
       centerTitle: false,
       systemOverlayStyle: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(statusBarColor: Colors.transparent),
-      titleTextStyle: TextStyle(fontFamily: _font, fontSize: 18, fontWeight: FontWeight.w600, color: ink, letterSpacing: -0.2),
+      titleTextStyle: TextStyle(fontFamily: _font, fontSize: 18, fontWeight: FontWeight.w700, color: ink, letterSpacing: -0.5),
     ),
     cardTheme: CardThemeData(
       color: card,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: line.withValues(alpha: dark ? 0.72 : 0.88))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: line.withValues(alpha: dark ? 0.55 : 0.35))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: card,
+      fillColor: dark ? FvTokens.fieldDark : FvTokens.field,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: border(line),
-      enabledBorder: border(line),
-      focusedBorder: border(primary, 2),
+      border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
+      focusedBorder: border(primary, 1.4),
       errorBorder: border(scheme.error),
       focusedErrorBorder: border(scheme.error, 2),
       labelStyle: TextStyle(fontFamily: _font, color: muted),
@@ -221,7 +228,7 @@ ThemeData buildTheme(Brightness b) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: const StadiumBorder(),
         textStyle: const TextStyle(fontFamily: _font, fontSize: 15.5, fontWeight: FontWeight.w600),
       ),
     ),
@@ -261,7 +268,7 @@ ThemeData buildTheme(Brightness b) {
       backgroundColor: card,
       selectedColor: scheme.primaryContainer,
       side: BorderSide(color: line),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: const StadiumBorder(),
       labelStyle: TextStyle(fontFamily: _font, fontWeight: FontWeight.w600, color: ink),
       showCheckmark: false,
     ),

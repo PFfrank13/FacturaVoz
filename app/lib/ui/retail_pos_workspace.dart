@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import 'theme.dart';
+import 'design_tokens.dart';
 
 /// Usa el espacio realmente disponible (no la resolución física del dispositivo).
 /// El panel se muestra solamente en Bodega/Tienda integrada al MainShell.
@@ -34,13 +35,13 @@ class RetailPosCartPane extends StatelessWidget {
     final quantity = lines.fold<double>(0, (sum, line) => sum + line.quantity);
     return Container(
       key: const ValueKey('retail-pos-desktop-cart'),
-      width: 320,
-      margin: const EdgeInsets.fromLTRB(0, 9, 12, 12),
+      width: FvTokens.desktopCartWidth,
+      margin: const EdgeInsets.fromLTRB(0, 10, 12, 12),
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border.all(color: cs.outlineVariant),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: Brand.softShadow(Theme.of(context).brightness == Brightness.dark, a: 0.09),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+        boxShadow: FvTokens.shadow(Theme.of(context).brightness),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
@@ -57,7 +58,7 @@ class RetailPosCartPane extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Venta actual', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('Ticket actual', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 3),
               Text(lines.isEmpty
                   ? 'Sin productos'
@@ -162,7 +163,7 @@ class RetailPosCartPane extends StatelessWidget {
               Expanded(child: Text('Total', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
               Flexible(child: Text(money(totals.total, currency),
                 textAlign: TextAlign.end, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, fontFeatures: const [FontFeature.tabularFigures()]))),
             ]),
             const SizedBox(height: 15),
             FilledButton.icon(
@@ -170,7 +171,12 @@ class RetailPosCartPane extends StatelessWidget {
               onPressed: lines.isEmpty ? null : onReview,
               icon: const Icon(Icons.shopping_cart_checkout_rounded),
               label: const Text('Revisar y cobrar'),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 54)),
+              style: FilledButton.styleFrom(
+                backgroundColor: FvTokens.emerald,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 54),
+                shape: const StadiumBorder(),
+              ),
             ),
             const SizedBox(height: 7),
             Text('El pago se confirma en el siguiente paso.',

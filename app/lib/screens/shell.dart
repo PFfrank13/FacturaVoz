@@ -13,6 +13,7 @@ import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import 'assistant.dart';
 import 'catalog.dart';
 import 'clients_hub.dart';
@@ -101,7 +102,7 @@ bool _destAllowed(String id, Access a) => switch (id) {
     };
 
 /// Punto de corte para usar la navegación lateral fija en escritorio/tablet.
-bool bodegaUsesPermanentSidebar(double width) => width >= 980;
+bool bodegaUsesPermanentSidebar(double width) => FvTokens.isWide(width);
 
 /// Navegación visible de Bodega según la licencia y el rol verificados.
 /// Es la fuente única tanto del Drawer como de sus pruebas de regresión.
@@ -321,65 +322,116 @@ class _MainShellState extends State<MainShell> {
         _ => const SettingsScreen(embedded: true),
       };
 
-  Widget _bodegaNavigation(List<_Dest> destinations, {bool pinned = false}) {
+  /// Drawer móvil único; sin otra barra de navegación duplicada.
+  Widget _bodegaNavigation(List<_Dest> destinations) {
+    final t = Theme.of(context);
+    final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
     final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B0E17),
-        border: Border(right: BorderSide(color: Colors.white10, width: 1)),
+    return NavigationDrawer(
+      key: const ValueKey('bodega-navigation-drawer'),
+      backgroundColor: cs.surface,
+      indicatorColor: cs.primary.withValues(alpha: 0.09),
+      selectedIndex: selected < 0 ? 0 : selected,
+      onDestinationSelected: (index) {
+        Navigator.of(context).pop();
+        if (index >= 0 && index < destinations.length) _go(destinations[index].id);
+      },
+      children: [
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 22, 22),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  height: 42, width: 42,
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(Icons.storefront_rounded, color: cs.onPrimary),
+                ),
+                const SizedBox(width: 12),
+                const Text('FACTURAVOZ', style: TextStyle(
+                  fontSize: 11, letterSpacing: 1.6, fontWeight: FontWeight.w800)),
+              ]),
+              const SizedBox(height: 20),
+              Text(orgName, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: t.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+              const SizedBox(height: 5),
+              Text('Bodega / Tienda  ·  ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
+                style: t.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            ]),
+          ),
+        ),
+        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(26, 20, 18, 8),
+          child: Text('ESPACIO DE TRABAJO', style: TextStyle(
+            fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.w700)),
+        ),
+        for (final d in destinations)
+          NavigationDrawerDestination(
+            icon: Icon(d.icon, color: cs.onSurfaceVariant, size: 21),
+            selectedIcon: Icon(d.icon, color: cs.primary, size: 21),
+            label: Text(d.label, style: const TextStyle(
+              fontWeight: FontWeight.w700, fontSize: 14)),
+          ),
+        const SizedBox(height: 18),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(26, 12, 18, 24),
+          child: Text('Funciones habilitadas para tu plan y rol.',
+            style: t.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+        ),
+      ],
+    );
+  }
+
+  /// En tablet/escritorio sólo un rail; el POS conserva el resto de ancho.
+  Widget _bodegaRail(List<_Dest> destinations) {
+    final t = Theme.of(context);
+    final cs = t.colorScheme;
+    final selected = destinations.indexWhere((d) => d.id == _tab);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(right: BorderSide(
+          color: cs.outlineVariant.withValues(alpha: 0.45))),
       ),
-      child: NavigationDrawer(
-        key: const ValueKey('bodega-navigation-drawer'),
-        backgroundColor: const Color(0xFF0B0E17),
-        indicatorColor: const Color(0xFF174B49),
+      child: NavigationRail(
+        key: const ValueKey('bodega-navigation-rail'),
+        backgroundColor: cs.surface,
         selectedIndex: selected < 0 ? 0 : selected,
+        labelType: NavigationRailLabelType.selected,
+        groupAlignment: -1,
+        useIndicator: true,
+        indicatorColor: cs.primary.withValues(alpha: 0.09),
+        selectedIconTheme: IconThemeData(color: cs.primary, size: 23),
+        unselectedIconTheme: IconThemeData(color: cs.onSurfaceVariant, size: 22),
+        selectedLabelTextStyle: t.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w800, color: cs.onSurface),
+        unselectedLabelTextStyle: t.textTheme.labelSmall,
+        leading: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 18, 0, 22),
+          child: Tooltip(
+            message: 'FacturaVoz · Solvex',
+            child: Icon(Icons.storefront_rounded, color: cs.primary, size: 27),
+          ),
+        ),
+        destinations: [
+          for (final d in destinations)
+            NavigationRailDestination(
+              icon: Icon(d.icon),
+              selectedIcon: Icon(d.icon),
+              label: Text(d.label),
+              padding: const EdgeInsets.symmetric(vertical: 2),
+            ),
+        ],
         onDestinationSelected: (index) {
-          // El menú fijo en escritorio no es una ruta modal. No hacer pop.
-          if (!pinned) Navigator.of(context).pop();
           if (index >= 0 && index < destinations.length) _go(destinations[index].id);
         },
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 28, 22, 20),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('FACTURAVOZ', style: TextStyle(
-                  color: Color(0xFF7AE2D0), fontWeight: FontWeight.w900,
-                  letterSpacing: 2.1, fontSize: 12)),
-                const SizedBox(height: 16),
-                Text(orgName, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 21,
-                    fontWeight: FontWeight.w800, letterSpacing: -.5)),
-                const SizedBox(height: 7),
-                Text('Bodega / Tienda  ·  ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
-                  style: const TextStyle(color: Color(0xFFBCCBCF), fontSize: 12)),
-              ]),
-            ),
-          ),
-          const Divider(height: 1, color: Colors.white10),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(27, 25, 20, 10),
-            child: Text('ESPACIO DE TRABAJO', style: TextStyle(
-              color: Color(0xFF90AAA9), fontSize: 10, letterSpacing: 1.5,
-              fontWeight: FontWeight.w800)),
-          ),
-          for (final d in destinations)
-            NavigationDrawerDestination(
-              icon: Icon(d.icon, color: Colors.white70, size: 21),
-              selectedIcon: Icon(d.icon, color: const Color(0xFF94F0DC), size: 21),
-              label: Text(d.label, style: const TextStyle(color: Colors.white,
-                fontWeight: FontWeight.w600, fontSize: 14)),
-            ),
-          const SizedBox(height: 24),
-          const Divider(height: 1, color: Colors.white10),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(27, 18, 20, 20),
-            child: Text('Solo las funciones incluidas en tu licencia.',
-              style: TextStyle(color: Color(0xFFA8C2C4), fontSize: 11)),
-          ),
-        ],
       ),
     );
   }
@@ -442,10 +494,7 @@ class _MainShellState extends State<MainShell> {
             ) : null,
             body: Row(children: [
               if (pinnedSidebar)
-                SizedBox(
-                  width: 304,
-                  child: _bodegaNavigation(dests, pinned: true),
-                ),
+                _bodegaRail(dests),
               Expanded(child: Column(children: [
                 const LicenseBanner(),
                 Expanded(

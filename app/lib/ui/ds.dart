@@ -114,7 +114,11 @@ class DsStat extends StatelessWidget {
       excludeSemantics: true,
       child: Material(
         color: ds.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: ds.line)),
+        elevation: t.brightness == Brightness.dark ? 0 : 1.0,
+        shadowColor: const Color(0x0A111827),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.lg),
+          side: BorderSide(color: ds.line.withValues(alpha: 0.22))),
         clipBehavior: Clip.antiAlias,
         child: onTap == null ? body : InkWell(onTap: onTap, child: body),
       ),

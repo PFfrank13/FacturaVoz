@@ -23,8 +23,9 @@ import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
+import '../ui/pos_product_card.dart';
 import '../ui/widgets.dart';
-import '../ui/retail_visual.dart';
 import '../ui/retail_pos_workspace.dart';
 import 'client_profile.dart' show StorageImage;
 import 'invoice_detail.dart';
@@ -306,7 +307,7 @@ class _PosScreenState extends State<PosScreen> {
       ));
       return;
     }
-    Haptics.tap();
+    Haptics.soft();
     setState(() {
       final q = (_cart[p.id] ?? 0) + n;
       if (q <= 0) {
@@ -326,7 +327,19 @@ class _PosScreenState extends State<PosScreen> {
     final byExtra = _extra.entries.where((e) => (e.value['barcode'] ?? '') == code).map((e) => e.key).firstOrNull;
     final p = byExtra == null ? null : _products?.where((x) => x.id == byExtra).firstOrNull;
     if (p != null) {
+      final previousQuantity = _cart[p.id] ?? 0;
       _add(p);
+      final currentQuantity = _cart[p.id] ?? 0;
+      if (currentQuantity > previousQuantity && mounted) {
+        final effectivePrice = _price(p, currentQuantity).unitPrice;
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 1600),
+          content: Text('${p.name} · ${money(effectivePrice, _cur)}',
+            maxLines: 2, overflow: TextOverflow.ellipsis),
+        ));
+      }
       _q.clear();
       setState(() {});
       _focus.requestFocus();
@@ -608,9 +621,22 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     if (_lines().isEmpty) return;
-    final approved = await Navigator.of(context).push<RetailCartAction>(
-      MaterialPageRoute<RetailCartAction>(
-        builder: (_) => PosCartReviewScreen(
+    final approved = await showModalBottomSheet<RetailCartAction>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(FvTokens.sheetRadius))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.82,
+        minChildSize: 0.48,
+        maxChildSize: 0.96,
+        builder: (sheetContext, scrollController) => PosCartReviewScreen(
+          sheetScrollController: scrollController,
           lines: _lines,
           productImages: _extra.map((id, value) =>
               MapEntry(id, (value['image_path'] ?? '').toString())),
@@ -956,8 +982,8 @@ class _PosScreenState extends State<PosScreen> {
     final totals = computeTotals(lines, _rate);
     final count = _cart.values.fold(0.0, (a, b) => a + b);
     final actions = <Widget>[
-      if (retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
-      if (retail && Access.instance.has('stock') && Access.instance.can('products_edit'))
+      if (!retail) IconButton(tooltip: 'Venta con cliente, factura o crédito', onPressed: _checkout, icon: const Icon(Icons.receipt_long_rounded)),
+      if (!retail && Access.instance.has('stock') && Access.instance.can('products_edit'))
         IconButton(
           tooltip: 'Editar catálogo y fotos de productos',
           icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -965,7 +991,7 @@ class _PosScreenState extends State<PosScreen> {
             builder: (_) => const ProductsScreen(),
           )),
         ),
-      IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
+      if (!retail) IconButton(tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
     return Theme(data: t, child: Scaffold(
@@ -1013,8 +1039,19 @@ class _PosScreenState extends State<PosScreen> {
                   return Column(children: [
                   if (retail)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
-                      child: RetailVisual.journey(step: 1, label: 'Elegir productos'),
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Punto de venta',
+                            style: t.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                          const SizedBox(height: 4),
+                          Text('Escanea o selecciona un producto para vender',
+                            style: t.textTheme.bodySmall?.copyWith(
+                              color: t.colorScheme.onSurfaceVariant)),
+                        ],
+                      ),
                     ),
 
                   if (widget.embedded && actions.isNotEmpty)
@@ -1040,7 +1077,17 @@ class _PosScreenState extends State<PosScreen> {
                         onChanged: (_) => setState(() {}),
                         onSubmitted: _submit,
                         textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(hintText: 'Busca o pasa el lector de código de barras', prefixIcon: Icon(Icons.search_rounded), isDense: true),
+                        decoration: InputDecoration(
+                          hintText: retail ? 'Buscar producto o escanear' : 'Busca o pasa el lector de código de barras',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: retail ? IconButton(
+                            key: const ValueKey('retail-pos-barcode-scan'),
+                            tooltip: 'Escanear código de barras',
+                            onPressed: _scan,
+                            icon: const Icon(Icons.qr_code_scanner_rounded),
+                          ) : null,
+                          isDense: true,
+                        ),
                       ),
                     ),
                   ),
@@ -1074,10 +1121,10 @@ class _PosScreenState extends State<PosScreen> {
                               ),
                           ])
                         : LayoutBuilder(builder: (context, c) {
-                            final cols = (c.maxWidth / 150).floor().clamp(2, 6);
+                            final cols = retail ? FvTokens.productColumns(c.maxWidth) : (c.maxWidth / 150).floor().clamp(2, 6);
                             return GridView.builder(
-                              padding: EdgeInsets.fromLTRB(12, 8, 12, retail && widget.embedded ? 8 : widget.embedded ? 210 : 120),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: MediaQuery.textScalerOf(context).scale(200)),
+                              padding: EdgeInsets.fromLTRB(12, 10, 12, retail && widget.embedded ? 12 : widget.embedded ? 210 : 120),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols, mainAxisSpacing: 12, crossAxisSpacing: 12, mainAxisExtent: MediaQuery.textScalerOf(context).scale(retail ? 244 : 200)),
                               itemCount: list.length,
                               itemBuilder: (context, i) {
                                 final p = list[i];
@@ -1097,6 +1144,24 @@ class _PosScreenState extends State<PosScreen> {
                                                     ? Icons.cleaning_services_rounded
                                                     : Icons.inventory_2_rounded;
                                 final pr = _price(p, n == 0 ? 1 : n);
+                                if (retail) {
+                                  return FvPosProductCard(
+                                    key: ValueKey('retail-product-${p.id}'),
+                                    name: p.name,
+                                    price: money(pr.unitPrice, _cur),
+                                    icon: placeholderIcon,
+                                    category: categoryLabel,
+                                    photo: img == null || img.isEmpty
+                                        ? null : StorageImage(path: img),
+                                    stockLabel: p.tracksStock
+                                        ? (p.stock! <= 0 ? 'Sin stock' : 'Stock: ${qtyText(p.stock!)}')
+                                        : null,
+                                    soldOut: p.tracksStock && p.stock! <= 0,
+                                    quantity: n > 0 ? qtyText(n) : null,
+                                    onAdd: () => _add(p),
+                                    onRemove: n > 0 ? () => _add(p, -1) : null,
+                                  );
+                                }
                                 return Pressable(
                                   onTap: () => _add(p),
                                   onLongPress: n > 0 ? () => _add(p, -1) : null,
@@ -1185,46 +1250,57 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                   if (retail && widget.embedded && lines.isNotEmpty &&
                       !desktopCart)
-                    Container(
+                    Padding(
                       key: const ValueKey('retail-pos-checkout-bar'),
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      decoration: BoxDecoration(
-                        color: t.colorScheme.surface,
-                        border: Border(top: BorderSide(color: t.colorScheme.outline)),
-                      ),
-                      child: Row(children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: _reviewRetailCart,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${qtyText(count)} productos · Ver carrito',
-                                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: t.textTheme.bodySmall?.copyWith(
-                                      color: t.colorScheme.onSurfaceVariant)),
-                                Text(money(totals.total, _cur),
-                                  style: t.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)),
-                              ],
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: FvGlassSurface(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                        child: Row(children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: _reviewRetailCart,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Row(children: [
+                                const Icon(Icons.shopping_bag_outlined, size: 22),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text('${qtyText(count)} productos · Ver carrito',
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: t.textTheme.labelSmall?.copyWith(
+                                          color: t.colorScheme.onSurfaceVariant)),
+                                      Text(money(totals.total, _cur),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: t.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w800)),
+                                    ],
+                                  ),
+                                ),
+                              ]),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        FilledButton.icon(
-                          key: const ValueKey('retail-pos-charge'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 50),
-                            backgroundColor: t.colorScheme.primary,
-                            foregroundColor: t.colorScheme.onPrimary,
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            key: const ValueKey('retail-pos-charge'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(100, 48),
+                              backgroundColor: FvTokens.emerald,
+                              foregroundColor: Colors.white,
+                              shape: const StadiumBorder(),
+                            ),
+                            onPressed: _charging || _savingOrder || _chargeRequestId != null
+                                ? null : () {
+                                    Haptics.soft();
+                                    _reviewRetailCart();
+                                  },
+                            child: const Text('Cobrar',
+                              style: TextStyle(fontWeight: FontWeight.w800)),
                           ),
-                          onPressed: _charging || _savingOrder || _chargeRequestId != null
-                              ? null : _reviewRetailCart,
-                          icon: const Icon(Icons.shopping_cart_checkout_rounded),
-                          label: const Text('Cobrar', style: TextStyle(fontWeight: FontWeight.w800)),
-                        ),
-                      ]),
+                        ]),
+                      ),
                     ),
                 ]);
               }),

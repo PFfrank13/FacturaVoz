@@ -18,6 +18,7 @@ class PosCartReviewScreen extends StatefulWidget {
     required this.taxRate,
     required this.productImages,
     this.canSellOnCredit = false,
+    this.sheetScrollController,
   });
 
   final List<LineItem> Function() lines;
@@ -26,6 +27,8 @@ class PosCartReviewScreen extends StatefulWidget {
   final double taxRate;
   final Map<String, String> productImages;
   final bool canSellOnCredit;
+  /// El mismo carrito puede ser pantalla completa o sheet draggable.
+  final ScrollController? sheetScrollController;
 
   @override
   State<PosCartReviewScreen> createState() => _PosCartReviewScreenState();
@@ -99,6 +102,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                         ],
                       ))
                     : ListView.separated(
+                        controller: widget.sheetScrollController,
                         padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
                         itemCount: items.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 9),
