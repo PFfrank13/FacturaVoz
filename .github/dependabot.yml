@@ -10,3 +10,22 @@ updates:
       time: "09:00"
       timezone: "America/Lima"
     open-pull-requests-limit: 5
+  # Flutter/Dart: actualizar pubspec.yaml y lockfile mediante PRs revisables.
+  - package-ecosystem: "pub"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:20"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 3
+
+  # Vigilar también las acciones de CI y del emulador (no autofusionar).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:40"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 3

@@ -236,7 +236,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: guided ? const Color(0xFF111533) : null,
+      backgroundColor: guided ? Theme.of(context).colorScheme.surface : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -249,22 +249,22 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 Container(
                   padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5124B3), Color(0xFF242057)],
-                    ),
+                    color: Theme.of(ctx).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFA87EFF)),
+                    border: Border.all(color: Theme.of(ctx).colorScheme.outlineVariant),
                   ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Row(children: [
-                      Icon(Icons.inventory_2_rounded, color: Colors.white, size: 27),
-                      SizedBox(width: 10),
+                    Row(children: [
+                      Icon(Icons.inventory_2_rounded,
+                        color: Theme.of(ctx).colorScheme.onPrimaryContainer, size: 27),
+                      const SizedBox(width: 10),
                       Expanded(child: Text('Agregar producto a tu tienda',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white))),
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900,
+                          color: Theme.of(ctx).colorScheme.onPrimaryContainer))),
                     ]),
                     const SizedBox(height: 6),
                     Text('PASO ${wizardStep + 1} DE 6 · ${steps[wizardStep]}',
-                      style: const TextStyle(color: Color(0xFFE4D7FF),
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w800, fontSize: 12)),
                     const SizedBox(height: 12),
                     Row(children: [
@@ -274,8 +274,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                           height: 7,
                           decoration: BoxDecoration(
                             color: i <= wizardStep
-                                ? const Color(0xFFBB93FF)
-                                : const Color(0xFF68618F),
+                                ? Theme.of(ctx).colorScheme.primary
+                                : Theme.of(ctx).colorScheme.outlineVariant,
                             borderRadius: BorderRadius.circular(9),
                           ),
                         )),

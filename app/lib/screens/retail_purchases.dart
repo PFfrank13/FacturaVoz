@@ -15,6 +15,13 @@ import 'pos_payment_logic.dart';
 import 'products.dart';
 import 'retail_settlements.dart';
 
+/// Centra el flujo de compras en pantallas anchas sin estrecharlo en móviles.
+/// Usa el espacio REAL disponible, no el tamaño físico de la pantalla.
+double retailPurchaseHorizontalInset(double availableWidth) {
+  if (!availableWidth.isFinite || availableWidth <= 992) return 16;
+  return (availableWidth - 960) / 2;
+}
+
 /// Plan Básico: supplier -> product ID -> atomic stock receipt -> expense/cash.
 /// This is deliberately online-only until an audited offline ledger exists.
 class RetailPurchasesScreen extends StatefulWidget {
@@ -360,8 +367,11 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     TextButton(onPressed: _load, child: const Text('Reintentar')),
                   ]),
                 ))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+              : LayoutBuilder(builder: (context, constraints) => ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    retailPurchaseHorizontalInset(constraints.maxWidth), 12,
+                    retailPurchaseHorizontalInset(constraints.maxWidth), 90,
+                  ),
                   children: [
                     RetailVisual.hero(
                        context: context,
@@ -404,7 +414,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                       Card(
                         margin: const EdgeInsets.symmetric(vertical: 3),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15),
-                          side: const BorderSide(color: Color(0xFF474777))),
+                          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
                         child: ListTile(
                         title: Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -414,7 +424,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                           tooltip: 'Agregar a recepción',
                           onPressed: () => _editLine(p),
                           icon: Icon(_lines.containsKey(p.id) ? Icons.check_circle_rounded : Icons.add_circle_outline,
-                            color: const Color(0xFF61E3D0)),
+                            color: Theme.of(context).colorScheme.primary),
                         ),
                         onTap: () => _editLine(p),
                       )),
@@ -487,7 +497,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     RetailVisual.section(number: 5, title: 'Recepciones recientes',
                        subtitle: 'Historial y pagos pendientes', icon: Icons.history_rounded),
                     for (final receipt in _history)
-                      Card(color: RetailVisual.surface,
+                      Card(
                         margin: const EdgeInsets.symmetric(vertical: 3),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         child: ListTile(
@@ -507,7 +517,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                             ? () => _openSettlement(receipt) : null,
                       )),
                   ],
-                ),
+                )),
     );
   }
 }
