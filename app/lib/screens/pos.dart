@@ -1080,7 +1080,7 @@ class _PosScreenState extends State<PosScreen> {
                                 final img = _extra[p.id]?['image_path'] as String?;
                                 final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
                                 final categoryLabel = (_extra[p.id]?['category'] ?? '').toString().trim();
-                                final category = '${p.name} ${categoryLabel}'.toLowerCase();
+                                final category = '${p.name} $categoryLabel'.toLowerCase();
                                 final placeholderIcon =
                                     category.contains('agua') || category.contains('bebida')
                                         ? Icons.water_drop_rounded
