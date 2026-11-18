@@ -7,6 +7,8 @@ import '../app_state.dart';
 import '../config.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
+import '../ui/retail_layout.dart';
 import '../ui/widgets.dart';
 import '../ui/motion.dart';
 import 'clients.dart';
@@ -152,7 +154,7 @@ class SettingsScreen extends StatelessWidget {
     final org = AppState.instance.activeOrg;
     final a = Access.instance;
     void go(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
-    return Scaffold(
+    return RetailResponsiveFrame(maxWidth: 1080, child: Scaffold(
       appBar: embedded && Access.instance.rubro == 'bodega' ? null : AppBar(
         title: const Text('Ajustes'),
         automaticallyImplyLeading: !embedded,
@@ -165,27 +167,44 @@ class SettingsScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                image: DecorationImage(image: AssetImage('assets/photos/${sectorPhotoFor(a.rubro ?? 'bodega')}.webp'), fit: BoxFit.cover, colorFilter: const ColorFilter.mode(Color(0xA5082737), BlendMode.multiply)),
-                gradient: Brand.heroGradient,
-                borderRadius: BorderRadius.circular(Radii.xl), boxShadow: Brand.softShadow(false, a: 0.3)),
+                color: t.colorScheme.surface,
+                borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+                border: Border.all(color: t.colorScheme.outlineVariant.withValues(alpha: 0.25)),
+                boxShadow: FvTokens.shadow(t.brightness),
+              ),
               child: Row(children: [
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 56,
+                  height: 56,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: t.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(18)),
                   child: Text(email.isEmpty ? '?' : email.characters.first.toUpperCase(),
-                      style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+                    style: t.textTheme.headlineSmall?.copyWith(
+                      color: t.colorScheme.onSurface, fontWeight: FontWeight.w800)),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 15),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(org?.name ?? 'Mi cuenta',
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
-                    Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Text(sectorShortName(a.rubro), maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFFD9DEFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    Text('CUENTA DE EMPRESA', style: t.textTheme.labelSmall?.copyWith(
+                      color: t.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    const SizedBox(height: 4),
+                    Text(org?.name ?? 'Mi cuenta', maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                    const SizedBox(height: 4),
+                    Text(email, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: t.textTheme.bodySmall?.copyWith(
+                        color: t.colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 6),
+                    Text(sectorShortName(a.rubro),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: t.textTheme.labelSmall?.copyWith(
+                        color: t.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ]),
@@ -306,6 +325,6 @@ class SettingsScreen extends StatelessWidget {
           ),
         ]),
       ),
-    );
+    ));
   }
 }
