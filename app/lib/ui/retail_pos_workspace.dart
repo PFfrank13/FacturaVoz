@@ -94,7 +94,7 @@ class RetailPosCartPane extends StatelessWidget {
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(line.description, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w750)),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 7),
                       Row(children: [
                         Expanded(child: Text('${qtyText(line.quantity)} × ${money(line.unitPrice, currency)}',
