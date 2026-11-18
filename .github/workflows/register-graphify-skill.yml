@@ -1,0 +1,77 @@
+name: Register Graphify project skill
+
+# One-time installation on a dedicated branch, never on production main.
+on:
+  push:
+    branches:
+      - chore/register-graphify-skill-20261118
+    paths:
+      - .github/workflows/register-graphify-skill.yml
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Graphify source with pip in isolated venv
+        run: |
+          python -m venv "$RUNNER_TEMP/graphify-venv"
+          "$RUNNER_TEMP/graphify-venv/bin/python" -m pip install --disable-pip-version-check 'git+https://github.com/Graphify-Labs/graphify.git@340268a70a83588d6b3c6de1fffb05326350ef1d'
+      - name: Register cross-framework and Codex project skills
+        run: |
+          "$RUNNER_TEMP/graphify-venv/bin/graphify" install --project --platform agents
+          "$RUNNER_TEMP/graphify-venv/bin/graphify" install --project --platform codex
+          test -s .agents/skills/graphify/SKILL.md
+          test -s .codex/skills/graphify/SKILL.md
+          test -d .agents/skills/graphify/references
+          test -d .codex/skills/graphify/references
+      - name: Package only project skill outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphify-project-skills
+          include-hidden-files: true
+          retention-days: 1
+          path: |
+            .agents/skills/graphify/
+            .codex/skills/graphify/
+
+  commit:
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch generated skill files
+        uses: actions/download-artifact@v4
+        with:
+          name: graphify-project-skills
+          path: .
+      - name: Verify scoped artifact and commit to installation branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -s .agents/skills/graphify/SKILL.md
+          test -s .codex/skills/graphify/SKILL.md
+          # Only the Graphify skill folders are staged; no unrelated files or secrets.
+          git add -- .agents/skills/graphify .codex/skills/graphify
+          if git diff --cached --quiet; then
+            echo "Skills already registered."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'chore(skills): register Graphify in project'
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/chore/register-graphify-skill-20261118"
