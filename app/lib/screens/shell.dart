@@ -31,6 +31,9 @@ import 'license_gate.dart';
 import 'new_invoice.dart';
 import 'pos.dart';
 import 'products.dart';
+import 'reports.dart';
+import 'retail_purchases.dart';
+import 'retail_receipts.dart';
 import 'profit.dart';
 import 'quotes.dart';
 import 'rubro_picker.dart';
@@ -69,6 +72,10 @@ const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
 const _dCash = _Dest('cash', Icons.account_balance_wallet_rounded, 'Caja', 'Caja');
 const _dStock = _Dest('stock', Icons.inventory_2_rounded, 'Inventario', 'Inventario');
 const _dBodegaSettings = _Dest('settings', Icons.settings_rounded, 'Configuración', 'Configuración');
+const _dRetailSell = _Dest('sell', Icons.point_of_sale_rounded, 'Venta rápida', 'Venta rápida');
+const _dRetailReceipts = _Dest('comprobantes', Icons.receipt_long_rounded, 'Comprobantes', 'Comprobantes');
+const _dRetailPurchases = _Dest('compras', Icons.local_shipping_outlined, 'Compras', 'Compras');
+const _dRetailReports = _Dest('reportes', Icons.insights_rounded, 'Reportes', 'Reportes');
 
 /// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
 const _rubroIcons = <String, IconData>{
@@ -88,6 +95,9 @@ const _rubroIcons = <String, IconData>{
 /// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
 bool _destAllowed(String id, Access a) => switch (id) {
       'sell' => a.can('sell') && a.has('facturar'),
+      'comprobantes' => a.has('facturar') && a.allows('sales.read'),
+      'compras' => a.has('stock') && a.can('products_edit'),
+      'reportes' => a.has('reportes') && a.can('finance'),
       'quotes' => a.can('sell') && a.has('cotizaciones'),
       'collect' => a.can('collect') && a.has('cobros'),
       'fiados' => a.can('collect') && a.has('fiados'),
@@ -114,9 +124,13 @@ bool usesMultirubroRail(String? rubro, double width) =>
 List<String> bodegaDrawerIds(Access access) => [
   'home',
   if (_destAllowed('sell', access)) 'sell',
+  if (_destAllowed('stock', access)) 'stock',
+  if (_destAllowed('compras', access)) 'compras',
+  if (_destAllowed('comprobantes', access)) 'comprobantes',
   if (_destAllowed('fiados', access)) 'fiados',
   if (_destAllowed('cash', access)) 'cash',
-  if (_destAllowed('stock', access)) 'stock',
+  if (_destAllowed('clients', access)) 'clients',
+  if (_destAllowed('reportes', access)) 'reportes',
   'settings',
 ];
 
@@ -220,10 +234,14 @@ class _MainShellState extends State<MainShell> {
     if ((a.rubro ?? _settings?.businessType) == 'bodega') {
       const destinations = <String, _Dest>{
         'home': _dHome,
-        'sell': _dSell,
+        'sell': _dRetailSell,
+        'stock': _dStock,
+        'compras': _dRetailPurchases,
+        'comprobantes': _dRetailReceipts,
         'fiados': _dFiados,
         'cash': _dCash,
-        'stock': _dStock,
+        'clients': _dClients,
+        'reportes': _dRetailReports,
         'settings': _dBodegaSettings,
       };
       return [for (final id in bodegaDrawerIds(a)) destinations[id]!];
@@ -323,6 +341,9 @@ class _MainShellState extends State<MainShell> {
         'fiados' => FiadosScreen(embedded: Access.instance.rubro == 'bodega'),
         'cash' => CashDayScreen(embedded: Access.instance.rubro == 'bodega'),
         'stock' => const ProductsScreen(embedded: true),
+        'compras' => const RetailPurchasesScreen(),
+        'comprobantes' => const RetailReceiptsScreen(),
+        'reportes' => const ReportsScreen(),
         'tables' => const KitchenScreen(),
         _ => const SettingsScreen(embedded: true),
       };
@@ -335,8 +356,8 @@ class _MainShellState extends State<MainShell> {
     final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
     return NavigationDrawer(
       key: const ValueKey('bodega-navigation-drawer'),
-      backgroundColor: cs.surface,
-      indicatorColor: cs.primary.withValues(alpha: 0.09),
+      backgroundColor: Colors.transparent,
+      indicatorColor: cs.primary.withValues(alpha: 0.12),
       selectedIndex: selected < 0 ? 0 : selected,
       onDestinationSelected: (index) {
         Navigator.of(context).pop();
@@ -407,9 +428,10 @@ class _MainShellState extends State<MainShell> {
       ),
       child: NavigationRail(
         key: const ValueKey('bodega-navigation-rail'),
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.transparent,
         selectedIndex: selected < 0 ? 0 : selected,
         labelType: NavigationRailLabelType.selected,
+        scrollable: true,
         groupAlignment: -1,
         useIndicator: true,
         indicatorColor: cs.primary.withValues(alpha: 0.09),
