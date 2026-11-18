@@ -48,21 +48,31 @@ void main() {
     expect(tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration, Duration.zero);
   });
 
-  testWidgets('El scroll conserva rebote en móvil y precisión en escritorio', (tester) async {
-    ScrollPhysics? physics;
-    Future<void> check(TargetPlatform platform) async {
+  for (final platform in <TargetPlatform>[
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+    TargetPlatform.windows,
+    TargetPlatform.macOS,
+    TargetPlatform.linux,
+  ]) {
+    testWidgets('Scroll usa físicas adecuadas para $platform', (tester) async {
+      ScrollPhysics? physics;
       await tester.pumpWidget(MaterialApp(
-        theme: ThemeData(platform: platform),
-        home: Builder(builder: (context) {
-          physics = const PremiumScrollBehavior().getScrollPhysics(context);
-          return const SizedBox.shrink();
-        }),
+        home: Theme(
+          data: ThemeData(platform: platform),
+          child: Builder(builder: (context) {
+            physics = const PremiumScrollBehavior().getScrollPhysics(context);
+            return const SizedBox.shrink();
+          }),
+        ),
       ));
-    }
-
-    await check(TargetPlatform.iOS);
-    expect(physics, isA<BouncingScrollPhysics>());
-    await check(TargetPlatform.windows);
-    expect(physics, isA<ClampingScrollPhysics>());
-  });
+      final mobile = platform == TargetPlatform.android ||
+          platform == TargetPlatform.iOS;
+      if (mobile) {
+        expect(physics, isA<BouncingScrollPhysics>());
+      } else {
+        expect(physics, isA<ClampingScrollPhysics>());
+      }
+    });
+  }
 }
