@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 /// Sistema de diseño de FacturaVoz.
-/// Índigo nocturno, violeta eléctrico y cian suave. Fotografía contextual realista; sin dorados decorativos.
+/// Edición Enterprise: tinta naval, verde petróleo y ámbar funcional. Tipografía legible y superficies con jerarquía.
 /// Radios de esquina (usar estos en pantallas nuevas en vez de números sueltos).
 class Radii {
   static const sm = 8.0; // chips, barras de progreso
@@ -41,70 +41,71 @@ class DsColors {
   final Color ok, warn, bad;
 
   static const dark = DsColors(
-    bg: Color(0xFF0B1024), surface: Color(0xFF151B34), elevated: Color(0xFF202947), line: Color(0xFF2C3557),
-    ink: Color(0xFFF6F7FC), muted: Color(0xFFADB7D1),
-    primary: Color(0xFF6957F5), onPrimary: Color(0xFFFFFFFF), primaryText: Color(0xFFA99DFF),
-    accent: Color(0xFF17B8D4), ok: Color(0xFF26B887), warn: Color(0xFFF0B34A), bad: Color(0xFFF16D79),
+    bg: Color(0xFF0A1520), surface: Color(0xFF12232E), elevated: Color(0xFF1D3740), line: Color(0xFF33505A),
+    ink: Color(0xFFF1F8F7), muted: Color(0xFFAFCCCE),
+    primary: Color(0xFF42CDBA), onPrimary: Color(0xFF062E2B), primaryText: Color(0xFF83E6D9),
+    accent: Color(0xFFF2B75E), ok: Color(0xFF67D3A4), warn: Color(0xFFFFC677), bad: Color(0xFFFF8994),
   );
 
   static const light = DsColors(
-    bg: Color(0xFFF6F7FC), surface: Color(0xFFFFFFFF), elevated: Color(0xFFEEF0F8), line: Color(0xFFD7DBEA),
-    ink: Color(0xFF0B1024), muted: Color(0xFF4F5873),
-    primary: Color(0xFF4C3BD7), onPrimary: Color(0xFFFFFFFF), primaryText: Color(0xFF4C3BD7),
-    accent: Color(0xFF0E7C91), ok: Color(0xFF13795A), warn: Color(0xFF8A5300), bad: Color(0xFFB42336),
+    bg: Color(0xFFF4F7F8), surface: Color(0xFFFFFFFF), elevated: Color(0xFFEAF1F1), line: Color(0xFFD7E2E5),
+    ink: Color(0xFF132A36), muted: Color(0xFF536A73),
+    primary: Color(0xFF087E74), onPrimary: Color(0xFFFFFFFF), primaryText: Color(0xFF076D65),
+    accent: Color(0xFFAD6416), ok: Color(0xFF167550), warn: Color(0xFF92550D), bad: Color(0xFFAD3449),
   );
 
   static DsColors of(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? dark : light;
 }
 
 class Brand {
-  // Compatibilidad: las pantallas antiguas usan estas constantes en ambos modos. Son tonos medios de la paleta
-  // que dan ≥ 3:1 sobre fondo claro y oscuro (íconos, chips). Pantallas nuevas: DsColors.of(context).
-  static const indigo = Color(0xFF6957F5);
-  static const indigoDeep = Color(0xFF4C3BD7);
-  static const indigoSoft = Color(0xFFA99DFF);
-  static const lilac = Color(0xFF7B6CF6);
-  static const gold = Color(0xFF1399B0); // cian para dictado y accesos esenciales
-  static const goldDeep = Color(0xFF0E7C91);
-  static const onGold = Color(0xFFFFFFFF);
+  // Compatibilidad: las pantallas antiguas leen Brand; los colores derivan de la identidad Enterprise.
+  // Los nuevos componentes usan DsColors.of(context) y roles semánticos para contraste.
+  static const indigo = Color(0xFF087E74);
+  static const indigoDeep = Color(0xFF075D58);
+  static const indigoSoft = Color(0xFF83E6D9);
+  static const lilac = Color(0xFF3185A0);
+  static const gold = Color(0xFFF0AC4A);
+  static const goldDeep = Color(0xFFAD6416);
+  static const onGold = Color(0xFF182B33);
 
-  static const ok = Color(0xFF1F9D73);
-  static const warn = Color(0xFFB97E14);
-  static const bad = Color(0xFFE04F5F);
+  static const ok = Color(0xFF167550);
+  static const warn = Color(0xFF92550D);
+  static const bad = Color(0xFFAD3449);
 
-  static const lightBg = Color(0xFFF6F7FC);
-  static const lightInk = Color(0xFF0B1024);
-  static const lightMuted = Color(0xFF4F5873);
-  static const lightLine = Color(0xFFD7DBEA);
+  static const lightBg = Color(0xFFF4F7F8);
+  static const lightInk = Color(0xFF132A36);
+  static const lightMuted = Color(0xFF536A73);
+  static const lightLine = Color(0xFFD7E2E5);
 
-  static const darkBg = Color(0xFF0B1024);
-  static const darkCard = Color(0xFF151B34);
-  static const darkInk = Color(0xFFF6F7FC);
-  static const darkMuted = Color(0xFFADB7D1);
-  static const darkLine = Color(0xFF2C3557);
+  static const darkBg = Color(0xFF0A1520);
+  static const darkCard = Color(0xFF12232E);
+  static const darkInk = Color(0xFFF1F8F7);
+  static const darkMuted = Color(0xFFAFCCCE);
+  static const darkLine = Color(0xFF33505A);
 
-  // §11 "no abusar de degradados": los 79 usos existentes quedan casi planos (dos tonos vecinos de la marca).
+  // Profundidad sutil en cabeceras y acciones, sin estética púrpura/neón.
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF202947), Color(0xFF2A2F66)],
+    colors: [Color(0xFF102D3D), Color(0xFF125B5B)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF6957F5), Color(0xFF5E4CEB)],
+    colors: [Color(0xFF087E74), Color(0xFF106C74)],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
   /// Reducido a tonos de la paleta: menos colores en pantalla.
   static const fnPalette = <Color>[
-    Color(0xFF6957F5), Color(0xFF1399B0), Color(0xFF1F9D73), Color(0xFF4C3BD7), Color(0xFFB97E14), Color(0xFF5B6B8C),
+    Color(0xFF087E74), Color(0xFF2C83A1), Color(0xFF167550),
+    Color(0xFFB66D20), Color(0xFFAA5364), Color(0xFF526B84),
   ];
 
   /// Sombra apenas perceptible (§11: sin sombras duras). En oscuro no hay sombra: separa el borde.
   static List<BoxShadow> softShadow(bool dark, {double a = 0.10}) => dark
       ? const []
-      : [BoxShadow(color: const Color(0xFF0B1024).withValues(alpha: a * 0.5), blurRadius: 12, offset: const Offset(0, 3))];
+      : [BoxShadow(color: const Color(0xFF142A36).withValues(alpha: a * 0.55), blurRadius: 18, offset: const Offset(0, 5))];
 }
 
 const _font = 'Inter';
@@ -157,8 +158,8 @@ ThemeData buildTheme(Brightness b) {
     surfaceContainer: card,
     surfaceContainerLow: card,
     surfaceContainerLowest: card,
-    primaryContainer: dark ? const Color(0xFF2A2F66) : const Color(0xFFE9E6FF),
-    onPrimaryContainer: dark ? ds.primaryText : const Color(0xFF2A1FA0),
+    primaryContainer: dark ? const Color(0xFF19453E) : const Color(0xFFD7F1E9),
+    onPrimaryContainer: dark ? const Color(0xFFBDF6E8) : const Color(0xFF07564E),
   );
 
   final radius = BorderRadius.circular(16);
@@ -167,7 +168,7 @@ ThemeData buildTheme(Brightness b) {
 
   return ThemeData(
     useMaterial3: true,
-    splashFactory: InkSparkle.splashFactory,
+    splashFactory: InkRipple.splashFactory,
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
       TargetPlatform.android: SoftPageTransitions(),
       TargetPlatform.iOS: SoftPageTransitions(),
@@ -187,6 +188,7 @@ ThemeData buildTheme(Brightness b) {
     scaffoldBackgroundColor: bg,
     fontFamily: _font,
     textTheme: _text(ink, muted),
+    visualDensity: VisualDensity.standard,
     dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
     appBarTheme: AppBarTheme(
       backgroundColor: bg,
@@ -201,7 +203,7 @@ ThemeData buildTheme(Brightness b) {
       color: card,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: line)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: line.withValues(alpha: dark ? 0.72 : 0.88))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
