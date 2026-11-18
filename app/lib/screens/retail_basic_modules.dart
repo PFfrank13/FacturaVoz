@@ -67,6 +67,19 @@ class _RetailPlanDashboard extends StatelessWidget {
       detail: 'Actividad y segmentos', icon: Icons.insights_rounded),
   ];
 
+  /// Colores funcionales: reconocimiento rápido sin saturar el tablero.
+  static Color _toneFor(String id) => switch (id) {
+    'comprobantes' => const Color(0xFF0D9488),
+    'compras' => const Color(0xFF287DB1),
+    'reportes' => const Color(0xFFC38128),
+    'clientes' || 'clientes360' => const Color(0xFF2A936B),
+    'cotizaciones' => const Color(0xFF4A7C9F),
+    'precios' => const Color(0xFFC17B39),
+    'recurrentes' => const Color(0xFF329394),
+    'comisiones' => const Color(0xFFAC6671),
+    _ => const Color(0xFF297E9D),
+  };
+
   @override
   Widget build(BuildContext context) {
     final a = Access.instance;
@@ -115,7 +128,7 @@ class _RetailPlanDashboard extends StatelessWidget {
           ),
           const SizedBox(width: Gap.md),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Tu bodega, en control',
+            Text('Tu negocio, al día',
               style: theme.textTheme.titleLarge?.copyWith(
                 color: colors.ink, fontWeight: FontWeight.w800, letterSpacing: -.4)),
             const SizedBox(height: Gap.xs),
@@ -150,7 +163,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                     const SizedBox(height: Gap.xs),
                     Text(compactWidth ? 'Escanea, cobra y registra' :
                       'Escanea, cobra y registra en un solo flujo',
-                      style: theme.textTheme.bodySmall?.copyWith(color: foreground.withValues(alpha: .90))),
+                      style: theme.textTheme.bodySmall?.copyWith(color: foreground.withValues(alpha: .92))),
                   ])),
                   Icon(Icons.arrow_forward_rounded, color: foreground),
                 ]),
@@ -160,11 +173,11 @@ class _RetailPlanDashboard extends StatelessWidget {
         ],
         if (actions.isNotEmpty) ...[
           const SizedBox(height: 24),
-          Text('Acciones rápidas',
+          Text('Tu espacio de trabajo',
             style: theme.textTheme.titleMedium?.copyWith(
               color: colors.ink, fontWeight: FontWeight.w800)),
           const SizedBox(height: Gap.xs),
-          Text('Operaciones frecuentes del negocio',
+          Text('Accede directamente a lo que usas cada día',
             style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
           const SizedBox(height: Gap.md),
           LayoutBuilder(builder: (context, layout) {
@@ -184,21 +197,36 @@ class _RetailPlanDashboard extends StatelessWidget {
               ),
               itemBuilder: (context, i) {
                 final entry = actions[i];
+                final tone = _toneFor(entry.action.id);
                 return Material(
                   color: colors.surface,
                   borderRadius: BorderRadius.circular(Radii.md),
                   child: InkWell(
                     key: ValueKey('retail-module-${entry.action.id}'),
                     onTap: () => openFeature(context, entry.feature),
+                    hoverColor: colors.primary.withValues(alpha: .05),
+                    splashColor: colors.primary.withValues(alpha: .10),
                     borderRadius: BorderRadius.circular(Radii.md),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(Radii.md),
                         border: Border.all(color: colors.line),
+                        boxShadow: Brand.softShadow(theme.brightness == Brightness.dark, a: .04),
                       ),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Icon(entry.action.icon, color: colors.primaryText, size: 23),
+                        Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              color: tone.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Icon(entry.action.icon, color: tone, size: 20),
+                          ),
+                          const Spacer(),
+                          Icon(Icons.north_east_rounded, color: colors.muted, size: 15),
+                        ]),
                         const Spacer(),
                         Text(entry.action.label, maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -235,6 +263,7 @@ class _RetailPlanDashboard extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, i) {
                 final entry = premium[i];
+                final tone = _toneFor(entry.action.id);
                 return SizedBox(
                   width: 174,
                   child: Material(
@@ -243,6 +272,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                     child: InkWell(
                       key: ValueKey('retail-extra-${entry.action.id}'),
                       onTap: () => openFeature(context, entry.feature),
+                      hoverColor: colors.primary.withValues(alpha: .05),
                       borderRadius: BorderRadius.circular(Radii.md),
                       child: Container(
                         padding: const EdgeInsets.all(13),
@@ -253,7 +283,18 @@ class _RetailPlanDashboard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(entry.action.icon, color: colors.primaryText, size: 23),
+                            Row(children: [
+                              Container(
+                                width: 36, height: 36,
+                                decoration: BoxDecoration(
+                                  color: tone.withValues(alpha: .12),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: Icon(entry.action.icon, color: tone, size: 20),
+                              ),
+                              const Spacer(),
+                              Icon(Icons.north_east_rounded, color: colors.muted, size: 15),
+                            ]),
                             const Spacer(),
                             Text(entry.action.label, maxLines: 2,
                               overflow: TextOverflow.ellipsis,
