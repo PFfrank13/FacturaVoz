@@ -1295,7 +1295,7 @@ class _PosScreenState extends State<PosScreen> {
                             ),
                             onPressed: _charging || _savingOrder || _chargeRequestId != null
                                 ? null : () {
-                                    Haptics.tap();
+                                    Haptics.soft();
                                     _reviewRetailCart();
                                   },
                             child: const Text('Cobrar',
