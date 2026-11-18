@@ -70,22 +70,33 @@ class FvGlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: (dark ? FvTokens.surfaceDark : FvTokens.surface)
-                .withValues(alpha: dark ? 0.91 : 0.88),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: dark ? 0.12 : 0.9),
-            ),
-            boxShadow: FvTokens.shadow(Theme.of(context).brightness),
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    // Si se solicita alto contraste, evitamos transparencia y blur para
+    // garantizar legibilidad y reducir trabajo gráfico.
+    final highContrast = MediaQuery.highContrastOf(context);
+    final background = dark ? FvTokens.surfaceDark : FvTokens.surface;
+    final alpha = highContrast ? 1.0 : (dark ? 0.79 : 0.73);
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: highContrast ? 0 : blur,
+            sigmaY: highContrast ? 0 : blur,
           ),
-          child: Padding(padding: padding, child: child),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: background.withValues(alpha: alpha),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(
+                color: (dark ? Colors.white : Colors.white)
+                    .withValues(alpha: dark ? 0.18 : 0.82),
+              ),
+              boxShadow: FvTokens.shadow(theme.brightness),
+            ),
+            child: Padding(padding: padding, child: child),
+          ),
         ),
       ),
     );
