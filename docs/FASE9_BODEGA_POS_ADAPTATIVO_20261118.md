@@ -4,7 +4,7 @@
 
 ## Flujo comercial
 
-- **Móvil y tablet (ancho disponible inferior a 1 040 dp):** catálogo con cuadrícula adaptable y barra de carrito/cobro fija. No aparece un segundo menú.
+- **Móvil y tablet (ancho disponible inferior a 900 dp de espacio útil):** catálogo con cuadrícula adaptable y barra de carrito/cobro fija. No aparece un segundo menú.
 - **PC y ventana amplia (1 040 dp o más):** catálogo a la izquierda y resumen permanente de venta a la derecha. El carrito muestra SKU/descrición, cantidad, precio unitario, subtotal, IGV y total **calculados por el motor existente**. La acción principal abre `PosCartReviewScreen`: después mantiene el flujo de pago y el guardado idempotente existente.
 - **Carrito vacío:** indica cómo empezar y deshabilita «Revisar y cobrar»; nunca inventa una transacción.
 - **Existencias:** cuando Bodega tiene stock controlado, la interfaz impide añadir cantidades que **ya** exceden el saldo conocido y señala productos sin stock o por debajo del punto de reposición. El control de la base de datos y la consulta de stock justo antes de confirmar el pago continúan siendo la autoridad final para ventas entre cajas.
