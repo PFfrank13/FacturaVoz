@@ -355,9 +355,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   width: 74,
                   height: 74,
                   child: newImage != null
-                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.memory(newImage!, fit: BoxFit.cover))
+                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.memory(newImage!, fit: aiProcessed ? BoxFit.contain : BoxFit.cover))
                       : (oldImage != null && oldImage.isNotEmpty
-                          ? StorageImage(path: oldImage)
+                          ? StorageImage(path: oldImage, fit: BoxFit.contain)
                           : Container(
                               decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
                               child: const Icon(Icons.add_a_photo_rounded),
@@ -898,7 +898,10 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: (_catalogExtras[p.id]?['image_path'] ?? '').toString().isNotEmpty
-                                  ? StorageImage(path: (_catalogExtras[p.id]?['image_path'] ?? '').toString())
+                                  ? IgnorePointer(child: StorageImage(
+                                      path: (_catalogExtras[p.id]?['image_path'] ?? '').toString(),
+                                      fit: BoxFit.contain,
+                                    ))
                                   : DecoratedBox(
                                       decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: .12)),
                                       child: Icon(p.isService ? Icons.handyman_rounded : Icons.inventory_2_rounded,
