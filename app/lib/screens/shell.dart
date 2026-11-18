@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
+import '../permissions.dart';
 import '../app_state.dart';
 import '../models_v2.dart';
 import '../rubros.dart';
