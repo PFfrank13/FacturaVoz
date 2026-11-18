@@ -609,9 +609,22 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     if (_lines().isEmpty) return;
-    final approved = await Navigator.of(context).push<RetailCartAction>(
-      MaterialPageRoute<RetailCartAction>(
-        builder: (_) => PosCartReviewScreen(
+    final approved = await showModalBottomSheet<RetailCartAction>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(FvTokens.sheetRadius))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.82,
+        minChildSize: 0.48,
+        maxChildSize: 0.96,
+        builder: (sheetContext, scrollController) => PosCartReviewScreen(
+          sheetScrollController: scrollController,
           lines: _lines,
           productImages: _extra.map((id, value) =>
               MapEntry(id, (value['image_path'] ?? '').toString())),
