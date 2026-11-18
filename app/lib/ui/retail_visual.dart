@@ -8,10 +8,10 @@ import 'theme.dart';
 /// componente fuerza ThemeData.dark, crea metricas falsas ni modifica el flujo.
 abstract final class RetailVisual {
   // Compatibilidad para pantallas que importan estas constantes antiguas.
-  static const navy = Color(0xFF0D1231);
-  static const surface = Color(0xFF1B2149);
-  static const violet = Color(0xFF6366F1);
-  static const mint = Color(0xFF26B887);
+  static const navy = Color(0xFF102C3C);
+  static const surface = Color(0xFF12232E);
+  static const violet = Color(0xFF087E74); // Alias legado: nuevo acento empresarial
+  static const mint = Color(0xFF42CDBA);
 
   /// Cabecera informativa plana, sin degradados, ornamentos ni sombra neon.
   /// El contraste se deriva del tema activo (claro/oscuro).
@@ -31,6 +31,7 @@ abstract final class RetailVisual {
         color: c.surface,
         borderRadius: BorderRadius.circular(Radii.lg),
         border: Border.all(color: c.line),
+        boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: .06),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
