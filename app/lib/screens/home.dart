@@ -33,7 +33,7 @@ import 'invoice_detail.dart';
 import 'new_invoice.dart';
 import 'products.dart';
 import 'recurring.dart';
-import 'retail_basic_modules.dart';
+
 import 'scan.dart';
 import 'store.dart';
 
@@ -369,10 +369,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 onGoal: () => _setGoal(m.total),
               ),
             ),
-            if (Access.instance.rubro == 'bodega' &&
-                Access.instance.license.plan == 'BASICO')
-              const SliverToBoxAdapter(child: RetailBasicModules()),
-            SliverToBoxAdapter(
+            // El POS y las acciones básicas están en el menú lateral único;
+            // no repetimos una cuadrícula ni un carrusel en Inicio.
+            if (Access.instance.rubro != 'bodega')
+              SliverToBoxAdapter(
               child: Reveal(
                 index: 1,
                 child: SizedBox(
