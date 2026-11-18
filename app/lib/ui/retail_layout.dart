@@ -23,3 +23,8 @@ class RetailResponsiveFrame extends StatelessWidget {
         ),
       );
 }
+
+/// Usa dos columnas solo cuando el ancho realmente asignado permite dos
+/// tarjetas completas; split view y ventanas estrechas siguen a una.
+int retailCardColumnCount(double availableWidth, {double twoColumnMinWidth = 880}) =>
+    availableWidth.isFinite && availableWidth >= twoColumnMinWidth ? 2 : 1;
