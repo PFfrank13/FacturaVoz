@@ -191,7 +191,7 @@ class _RetailPlanDashboard extends StatelessWidget {
               itemCount: actions.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                mainAxisExtent: largeText ? 152 : 124,
+                mainAxisExtent: largeText ? 194 : 152,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
@@ -255,7 +255,7 @@ class _RetailPlanDashboard extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
           const SizedBox(height: Gap.md),
           SizedBox(
-            height: MediaQuery.textScalerOf(context).scale(1) > 1.25 ? 168 : 142,
+            height: MediaQuery.textScalerOf(context).scale(1) > 1.25 ? 208 : 176,
             child: ListView.separated(
               key: const ValueKey('retail-plan-premium'),
               scrollDirection: Axis.horizontal,
@@ -265,7 +265,7 @@ class _RetailPlanDashboard extends StatelessWidget {
                 final entry = premium[i];
                 final tone = _toneFor(entry.action.id);
                 return SizedBox(
-                  width: 174,
+                  width: 184,
                   child: Material(
                     color: colors.surface,
                     borderRadius: BorderRadius.circular(Radii.md),
