@@ -10,6 +10,7 @@ import '../services/repo.dart';
 import '../services/retail_purchase.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
+import '../ui/design_tokens.dart';
 import '../ui/theme.dart';
 import 'pos_payment_logic.dart';
 import 'products.dart';
@@ -387,16 +388,32 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                      ),
                      RetailVisual.section(number: 1, title: 'Proveedor',
                        subtitle: 'Identifica de quién recibiste mercadería', icon: Icons.storefront_rounded),
-                    TextField(
-                      controller: _supplier,
-                      maxLength: 120,
-                      decoration: const InputDecoration(labelText: 'Proveedor', hintText: 'Nombre o razón social'),
-                    ),
-                    TextField(
-                      controller: _reference,
-                      maxLength: 40,
-                      decoration: const InputDecoration(labelText: 'Documento del proveedor (opcional)'),
-                    ),
+                    LayoutBuilder(builder: (context, form) {
+                      final supplier = TextField(
+                        controller: _supplier,
+                        maxLength: 120,
+                        decoration: const InputDecoration(
+                          labelText: 'Proveedor',
+                          hintText: 'Nombre o razón social'),
+                      );
+                      final reference = TextField(
+                        controller: _reference,
+                        maxLength: 40,
+                        decoration: const InputDecoration(
+                          labelText: 'Documento del proveedor (opcional)'),
+                      );
+                      if (form.maxWidth < FvTokens.mobileBreakpoint) {
+                        return Column(children: [supplier, reference]);
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: supplier),
+                          const SizedBox(width: 14),
+                          Expanded(child: reference),
+                        ],
+                      );
+                    }),
                     const SizedBox(height: 12),
                     RetailVisual.section(number: 2, title: 'Productos recibidos',
                        subtitle: 'Busca un producto y registra las unidades que ingresan',
@@ -410,8 +427,15 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                     ),
                     if (products.isEmpty)
                       const Padding(padding: EdgeInsets.all(12), child: Text('No se encontraron productos. Agrégalos al catálogo.')),
-                    for (final p in products.take(40))
-                      Card(
+                    LayoutBuilder(builder: (context, available) {
+                      final columns = available.maxWidth >= 760 ? 2 : 1;
+                      final cellWidth = (available.maxWidth - (columns - 1) * 12) / columns;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 5,
+                        children: [
+                          for (final p in products.take(40))
+                            SizedBox(width: cellWidth, child: Card(
                         margin: const EdgeInsets.symmetric(vertical: 3),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15),
                           side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
@@ -427,7 +451,10 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                             color: Theme.of(context).colorScheme.primary),
                         ),
                         onTap: () => _editLine(p),
-                      )),
+                      ))),
+                        ],
+                      );
+                    }),
                     TextButton.icon(
                       onPressed: () async {
                         await Navigator.of(context).push(MaterialPageRoute<void>(
@@ -487,7 +514,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                        style: FilledButton.styleFrom(
                          backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                         shape: const StadiumBorder()),
                        onPressed: _saving || _lines.isEmpty || _total <= 0 ? null : _submit,
                        icon: Icon(_saving ? Icons.hourglass_top_rounded : Icons.inventory_rounded),
                        label: Text(_saving ? 'Registrando recepción…' : 'Confirmar recepción',
