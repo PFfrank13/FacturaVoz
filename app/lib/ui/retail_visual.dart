@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
+import 'design_tokens.dart';
 
 /// Componentes de presentacion compartidos por los flujos de Bodega/Tienda.
 ///
@@ -8,10 +9,10 @@ import 'theme.dart';
 /// componente fuerza ThemeData.dark, crea metricas falsas ni modifica el flujo.
 abstract final class RetailVisual {
   // Compatibilidad para pantallas que importan estas constantes antiguas.
-  static const navy = Color(0xFF102C3C);
-  static const surface = Color(0xFF12232E);
-  static const violet = Color(0xFF087E74); // Alias legado: nuevo acento empresarial
-  static const mint = Color(0xFF42CDBA);
+  static const navy = FvTokens.canvasDark;
+  static const surface = FvTokens.surfaceDark;
+  static const violet = FvTokens.ink; // Alias legado; usar roles del tema.
+  static const mint = FvTokens.emerald;
 
   /// Cabecera informativa plana, sin degradados, ornamentos ni sombra neon.
   /// El contraste se deriva del tema activo (claro/oscuro).
@@ -29,9 +30,9 @@ abstract final class RetailVisual {
       width: double.infinity,
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: c.line),
-        boxShadow: Brand.softShadow(t.brightness == Brightness.dark, a: .06),
+        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+        border: Border.all(color: c.line.withValues(alpha: t.brightness == Brightness.dark ? .5 : .22)),
+        boxShadow: FvTokens.shadow(t.brightness),
       ),
       child: Padding(
         padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 14 : 20),
@@ -41,9 +42,9 @@ abstract final class RetailVisual {
               width: 46, height: 46,
               decoration: BoxDecoration(
                 color: c.elevated,
-                borderRadius: BorderRadius.circular(Radii.md),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: c.primaryText, size: 24),
+              child: Icon(icon, color: c.ink, size: 24),
             ),
             const SizedBox(width: Gap.md),
             Expanded(
@@ -61,10 +62,16 @@ abstract final class RetailVisual {
           Text(subtitle, style: t.textTheme.bodyMedium?.copyWith(
             color: c.muted, height: 1.45)),
           if (footer != null) ...[
-            const SizedBox(height: 20),
-            Divider(height: 1, color: c.line),
-            const SizedBox(height: 16),
-            footer,
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: c.elevated,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: footer,
+            ),
           ],
         ]),
       ),
@@ -89,9 +96,9 @@ abstract final class RetailVisual {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: c.elevated,
-              borderRadius: BorderRadius.circular(Radii.md)),
+              borderRadius: BorderRadius.circular(14)),
             child: Text('$number', style: t.textTheme.titleMedium?.copyWith(
-              color: c.primaryText, fontWeight: FontWeight.w800)),
+              color: c.ink, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(width: Gap.md),
           Expanded(child: Column(
@@ -103,7 +110,7 @@ abstract final class RetailVisual {
             ],
           )),
           const SizedBox(width: Gap.sm),
-          Icon(icon, color: c.primaryText, size: 21),
+          Icon(icon, color: c.muted, size: 21),
         ]),
       );
     });
@@ -121,8 +128,9 @@ abstract final class RetailVisual {
       padding: padding,
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+        border: Border.all(color: c.line.withValues(alpha: 0.28)),
+        boxShadow: FvTokens.shadow(Theme.of(context).brightness),
       ),
       child: child,
     );
@@ -174,9 +182,15 @@ abstract final class RetailVisual {
           style: t.textTheme.labelSmall?.copyWith(
             color: c.muted, fontWeight: FontWeight.w700)),
         const SizedBox(height: Gap.xs),
-        Text(value, maxLines: 2, overflow: TextOverflow.ellipsis,
-          style: t.textTheme.titleLarge?.copyWith(
-            color: c.ink, fontWeight: FontWeight.w800)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: t.textTheme.titleLarge?.copyWith(
+              color: c.ink,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()])),
+        ),
       ]);
     });
   }
