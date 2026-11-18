@@ -4,6 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import '../lib/ui/retail_layout.dart';
 
 void main() {
+  test('Tarjetas: un panel estrecho, dos columnas si caben', () {
+    for (final width in <double>[0, 320, 360, 600, 768, 879.9]) {
+      expect(retailCardColumnCount(width), 1, reason: '$width');
+    }
+    for (final width in <double>[880, 1024, 1440, 3440]) {
+      expect(retailCardColumnCount(width), 2, reason: '$width');
+    }
+    expect(retailCardColumnCount(double.infinity), 1);
+    expect(retailCardColumnCount(double.nan), 1);
+    expect(retailCardColumnCount(819, twoColumnMinWidth: 820), 1);
+    expect(retailCardColumnCount(820, twoColumnMinWidth: 820), 2);
+  });
+
   testWidgets('Los listados usan todo el móvil y no se estiran en escritorio', (tester) async {
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
