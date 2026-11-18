@@ -58,7 +58,8 @@ void main() {
     expect(a.has('facturar'), isTrue);
     expect(a.has('stock'), isTrue);
     expect(bodegaDrawerIds(a), [
-      'home', 'sell', 'fiados', 'cash', 'stock', 'settings',
+      'home', 'sell', 'stock', 'compras', 'comprobantes',
+      'fiados', 'cash', 'clients', 'reportes', 'settings',
     ]);
   });
 
