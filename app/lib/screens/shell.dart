@@ -750,7 +750,6 @@ class _Dock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
     final left = dests.take((dests.length + 1) ~/ 2).toList();
     final right = dests.skip(left.length).toList();
