@@ -17,6 +17,7 @@ import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/ds.dart';
 import '../ui/theme.dart';
+import '../ui/retail_home_premium.dart';
 import 'catalog.dart';
 import 'menu.dart';
 import '../ui/motion.dart' show pushPremium, showSuccess;
@@ -146,21 +147,43 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
 
   String _money(double v) => money(v, _day?.currency ?? AppState.instance.profile?.currency ?? 'PEN');
 
+  Widget _metric({
+    required String label,
+    required String value,
+    String? detail,
+    required IconData icon,
+    Color? tone,
+    VoidCallback? onTap,
+    required Color accent,
+  }) {
+    if (Access.instance.rubro == 'bodega') {
+      return RetailHomeStat(
+        label: label, value: value, detail: detail,
+        icon: icon, tint: accent, tone: tone, onTap: onTap,
+      );
+    }
+    return DsStat(
+      label: label, value: value, detail: detail,
+      icon: icon, tone: tone, onTap: onTap,
+    );
+  }
+
   Widget? _stat(String id) {
     final b = homeBlocks[id]!;
-    Widget err() => DsStat(label: b.label, value: '—', detail: 'No se pudo cargar · toca para reintentar', tone: DsColors.of(context).bad, icon: Icons.refresh_rounded, onTap: _load);
+    Widget err() => _metric(accent: RetailAccent.amber, label: b.label, value: '—', detail: 'No se pudo cargar · toca para reintentar', tone: DsColors.of(context).bad, icon: Icons.refresh_rounded, onTap: _load);
     switch (id) {
       case 'today_sales':
         if (_errors.contains('day')) return err();
         final d = _day;
-        return DsStat(label: b.label, value: d == null ? '…' : _money(d.salesTotal), detail: d == null ? null : '${d.salesCount} ventas', icon: Icons.trending_up_rounded, onTap: () => _open(b.route));
+        return _metric(accent: RetailAccent.blue, label: b.label, value: d == null ? '…' : _money(d.salesTotal), detail: d == null ? null : '${d.salesCount} ventas', icon: Icons.trending_up_rounded, onTap: () => _open(b.route));
       case 'cash_status':
         if (_errors.contains('day')) return err();
         final d = _day;
         final closed = _closing != null;
         // Arqueo ciego (cash_day.dart): antes del cierre NO se muestra el efectivo esperado, solo el estado.
         final opened = (d?.opening ?? 0) > 0;
-        return DsStat(
+        return _metric(
+          accent: RetailAccent.amber,
           label: b.label,
           value: d == null ? '…' : closed ? 'Cerrada' : opened ? 'Abierta' : 'Sin abrir',
           detail: d == null ? null : closed ? 'Cierre de hoy registrado' : opened ? 'Cierra con arqueo al final del día' : 'Toca para abrir la caja',
@@ -173,7 +196,8 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
         final c = _credit;
         final owing = c?.where((x) => x.balance > 0.004).toList();
         final total = owing?.fold<double>(0, (s, x) => s + x.balance);
-        return DsStat(
+        return _metric(
+          accent: RetailAccent.violet,
           label: b.label,
           value: total == null ? '…' : _money(total),
           detail: owing == null ? null : owing.length == 1 ? '1 cliente' : '${owing.length} clientes',
@@ -183,7 +207,8 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
         );
       case 'stock_low':
         if (_errors.contains('stock')) return err();
-        return DsStat(
+        return _metric(
+          accent: RetailAccent.mint,
           label: b.label,
           value: _low == null ? '…' : '$_low',
           detail: _low == null ? null : _low == 0 ? 'Todo en orden' : 'productos por reponer',

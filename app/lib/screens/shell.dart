@@ -15,6 +15,7 @@ import '../ui/theme.dart';
 import '../ui/retail_layout.dart';
 import '../ui/design_tokens.dart';
 import '../ui/glass_widgets.dart';
+import '../ui/retail_home_premium.dart';
 import 'assistant.dart';
 import 'catalog.dart';
 import 'clients_hub.dart';
@@ -319,7 +320,7 @@ class _MainShellState extends State<MainShell> {
     if (rubroFor(_settings?.businessType) != null) {
       switch (id) {
         case 'home':
-          return const InicioScreen();
+          return InicioScreen(onNavigate: _go);
         case 'collect':
           return const OwedHubScreen();
         case 'business':
@@ -584,6 +585,13 @@ class _MainShellState extends State<MainShell> {
               title: Text(activeTitle,
                 style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -.35)),
               actions: [
+                if (canVoiceSell && !pinnedSidebar)
+                  IconButton(
+                    key: const ValueKey('bodega-voice-header'),
+                    tooltip: 'Vender por voz',
+                    icon: const Icon(Icons.mic_none_rounded),
+                    onPressed: _newInvoice,
+                  ),
                 if (canCopilot)
                   IconButton(
                     key: const ValueKey('bodega-open-copilot'),
@@ -627,7 +635,7 @@ class _MainShellState extends State<MainShell> {
             ]),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
             // Evitar que el micrófono cubra Cobrar en el POS o Abrir/Cerrar caja.
-            floatingActionButton: isBodega && !keyboard &&
+            floatingActionButton: isBodega && pinnedSidebar && !keyboard &&
                 _tab != 'sell' && _tab != 'cash' && (canCopilot || canVoiceSell)
                 ? Container(
                     decoration: BoxDecoration(
@@ -652,7 +660,23 @@ class _MainShellState extends State<MainShell> {
                   )
                 : null,
             // Los otros ocho rubros conservan su shell hasta su rediseño propio.
-            bottomNavigationBar: isBodega || workstationRail ? null : AnimatedSlide(
+            bottomNavigationBar: isBodega
+                ? pinnedSidebar || keyboard ? null : RetailPremiumBottomDock(
+                    current: _tab,
+                    items: [
+                      for (final id in const ['home', 'sell', 'stock', 'cash'])
+                        if (dests.any((d) => d.id == id))
+                          (
+                            id,
+                            id == 'home' ? 'Inicio' : id == 'sell' ? 'Ventas'
+                                : id == 'stock' ? 'Inventario' : 'Caja',
+                            dests.firstWhere((d) => d.id == id).icon,
+                          ),
+                    ],
+                    onNavigate: _go,
+                    onMore: () => _scaffoldKey.currentState?.openDrawer(),
+                  )
+                : workstationRail ? null : AnimatedSlide(
               offset: keyboard ? const Offset(0, 1.4) : Offset.zero,
               duration: Motion.d(context, Motion.fast),
               curve: Motion.standard,
