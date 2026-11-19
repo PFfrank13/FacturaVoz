@@ -6,7 +6,9 @@ adb logcat -c || true
 set +e
 (
   cd app
-  flutter test integration_test/bodega_emulator_smoke_test.dart \
+  flutter drive \
+    --driver=test_driver/integration_test.dart \
+    --target=integration_test/bodega_emulator_smoke_test.dart \
     -d emulator-5554 \
     --no-dds \
     --dart-define=SUPABASE_URL=https://example.supabase.co \
@@ -17,7 +19,7 @@ status=$?
 set -e
 if [ "$status" -ne 0 ]; then
   echo 'ANDROID SMOKE FAILED: collecting crash and VM-service diagnostics'
-  adb shell pidof com.example.facturavoz || true
+  adb shell pidof dev.solvexsoftware.facturavoz || true
   adb shell dumpsys activity activities | tail -n 75 || true
   echo '--- Android crash buffer ---'
   adb logcat -d -b crash -v brief -t 800 | tail -n 220 || true
