@@ -2,22 +2,57 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+/// Paleta editorial con brillo controlado y color solo donde comunica una acción.
+/// No utiliza materiales propietarios de UIKit.
+abstract final class FvLuxe {
+  static const jade = Color(0xFF087F68);
+  static const jadeSoft = Color(0xFFE0F5E9);
+  static const blue = Color(0xFF2864A2);
+  static const blueSoft = Color(0xFFE6F1FF);
+  static const gold = Color(0xFFAD6A23);
+  static const goldSoft = Color(0xFFFFEFDA);
+  static const lilac = Color(0xFF7461A8);
+  static const lilacSoft = Color(0xFFF0EBFD);
+
+  static LinearGradient ambient(Brightness brightness) => LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: brightness == Brightness.dark
+      ? const [Color(0xFF101C2B), Color(0xFF13252D), Color(0xFF101925)]
+      : const [Color(0xFFE8F4FF), Color(0xFFF1F9FB), Color(0xFFF5F7FC)],
+    stops: const [0, .50, 1],
+  );
+
+  static LinearGradient editorial(Brightness brightness) => LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: brightness == Brightness.dark
+      ? const [Color(0xFF1A3441), Color(0xFF1C2D46)]
+      : const [Color(0xFFDCF5EA), Color(0xFFE7F1FF)],
+  );
+
+  static LinearGradient productBackdrop(Brightness brightness) => LinearGradient(
+    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+    colors: brightness == Brightness.dark
+      ? const [Color(0xFF243648), Color(0xFF192938)]
+      : const [Color(0xFFE7F4F3), Color(0xFFF4F8FE)],
+  );
+}
+
 /// Tokens visuales globales. No modifica facturación, licencias ni datos.
 abstract final class FvTokens {
-  static const Color canvas = Color(0xFFF5F5F7);
-  static const Color canvasDark = Color(0xFF0A0A0C);
+  static const Color canvas = Color(0xFFF2F7FC);
+  static const Color canvasDark = Color(0xFF0E1723);
   static const Color surface = Colors.white;
-  static const Color surfaceDark = Color(0xFF161618);
-  static const Color field = Color(0xFFF0F0F2);
-  static const Color fieldDark = Color(0xFF242427);
-  static const Color ink = Color(0xFF111114);
-  static const Color inkDark = Color(0xFFF5F5F7);
-  static const Color muted = Color(0xFF626268);
-  static const Color mutedDark = Color(0xFFACACB3);
-  static const Color emerald = Color(0xFF317B65);
-  static const Color emeraldDark = Color(0xFF85C4AC);
-  static const Color stroke = Color(0xFFE4E4E8);
-  static const Color strokeDark = Color(0xFF333337);
+  static const Color surfaceDark = Color(0xFF182432);
+  static const Color field = Color(0xFFEBF2F8);
+  static const Color fieldDark = Color(0xFF253345);
+  static const Color ink = Color(0xFF172337);
+  static const Color inkDark = Color(0xFFF5F8FC);
+  static const Color muted = Color(0xFF627184);
+  static const Color mutedDark = Color(0xFFBEC9D6);
+  static const Color emerald = Color(0xFF087F68);
+  static const Color emeraldDark = Color(0xFF91DEBF);
+  static const Color stroke = Color(0xFFDDE7F1);
+  static const Color strokeDark = Color(0xFF344659);
 
   static const double cardRadius = 22;
   static const double sheetRadius = 30;
@@ -67,8 +102,8 @@ abstract final class FvSurfaces {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: dark
-          ? const [Color(0xFF242427), Color(0xFF161618)]
-          : const [Color(0xFFFFFFFF), Color(0xFFFCFCFD)],
+          ? const [Color(0xFF202D3B), Color(0xFF182432)]
+          : const [Color(0xFFFFFFFF), Color(0xFFF8FBFF)],
       ) : null,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
@@ -110,17 +145,17 @@ class FvGlassSurface extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: dark
             ? [
-                const Color(0xFF38383E).withValues(alpha: highContrast ? 1 : .62),
-                const Color(0xFF18181C).withValues(alpha: highContrast ? 1 : .53),
+                const Color(0xFF30475C).withValues(alpha: highContrast ? 1 : .62),
+                const Color(0xFF1A2937).withValues(alpha: highContrast ? 1 : .46),
               ]
             : [
-                Colors.white.withValues(alpha: highContrast ? 1 : .74),
-                const Color(0xFFF5F5F8).withValues(alpha: highContrast ? 1 : .61),
+                Colors.white.withValues(alpha: highContrast ? 1 : .62),
+                const Color(0xFFEAF5FC).withValues(alpha: highContrast ? 1 : .40),
               ],
         ),
         borderRadius: rounded,
         border: Border.all(
-          color: dark ? const Color(0xFF5B5B62) : Colors.white,
+          color: dark ? const Color(0xFF7895A8) : Colors.white,
           width: 1,
         ),
         boxShadow: FvTokens.shadow(theme.brightness),

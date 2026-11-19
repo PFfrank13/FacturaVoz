@@ -13,13 +13,13 @@ double _contrast(Color foreground, Color background) {
 
 void main() {
   test('identidad comercial elimina el violeta del sistema compartido', () {
-    expect(DsColors.light.primary, FvTokens.ink);
-    expect(DsColors.dark.primary, FvTokens.inkDark);
+    expect(DsColors.light.primary, FvTokens.emerald);
+    expect(DsColors.dark.primary, FvTokens.emeraldDark);
     expect(DsColors.light.bg, FvTokens.canvas);
     expect(DsColors.dark.bg, FvTokens.canvasDark);
     expect(Brand.heroGradient.colors,
-        [const Color(0xFF18181B), const Color(0xFF54545B)]);
-    expect(Brand.coralGradient.colors.first, const Color(0xFF18181B));
+        [const Color(0xFF087F68), const Color(0xFF2864A2)]);
+    expect(Brand.coralGradient.colors.first, const Color(0xFF087F68));
   });
 
   test('acciones y textos esenciales cumplen contraste AA en ambos modos', () {

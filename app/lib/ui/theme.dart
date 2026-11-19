@@ -46,9 +46,9 @@ class DsColors {
     bg: FvTokens.canvasDark, surface: FvTokens.surfaceDark,
     elevated: FvTokens.fieldDark, line: FvTokens.strokeDark,
     ink: FvTokens.inkDark, muted: FvTokens.mutedDark,
-    primary: FvTokens.inkDark, onPrimary: FvTokens.ink,
-    primaryText: FvTokens.inkDark,
-    accent: Color(0xFFB8B8BE), ok: FvTokens.emeraldDark,
+    primary: FvTokens.emeraldDark, onPrimary: FvTokens.canvasDark,
+    primaryText: FvTokens.emeraldDark,
+    accent: Color(0xFF8BCAE2), ok: FvTokens.emeraldDark,
     warn: Color(0xFFFBBF24), bad: Color(0xFFF87171),
   );
 
@@ -56,9 +56,9 @@ class DsColors {
     bg: FvTokens.canvas, surface: FvTokens.surface,
     elevated: FvTokens.field, line: FvTokens.stroke,
     ink: FvTokens.ink, muted: FvTokens.muted,
-    primary: FvTokens.ink, onPrimary: FvTokens.surface,
-    primaryText: FvTokens.ink,
-    accent: Color(0xFF66666C), ok: FvTokens.emerald,
+    primary: FvTokens.emerald, onPrimary: FvTokens.surface,
+    primaryText: FvTokens.emerald,
+    accent: Color(0xFF2864A2), ok: FvTokens.emerald,
     warn: Color(0xFFB45309), bad: Color(0xFFB91C1C),
   );
 
@@ -68,8 +68,8 @@ class DsColors {
 class Brand {
   // Compatibilidad: las pantallas antiguas leen Brand; los colores derivan de la identidad Enterprise.
   // Los nuevos componentes usan DsColors.of(context) y roles semánticos para contraste.
-  static const indigo = FvTokens.ink;
-  static const indigoDeep = FvTokens.ink;
+  static const indigo = FvTokens.emerald;
+  static const indigoDeep = FvTokens.emerald;
   static const indigoSoft = FvTokens.mutedDark;
   static const lilac = Color(0xFF777780);
   static const gold = Color(0xFFB69E81);
@@ -95,19 +95,19 @@ class Brand {
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF18181B), Color(0xFF54545B)],
+    colors: [Color(0xFF087F68), Color(0xFF2864A2)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF18181B), Color(0xFF54545B)],
+    colors: [Color(0xFF087F68), Color(0xFF2864A2)],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
   /// Reducido a tonos de la paleta: menos colores en pantalla.
   static const fnPalette = <Color>[
-    Color(0xFF647A74), Color(0xFF687782), Color(0xFF667A70),
-    Color(0xFF9A866F), Color(0xFF917E83), Color(0xFF757D8B),
+    Color(0xFF087F68), Color(0xFF2864A2), Color(0xFF527BA5),
+    Color(0xFFAD6A23), Color(0xFF7461A8), Color(0xFF628A8C),
   ];
 
   /// Sombra apenas perceptible (§11: sin sombras duras). En oscuro no hay sombra: separa el borde.
@@ -198,7 +198,7 @@ ThemeData buildTheme(Brightness b) {
     visualDensity: VisualDensity.standard,
     dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
     appBarTheme: AppBarTheme(
-      backgroundColor: bg,
+      backgroundColor: bg.withValues(alpha: .94),
       foregroundColor: ink,
       elevation: 0,
       scrolledUnderElevation: 0,
