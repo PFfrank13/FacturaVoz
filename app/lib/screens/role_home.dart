@@ -153,7 +153,7 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
       case 'today_sales':
         if (_errors.contains('day')) return err();
         final d = _day;
-        return DsStat(label: b.label, value: d == null ? '…' : _money(d.salesTotal), detail: d == null ? null : '${d.salesCount} ventas', icon: Icons.trending_up_rounded, onTap: () => _open(b.route));
+        return DsStat(accent: Access.instance.rubro == 'bodega' ? const Color(0xFF527CC2) : null, label: b.label, value: d == null ? '…' : _money(d.salesTotal), detail: d == null ? null : '${d.salesCount} ventas', icon: Icons.trending_up_rounded, onTap: () => _open(b.route));
       case 'cash_status':
         if (_errors.contains('day')) return err();
         final d = _day;
@@ -161,6 +161,7 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
         // Arqueo ciego (cash_day.dart): antes del cierre NO se muestra el efectivo esperado, solo el estado.
         final opened = (d?.opening ?? 0) > 0;
         return DsStat(
+          accent: Access.instance.rubro == 'bodega' ? const Color(0xFFD08C48) : null,
           label: b.label,
           value: d == null ? '…' : closed ? 'Cerrada' : opened ? 'Abierta' : 'Sin abrir',
           detail: d == null ? null : closed ? 'Cierre de hoy registrado' : opened ? 'Cierra con arqueo al final del día' : 'Toca para abrir la caja',
@@ -174,6 +175,7 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
         final owing = c?.where((x) => x.balance > 0.004).toList();
         final total = owing?.fold<double>(0, (s, x) => s + x.balance);
         return DsStat(
+          accent: Access.instance.rubro == 'bodega' ? const Color(0xFFAC7494) : null,
           label: b.label,
           value: total == null ? '…' : _money(total),
           detail: owing == null ? null : owing.length == 1 ? '1 cliente' : '${owing.length} clientes',
@@ -184,6 +186,7 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
       case 'stock_low':
         if (_errors.contains('stock')) return err();
         return DsStat(
+          accent: Access.instance.rubro == 'bodega' ? const Color(0xFF338B72) : null,
           label: b.label,
           value: _low == null ? '…' : '$_low',
           detail: _low == null ? null : _low == 0 ? 'Todo en orden' : 'productos por reponer',
