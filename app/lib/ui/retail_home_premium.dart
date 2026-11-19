@@ -399,3 +399,122 @@ class RetailHomeStat extends StatelessWidget {
     );
   }
 }
+
+
+/// iOS-style bottom glass navigation for compact retail screens.
+/// The same MainShell still owns all navigation and permissions.
+class RetailPremiumBottomDock extends StatelessWidget {
+  const RetailPremiumBottomDock({
+    super.key,
+    required this.current,
+    required this.items,
+    required this.onNavigate,
+    required this.onMore,
+  });
+  final String current;
+  final List<(String, String, IconData)> items;
+  final ValueChanged<String> onNavigate;
+  final VoidCallback onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final dark = t.brightness == Brightness.dark;
+    final ink = t.colorScheme.onSurface;
+    final selectedTint = dark ? const Color(0xFFB9D8F7) : RetailAccent.blue;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
+        child: Container(
+          key: const ValueKey('bodega-premium-bottom-dock'),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: FvTokens.shadow(t.brightness),
+          ),
+          child: FvGlassSurface(
+            radius: 32, blur: 20,
+            padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+            child: SizedBox(
+              height: 62,
+              child: Row(children: [
+                for (final item in items)
+                  Expanded(
+                    child: _DockDestination(
+                      id: item.$1,
+                      label: item.$2,
+                      icon: item.$3,
+                      current: current,
+                      tint: selectedTint,
+                      ink: ink,
+                      onTap: () => onNavigate(item.$1),
+                    ),
+                  ),
+                Expanded(child: _DockDestination(
+                  id: 'more',
+                  label: 'Más',
+                  icon: Icons.more_horiz_rounded,
+                  current: current,
+                  tint: selectedTint,
+                  ink: ink,
+                  onTap: onMore,
+                )),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DockDestination extends StatelessWidget {
+  const _DockDestination({
+    required this.id, required this.label, required this.icon,
+    required this.current, required this.tint, required this.ink,
+    required this.onTap,
+  });
+  final String id, label, current;
+  final Color tint, ink;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = id == current;
+    final still = MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      child: InkWell(
+        key: ValueKey('bodega-dock-$id'),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(21),
+        child: AnimatedContainer(
+          duration: still ? Duration.zero : const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: selected ? tint.withValues(alpha: .13) : Colors.transparent,
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 22, color: selected ? tint : ink.withValues(alpha: .67)),
+            const SizedBox(height: 3),
+            Text(label,
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 10,
+                color: selected ? tint : ink.withValues(alpha: .78),
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
