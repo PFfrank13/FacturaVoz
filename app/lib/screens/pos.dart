@@ -25,6 +25,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/pos_product_card.dart';
+import '../ui/demo_pos_gallery.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_pos_workspace.dart';
 import 'client_profile.dart' show StorageImage;
@@ -1102,8 +1103,10 @@ class _PosScreenState extends State<PosScreen> {
                   Expanded(
                     child: LayoutBuilder(builder: (context, workspace) {
                       final showSideCart = desktopCart;
-                      final Widget catalog = all.isEmpty
-                        ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
+                      final Widget catalog = retail && all.isEmpty && _products != null
+                         ? const FvDemoPosGallery()
+                         : all.isEmpty
+                         ? ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 36), children: [
                             SectorPhotoBanner(
                               rubro: Access.instance.rubro,
                               title: _restaurant ? 'Tu carta, con personalidad' : 'Tu catálogo, con identidad',

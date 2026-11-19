@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'design_tokens.dart';
+import 'glass_widgets.dart';
 import 'motion.dart';
 
 /// Tarjeta POS sin lógica de negocio. La pantalla propietaria mantiene
@@ -51,7 +52,7 @@ class FvPosProductCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(FvTokens.cardRadius),
             border: Border.all(
               color: isSelected
-                  ? FvTokens.positive(t.brightness).withValues(alpha: 0.38)
+                  ? t.colorScheme.onSurface.withValues(alpha: 0.28)
                   : (dark ? FvTokens.strokeDark : Colors.transparent),
             ),
             boxShadow: FvTokens.shadow(t.brightness),
@@ -73,21 +74,8 @@ class FvPosProductCard extends StatelessWidget {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(14),
                             child: ColoredBox(
-                              color: dark ? FvTokens.fieldDark : const Color(0xFFF9FAFB),
-                              child: photo ?? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(icon, color: muted, size: 43),
-                                  if (category != null && category!.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 5, left: 5, right: 5),
-                                      child: Text(category!, maxLines: 1,
-                                        textAlign: TextAlign.center,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: t.textTheme.labelSmall?.copyWith(color: muted)),
-                                    ),
-                                ],
-                              ),
+                              color: dark ? FvTokens.fieldDark : const Color(0xFFF5F5F7),
+                              child: photo ?? FvProductPhotoFallback(name: name, category: category),
                             ),
                           ),
                         ),
@@ -113,12 +101,12 @@ class FvPosProductCard extends StatelessWidget {
                           Positioned(right: 6, top: 6,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
-                                color: FvTokens.positive(t.brightness),
+                                color: t.colorScheme.onSurface,
                                 borderRadius: BorderRadius.circular(99)),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 child: Text(quantity!, style: const TextStyle(
-                                  color: Colors.white, fontSize: 11,
+                                  color: t.colorScheme.surface, fontSize: 11,
                                   fontWeight: FontWeight.w700)),
                               ),
                             ),
@@ -148,8 +136,8 @@ class FvPosProductCard extends StatelessWidget {
                             onPressed: disabled ? null : onAdd,
                             icon: const Icon(Icons.add_rounded, size: 23),
                             style: IconButton.styleFrom(
-                              backgroundColor: FvTokens.ink,
-                              foregroundColor: Colors.white,
+                              backgroundColor: t.colorScheme.onSurface,
+                              foregroundColor: t.colorScheme.surface,
                               disabledBackgroundColor: t.disabledColor.withValues(alpha: 0.2),
                             ),
                           ),
