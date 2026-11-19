@@ -28,7 +28,13 @@ abstract final class RetailVisual {
     final t = Theme.of(context);
     return Container(
       width: double.infinity,
-      decoration: FvSurfaces.card(t),
+      decoration: BoxDecoration(
+        gradient: FvLuxe.editorial(t.brightness),
+        borderRadius: BorderRadius.circular(FvTokens.sheetRadius),
+        border: Border.all(color: t.brightness == Brightness.dark
+            ? const Color(0xFF476174) : Colors.white, width: 1.1),
+        boxShadow: FvTokens.shadow(t.brightness),
+      ),
       child: Padding(
         padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 14 : 20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -36,10 +42,14 @@ abstract final class RetailVisual {
             Container(
               width: 46, height: 46,
               decoration: BoxDecoration(
-                color: c.elevated,
+                color: t.brightness == Brightness.dark
+                    ? FvLuxe.jade.withValues(alpha: .25)
+                    : Colors.white.withValues(alpha: .72),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: .55)),
               ),
-              child: Icon(icon, color: c.ink, size: 24),
+              child: Icon(icon, color: t.brightness == Brightness.dark
+                  ? FvTokens.emeraldDark : FvLuxe.jade, size: 24),
             ),
             const SizedBox(width: Gap.md),
             Expanded(
@@ -62,8 +72,9 @@ abstract final class RetailVisual {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: c.elevated,
-                borderRadius: BorderRadius.circular(16),
+                color: t.colorScheme.surface.withValues(alpha: .74),
+                borderRadius: BorderRadius.circular(19),
+                border: Border.all(color: Colors.white.withValues(alpha: .55)),
               ),
               child: footer,
             ),

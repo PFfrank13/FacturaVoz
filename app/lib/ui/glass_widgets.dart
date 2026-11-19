@@ -12,10 +12,19 @@ class FvGlassTopBar extends StatelessWidget {
     final contrast = MediaQuery.highContrastOf(context);
     final pane = DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha:
-            contrast ? 1 : theme.brightness == Brightness.dark ? .67 : .70),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: contrast
+            ? [theme.colorScheme.surface, theme.colorScheme.surface]
+            : theme.brightness == Brightness.dark
+                ? const [Color(0xDE1D3343), Color(0xD21B293D)]
+                : const [Color(0xE8FFFFFF), Color(0xC4E6F4F5)],
+        ),
         border: Border(bottom: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: .65),
+          color: theme.brightness == Brightness.dark
+            ? const Color(0xFF3C596B).withValues(alpha: .65)
+            : Colors.white.withValues(alpha: .94),
           width: .5,
         )),
       ),
