@@ -83,7 +83,7 @@ class FvNetworkProductPhoto extends StatelessWidget {
   Widget build(BuildContext context) => Image.network(
     url, fit: BoxFit.cover, width: double.infinity, height: double.infinity,
     filterQuality: FilterQuality.medium,
-    semanticLabel: 'Fotografía ilustrativa de ' + name,
+    semanticLabel: 'Fotografía ilustrativa de $name',
     errorBuilder: (_, __, ___) =>
       FvProductPhotoFallback(name: name, category: category),
     loadingBuilder: (context, child, progress) => progress == null

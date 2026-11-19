@@ -105,9 +105,9 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
               final p = visible[index];
               final qty = _quantities[p.name] ?? 0;
               return FvPosProductCard(
-                key: ValueKey('demo-' + p.name),
+                key: ValueKey('demo-${p.name}'),
                 name: p.name,
-                price: 'S/ ' + p.price.toStringAsFixed(2),
+                price: 'S/ ${p.price.toStringAsFixed(2)}',
                 category: p.category, stockLabel: 'Muestra',
                 quantity: qty > 0 ? '$qty' : null,
                 icon: Icons.shopping_bag_outlined,
@@ -133,7 +133,7 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
                       ? '1 artículo de muestra'
                       : '$_count artículos de muestra',
                     style: t.textTheme.titleSmall)),
-                  Text('S/ ' + _total.toStringAsFixed(2),
+                  Text('S/ ${_total.toStringAsFixed(2)}',
                     style: t.textTheme.titleMedium?.copyWith(
                       fontFeatures: const [FontFeature.tabularFigures()])),
                 ]),

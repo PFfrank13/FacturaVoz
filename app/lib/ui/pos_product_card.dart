@@ -105,7 +105,7 @@ class FvPosProductCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(99)),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                child: Text(quantity!, style: const TextStyle(
+                                child: Text(quantity!, style: TextStyle(
                                   color: t.colorScheme.surface, fontSize: 11,
                                   fontWeight: FontWeight.w700)),
                               ),
