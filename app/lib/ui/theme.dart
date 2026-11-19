@@ -226,8 +226,6 @@ ThemeData buildTheme(Brightness b) {
     navigationDrawerTheme: NavigationDrawerThemeData(
       backgroundColor: Colors.transparent,
       indicatorColor: primary.withValues(alpha: .12),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.horizontal(right: Radius.circular(28))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

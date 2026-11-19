@@ -117,7 +117,6 @@ abstract final class RetailVisual {
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(16),
   }) {
-    final c = DsColors.of(context);
     return Container(
       width: double.infinity,
       padding: padding,
