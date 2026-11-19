@@ -78,6 +78,15 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      # Renders de widgets Flutter reales para revisar el diseño en el PR.
+      - name: Exportar vistas Flutter Luxe
+        run: flutter test tool/visual_preview.dart --update-goldens
+      - uses: actions/upload-artifact@v4
+        with:
+          name: facturavoz-luxe-flutter-previews
+          path: app/tool/previews/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Fase 5 - rechazar APK release sin firma privada en CI
         shell: bash
         run: |
