@@ -265,11 +265,32 @@ class DataRow2 extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        Expanded(child: Text(label, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant))),
-        Money(value, size: strong ? 20 : 14.5, weight: strong ? FontWeight.w700 : FontWeight.w500),
-      ]),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final compact = constraints.maxWidth < 300 || textScale >= 1.6;
+        final labelWidget = Text(label,
+          softWrap: true,
+          style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant));
+        final valueWidget = Money(value,
+          size: strong ? 20 : 14.5,
+          weight: strong ? FontWeight.w700 : FontWeight.w500);
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              labelWidget,
+              const SizedBox(height: 4),
+              Align(alignment: Alignment.centerLeft, child: valueWidget),
+            ],
+          );
+        }
+        return Row(children: [
+          Expanded(child: labelWidget),
+          const SizedBox(width: 12),
+          Flexible(child: Align(alignment: Alignment.centerRight, child: valueWidget)),
+        ]);
+      }),
     );
   }
 }
@@ -296,14 +317,21 @@ class _EmptyStateState extends State<EmptyState> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 56, 32, 32),
-      child: Column(children: [
-        AnimatedBuilder(
-          animation: _c,
-          builder: (context, child) => Transform.translate(offset: Offset(0, -8 * Curves.easeInOut.transform(_c.value)), child: child),
-          child: const BrandMark(size: 60),
-        ),
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (reduceMotion)
+          const BrandMark(size: 60)
+        else
+          AnimatedBuilder(
+            animation: _c,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(0, -8 * Curves.easeInOut.transform(_c.value)),
+              child: child,
+            ),
+            child: const BrandMark(size: 60),
+          ),
         const SizedBox(height: 20),
         Reveal(index: 1, dy: 12, child: Text(widget.title, textAlign: TextAlign.center, style: t.textTheme.titleLarge)),
         const SizedBox(height: 8),
