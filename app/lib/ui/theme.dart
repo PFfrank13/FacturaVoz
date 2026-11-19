@@ -48,7 +48,7 @@ class DsColors {
     ink: FvTokens.inkDark, muted: FvTokens.mutedDark,
     primary: FvTokens.inkDark, onPrimary: FvTokens.ink,
     primaryText: FvTokens.inkDark,
-    accent: Color(0xFF60A5FA), ok: FvTokens.emeraldDark,
+    accent: Color(0xFFB8B8BE), ok: FvTokens.emeraldDark,
     warn: Color(0xFFFBBF24), bad: Color(0xFFF87171),
   );
 
@@ -58,7 +58,7 @@ class DsColors {
     ink: FvTokens.ink, muted: FvTokens.muted,
     primary: FvTokens.ink, onPrimary: FvTokens.surface,
     primaryText: FvTokens.ink,
-    accent: Color(0xFF2563EB), ok: FvTokens.emerald,
+    accent: Color(0xFF66666C), ok: FvTokens.emerald,
     warn: Color(0xFFB45309), bad: Color(0xFFB91C1C),
   );
 
@@ -71,9 +71,9 @@ class Brand {
   static const indigo = FvTokens.ink;
   static const indigoDeep = FvTokens.ink;
   static const indigoSoft = FvTokens.mutedDark;
-  static const lilac = Color(0xFF3185A0);
-  static const gold = Color(0xFFF0AC4A);
-  static const goldDeep = Color(0xFFAD6416);
+  static const lilac = Color(0xFF777780);
+  static const gold = Color(0xFFB69E81);
+  static const goldDeep = Color(0xFF8B7964);
   static const onGold = Color(0xFF182B33);
 
   static const ok = FvTokens.emerald;
@@ -95,19 +95,19 @@ class Brand {
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF111827), Color(0xFF374151)],
+    colors: [Color(0xFF18181B), Color(0xFF54545B)],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF111827), Color(0xFF374151)],
+    colors: [Color(0xFF18181B), Color(0xFF54545B)],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
   /// Reducido a tonos de la paleta: menos colores en pantalla.
   static const fnPalette = <Color>[
-    Color(0xFF087E74), Color(0xFF2C83A1), Color(0xFF167550),
-    Color(0xFFB66D20), Color(0xFFAA5364), Color(0xFF526B84),
+    Color(0xFF647A74), Color(0xFF687782), Color(0xFF667A70),
+    Color(0xFF9A866F), Color(0xFF917E83), Color(0xFF757D8B),
   ];
 
   /// Sombra apenas perceptible (§11: sin sombras duras). En oscuro no hay sombra: separa el borde.

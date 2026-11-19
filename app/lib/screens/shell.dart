@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,6 +14,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/retail_layout.dart';
 import '../ui/design_tokens.dart';
+import '../ui/glass_widgets.dart';
 import 'assistant.dart';
 import 'catalog.dart';
 import 'clients_hub.dart';
@@ -568,17 +567,7 @@ class _MainShellState extends State<MainShell> {
             appBar: isBodega ? AppBar(
               automaticallyImplyLeading: !pinnedSidebar,
               backgroundColor: Colors.transparent,
-              flexibleSpace: MediaQuery.highContrastOf(context)
-                  ? ColoredBox(color: Theme.of(context).colorScheme.surface)
-                  : ClipRect(
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                        child: ColoredBox(
-                          color: Theme.of(context).colorScheme.surface
-                              .withValues(alpha: .76),
-                        ),
-                      ),
-                    ),
+              flexibleSpace: const FvGlassTopBar(),
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
@@ -758,9 +747,7 @@ class _Dock extends StatelessWidget {
       child: SizedBox(
         height: 84,
         child: Stack(clipBehavior: Clip.none, alignment: Alignment.bottomCenter, children: [
-          FvGlassSurface(
-            radius: Radii.xl,
-            blur: 16,
+          FvFloatingGlassDock(
             child: SizedBox(
               height: 68,
               // Dos mitades iguales mantienen el hueco del micrófono central.

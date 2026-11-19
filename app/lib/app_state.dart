@@ -30,7 +30,7 @@ class AppState extends ChangeNotifier {
   void bump() => dataVersion.value++;
 
   /// Apariencia elegida (se recuerda en la cuenta). Escucha este notifier para cambiar el tema al instante.
-  final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
+  final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.light);
 
   /// Modo Fácil (E): letras más grandes y menos cosas en pantalla. Preferencia de la persona (se recuerda en su cuenta).
   final ValueNotifier<bool> easyMode = ValueNotifier(false);
@@ -45,7 +45,7 @@ class AppState extends ChangeNotifier {
   static ThemeMode _parseTheme(Object? v) => switch (v) {
         'light' => ThemeMode.light,
         'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
+        _ => ThemeMode.light,
       };
 
   Future<void> setTheme(ThemeMode m) async {
@@ -173,7 +173,7 @@ class AppState extends ChangeNotifier {
     Repo.activeOrgId = null;
     V2Repo.forgetSettings();
     Access.instance.clear();
-    themeMode.value = ThemeMode.system;
+    themeMode.value = ThemeMode.light;
     easyMode.value = false;
     error = null;
     loading = false;

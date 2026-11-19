@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:facturavoz/ui/theme.dart';
+import 'package:facturavoz/ui/design_tokens.dart';
 
 double _contrast(Color foreground, Color background) {
   final a = foreground.computeLuminance();
@@ -12,13 +13,13 @@ double _contrast(Color foreground, Color background) {
 
 void main() {
   test('identidad comercial elimina el violeta del sistema compartido', () {
-    expect(DsColors.light.primary, const Color(0xFF101C2B));
-    expect(DsColors.dark.primary, const Color(0xFFF7FAFF));
-    expect(DsColors.light.bg, const Color(0xFFF2F5F8));
-    expect(DsColors.dark.bg, const Color(0xFF070B12));
+    expect(DsColors.light.primary, FvTokens.ink);
+    expect(DsColors.dark.primary, FvTokens.inkDark);
+    expect(DsColors.light.bg, FvTokens.canvas);
+    expect(DsColors.dark.bg, FvTokens.canvasDark);
     expect(Brand.heroGradient.colors,
-        [const Color(0xFF111827), const Color(0xFF374151)]);
-    expect(Brand.coralGradient.colors.first, const Color(0xFF111827));
+        [const Color(0xFF18181B), const Color(0xFF54545B)]);
+    expect(Brand.coralGradient.colors.first, const Color(0xFF18181B));
   });
 
   test('acciones y textos esenciales cumplen contraste AA en ambos modos', () {
