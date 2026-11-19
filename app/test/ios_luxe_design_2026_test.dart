@@ -1,5 +1,4 @@
 import 'package:facturavoz/ui/design_tokens.dart';
-import 'package:facturavoz/ui/glass_widgets.dart';
 import 'package:facturavoz/ui/pos_product_card.dart';
 import 'package:facturavoz/ui/retail_home_premium.dart';
 import 'package:facturavoz/ui/theme.dart';
