@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'design_tokens.dart';
-import 'motion.dart';
 
 /// Editorial palette: neutral foundations with restrained functional color.
 /// These tones identify actions, never replace their text labels.
