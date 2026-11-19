@@ -93,13 +93,17 @@ Widget _pos() => Column(children: [
             hintText: 'Buscar producto o escanear código',
           )),
         const SizedBox(height: 14),
-        const Row(children: [
-          Chip(label: Text('Todos')),
-          SizedBox(width: 8),
-          Chip(label: Text('Bebidas')),
-          SizedBox(width: 8),
-          Chip(label: Text('Abarrotes')),
-        ]),
+        const SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: BouncingScrollPhysics(),
+          child: Row(children: [
+            Chip(label: Text('Todos')),
+            SizedBox(width: 8),
+            Chip(label: Text('Bebidas')),
+            SizedBox(width: 8),
+            Chip(label: Text('Abarrotes')),
+          ]),
+        ),
         const SizedBox(height: 12),
         GridView.count(
           shrinkWrap:true, physics:const NeverScrollableScrollPhysics(),
