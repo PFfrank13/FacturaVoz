@@ -40,7 +40,7 @@ void main() {
                 icon: Icons.point_of_sale_outlined,
                 tint: RetailAccent.amber)),
           ]),
-        ))),
+        )),
       ));
       expect(find.byKey(const ValueKey('bodega-enterprise-overview')),
           findsOneWidget);
