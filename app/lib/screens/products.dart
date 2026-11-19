@@ -98,8 +98,10 @@ class _ProductPickerState extends State<_ProductPicker> {
 
 /// Catálogo de la empresa activa: crear, editar, archivar y borrar.
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key, this.loadProducts});
+  const ProductsScreen({super.key, this.loadProducts, this.stockOnly = false});
   final Future<List<Product>> Function()? loadProducts;
+  /// Reutiliza el catálogo real con filtro de inventario; no duplica datos.
+  final bool stockOnly;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -524,9 +526,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final t = Theme.of(context);
     final all = _all;
     final q = _q.trim().toLowerCase();
-    final list = (all ?? const <Product>[]).where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).toList();
+    final list = (all ?? const <Product>[]).where((p) =>
+      (!widget.stockOnly || p.tracksStock) &&
+      (q.isEmpty || p.name.toLowerCase().contains(q))).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Productos y servicios')),
+      appBar: AppBar(title: Text(widget.stockOnly ? 'Inventario' : 'Productos y servicios')),
       floatingActionButton: Access.instance.can('products_edit') ? FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Nuevo')) : null,
       body: RefreshIndicator(
         onRefresh: _load,
@@ -535,7 +539,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
-            SectorPhotoBanner(rubro: Access.instance.rubro,
+            SectorPhotoBanner(rubro: 'bodega',
               title: 'Tu catálogo, con identidad', subtitle: 'Organiza productos, servicios, precios y fotos reales.', height: 136),
             const SizedBox(height: 16),
             TextField(

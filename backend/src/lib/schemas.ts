@@ -8,6 +8,7 @@ export const itemSchema = z.object({
 
 export const invoiceInputSchema = z.object({
   client_name: z.string().trim().min(1).max(120),
+  client_tax_id: z.string().trim().max(30).optional(),
   tax_rate: z.number().min(0).max(100),
   notes: z.string().max(500).optional(),
   transcript: z.string().max(5000).optional(),

@@ -1,0 +1,6 @@
+interface:
+  display_name: "FacturaVoz · database"
+  short_description: "Guía específica de database para FacturaVoz"
+  default_prompt: "Usa $facturavoz-database para resolver la tarea en el proyecto existente."
+policy:
+  allow_implicit_invocation: true

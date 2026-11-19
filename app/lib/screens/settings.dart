@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
 import '../app_state.dart';
+import '../ux/commerce_navigation.dart';
 import '../config.dart';
 import '../services/repo.dart';
 import '../ui/theme.dart';
@@ -184,7 +185,7 @@ class SettingsScreen extends StatelessWidget {
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
                     Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Inter', color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
                     const SizedBox(height: 8),
-                    Text(sectorShortName(a.rubro), maxLines: 1, overflow: TextOverflow.ellipsis,
+                    Text(commerceExperience(commerceViewPlan(a.license.plan)), maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Color(0xFFD9DEFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
                   ]),
                 ),
@@ -201,7 +202,7 @@ class SettingsScreen extends StatelessWidget {
             child: SoftCard(
               padding: EdgeInsets.zero,
               child: Column(children: _joined(context, [
-                _tile(context,
+                if (!basicLocalPreview) _tile(context,
                     icon: Icons.apartment_rounded,
                     title: 'Empresas',
                     subtitle: org?.name ?? 'Cambia de empresa o crea otra',
@@ -217,19 +218,19 @@ class SettingsScreen extends StatelessWidget {
                       title: 'Cobros y recordatorios',
                       subtitle: 'Yape, Plin, banco, tarjeta y cobranza automática',
                       onTap: () => pushPremium(context, const PaySettingsScreen())),
-                if (a.can('settings') && a.has('tienda'))
+                if (!basicLocalPreview && a.license.plan.toUpperCase() != 'BASICO' && a.can('settings') && a.has('tienda'))
                   _tile(context,
                       icon: Icons.storefront_rounded,
                       title: 'Tienda en línea',
                       subtitle: 'Tu catálogo como página web: recibe pedidos por WhatsApp',
                       onTap: () => pushPremium(context, const StoreScreen())),
-                if (a.can('finance') && a.has('recurrentes'))
+                if (!basicLocalPreview && a.license.plan.toUpperCase() != 'BASICO' && a.can('finance') && a.has('recurrentes'))
                   _tile(context,
                       icon: Icons.event_repeat_rounded,
                       title: 'Facturación recurrente',
                       subtitle: 'Alquileres y mensualidades que se facturan solos',
                       onTap: () => pushPremium(context, const RecurringScreen())),
-                if (a.can('finance'))
+                if (!basicLocalPreview && a.license.plan.toUpperCase() != 'BASICO' && a.can('finance'))
                   _tile(context,
                       icon: Icons.groups_rounded,
                       title: 'Clientes 360',

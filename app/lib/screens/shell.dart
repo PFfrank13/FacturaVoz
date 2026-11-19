@@ -11,6 +11,7 @@ import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/feature_access.dart';
+import '../ux/commerce_navigation.dart';
 import '../ui/theme.dart';
 import 'assistant.dart';
 import 'catalog.dart';
@@ -24,7 +25,7 @@ import 'pos.dart';
 import 'settings.dart';
 
 /// Navegación comercial: Inicio · Vender · [mic] · Fiados · Caja.
-/// Conserva el dock de cristal y filtra destinos según Hub y rol.
+/// Conserva el dock de cristal; B1 muestra accesos locales solo en debug.
 /// Toque en el micrófono = vender por voz. Mantener presionado = Copiloto de IA.
 /// Las pestañas que el rol o el plan no permiten no se muestran (la base de datos igual lo impide).
 class MainShell extends StatefulWidget {
@@ -46,21 +47,6 @@ const _dHome = _Dest('home', Icons.space_dashboard_rounded, 'Inicio', 'Inicio');
 const _dSell = _Dest('sell', Icons.point_of_sale_rounded, 'Vender', 'Vender');
 const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
 const _dCash = _Dest('cash', Icons.lock_clock_rounded, 'Caja', 'Caja');
-
-/// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
-bool _destAllowed(String id, Access a) => switch (id) {
-      'sell' => a.can('sell') && a.has('facturar'),
-      'quotes' => a.can('sell') && a.has('cotizaciones'),
-      'collect' => a.can('collect') && a.has('cobros'),
-      'fiados' => a.can('collect') && a.has('fiados'),
-      'cash' => a.can('collect') && a.has('caja'),
-      'business' => a.can('finance') && a.has('reportes'),
-      'jobs' => a.can('jobs') && a.has('trabajos'),
-      'agenda' => a.can('jobs') && a.has('agenda'),
-      'clients' => a.can('clients') && a.has('clientes'),
-      'tables' => a.has('carta_qr'),
-      _ => true,
-    };
 
 class _MainShellState extends State<MainShell> {
   String _tab = ''; // se resuelve al construir: la app abre donde se vende
@@ -128,26 +114,54 @@ class _MainShellState extends State<MainShell> {
       case 'search':
         openUniversalSearch(context);
       case 'copilot':
-        openCopilot(context);
+        if (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' &&
+            Access.instance.has('copiloto')) openCopilot(context);
       case 'fiados':
         final f = featureById('fiados');
-        if (f != null && f.allowed) openFeature(context, f);
+        if (f != null && commerceEntryVisible(
+          id: f.id, hubPlan: Access.instance.license.plan,
+          roleOk: f.roleOk, planOk: f.planOk,
+        )) openBasicCommerceFeature(context, f);
     }
   }
 
-  List<_Dest> _dests() => [
-    for (final d in const [_dHome, _dSell, _dFiados, _dCash])
-      if (_destAllowed(d.id, Access.instance)) d,
-  ];
+  List<_Dest> _dests() {
+    final a = Access.instance;
+    return [
+      _dHome,
+      if (a.can('sell') && (a.has('facturar') || basicLocalPreview)) _dSell,
+      if (a.can('collect') && (a.has('fiados') || basicLocalPreview)) _dFiados,
+      if (a.can('collect') && (a.has('caja') || basicLocalPreview)) _dCash,
+    ];
+  }
 
   String _landing(List<_Dest> d) => 'home';
 
   void _go(String id) {
     if (id == _tab) return;
+    // Se ven las pestañas del plan propuesto en debug, pero el backend
+    // sigue siendo la autoridad: si no hay licencia, NO se crea la pantalla.
+    if (basicLocalPreview) {
+      final required = switch (id) {
+        'sell' => 'facturar',
+        'fiados' => 'fiados',
+        'cash' => 'caja',
+        _ => '',
+      };
+      if (required.isNotEmpty && !Access.instance.has(required)) {
+        showBasicPreviewRestriction(context, switch (id) {
+          'sell' => 'Vender', 'fiados' => 'Fiados', _ => 'Caja',
+        });
+        return;
+      }
+    }
     if (!_dests().any((d) => d.id == id)) {
       // Ese destino no está en la barra de este rubro: se abre como pantalla.
       final f = featureById(const {'sell': 'pos', 'collect': 'cobranza', 'business': 'negocio', 'clients': 'clientes', 'jobs': 'trabajos', 'agenda': 'agenda'}[id] ?? id);
-      if (f != null && f.allowed) openFeature(context, f);
+      if (f != null && commerceEntryVisible(
+          id: f.id, hubPlan: Access.instance.license.plan,
+          roleOk: f.roleOk, planOk: f.planOk,
+        )) openBasicCommerceFeature(context, f);
       return;
     }
     Haptics.select();
@@ -158,8 +172,13 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _newInvoice() async {
-    if (!Access.instance.has('facturar') || !Access.instance.has('voz')) return;
     if (!Access.instance.can('sell')) return;
+    if (!Access.instance.has('facturar') || !Access.instance.has('voz')) {
+      if (basicLocalPreview) {
+        await showBasicPreviewRestriction(context, 'Facturación por voz');
+      }
+      return;
+    }
     final id = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => FeatureAccessGate(roleAllowed: () => Access.instance.can('sell'), planAllowed: () => Access.instance.has('facturar') && Access.instance.has('voz'), builder: (_) => const NewInvoiceScreen())));
     AppState.instance.bump();
     if (id != null && mounted && Access.instance.has('facturar') && Access.instance.can('sell')) {
@@ -192,7 +211,8 @@ class _MainShellState extends State<MainShell> {
             if (!didPop) _go(first); // "atrás" vuelve a la primera pestaña antes de salir
           },
           child: Scaffold(
-            extendBody: true,
+            // La barra inferior ocupa espacio real; no debe cubrir los accesos.
+            extendBody: false,
             body: Column(children: [
               const LicenseBanner(),
               Expanded(
@@ -217,7 +237,10 @@ class _MainShellState extends State<MainShell> {
                 current: _tab,
                 onTap: _go,
                 onMic: _newInvoice,
-                onMicLong: () => openCopilot(context),
+                onMicLong: () {
+                  if (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' &&
+            Access.instance.has('copiloto')) openCopilot(context);
+                },
               ),
             ),
           ),
@@ -320,21 +343,26 @@ class _Dock extends StatelessWidget {
                 // Dos mitades iguales: el hueco del micrófono queda SIEMPRE al centro, aunque haya 3 a un lado y 2 al otro.
                 child: Row(children: [
                   Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
-                  if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
+                  if (Access.instance.can('sell') &&
+                      (basicLocalPreview || (Access.instance.has('voz') && Access.instance.has('facturar')))) const SizedBox(width: 72),
                   Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
                 ]),
               ),
             ),
           ),
-          if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) Positioned(
+          if (Access.instance.can('sell') &&
+                      (basicLocalPreview || (Access.instance.has('voz') && Access.instance.has('facturar')))) Positioned(
             top: 0,
             child: Semantics(
               button: true,
-              label: 'Vender por voz. Mantén presionado para el copiloto.',
+              label: (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' &&
+                  Access.instance.has('copiloto'))
+                  ? 'Vender por voz. Mantén presionado para el copiloto.'
+                  : 'Vender por voz.',
               child: GestureDetector(
                 onLongPress: () {
                   Haptics.heavy();
-                  if (Access.instance.has('copiloto')) onMicLong();
+                  if (!basicLocalPreview && Access.instance.has('copiloto')) onMicLong();
                 },
                 child: DictateMini(onPressed: onMic),
               ),

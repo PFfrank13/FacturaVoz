@@ -180,7 +180,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
       if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(today, tomorrow, cur), 'inicio.today', (v) => _today = v),
       if (seeMoney) piece<Map<String, dynamic>?>(V2Repo.salesSummary(first, next, cur), 'inicio.month', (v) => _month = v),
       if (seeMoney) piece<double?>(GrowthRepo.monthlyGoal(), 'inicio.goal', (v) => _goal = v),
-      if (Access.instance.has('copiloto')) piece<List<DailyAlert>>(V2Repo.dailyAlerts(), 'inicio.alerts', (v) => _alerts = v),
+      if (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' && Access.instance.has('copiloto')) piece<List<DailyAlert>>(V2Repo.dailyAlerts(), 'inicio.alerts', (v) => _alerts = v),
       if (_canReadInvoices) () async {
         try {
           final inv = await Repo.listInvoices(limit: _limit);
@@ -261,7 +261,13 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final monthCount = ((_month?['sales_count'] as num?) ?? 0).toInt();
     final drafts = ((_month?['drafts_count'] as num?) ?? 0).toInt();
     final draftsTotal = ((_month?['drafts_total'] as num?) ?? 0).toDouble();
-    final shortcuts = [for (final id in commerceHomeOrder(a.license.plan)) if (!(a.can('sell') && a.has('facturar') && id == 'pos')) if (featureById(id) case final f? when f.allowed) f];
+    // La portada Básico prioriza operaciones reales, sin mostrar premium.
+    // Cada destino mantiene las comprobaciones de licencia y rol existentes.
+    final shortcuts = [
+      for (final id in const ['pos', 'caja', 'productos', 'inventario', 'fiados'])
+        if (featureById(id) case final f?
+            when commerceEntryVisible(id: f.id, hubPlan: a.license.plan, roleOk: f.roleOk, planOk: f.planOk)) f,
+    ];
     final list = _canReadInvoices ? _visible() : <InvoiceRecord>[];
     final buyers = _canReadInvoices && a.can('clients') ? _todayBuyers() : <InvoiceRecord>[];
     return Scaffold(
@@ -292,11 +298,56 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               onMenu: () => pushPremium(context, const MenuScreen()),
             ),
           ),
+          if (basicLocalPreview)
+            const SliverToBoxAdapter(child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text('BÁSICO · VISTA LOCAL DE NAVEGACIÓN',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                  color: Color(0xFFE6B656), letterSpacing: 0.6)),
+            )),
+          // En mostrador la venta debe estar arriba: accesos antes de banners.
+          // Acciones adaptables: sin desbordamiento horizontal ni botones
+          // fantasma; todos abren destinos del catálogo existente.
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: LayoutBuilder(builder: (context, constraints) {
+                final actions = <Widget>[
+                  for (final f in shortcuts)
+                    _InicioBodegaAction(
+                      label: f.id == 'pos' ? 'Nueva venta'
+                          : f.id == 'productos' ? 'Productos'
+                          : f.id == 'caja' ? 'Caja'
+                          : f.id == 'fiados' ? 'Fiados'
+                          : f.title,
+                      icon: f.icon,
+                      color: featureColor(f.id),
+                      primary: f.id == 'pos',
+                      onTap: () async {
+                        await openBasicCommerceFeature(context, f);
+                        if (mounted) _load();
+                      },
+                    ),
+                  _InicioBodegaAction(
+                    label: 'Ver todas', icon: Icons.grid_view_rounded,
+                    color: Brand.indigo, onTap: () => pushPremium(context, const MenuScreen()),
+                  ),
+                ];
+                final scale = MediaQuery.textScalerOf(context).scale(1);
+                final columns = constraints.maxWidth >= 290 && scale <= 1.5 ? 2 : 1;
+                const gap = 12.0;
+                final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+                return Wrap(spacing: gap, runSpacing: gap, children: [
+                  for (final action in actions) SizedBox(width: width, child: action),
+                ]);
+              }),
+            ),
+          ),
           SliverToBoxAdapter(child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: ActionChip(
               avatar: const Icon(Icons.workspace_premium_rounded, size: 18),
-              label: Text(commerceExperience(a.license.plan)),
+              label: Text(commerceExperience(commerceViewPlan(a.license.plan))),
               onPressed: () => pushPremium(context, const PlanScreen()),
             ),
           )),
@@ -309,33 +360,6 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   subtitle: guide.homeSubtitle,
                 )),
             ),
-          if (a.can('sell') || shortcuts.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Reveal(
-                index: 1,
-                child: SizedBox(
-                  height: MediaQuery.textScalerOf(context).scale(104),
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
-                    children: [
-                      if (a.can('sell') && a.has('facturar'))
-                        QuickAction(icon: Icons.add_shopping_cart_rounded, label: 'Nueva venta', colors: Brand.coralGradient.colors, onTap: () => openFeature(context, featureById('pos')!).then((_) {
-                              if (mounted) _load();
-                            })),
-                      for (final f in shortcuts.take(6))
-                        QuickAction(
-                          icon: f.icon,
-                          label: shortActionLabel(f.id, f.title),
-                          colors: [featureColor(f.id).withValues(alpha: 0.8), featureColor(f.id)],
-                          onTap: () => openFeature(context, f),
-                        ),
-                      QuickAction(icon: Icons.menu_rounded, label: 'Ver todas', colors: const [Brand.lightInk, Brand.indigoDeep], onTap: () => pushPremium(context, const MenuScreen())),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           if (_showWork) SliverToBoxAdapter(child: WorkQueue(
             title: _appointmentHome ? 'Tus citas de hoy' : 'Trabajos por avanzar', jobs: _work,
             loading: _workLoading, error: _workError, onRetry: _load,
@@ -345,7 +369,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               if (mounted) _load();
             },
           )),
-          if (a.has('copiloto')) SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load, max: AppState.instance.easyMode.value ? 1 : 2)),
+          if (!basicLocalPreview && a.license.plan.toUpperCase() != 'BASICO' && a.has('copiloto')) SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load, max: AppState.instance.easyMode.value ? 1 : 2)),
           if (buyers.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -453,6 +477,50 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               ),
           ],
         ]),
+      ),
+    );
+  }
+}
+
+
+/// Atajo de mostrador: área táctil amplia, 2 columnas en móviles normales,
+/// texto accesible y sin deslizar horizontalmente para buscar funciones.
+class _InicioBodegaAction extends StatelessWidget {
+  const _InicioBodegaAction({required this.label, required this.icon,
+    required this.color, required this.onTap, this.primary = false});
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final fg = primary ? Colors.white : t.colorScheme.onSurface;
+    return Material(
+      color: primary ? Brand.indigo : t.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: primary ? Brand.indigo : t.colorScheme.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 92),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 25, color: primary ? Colors.white : color),
+              const SizedBox(height: 8),
+              Text(label, textAlign: TextAlign.center, maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: t.textTheme.labelLarge?.copyWith(
+                  color: fg, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ),
       ),
     );
   }

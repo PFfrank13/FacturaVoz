@@ -29,7 +29,7 @@ const run = safeAction
     // Creación atómica en la base de datos (cliente + número correlativo + cabecera + líneas)
     const { data, error } = await supabase.rpc("create_invoice", {
       p_client_name: parsedInput.client_name,
-      p_client_tax_id: null,
+      p_client_tax_id: parsedInput.client_tax_id || null,
       p_tax_rate: parsedInput.tax_rate,
       p_currency: c.organization.currency || "PEN",
       p_org_id: c.org,

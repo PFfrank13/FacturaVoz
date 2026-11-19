@@ -667,7 +667,7 @@ IconData sectorIcon(String? rubro) => switch (rubro) {
 };
 
 String sectorShortName(String? rubro) => switch (rubro) {
-  'bodega' => 'Bodega / Minimarket', 'restaurante' => 'Restaurante / Cafetería',
+  'bodega' => 'Bodega / Tienda', 'restaurante' => 'Restaurante / Cafetería',
   'servicios_tecnicos' => 'Servicios técnicos', 'taller' => 'Taller automotriz',
   'consultorio' => 'Consultorio / Salud', 'salon' => 'Salón / Barbería',
   'educacion' => 'Educación / Academia', 'construccion' => 'Construcción / Obras',

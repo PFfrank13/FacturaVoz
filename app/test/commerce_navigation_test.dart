@@ -101,24 +101,29 @@ void main() {
     expect(find.text('Tu licencia necesita validación. Revisa Mi plan.'), findsOneWidget);
   });
 
-  testWidgets('menu search discovers locked tools but not role-denied or sector tools', (tester) async {
-    fixture();
+  test('Básico: menú operativo sin vitrinas premium ni otros rubros', () {
+    expect(commerceMenuVisible('pos', 'BASICO'), isTrue);
+    expect(commerceMenuVisible('inventario', 'BASICO'), isTrue);
+    expect(commerceMenuVisible('fiados', 'BASICO'), isTrue);
+    expect(commerceMenuVisible('plan', 'BASICO'), isTrue);
+    expect(commerceMenuVisible('copiloto', 'BASICO'), isFalse);
+    expect(commerceMenuVisible('tienda', 'BASICO'), isFalse);
+    expect(commerceMenuVisible('agente', 'BASICO'), isFalse);
+    expect(commerceMenuVisible('carta', 'EMPRESA'), isFalse);
+    expect(commerceMenuVisible('tipo', 'PRO'), isFalse);
+  });
+
+  testWidgets('Básico: menú y búsqueda ocultan la tienda sin concesión', (tester) async {
+    fixture(grants: {'facturar': true, 'stock': true, 'fiados': true, 'caja': true});
     await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const MenuScreen()));
     await tester.enterText(find.byType(TextField), 'Tienda en línea');
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(ListTile, 'Tienda en línea'), findsOneWidget);
-    expect(find.text('No incluida en tu plan actual'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ListTile, 'Tienda en línea'));
-    await tester.pumpAndSettle();
-    expect(find.text('Actualiza tu plan'), findsOneWidget);
-    await tester.tap(find.text('Ahora no'));
-    await tester.pumpAndSettle();
-    fixture(role: 'cajero');
-    await tester.pumpAndSettle();
     expect(find.widgetWithText(ListTile, 'Tienda en línea'), findsNothing);
-    await tester.enterText(find.byType(TextField), 'Carta QR');
+    expect(find.text('No incluida en tu plan actual'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'Inventario');
     await tester.pumpAndSettle();
-    expect(find.text('Carta QR y comandas'), findsNothing);
+    expect(find.widgetWithText(ListTile, 'Inventario'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
 }

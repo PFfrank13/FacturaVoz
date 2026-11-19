@@ -1,0 +1,6 @@
+interface:
+  display_name: "FacturaVoz · quality"
+  short_description: "Guía específica de quality para FacturaVoz"
+  default_prompt: "Usa $facturavoz-quality para resolver la tarea en el proyecto existente."
+policy:
+  allow_implicit_invocation: true

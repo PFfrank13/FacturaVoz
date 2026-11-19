@@ -1,0 +1,6 @@
+interface:
+  display_name: "FacturaVoz · commerce"
+  short_description: "Guía específica de commerce para FacturaVoz"
+  default_prompt: "Usa $facturavoz-commerce para resolver la tarea en el proyecto existente."
+policy:
+  allow_implicit_invocation: true

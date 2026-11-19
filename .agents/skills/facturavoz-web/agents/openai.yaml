@@ -1,0 +1,6 @@
+interface:
+  display_name: "FacturaVoz · web"
+  short_description: "Guía específica de web para FacturaVoz"
+  default_prompt: "Usa $facturavoz-web para resolver la tarea en el proyecto existente."
+policy:
+  allow_implicit_invocation: true

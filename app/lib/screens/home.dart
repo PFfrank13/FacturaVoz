@@ -19,6 +19,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../access.dart';
+import '../ux/commerce_navigation.dart';
 import '../models_v2.dart';
 import '../services/v2_repo.dart';
 import 'assistant.dart';
@@ -370,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onGoal: () => _setGoal(m.total),
               ),
             ),
-            SliverToBoxAdapter(
+            if (!basicLocalPreview) SliverToBoxAdapter(
               child: Reveal(
                 index: 1,
                 child: SizedBox(
@@ -409,14 +410,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         colors: const [Color(0xFFB58BF5), Color(0xFF8E5CF2)],
                         onTap: () => _push(const RecurringScreen()),
                       ),
-                      QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
+                      if (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' && Access.instance.has('copiloto'))
+                        QuickAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', colors: const [Color(0xFF26254B), Color(0xFF5048C8)], onTap: () => openCopilot(context)),
                     ],
                   ),
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
-            if (_items != null && _items!.isNotEmpty)
+            if (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' && Access.instance.has('copiloto'))
+              SliverToBoxAdapter(child: CopilotCards(alerts: _alerts, onChanged: _load)),
+            if (!basicLocalPreview && _items != null && _items!.isNotEmpty)
               SliverToBoxAdapter(
                 child: _InsightsStrip(
                   insights: buildInsights(
@@ -672,7 +675,7 @@ class HomeHeader extends StatelessWidget {
               const SizedBox(height: Gap.md),
               // Fila 2: accesos grandes, mismo ancho, con el texto centrado.
               Row(children: [
-                if (Access.instance.has('copiloto')) Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
+                if (!basicLocalPreview && Access.instance.license.plan.toUpperCase() != 'BASICO' && Access.instance.has('copiloto')) Expanded(child: _HeaderAction(icon: Icons.auto_awesome_rounded, label: 'Copiloto', onTap: () => openCopilot(context))),
                 if (onMenu != null) ...[
                   const SizedBox(width: Gap.sm),
                   Expanded(child: _HeaderAction(icon: Icons.menu_rounded, label: 'Menú', onTap: onMenu!)),

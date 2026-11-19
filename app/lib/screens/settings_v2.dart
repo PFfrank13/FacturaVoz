@@ -18,7 +18,6 @@ import '../ui/widgets.dart';
 import 'branding.dart';
 import 'catalog.dart';
 import 'license_gate.dart';
-import 'menu.dart' show upgradeLabel;
 import 'owner_control.dart';
 import '../ux/commerce_navigation.dart';
 import 'team.dart';
@@ -183,7 +182,7 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
         _row(
             Icons.dashboard_customize_rounded,
             'Experiencia comercial',
-            commerceExperience(a.license.plan),
+            commerceExperience(commerceViewPlan(a.license.plan)),
             () => go(const PlanScreen())),
       _row(
         Icons.text_increase_rounded,
@@ -198,7 +197,7 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
           },
         ),
       ),
-      if (a.has('copiloto'))
+      if (!basicLocalPreview && a.license.plan.toUpperCase() != 'BASICO' && a.has('copiloto'))
         _row(
           Icons.record_voice_over_rounded,
           'Voz del Copiloto',
@@ -210,18 +209,17 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
           trailing: const SizedBox.shrink(),
         ),
       _row(Icons.support_agent_rounded, 'Ayuda por WhatsApp', 'Escríbenos: el mensaje ya lleva tu versión, rubro y plan', () => openSupport(context)),
-      _row(Icons.security_rounded, 'Seguridad', 'Alertas, bitácora, PIN, papelera y huella', () => showSecuritySheet(context)),
-      if (admin && s != null && rubroFor(s.businessType) != null)
+      _row(Icons.security_rounded, 'Seguridad', 'PIN, huella y opciones autorizadas', () => showSecuritySheet(context)),
+      if (!basicLocalPreview && a.license.plan.toUpperCase() != 'BASICO' && admin && s != null && rubroFor(s.businessType) != null)
         _row(Icons.science_rounded, 'Datos de práctica', 'Productos y clientes de ejemplo de tu rubro (se borran con un toque)', () => showPracticeSheet(context, rubroFor(s.businessType)!)),
-      if (admin) _row(Icons.tune_rounded, 'Funciones a la vista', 'Elige qué se ve primero (nada se borra)', () => go(const ModulesScreen())),
+      if (!basicLocalPreview && admin) _row(Icons.tune_rounded, 'Funciones a la vista', 'Elige qué se ve primero (nada se borra)', () => go(const ModulesScreen())),
       _row(Icons.animation_rounded, 'Animaciones', rm == null ? 'Automático' : (rm ? 'Reducidas' : 'Completas'), _animations),
       if (a.can('team')) _row(Icons.groups_rounded, 'Equipo y permisos', 'Invita y elige qué ve cada uno', () => go(const TeamScreen())),
       _row(Icons.workspace_premium_rounded, 'Mi plan', a.license.dev
               ? 'Modo desarrollo (sin cobros)'
               : [
                   'Plan ${planName(a.license.plan)}',
-                  if (planPriceText(a.license.plan).isNotEmpty) planPriceText(a.license.plan),
-                  commerceExperience(a.license.plan),
+                  commerceExperience(commerceViewPlan(a.license.plan)),
                 ].join(' · '), () => go(const PlanScreen())),
       if (admin) _row(Icons.palette_rounded, 'Logo y comprobantes', 'Logo, diseño del PDF y ancho del ticket', () => go(const BrandingScreen())),
       _row(Icons.print_rounded, 'Impresora de tickets', 'Bluetooth o red · 58 u 80 mm', () => go(const PrinterSettingsScreen())),
@@ -498,7 +496,10 @@ class _JobFlowScreenState extends State<JobFlowScreen> {
 
 /// Ajustes → Seguridad (E): alertas del dueño, bitácora, PIN, papelera y bloqueo con huella en un solo lugar.
 void showSecuritySheet(BuildContext context) {
-  final items = [for (final id in const ['alertas', 'bitacora', 'pin', 'papelera', 'seguridad']) if (featureById(id) case final f? when f.roleOk) f];
+  final items = [for (final id in const ['alertas', 'bitacora', 'pin', 'papelera', 'seguridad'])
+    if (featureById(id) case final f? when
+      commerceEntryVisible(id: f.id, hubPlan: Access.instance.license.plan,
+        roleOk: f.roleOk, planOk: f.planOk)) f];
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -506,12 +507,12 @@ void showSecuritySheet(BuildContext context) {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         for (final f in items)
           ListTile(
-            leading: Icon(f.planOk ? f.icon : Icons.lock_rounded),
+            leading: Icon(f.icon),
             title: Text(f.title),
-            subtitle: Text(f.planOk ? f.subtitle : upgradeLabel(f)),
+            subtitle: Text(f.subtitle),
             onTap: () {
               Navigator.pop(c);
-              openFeature(context, f);
+              openBasicCommerceFeature(context, f);
             },
           ),
       ]),

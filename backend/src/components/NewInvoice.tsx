@@ -70,6 +70,11 @@ export default function NewInvoice({ org, currency, voiceAllowed, defaultTaxRate
           value={inv.client_name}
           onChange={(e) => set({ client_name: e.target.value })}
         />
+        <label className="block text-sm">Documento del cliente (opcional en este borrador)
+          <input className="w-full rounded border p-2" maxLength={30}
+            value={inv.client_tax_id ?? ""} disabled={saving}
+            onChange={e => set({ client_tax_id: e.target.value })} />
+        </label>
         {inv.items.map((it, k) => (
           <div key={k} className="grid grid-cols-6 gap-2">
             <input

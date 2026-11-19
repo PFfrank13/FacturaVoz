@@ -1,5 +1,5 @@
-// Menú de las nueve experiencias. Muestra primero lo más útil, y deja TODAS las
-// herramientas accesibles en categorías desplegables y búsqueda, sin alterar permisos.
+// Menú comercial limpio: únicamente herramientas realmente autorizadas.
+// La comparación comercial se consulta voluntariamente desde Mi plan.
 import 'package:flutter/material.dart';
 
 import '../access.dart';
@@ -13,6 +13,10 @@ import '../ux/rubro_experience.dart';
 import 'catalog.dart';
 import 'license_gate.dart' show PlanScreen;
 
+// Conservado por compatibilidad con Ajustes y pruebas antiguas.
+// No se utiliza para anunciar funciones bloqueadas en el Menú Básico.
+String upgradeLabel(FeatureEntry f) => 'No incluida en tu plan actual';
+
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
 
@@ -20,8 +24,6 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-/// Plan mínimo para mostrar el candado sin inventar accesos.
-String upgradeLabel(FeatureEntry f) => 'No incluida en tu plan actual';
 
 class _MenuScreenState extends State<MenuScreen> {
   String _q = '';
@@ -40,21 +42,19 @@ class _MenuScreenState extends State<MenuScreen> {
     super.dispose();
   }
 
-  void _open(FeatureEntry f) => openFeature(context, f);
+  void _open(FeatureEntry f) => openBasicCommerceFeature(context, f);
 
   Widget _tile(FeatureEntry f) {
-    final t = Theme.of(context);
-    final locked = !f.planOk;
     final c = featureColor(f.id);
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
-        decoration: BoxDecoration(color: c.withValues(alpha: locked ? 0.06 : 0.12), borderRadius: BorderRadius.circular(13)),
-        child: Icon(locked ? Icons.lock_rounded : f.icon, color: locked ? t.colorScheme.outline : c, size: 21),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
+        child: Icon(f.icon, color: c, size: 21),
       ),
-      title: Text(f.title, style: locked ? TextStyle(color: t.colorScheme.onSurfaceVariant) : null),
-      subtitle: Text(locked ? upgradeLabel(f) : f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      title: Text(f.title),
+      subtitle: Text(f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded, size: 20),
       onTap: () => _open(f),
     );
@@ -86,7 +86,8 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final guide = experienceFor('bodega');
-    final all = featureCatalog().where((f) => f.roleOk).toList();
+    final all = featureCatalog().where((f) =>
+        commerceEntryVisible(id: f.id, hubPlan: Access.instance.license.plan, roleOk: f.roleOk, planOk: f.planOk)).toList();
     final byId = {for (final f in all) f.id: f};
     final areas = [
       for (final g in groupOrder) RubroArea(g, [for (final f in all) if (f.group == g) f.id]),
@@ -101,7 +102,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final priorities = <FeatureEntry>[];
     for (final id in const ['pos', 'productos', 'caja']) {
       final f = byId[id];
-      if (f != null && f.allowed && !priorities.any((x) => x.id == id)) priorities.add(f);
+      if (f != null && !priorities.any((x) => x.id == id)) priorities.add(f);
       if (priorities.length == 3) break;
     }
 
@@ -113,8 +114,10 @@ class _MenuScreenState extends State<MenuScreen> {
         children: [
           ListTile(
             leading: const Icon(Icons.workspace_premium_rounded),
-            title: Text(commerceExperience(Access.instance.license.plan)),
-            subtitle: const Text('Mi plan · capacidades verificadas por Solvex Hub'),
+            title: Text(commerceExperience(commerceViewPlan(Access.instance.license.plan))),
+            subtitle: Text(basicLocalPreview
+                ? 'Vista local B1 · el Hub y los datos reales no cambian'
+                : 'Mi plan · capacidades verificadas por Solvex Hub'),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => pushPremium(context, const PlanScreen()),
           ),
@@ -161,10 +164,10 @@ class _MenuScreenState extends State<MenuScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                       leading: CircleAvatar(
                         backgroundColor: featureColor(f.id).withValues(alpha: 0.13),
-                        child: Icon(f.planOk ? f.icon : Icons.lock_rounded, color: featureColor(f.id)),
+                        child: Icon(f.icon, color: featureColor(f.id)),
                       ),
                       title: Text(shortActionLabel(f.id, f.title), style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                      subtitle: Text(f.planOk ? f.subtitle : upgradeLabel(f), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(f.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
                       trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                       onTap: () => _open(f),
                     ),
@@ -193,13 +196,16 @@ class _MenuScreenState extends State<MenuScreen> {
             const SizedBox(height: 24),
             Text('Todas tus herramientas', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text('Explora las herramientas. Los candados indican funciones no incluidas.', style: t.textTheme.bodySmall),
+            Text(basicLocalPreview
+                ? 'Accesos propuestos para Básico. Las operaciones sin licencia real quedan protegidas.'
+                : 'Solo ves las herramientas disponibles para tu negocio.',
+                style: t.textTheme.bodySmall),
             const SizedBox(height: 12),
             for (final (i, area) in areas.indexed)
               if (area.features.any(byId.containsKey))
                 _section(
                   'commerce-$i',
-                  simpleAreaTitle(area.title),
+                  commerceMenuGroup(area.title),
                   [for (final id in area.features) if (byId[id] case final f?) f],
                   initiallyExpanded: i == 0,
                 ),

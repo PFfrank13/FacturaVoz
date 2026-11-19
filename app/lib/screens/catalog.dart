@@ -152,6 +152,7 @@ List<FeatureEntry> featureCatalog() => [
       FeatureEntry(id: 'cuaderno', title: 'Del cuaderno a la factura', subtitle: 'Foto de tu cuaderno, nota o WhatsApp → venta', icon: Icons.menu_book_rounded, group: 'Vender', module: 'cuaderno_ia', feature: 'cuaderno_ia', perm: 'sell', keywords: const ['foto', 'nota', 'ia', 'cuaderno'], builder: (_) => const NotebookScreen()),
       FeatureEntry(id: 'recurrentes', title: 'Facturación recurrente', subtitle: 'Mensualidades que se facturan solas', icon: Icons.event_repeat_rounded, group: 'Vender', module: 'recurrentes', feature: 'recurrentes', perm: 'finance', keywords: const ['mensual', 'alquiler', 'suscripcion'], builder: (_) => const RecurringScreen()),
       FeatureEntry(id: 'productos', feature: 'facturar', title: 'Catálogo comercial', subtitle: 'Productos y servicios para vender', perm: 'sell', icon: Icons.inventory_2_rounded, group: 'Vender', module: 'stock', keywords: const ['stock', 'catalogo', 'precio', 'inventario'], builder: (_) => const ProductsScreen()),
+      FeatureEntry(id: 'inventario', title: 'Inventario', subtitle: 'Productos con control de existencias', icon: Icons.inventory_rounded, group: 'Vender', feature: 'stock', perm: 'sell', keywords: const ['stock', 'existencias', 'almacen', 'stock bajo'], builder: (_) => const ProductsScreen(stockOnly: true)),
       FeatureEntry(id: 'tienda', title: 'Tienda en línea', subtitle: 'Tu catálogo con carrito y pedidos por WhatsApp', icon: Icons.storefront_rounded, group: 'Vender', module: 'tienda', feature: 'tienda', perm: 'settings', keywords: const ['web', 'catalogo', 'whatsapp', 'pedidos'], builder: (_) => const StoreScreen()),
       FeatureEntry(id: 'carta', title: 'Carta QR y comandas', subtitle: 'Pedidos por mesa directo a cocina', icon: Icons.restaurant_menu_rounded, group: 'Vender', module: 'carta_qr', feature: 'carta_qr', keywords: const ['restaurante', 'mesa', 'cocina', 'comanda', 'menu'], builder: (_) => const KitchenScreen()),
       FeatureEntry(id: 'precios', title: 'Precios y promociones', subtitle: 'Mayorista, "lleva 3 paga 2" y cupones', icon: Icons.local_offer_rounded, group: 'Vender', module: 'precios', feature: 'precios', perm: 'products_edit', keywords: const ['descuento', 'promocion', 'cupon', 'mayorista'], builder: (_) => const PromosScreen()),
@@ -218,6 +219,39 @@ FeatureEntry? featureById(String id) {
   return null;
 }
 
+/// Navegación de la experiencia B1 en desarrollo.
+/// Los accesos concedidos por Hub abren sus pantallas originales.
+/// Los módulos solo presentes en el NUEVO plan propuesto muestran una
+/// explicación local y no construyen la pantalla ni hacen peticiones.
+Future<void> openBasicCommerceFeature(BuildContext context, FeatureEntry f) async {
+  if (basicLocalPreview && commerceMenuVisible(f.id, 'BASICO') &&
+      f.roleOk && !f.planOk) {
+    await showBasicPreviewRestriction(context, f.title);
+    return;
+  }
+  await openFeature(context, f);
+}
+
+Future<void> showBasicPreviewRestriction(BuildContext context, String name) async {
+  if (!basicLocalPreview) return;
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Función del Básico en preparación'),
+      content: Text('"$name" ya tiene acceso visible en la propuesta Básico. '
+          'El Hub anterior todavía no autoriza esta operación para tu cuenta. '
+          'Por seguridad no se ejecutará ninguna acción real ni se cambiarán datos. '
+          'Actualizaremos el Hub después de terminar y validar el plan.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Entendido'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<void> openFeature(BuildContext context, FeatureEntry f) async {
   if (!f.roleOk) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tu rol no tiene permiso para esta herramienta.')));
@@ -257,7 +291,7 @@ class FeatureStrip extends StatelessWidget {
     final t = Theme.of(context);
     final list = [
       for (final id in ids)
-        if (featureById(id) case final f? when f.allowed) f,
+        if (featureById(id) case final f? when commerceEntryVisible(id: f.id, hubPlan: Access.instance.license.plan, roleOk: f.roleOk, planOk: f.planOk)) f,
     ];
     if (list.isEmpty) return const SizedBox.shrink();
     return SizedBox(
@@ -271,7 +305,7 @@ class FeatureStrip extends StatelessWidget {
           final f = list[i];
           final c = featureColor(f.id);
           return Pressable(
-            onTap: () => openFeature(context, f),
+            onTap: () => openBasicCommerceFeature(context, f),
             child: Container(
               width: 112,
               padding: const EdgeInsets.all(12),
@@ -366,12 +400,12 @@ Future<void> showAccountSheet(BuildContext context) {
       void go(String id) {
         Navigator.of(ctx).pop();
         final f = featureById(id);
-        if (f != null) openFeature(nav.context, f);
+        if (f != null) openBasicCommerceFeature(nav.context, f);
       }
 
       Widget tile(String id) {
         final f = featureById(id);
-        if (f == null || !f.allowed) return const SizedBox.shrink();
+        if (f == null || !commerceEntryVisible(id: f.id, hubPlan: a.license.plan, roleOk: f.roleOk, planOk: f.planOk)) return const SizedBox.shrink();
         return ListTile(leading: Icon(f.icon), title: Text(f.title), subtitle: Text(f.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis), onTap: () => go(id));
       }
 
@@ -553,9 +587,10 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
   List<_Hit> _hits(String q) {
     final out = <_Hit>[];
     if (q.trim().isEmpty) return out;
-    for (final f in featureCatalog().where((f) => f.roleOk)) {
+    for (final f in featureCatalog().where((f) =>
+        commerceEntryVisible(id: f.id, hubPlan: Access.instance.license.plan, roleOk: f.roleOk, planOk: f.planOk))) {
       final s = matchScore(q, f.title, extra: [f.subtitle, ...f.keywords]);
-      if (s > 0) out.add(_Hit(s + 0.2, 'Función', f.title, f.planOk ? f.subtitle : 'No incluida en tu plan actual', f.planOk ? f.icon : Icons.lock_rounded, () => openFeature(context, f)));
+      if (s > 0) out.add(_Hit(s + 0.2, 'Función', f.title, f.subtitle, f.icon, () => openBasicCommerceFeature(context, f)));
     }
     for (final c in _clients) {
       final s = matchScore(q, c.name, extra: [c.taxId, c.phone, c.district, ...c.tags]);
@@ -574,7 +609,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
     }
     for (final p in _products) {
       final s = matchScore(q, p.name);
-      if (s > 0) out.add(_Hit(s * 0.85, 'Producto', p.name, money(p.unitPrice, AppState.instance.profile?.currency ?? 'PEN'), Icons.inventory_2_rounded, () => openFeature(context, featureById('productos')!)));
+      if (s > 0) out.add(_Hit(s * 0.85, 'Producto', p.name, money(p.unitPrice, AppState.instance.profile?.currency ?? 'PEN'), Icons.inventory_2_rounded, () => openBasicCommerceFeature(context, featureById('productos')!)));
     }
     out.sort((a, b) => b.score.compareTo(a.score));
     return out.take(60).toList();
