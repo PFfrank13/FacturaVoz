@@ -264,7 +264,8 @@ class _HeroChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ConstrainedBox(
     constraints: BoxConstraints(
-      maxWidth: MediaQuery.sizeOf(context).width - 72),
+      maxWidth: MediaQuery.sizeOf(context).width > 100
+          ? MediaQuery.sizeOf(context).width - 72 : double.infinity),
     child: DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: .12),
