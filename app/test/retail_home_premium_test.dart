@@ -1,4 +1,3 @@
-import 'package:facturavoz/ui/design_tokens.dart';
 import 'package:facturavoz/ui/ds.dart';
 import 'package:facturavoz/ui/retail_home_premium.dart';
 import 'package:facturavoz/ui/theme.dart';
@@ -80,7 +79,7 @@ void main() {
     await tester.pump();
     expect(destination, 'sell');
     expect(tester.takeException(), isNull);
-  }
+  });
 
   testWidgets('la cifra mensual no se expone sin permiso de reportes',
       (tester) async {
