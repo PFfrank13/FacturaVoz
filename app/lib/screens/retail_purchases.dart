@@ -26,7 +26,8 @@ double retailPurchaseHorizontalInset(double availableWidth) {
 /// Plan Básico: supplier -> product ID -> atomic stock receipt -> expense/cash.
 /// This is deliberately online-only until an audited offline ledger exists.
 class RetailPurchasesScreen extends StatefulWidget {
-  const RetailPurchasesScreen({super.key});
+  const RetailPurchasesScreen({super.key, this.embedded = false});
+  final bool embedded;
 
   @override
   State<RetailPurchasesScreen> createState() => _RetailPurchasesScreenState();
@@ -324,7 +325,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
         .toList();
     // Tema global: compras no fuerza modo oscuro ni colores privados.
     return Scaffold(
-      appBar: AppBar(
+      appBar: widget.embedded ? null : AppBar(
         title: const Text('Compras y recepción', style: TextStyle(fontWeight: FontWeight.w900)),
         actions: [
           IconButton(
@@ -336,7 +337,28 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
               tooltip: 'Actualizar'),
         ],
       ),
-      body: _recovering || _recoveryError != null || _pending != null
+      body: Column(children: [
+        if (widget.embedded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+            child: Row(children: [
+              Expanded(child: Text('Recepción de mercadería',
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800))),
+              IconButton(
+                onPressed: () => _openSettlement(),
+                icon: const Icon(Icons.pending_actions_rounded),
+                tooltip: 'Recuperar pago de proveedor',
+              ),
+              IconButton(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: 'Actualizar compras',
+              ),
+            ]),
+          ),
+        Expanded(child: _recovering || _recoveryError != null || _pending != null
           ? Center(child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -544,7 +566,8 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                             ? () => _openSettlement(receipt) : null,
                       )),
                   ],
-                )),
+                ))),
+      ]),
     );
   }
 }

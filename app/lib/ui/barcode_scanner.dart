@@ -20,7 +20,18 @@ class _ScanPageState extends State<_ScanPage> with SingleTickerProviderStateMixi
   late final AnimationController _scanLine = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1750),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // No mantener un ticker activo si el sistema pide menos movimiento.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scanLine.stop();
+    } else if (!_scanLine.isAnimating) {
+      _scanLine.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {

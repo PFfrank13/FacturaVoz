@@ -342,9 +342,9 @@ class _MainShellState extends State<MainShell> {
         'fiados' => FiadosScreen(embedded: Access.instance.rubro == 'bodega'),
         'cash' => CashDayScreen(embedded: Access.instance.rubro == 'bodega'),
         'stock' => const ProductsScreen(embedded: true),
-        'compras' => const RetailPurchasesScreen(),
-        'comprobantes' => const RetailReceiptsScreen(),
-        'reportes' => const ReportsScreen(),
+        'compras' => const RetailPurchasesScreen(embedded: true),
+        'comprobantes' => const RetailReceiptsScreen(embedded: true),
+        'reportes' => const ReportsScreen(embedded: true),
         'tables' => const KitchenScreen(),
         _ => const SettingsScreen(embedded: true),
       };
@@ -568,15 +568,17 @@ class _MainShellState extends State<MainShell> {
             appBar: isBodega ? AppBar(
               automaticallyImplyLeading: !pinnedSidebar,
               backgroundColor: Colors.transparent,
-              flexibleSpace: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: ColoredBox(
-                    color: Theme.of(context).colorScheme.surface.withValues(
-                      alpha: MediaQuery.highContrastOf(context) ? 1 : .76),
-                  ),
-                ),
-              ),
+              flexibleSpace: MediaQuery.highContrastOf(context)
+                  ? ColoredBox(color: Theme.of(context).colorScheme.surface)
+                  : ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                        child: ColoredBox(
+                          color: Theme.of(context).colorScheme.surface
+                              .withValues(alpha: .76),
+                        ),
+                      ),
+                    ),
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
