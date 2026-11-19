@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'motion.dart';
+import 'design_tokens.dart';
 
 Future<String?> scanBarcode(BuildContext context) => Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _ScanPage()));
 
@@ -14,8 +15,29 @@ class _ScanPage extends StatefulWidget {
   State<_ScanPage> createState() => _ScanPageState();
 }
 
-class _ScanPageState extends State<_ScanPage> {
+class _ScanPageState extends State<_ScanPage> with SingleTickerProviderStateMixin {
   bool _done = false;
+  late final AnimationController _scanLine = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1750),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // No mantener un ticker activo si el sistema pide menos movimiento.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scanLine.stop();
+    } else if (!_scanLine.isAnimating) {
+      _scanLine.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scanLine.dispose();
+    super.dispose();
+  }
 
   void _onDetect(BarcodeCapture capture) {
     if (_done) return;
@@ -38,17 +60,62 @@ class _ScanPageState extends State<_ScanPage> {
             // Sin errorBuilder a propósito: su firma cambió entre versiones del paquete; el texto de abajo ya orienta.
             child: MobileScanner(onDetect: _onDetect),
           ),
-          const Positioned(
-            left: 24,
-            right: 24,
-            bottom: 40,
-            child: Text('Si la cámara no abre, permite el acceso en Ajustes del teléfono o escribe el código a mano.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 35,
+            child: SafeArea(
+              top: false,
+              child: FvGlassSurface(
+                radius: 22,
+                blur: 16,
+                padding: const EdgeInsets.all(16),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.qr_code_scanner_rounded, size: 28),
+                  const SizedBox(height: 6),
+                  Text('Apunta al código del producto',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text('Lo reconoceremos y mostraremos su precio al instante. '
+                    'También puedes usar un lector USB o Bluetooth en Venta rápida.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall),
+                ]),
+              ),
+            ),
           ),
           Center(
             child: Container(
-              width: 260,
-              height: 150,
-              decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 3), borderRadius: BorderRadius.circular(18)),
+              width: 264, height: 172,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white.withValues(alpha: .9), width: 2),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: MediaQuery.disableAnimationsOf(context)
+                  ? const SizedBox.shrink()
+                  : AnimatedBuilder(
+                      animation: _scanLine,
+                      builder: (context, _) => Stack(children: [
+                        Positioned(
+                          top: _scanLine.value * 169,
+                          left: 20, right: 20,
+                          child: Container(
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: FvTokens.emeraldDark,
+                              borderRadius: BorderRadius.circular(99),
+                              boxShadow: const [BoxShadow(
+                                color: Color(0xAA10B981), blurRadius: 12)],
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
+              ),
             ),
           ),
         ]),

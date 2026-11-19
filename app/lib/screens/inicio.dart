@@ -28,7 +28,6 @@ import 'goal_sheet.dart';
 import 'home.dart' show CopilotCards, HomeHeader, InvoiceRow;
 import 'invoice_detail.dart';
 import 'role_home.dart';
-import 'retail_basic_modules.dart';
 import 'jobs.dart' show JobDetailScreen, showJobForm;
 import 'new_invoice.dart' show NewInvoiceScreen;
 import '../nav/navigation_contract.dart';
@@ -251,7 +250,6 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final spec = rubroFor(a.rubro);
     final guide = experienceFor(spec?.id);
     final isBodega = a.rubro == 'bodega';
-    final isBodegaBasic = isBodega && a.license.plan == 'BASICO';
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final seeMoney = a.can('finance') || a.can('collect');
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
@@ -312,13 +310,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
             ),
-          // Un tablero por rubro y plan. No más menú adicional para Pro/Empresa.
-          if (isBodega)
-            SliverToBoxAdapter(
-              child: isBodegaBasic ? const RetailBasicModules()
-                  : const RetailPlanModules(),
-            )
-          else if (spec != null)
+          // Bodega usa exclusivamente el Drawer/rail de MainShell. Aquí solo
+          // quedan indicadores y actividad; el grid antiguo duplicaba el menú.
+          if (!isBodega && spec != null)
             SliverToBoxAdapter(
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: SectorPhotoBanner(

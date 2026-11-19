@@ -20,7 +20,8 @@ import '../ui/widgets.dart';
 
 /// Reportes de ventas por mes + exportación CSV para el contador.
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
+  const ReportsScreen({super.key, this.embedded = false});
+  final bool embedded;
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -144,7 +145,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
     final org = AppState.instance.activeOrg?.name;
 
     return RetailResponsiveFrame(maxWidth: 1220, child: Scaffold(
-      appBar: AppBar(title: const Text('Reportes')),
+      appBar: widget.embedded ? null : AppBar(title: const Text('Reportes')),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

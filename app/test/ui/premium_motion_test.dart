@@ -66,11 +66,10 @@ void main() {
           }),
         ),
       ));
-      final mobile = platform == TargetPlatform.android ||
-          platform == TargetPlatform.iOS;
-      if (mobile) {
+      if (platform == TargetPlatform.iOS) {
         expect(physics, isA<BouncingScrollPhysics>());
       } else {
+        // Android usa scroll nativo Material; escritorio usa rueda/trackpad.
         expect(physics, isA<ClampingScrollPhysics>());
       }
     });

@@ -58,10 +58,5 @@ jobs:
           profile: pixel_4
           disable-animations: true
           emulator-options: '-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim'
-          script: >-
-            cd app &&
-            flutter test integration_test/bodega_emulator_smoke_test.dart
-            -d emulator-5554
-            --dart-define=SUPABASE_URL=https://example.supabase.co
-            --dart-define=SUPABASE_ANON_KEY=ci
-            --dart-define=API_BASE_URL=https://example.vercel.app
+          # The runner invokes each script line via sh -c: use one command.
+          script: bash app/tool/android_emulator_smoke.sh

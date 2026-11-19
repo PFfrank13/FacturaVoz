@@ -1078,7 +1078,7 @@ class _PosScreenState extends State<PosScreen> {
                         onSubmitted: _submit,
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
-                          hintText: retail ? 'Buscar producto o escanear' : 'Busca o pasa el lector de código de barras',
+                          hintText: retail ? 'Escanea código o busca producto' : 'Busca o pasa el lector de código de barras',
                           prefixIcon: const Icon(Icons.search_rounded),
                           suffixIcon: retail ? IconButton(
                             key: const ValueKey('retail-pos-barcode-scan'),
@@ -1151,8 +1151,20 @@ class _PosScreenState extends State<PosScreen> {
                                     price: money(pr.unitPrice, _cur),
                                     icon: placeholderIcon,
                                     category: categoryLabel,
+                                    // Las fotos procesadas como PNG transparente
+                                    // conservan su silueta, sin recortes ni zoom.
                                     photo: img == null || img.isEmpty
-                                        ? null : StorageImage(path: img),
+                                        ? null : Padding(
+                                            padding: const EdgeInsets.all(10),
+                                            // En POS tocar una fotografía debe agregar el
+                                            // producto, no abrir el visor de imagen.
+                                            child: IgnorePointer(
+                                              child: StorageImage(
+                                                path: img,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                          ),
                                     stockLabel: p.tracksStock
                                         ? (p.stock! <= 0 ? 'Sin stock' : 'Stock: ${qtyText(p.stock!)}')
                                         : null,

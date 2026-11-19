@@ -45,7 +45,8 @@ bool retailReceiptMatches(InvoiceRecord invoice, String filter, String query) {
 }
 
 class RetailReceiptsScreen extends StatefulWidget {
-  const RetailReceiptsScreen({super.key});
+  const RetailReceiptsScreen({super.key, this.embedded = false});
+  final bool embedded;
 
   @override
   State<RetailReceiptsScreen> createState() => _RetailReceiptsScreenState();
@@ -251,7 +252,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
     final c = DsColors.of(context);
     final t = Theme.of(context);
     return RetailResponsiveFrame(maxWidth: 960, child: Scaffold(
-        appBar: AppBar(
+        appBar: widget.embedded ? null : AppBar(
           title: const Text('Comprobantes'),
           actions: [
             IconButton(
@@ -269,6 +270,15 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
               controller: _listController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
+                if (widget.embedded)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      tooltip: 'Actualizar comprobantes',
+                      icon: const Icon(Icons.refresh_rounded),
+                      onPressed: _loading ? null : _refresh,
+                    ),
+                  ),
                 if (_showHistoryOnly) ...[
                   TextButton.icon(
                     key: const ValueKey('receipt-back-menu'),

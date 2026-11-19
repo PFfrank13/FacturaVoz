@@ -225,7 +225,8 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Empresas',
                     subtitle: org?.name ?? 'Cambia de empresa o crea otra',
                     onTap: () => go(const OrgsScreen())),
-                _tile(context,
+                if (a.rubro != 'bodega')
+                  _tile(context,
                     icon: Icons.inventory_2_rounded,
                     title: 'Productos y servicios',
                     subtitle: 'Catálogo, precios, código de barras y stock',
@@ -275,7 +276,8 @@ class SettingsScreen extends StatelessWidget {
                       title: 'Seguridad',
                       subtitle: 'PIN y huella para entrar',
                       onTap: () => go(const SecurityScreen())),
-                _tile(context,
+                if (a.rubro != 'bodega')
+                  _tile(context,
                     icon: Icons.contacts_rounded,
                     title: 'Clientes (lista simple)',
                     subtitle: 'Contactos, documentos y correos',
@@ -286,7 +288,7 @@ class SettingsScreen extends StatelessWidget {
                       title: 'Importar facturas antiguas',
                       subtitle: 'Desde Excel (.xlsx) o CSV de SUNAT o tu sistema anterior',
                       onTap: () => go(const ImportScreen())),
-                if (a.can('finance'))
+                if (a.rubro != 'bodega' && a.can('finance'))
                   _tile(context,
                       icon: Icons.insights_rounded,
                       title: 'Reportes',

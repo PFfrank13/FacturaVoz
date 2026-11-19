@@ -28,12 +28,7 @@ abstract final class RetailVisual {
     final t = Theme.of(context);
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
-        border: Border.all(color: c.line.withValues(alpha: t.brightness == Brightness.dark ? .5 : .22)),
-        boxShadow: FvTokens.shadow(t.brightness),
-      ),
+      decoration: FvSurfaces.card(t),
       child: Padding(
         padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 14 : 20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -122,16 +117,10 @@ abstract final class RetailVisual {
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(16),
   }) {
-    final c = DsColors.of(context);
     return Container(
       width: double.infinity,
       padding: padding,
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(FvTokens.cardRadius),
-        border: Border.all(color: c.line.withValues(alpha: 0.28)),
-        boxShadow: FvTokens.shadow(Theme.of(context).brightness),
-      ),
+      decoration: FvSurfaces.card(Theme.of(context)),
       child: child,
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../access.dart';
+import '../permissions.dart';
 import '../app_state.dart';
 import '../models_v2.dart';
 import '../rubros.dart';
@@ -31,6 +32,9 @@ import 'license_gate.dart';
 import 'new_invoice.dart';
 import 'pos.dart';
 import 'products.dart';
+import 'reports.dart';
+import 'retail_purchases.dart';
+import 'retail_receipts.dart';
 import 'profit.dart';
 import 'quotes.dart';
 import 'rubro_picker.dart';
@@ -69,6 +73,10 @@ const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
 const _dCash = _Dest('cash', Icons.account_balance_wallet_rounded, 'Caja', 'Caja');
 const _dStock = _Dest('stock', Icons.inventory_2_rounded, 'Inventario', 'Inventario');
 const _dBodegaSettings = _Dest('settings', Icons.settings_rounded, 'Configuración', 'Configuración');
+const _dRetailSell = _Dest('sell', Icons.point_of_sale_rounded, 'Venta rápida', 'Venta rápida');
+const _dRetailReceipts = _Dest('comprobantes', Icons.receipt_long_rounded, 'Comprobantes', 'Comprobantes');
+const _dRetailPurchases = _Dest('compras', Icons.local_shipping_outlined, 'Compras', 'Compras');
+const _dRetailReports = _Dest('reportes', Icons.insights_rounded, 'Reportes', 'Reportes');
 
 /// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
 const _rubroIcons = <String, IconData>{
@@ -88,6 +96,9 @@ const _rubroIcons = <String, IconData>{
 /// ¿El rol puede abrir este destino? (la base de datos igual lo impide)
 bool _destAllowed(String id, Access a) => switch (id) {
       'sell' => a.can('sell') && a.has('facturar'),
+      'comprobantes' => a.has('facturar') && a.allows('sales.read'),
+      'compras' => a.has('stock') && a.can('products_edit'),
+      'reportes' => a.has('reportes') && a.can('finance'),
       'quotes' => a.can('sell') && a.has('cotizaciones'),
       'collect' => a.can('collect') && a.has('cobros'),
       'fiados' => a.can('collect') && a.has('fiados'),
@@ -114,9 +125,13 @@ bool usesMultirubroRail(String? rubro, double width) =>
 List<String> bodegaDrawerIds(Access access) => [
   'home',
   if (_destAllowed('sell', access)) 'sell',
+  if (_destAllowed('stock', access)) 'stock',
+  if (_destAllowed('compras', access)) 'compras',
+  if (_destAllowed('comprobantes', access)) 'comprobantes',
   if (_destAllowed('fiados', access)) 'fiados',
   if (_destAllowed('cash', access)) 'cash',
-  if (_destAllowed('stock', access)) 'stock',
+  if (_destAllowed('clients', access)) 'clients',
+  if (_destAllowed('reportes', access)) 'reportes',
   'settings',
 ];
 
@@ -220,10 +235,14 @@ class _MainShellState extends State<MainShell> {
     if ((a.rubro ?? _settings?.businessType) == 'bodega') {
       const destinations = <String, _Dest>{
         'home': _dHome,
-        'sell': _dSell,
+        'sell': _dRetailSell,
+        'stock': _dStock,
+        'compras': _dRetailPurchases,
+        'comprobantes': _dRetailReceipts,
         'fiados': _dFiados,
         'cash': _dCash,
-        'stock': _dStock,
+        'clients': _dClients,
+        'reportes': _dRetailReports,
         'settings': _dBodegaSettings,
       };
       return [for (final id in bodegaDrawerIds(a)) destinations[id]!];
@@ -323,6 +342,9 @@ class _MainShellState extends State<MainShell> {
         'fiados' => FiadosScreen(embedded: Access.instance.rubro == 'bodega'),
         'cash' => CashDayScreen(embedded: Access.instance.rubro == 'bodega'),
         'stock' => const ProductsScreen(embedded: true),
+        'compras' => const RetailPurchasesScreen(embedded: true),
+        'comprobantes' => const RetailReceiptsScreen(embedded: true),
+        'reportes' => const ReportsScreen(embedded: true),
         'tables' => const KitchenScreen(),
         _ => const SettingsScreen(embedded: true),
       };
@@ -333,10 +355,13 @@ class _MainShellState extends State<MainShell> {
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
     final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
-    return NavigationDrawer(
+    return FvGlassSurface(
+      radius: 24,
+      blur: 18,
+      child: NavigationDrawer(
       key: const ValueKey('bodega-navigation-drawer'),
-      backgroundColor: cs.surface,
-      indicatorColor: cs.primary.withValues(alpha: 0.09),
+      backgroundColor: Colors.transparent,
+      indicatorColor: cs.primary.withValues(alpha: 0.12),
       selectedIndex: selected < 0 ? 0 : selected,
       onDestinationSelected: (index) {
         Navigator.of(context).pop();
@@ -391,6 +416,7 @@ class _MainShellState extends State<MainShell> {
             style: t.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
       ],
+      ),
     );
   }
 
@@ -399,17 +425,15 @@ class _MainShellState extends State<MainShell> {
     final t = Theme.of(context);
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        border: Border(right: BorderSide(
-          color: cs.outlineVariant.withValues(alpha: 0.45))),
-      ),
+    return FvGlassSurface(
+      radius: 0,
+      blur: 16,
       child: NavigationRail(
         key: const ValueKey('bodega-navigation-rail'),
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.transparent,
         selectedIndex: selected < 0 ? 0 : selected,
         labelType: NavigationRailLabelType.selected,
+        scrollable: true,
         groupAlignment: -1,
         useIndicator: true,
         indicatorColor: cs.primary.withValues(alpha: 0.09),
@@ -450,15 +474,12 @@ class _MainShellState extends State<MainShell> {
     final t = Theme.of(context);
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        border: Border(right: BorderSide(
-          color: cs.outlineVariant.withValues(alpha: 0.45))),
-      ),
+    return FvGlassSurface(
+      radius: 0,
+      blur: 16,
       child: NavigationRail(
         key: const ValueKey('multirubro-navigation-rail'),
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.transparent,
         selectedIndex: selected < 0 ? 0 : selected,
         labelType: NavigationRailLabelType.selected,
         groupAlignment: -1,
@@ -546,7 +567,18 @@ class _MainShellState extends State<MainShell> {
                 ? _bodegaNavigation(dests) : null,
             appBar: isBodega ? AppBar(
               automaticallyImplyLeading: !pinnedSidebar,
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: MediaQuery.highContrastOf(context)
+                  ? ColoredBox(color: Theme.of(context).colorScheme.surface)
+                  : ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                        child: ColoredBox(
+                          color: Theme.of(context).colorScheme.surface
+                              .withValues(alpha: .76),
+                        ),
+                      ),
+                    ),
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
@@ -718,8 +750,6 @@ class _Dock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final dark = t.brightness == Brightness.dark;
     final bottom = MediaQuery.paddingOf(context).bottom;
     final left = dests.take((dests.length + 1) ~/ 2).toList();
     final right = dests.skip(left.length).toList();
@@ -728,25 +758,17 @@ class _Dock extends StatelessWidget {
       child: SizedBox(
         height: 84,
         child: Stack(clipBehavior: Clip.none, alignment: Alignment.bottomCenter, children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(Radii.xl),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: Container(
-                height: 68,
-                decoration: BoxDecoration(
-                  color: (dark ? Brand.darkCard : Colors.white).withValues(alpha: dark ? 0.78 : 0.82),
-                  borderRadius: BorderRadius.circular(Radii.xl),
-                  border: Border.all(color: (dark ? Colors.white : Brand.indigo).withValues(alpha: 0.08)),
-                  boxShadow: Brand.softShadow(dark, a: 0.16),
-                ),
-                // Dos mitades iguales: el hueco del micrófono queda SIEMPRE al centro, aunque haya 3 a un lado y 2 al otro.
-                child: Row(children: [
-                  Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
-                  if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
-                  Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
-                ]),
-              ),
+          FvGlassSurface(
+            radius: Radii.xl,
+            blur: 16,
+            child: SizedBox(
+              height: 68,
+              // Dos mitades iguales mantienen el hueco del micrófono central.
+              child: Row(children: [
+                Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
+                if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
+                Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
+              ]),
             ),
           ),
           if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) Positioned(
