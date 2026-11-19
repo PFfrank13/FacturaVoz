@@ -153,9 +153,10 @@ class RetailPremiumOverview extends StatelessWidget {
               Row(children: [
                 Icon(Icons.show_chart_rounded, size: 18, color: primary),
                 const SizedBox(width: 7),
-                Text('Tendencia · últimos 14 días',
+                Expanded(child: Text('Tendencia · últimos 14 días',
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: muted, fontWeight: FontWeight.w700)),
+                    color: muted, fontWeight: FontWeight.w700))),
               ]),
               const SizedBox(height: 10),
               SizedBox(height: 56, child: chart),
@@ -229,8 +230,12 @@ class _MiniFact extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 15, color: tint),
           const SizedBox(width: 6),
-          Text(label, style: t.textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w600, color: t.colorScheme.onSurface)),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: t.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: t.colorScheme.onSurface))),
         ]),
       ),
     );
