@@ -643,9 +643,13 @@ class _MainShellState extends State<MainShell> {
                       heroTag: 'bodega-voice-action',
                       tooltip: canCopilot ? 'Hablar con Copiloto IA' : 'Vender por voz',
                       elevation: 0,
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      backgroundColor: const Color(0xFF277B6A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(17),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: .32),
+                          width: .8)),
                       onPressed: canCopilot ? () => openCopilot(context) : _newInvoice,
                       child: const Icon(Icons.mic_rounded),
                     ),

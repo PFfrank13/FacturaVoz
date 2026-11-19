@@ -474,6 +474,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
           ],
+          SliverToBoxAdapter(child: SizedBox(height: isBodega ? 96 : 24)),
         ]),
       ),
     ));
