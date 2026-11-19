@@ -26,6 +26,20 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+  testWidgets('inventory previews products without stock mutation', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.light),
+      home: const Scaffold(body: SingleChildScrollView(
+        child: FvDemoInventoryGallery(loadPhotos: false))),
+    ));
+    expect(find.text('Vista de muestra'), findsOneWidget);
+    expect(find.text('Ejemplo · sin stock registrado'), findsNWidgets(6));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('display-only gallery has no real payment', (tester) async {
     tester.view.physicalSize = const Size(390, 900);
     tester.view.devicePixelRatio = 1;

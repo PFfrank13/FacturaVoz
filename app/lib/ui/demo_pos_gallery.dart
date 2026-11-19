@@ -151,3 +151,70 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
     });
   }
 }
+
+
+/// Inventory preview uses the same photos without creating database records.
+class FvDemoInventoryGallery extends StatelessWidget {
+  const FvDemoInventoryGallery({super.key, this.loadPhotos = true});
+  final bool loadPhotos;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      FvGlassSurface(
+        radius: 20, blur: 18, padding: const EdgeInsets.all(16),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.visibility_outlined, size: 23),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Vista de muestra', style: t.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Así luce un inventario con fotografías. Los siguientes '
+                 'artículos y precios son ilustrativos; no existen en tu base de datos.',
+                 style: t.textTheme.bodySmall),
+          ])),
+        ]),
+      ),
+      const SizedBox(height: 16),
+      for (final p in _products)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: t.colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: t.colorScheme.outlineVariant
+                  .withValues(alpha: .65), width: .6),
+              boxShadow: FvTokens.shadow(t.brightness),
+            ),
+            child: Row(children: [
+              SizedBox(width: 72, height: 78,
+                child: ClipRRect(borderRadius: BorderRadius.circular(13),
+                  child: loadPhotos
+                      ? FvNetworkProductPhoto(
+                          url: p.photo, name: p.name, category: p.category)
+                      : FvProductPhotoFallback(
+                          name: p.name, category: p.category))),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: t.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(p.category, style: t.textTheme.bodySmall),
+                  const SizedBox(height: 4),
+                  Text('Ejemplo · sin stock registrado',
+                      style: t.textTheme.labelSmall),
+                ])),
+              const SizedBox(width: 6),
+              Text('S/ ${p.price.toStringAsFixed(2)}',
+                style: t.textTheme.titleSmall?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()])),
+            ]),
+          ),
+        ),
+    ]);
+  }
+}

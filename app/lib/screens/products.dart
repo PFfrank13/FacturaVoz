@@ -14,6 +14,8 @@ import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
+import '../ui/glass_widgets.dart';
+import '../ui/demo_pos_gallery.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
@@ -867,6 +869,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
               )
             else if (all == null)
               const SkeletonList()
+            else if (all.isEmpty && Access.instance.rubro == 'bodega')
+              const FvDemoInventoryGallery()
             else if (all.isEmpty)
               const EmptyState(title: 'Tu catálogo está vacío', body: 'Guarda tus productos y servicios con su precio y elígelos al facturar, sin dictar el precio cada vez.')
             else if (list.isEmpty)
@@ -902,11 +906,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                                       path: (_catalogExtras[p.id]?['image_path'] ?? '').toString(),
                                       fit: BoxFit.contain,
                                     ))
-                                  : DecoratedBox(
-                                      decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: .12)),
-                                      child: Icon(p.isService ? Icons.handyman_rounded : Icons.inventory_2_rounded,
-                                        size: 25, color: t.colorScheme.primary),
-                                    ),
+                                  : FvProductPhotoFallback(
+                                      name: p.name,
+                                      category: (_catalogExtras[p.id]?['category'] ?? '').toString(),)
                               ),
                             ),
                             const SizedBox(width: 14),
