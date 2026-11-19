@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../ui/retail_visual.dart';
-import '../ui/theme.dart';
 import '../ui/glass_widgets.dart';
 import 'client_profile.dart' show StorageImage;
 
