@@ -11,6 +11,7 @@
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
+import 'design_tokens.dart';
 
 /// Barra inferior con la acción principal de la pantalla. Úsala en Scaffold.bottomNavigationBar:
 /// no se superpone al contenido, sube con el teclado y respeta el área segura.
@@ -112,15 +113,14 @@ class DsStat extends StatelessWidget {
       button: onTap != null,
       label: '$label: $value${detail == null ? '' : ', $detail'}',
       excludeSemantics: true,
-      child: Material(
-        color: ds.surface,
-        elevation: t.brightness == Brightness.dark ? 0 : 1.0,
-        shadowColor: const Color(0x0A111827),
-        shape: RoundedRectangleBorder(
+      child: DecoratedBox(
+        decoration: FvSurfaces.card(t),
+        child: Material(
+          type: MaterialType.transparency,
+          clipBehavior: Clip.antiAlias,
           borderRadius: BorderRadius.circular(Radii.lg),
-          side: BorderSide(color: ds.line.withValues(alpha: 0.22))),
-        clipBehavior: Clip.antiAlias,
-        child: onTap == null ? body : InkWell(onTap: onTap, child: body),
+          child: onTap == null ? body : InkWell(onTap: onTap, child: body),
+        ),
       ),
     );
   }

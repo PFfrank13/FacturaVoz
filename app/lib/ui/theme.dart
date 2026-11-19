@@ -121,10 +121,10 @@ TextTheme _text(Color ink, Color muted) {
   TextStyle s(double size, FontWeight w, {double h = 1.3, double ls = 0, Color? c}) =>
       TextStyle(fontFamily: _font, fontSize: size, fontWeight: w, height: h, letterSpacing: ls, color: c ?? ink);
   return TextTheme(
-    displaySmall: s(40, FontWeight.w700, h: 1.1, ls: -1.0),
+    displaySmall: s(38, FontWeight.w800, h: 1.09, ls: -1.2),
     headlineMedium: s(28, FontWeight.w700, h: 1.15, ls: -0.5),
-    headlineSmall: s(22, FontWeight.w600, h: 1.2, ls: -0.3),
-    titleLarge: s(19, FontWeight.w600, ls: -0.2),
+    headlineSmall: s(23, FontWeight.w700, h: 1.19, ls: -0.55),
+    titleLarge: s(20, FontWeight.w700, ls: -0.4),
     titleMedium: s(16, FontWeight.w600),
     titleSmall: s(14, FontWeight.w600),
     bodyLarge: s(16, FontWeight.w400, h: 1.45),
@@ -208,9 +208,26 @@ ThemeData buildTheme(Brightness b) {
     ),
     cardTheme: CardThemeData(
       color: card,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg), side: BorderSide(color: line.withValues(alpha: dark ? 0.55 : 0.35))),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.lg),
+        side: BorderSide(color: line, width: .9)),
+    ),
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: Colors.transparent,
+      indicatorColor: primary.withValues(alpha: .12),
+      selectedIconTheme: IconThemeData(color: primary, size: 24),
+      unselectedIconTheme: IconThemeData(color: muted, size: 22),
+      selectedLabelTextStyle: TextStyle(fontFamily: _font,
+        fontWeight: FontWeight.w700, color: ink, fontSize: 12),
+    ),
+    navigationDrawerTheme: NavigationDrawerThemeData(
+      backgroundColor: Colors.transparent,
+      indicatorColor: primary.withValues(alpha: .12),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(28))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -294,6 +311,12 @@ ThemeData buildTheme(Brightness b) {
       textStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12.5),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: primary,
+      foregroundColor: ds.onPrimary,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
   );
 }
 
@@ -328,9 +351,11 @@ class PremiumScrollBehavior extends MaterialScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) => switch (Theme.of(context).platform) {
-        // Rebote tipo iPhone en móvil; en escritorio, rueda/trackpad precisos.
-        TargetPlatform.android || TargetPlatform.iOS =>
+        // Física nativa en cada plataforma: no forzar rebote iPhone en Android.
+        TargetPlatform.iOS =>
           const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        TargetPlatform.android =>
+          const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         _ => const ClampingScrollPhysics(),
       };
 

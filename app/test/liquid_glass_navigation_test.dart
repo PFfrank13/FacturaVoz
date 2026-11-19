@@ -32,7 +32,8 @@ void main() {
           ),
         ));
         expect(find.text('Navegación'), findsOneWidget);
-        expect(find.byType(BackdropFilter), findsOneWidget);
+        expect(find.byType(BackdropFilter),
+            contrast ? findsNothing : findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }

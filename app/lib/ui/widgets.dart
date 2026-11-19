@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'motion.dart';
 import 'theme.dart';
+import 'design_tokens.dart';
 
 const _tabular = [FontFeature.tabularFigures()];
 
@@ -430,15 +431,10 @@ class SoftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final shape = BorderRadius.circular(radius);
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color ?? Theme.of(context).colorScheme.surface,
-        borderRadius: shape,
-        boxShadow: Brand.softShadow(dark, a: 0.075),
-        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: dark ? 0.35 : 0.18)),
-      ),
+      decoration: FvSurfaces.card(
+        Theme.of(context), radius: radius, color: color),
       // Material transparente ENCIMA del color: los ListTile/InkWell de adentro dibujan su efecto de toque aquí
       // (si no, el color de la tarjeta lo tapa y Flutter muestra "EXCEPTION CAUGHT BY FLUTTER FRAMEWORK" en depuración).
       child: Material(

@@ -751,7 +751,6 @@ class _Dock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final dark = t.brightness == Brightness.dark;
     final bottom = MediaQuery.paddingOf(context).bottom;
     final left = dests.take((dests.length + 1) ~/ 2).toList();
     final right = dests.skip(left.length).toList();
@@ -760,25 +759,17 @@ class _Dock extends StatelessWidget {
       child: SizedBox(
         height: 84,
         child: Stack(clipBehavior: Clip.none, alignment: Alignment.bottomCenter, children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(Radii.xl),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: Container(
-                height: 68,
-                decoration: BoxDecoration(
-                  color: (dark ? Brand.darkCard : Colors.white).withValues(alpha: dark ? 0.78 : 0.82),
-                  borderRadius: BorderRadius.circular(Radii.xl),
-                  border: Border.all(color: (dark ? Colors.white : Brand.indigo).withValues(alpha: 0.08)),
-                  boxShadow: Brand.softShadow(dark, a: 0.16),
-                ),
-                // Dos mitades iguales: el hueco del micrófono queda SIEMPRE al centro, aunque haya 3 a un lado y 2 al otro.
-                child: Row(children: [
-                  Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
-                  if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
-                  Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
-                ]),
-              ),
+          FvGlassSurface(
+            radius: Radii.xl,
+            blur: 16,
+            child: SizedBox(
+              height: 68,
+              // Dos mitades iguales mantienen el hueco del micrófono central.
+              child: Row(children: [
+                Expanded(child: Row(children: [for (final d in left) _item(context, d)])),
+                if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) const SizedBox(width: 72),
+                Expanded(child: Row(children: [for (final d in right) _item(context, d)])),
+              ]),
             ),
           ),
           if (Access.instance.has('voz') && Access.instance.has('facturar') && Access.instance.can('sell')) Positioned(
