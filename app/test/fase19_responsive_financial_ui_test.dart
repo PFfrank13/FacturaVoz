@@ -39,6 +39,9 @@ void main() {
     ));
     expect(find.text('Sin ventas'), findsOneWidget);
     expect(find.text('Registra tu primera venta'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(tester.hasRunningAnimations, isFalse,
+        reason: 'Movimiento reducido debe detener los tickers, no solo ocultarlos');
     expect(tester.takeException(), isNull);
   });
 }
