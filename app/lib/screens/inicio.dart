@@ -21,6 +21,7 @@ import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_layout.dart';
+import '../ui/retail_home_premium.dart';
 import '../ui/work_queue.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
@@ -34,7 +35,9 @@ import '../nav/navigation_contract.dart';
 import '../permissions.dart';
 
 class InicioScreen extends StatefulWidget {
-  const InicioScreen({super.key});
+  const InicioScreen({super.key, this.onRetailNavigate});
+
+  final ValueChanged<String>? onRetailNavigate;
 
   @override
   State<InicioScreen> createState() => _InicioScreenState();
@@ -262,6 +265,20 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     // Inicio muestra un resumen: la búsqueda completa corresponde a Comprobantes.
     final activity = isBodega ? list.take(4).toList() : list;
     final buyers = _todayBuyers();
+    final retailShortcuts = <RetailHomeShortcut>[
+      if (a.can('sell') && a.has('facturar'))
+        const RetailHomeShortcut('sell', 'Venta rápida',
+          Icons.shopping_bag_rounded, Color(0xFFD97763)),
+      if (a.has('stock') && (a.can('sell') || a.can('products_edit')))
+        const RetailHomeShortcut('stock', 'Inventario',
+          Icons.inventory_2_rounded, Color(0xFF5785C6)),
+      if (a.has('facturar') && a.allows('sales.read'))
+        const RetailHomeShortcut('comprobantes', 'Comprobantes',
+          Icons.receipt_long_rounded, Color(0xFF927BC5)),
+      if (a.can('collect') && a.has('caja'))
+        const RetailHomeShortcut('cash', 'Caja',
+          Icons.point_of_sale_rounded, Color(0xFFD39552)),
+    ];
     return RetailResponsiveFrame(maxWidth: 1200, child: Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,
@@ -272,7 +289,9 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               padding: isBodega
                   ? const EdgeInsets.fromLTRB(16, 12, 16, 0)
                   : EdgeInsets.zero,
-              child: HomeHeader(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [HomeHeader(
               compact: isBodega,
               name: AppState.instance.activeOrg?.name ?? '',
               currency: cur,
@@ -291,6 +310,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               onMenu: null,
               onSale: null,
               ),
+              if (isBodega && retailShortcuts.isNotEmpty)
+                RetailHomeShortcuts(
+                  items: retailShortcuts,
+                  onSelect: (id) => widget.onRetailNavigate?.call(id),
+                ),
+              ]),
             ),
           ),
           if ((!isBodega ? _primary(a) : null) case final p?)

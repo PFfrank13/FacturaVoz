@@ -78,11 +78,12 @@ class DsSection extends StatelessWidget {
 
 /// Indicador. En una fila usa [DsStatGrid] para que nunca se encimen en pantallas chicas.
 class DsStat extends StatelessWidget {
-  const DsStat({super.key, required this.label, required this.value, this.detail, this.tone, this.onTap, this.icon});
+  const DsStat({super.key, required this.label, required this.value, this.detail, this.tone, this.onTap, this.icon, this.accent});
   final String label;
   final String value;
   final String? detail;
   final Color? tone;
+  final Color? accent;
   final VoidCallback? onTap;
   final IconData? icon;
 
@@ -90,18 +91,36 @@ class DsStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final ds = DsColors.of(context);
+    final premium = accent != null;
     final body = Padding(
-      padding: const EdgeInsets.all(Gap.lg),
+      padding: EdgeInsets.all(premium ? 14 : Gap.lg),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
-          if (icon != null) ...[Icon(icon, size: 18, color: tone ?? ds.muted), const SizedBox(width: 6)],
-          Expanded(child: Text(label, style: t.textTheme.labelMedium?.copyWith(color: ds.muted), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          if (icon != null) ...[
+            if (premium)
+              Container(
+                width: 38, height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accent!.withValues(alpha: t.brightness == Brightness.dark ? .22 : .13),
+                  borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, size: 22, color: accent))
+            else
+              Icon(icon, size: 18, color: tone ?? ds.muted),
+            SizedBox(width: premium ? 8 : 6),
+          ],
+          Expanded(child: Text(label,
+            style: t.textTheme.labelMedium?.copyWith(
+              fontSize: premium ? 11.5 : null,
+              color: ds.muted,
+              fontWeight: premium ? FontWeight.w600 : null),
+            maxLines: 2, overflow: TextOverflow.ellipsis)),
         ]),
-        const SizedBox(height: 6),
+        SizedBox(height: premium ? 12 : 6),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child: Text(value, style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: tone ?? ds.ink, fontFeatures: const [FontFeature.tabularFigures()])),
+          child: Text(value, style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: premium ? ds.ink : tone ?? ds.ink, fontFeatures: const [FontFeature.tabularFigures()])),
         ),
         if (detail != null) ...[
           const SizedBox(height: 2),
@@ -114,7 +133,22 @@ class DsStat extends StatelessWidget {
       label: '$label: $value${detail == null ? '' : ', $detail'}',
       excludeSemantics: true,
       child: DecoratedBox(
-        decoration: FvSurfaces.card(t),
+        decoration: premium
+            ? BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.lerp(t.colorScheme.surface, accent!,
+                        t.brightness == Brightness.dark ? .16 : .09)!,
+                    t.colorScheme.surface,
+                  ]),
+                border: Border.all(
+                  color: accent!.withValues(alpha: .17), width: .7),
+                borderRadius: BorderRadius.circular(21),
+                boxShadow: FvTokens.shadow(t.brightness),
+              )
+            : FvSurfaces.card(t),
         child: Material(
           type: MaterialType.transparency,
           clipBehavior: Clip.antiAlias,
