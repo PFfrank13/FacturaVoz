@@ -55,6 +55,38 @@ void main() {
     });
   }
 
+  for (final width in [320.0, 390.0, 768.0]) {
+    testWidgets('dock comercial táctil en $width dp', (tester) async {
+      tester.view.physicalSize = Size(width, 840);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final navigated = <String>[];
+      var more = false;
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: Scaffold(bottomNavigationBar: RetailPremiumBottomDock(
+          current: 'home',
+          items: const [
+            ('home', 'Inicio', Icons.home_rounded),
+            ('sell', 'Ventas', Icons.shopping_cart_outlined),
+            ('stock', 'Inventario', Icons.inventory_2_outlined),
+            ('cash', 'Caja', Icons.point_of_sale_outlined),
+          ],
+          onNavigate: navigated.add,
+          onMore: () => more = true,
+        )),
+      ));
+      expect(find.byKey(const ValueKey('bodega-premium-bottom-dock')),
+          findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('bodega-dock-sell')));
+      await tester.pump();
+      expect(navigated, ['sell']);
+      await tester.tap(find.byKey(const ValueKey('bodega-dock-more')));
+      expect(more, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('los accesos se ocultan sin permisos', (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: buildTheme(Brightness.light),
