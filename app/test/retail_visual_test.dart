@@ -5,7 +5,7 @@ import 'package:facturavoz/ui/theme.dart';
 
 void main() {
   for (final brightness in [Brightness.light, Brightness.dark]) {
-    testWidgets('Retail surfaces respect ${brightness.name} theme without gradients', (tester) async {
+    testWidgets('Retail surfaces respect ${brightness.name} theme with controlled depth', (tester) async {
       await tester.pumpWidget(MaterialApp(
         theme: buildTheme(brightness),
         home: Scaffold(body: Builder(builder: (context) => Center(
@@ -36,7 +36,10 @@ void main() {
       final decorated = tester.widgetList<Container>(find.byType(Container))
           .where((w) => w.decoration is BoxDecoration)
           .map((w) => w.decoration! as BoxDecoration).toList();
-      expect(decorated.any((d) => d.color == expected.surface && d.gradient == null), isTrue);
+      // Una única superficie tonal para la cabecera: no se agrega un
+      // BackdropFilter costoso por cada indicador del panel.
+      expect(decorated.any((d) => d.gradient is LinearGradient), isTrue);
+      expect(find.byType(BackdropFilter), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
