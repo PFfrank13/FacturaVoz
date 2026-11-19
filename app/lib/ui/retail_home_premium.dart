@@ -224,19 +224,26 @@ class RetailPremiumHero extends StatelessWidget {
                           backgroundColor: Colors.white.withValues(alpha: .16),
                           color: const Color(0xFFA9E7CD)),
                       ],
-                      TextButton.icon(
-                        onPressed: () {
-                          HapticFeedback.selectionClick();
-                          onGoal();
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.fromLTRB(0, 9, 4, 0),
-                          foregroundColor: const Color(0xFFF6E0B8)),
-                        icon: const Icon(Icons.flag_outlined, size: 17),
-                        label: Text(progress == null ?
-                            'Establecer meta del mes' : 'Editar meta',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 12)),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              onGoal();
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.fromLTRB(0, 9, 4, 0),
+                              foregroundColor: const Color(0xFFF6E0B8)),
+                            icon: const Icon(Icons.flag_outlined, size: 17),
+                            label: Text(progress == null ?
+                                'Establecer meta del mes' : 'Editar meta',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 12)),
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -255,19 +262,25 @@ class _HeroChip extends StatelessWidget {
   final IconData icon;
   final String label;
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .12),
-      borderRadius: BorderRadius.circular(99)),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: const Color(0xFFC5EFDB), size: 13),
-        const SizedBox(width: 5),
-        Text(label, style: const TextStyle(
-          color: Colors.white, fontSize: 10.5,
-          fontWeight: FontWeight.w600)),
-      ]),
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(
+      maxWidth: MediaQuery.sizeOf(context).width - 72),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(99)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: const Color(0xFFC5EFDB), size: 13),
+          const SizedBox(width: 5),
+          Flexible(child: Text(label, maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white, fontSize: 10.5,
+              fontWeight: FontWeight.w600))),
+        ]),
+      ),
     ),
   );
 }
