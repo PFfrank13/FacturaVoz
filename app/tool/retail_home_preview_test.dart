@@ -1,16 +1,40 @@
 import 'dart:io';
+import 'dart:typed_data' show ByteData;
 
 import 'package:facturavoz/ui/ds.dart';
 import 'package:facturavoz/ui/glass_widgets.dart';
 import 'package:facturavoz/ui/retail_home_premium.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 /// Real Flutter pixels for a supervised visual review. Figures are fixtures
 /// copied from the example screenshot; never presented as a live data read.
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   Directory('tool/goldens').createSync(recursive: true);
+  setUpAll(() async {
+    final appFonts = FontLoader('Inter');
+    for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+      appFonts.addFont(rootBundle.load('assets/fonts/Inter-$weight.otf'));
+    }
+    await appFonts.load();
+
+    // Widget tests use Ahem blocks unless real glyph fonts are installed.
+    final sdk = Platform.environment['FLUTTER_ROOT'];
+    if (sdk == null || sdk.isEmpty) {
+      throw StateError('FLUTTER_ROOT is needed for visual previews');
+    }
+    final iconFile = File(
+      '$sdk/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+    if (!iconFile.existsSync()) {
+      throw StateError('Missing MaterialIcons: ${iconFile.path}');
+    }
+    final icons = FontLoader('MaterialIcons');
+    icons.addFont(iconFile.readAsBytes().then(ByteData.sublistView));
+    await icons.load();
+  });
   for (final width in <double>[320, 390]) {
     testWidgets('Inicio Flutter preview $width', (tester) async {
       tester.view.physicalSize = Size(width, 800);
