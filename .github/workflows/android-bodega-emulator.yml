@@ -58,11 +58,18 @@ jobs:
           profile: pixel_4
           disable-animations: true
           emulator-options: '-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim'
-          script: >-
-            cd app &&
-            flutter test integration_test/bodega_emulator_smoke_test.dart
-            -d emulator-5554
-            --no-dds
-            --dart-define=SUPABASE_URL=https://example.supabase.co
-            --dart-define=SUPABASE_ANON_KEY=ci
-            --dart-define=API_BASE_URL=https://example.vercel.app
+          script: |
+            adb logcat -c || true
+            if ! (cd app && flutter test integration_test/bodega_emulator_smoke_test.dart \
+              -d emulator-5554 \
+              --no-dds \
+              --dart-define=SUPABASE_URL=https://example.supabase.co \
+              --dart-define=SUPABASE_ANON_KEY=ci \
+              --dart-define=API_BASE_URL=https://example.vercel.app); then
+              echo 'ANDROID SMOKE FAILED: extracting device process and exception diagnostics'
+              adb shell pidof com.example.facturavoz || true
+              adb logcat -d -v brief -t 1500 | grep -Ei \
+                'AndroidRuntime|FATAL EXCEPTION|flutter|crash|OutOfMemoryError|am_crash|am_kill|Killed process|signal 11|signal 6' \
+                | tail -n 220 || true
+              exit 1
+            fi
