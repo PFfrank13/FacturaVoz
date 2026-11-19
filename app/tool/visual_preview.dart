@@ -6,6 +6,9 @@ import 'package:facturavoz/ui/retail_visual.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
+import 'dart:io';
+import 'dart:typed_data';
 
 // Widget-level captures rendered by Flutter, not concept art.
 // The amounts below are OFFLINE FIXTURES, never live financial data.
@@ -200,6 +203,26 @@ Widget _inventory() => Column(children: [
 ]);
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    final inter = FontLoader('Inter')
+      ..addFont(rootBundle.load('assets/fonts/Inter-Regular.otf'))
+      ..addFont(rootBundle.load('assets/fonts/Inter-Bold.otf'));
+    await inter.load();
+    // flutter_test replaces fonts with Ahem by default. Load the real icon
+    // font so exported previews are legible and show genuine Flutter icons.
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'] ??
+        File(Platform.resolvedExecutable)
+            .parent.parent.parent.parent.parent.path;
+    final icons = File(
+      '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+    if (await icons.exists()) {
+      final bytes = await icons.readAsBytes();
+      final loader = FontLoader('MaterialIcons')
+        ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+      await loader.load();
+    }
+  });
   for(final p in const <String>['Inicio','Venta','Inventario']) {
     testWidgets('Flutter render preview - $p', (tester) async {
       tester.view.physicalSize = const Size(390,844);
