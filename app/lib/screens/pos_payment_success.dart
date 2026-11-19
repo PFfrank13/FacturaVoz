@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
+import '../ui/glass_widgets.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'retail_receipts.dart';
@@ -57,7 +58,8 @@ class PosPaymentSuccessScreen extends StatelessWidget {
     }
 
     return Scaffold(
-        appBar: AppBar(title: const Text('Cobro registrado')),
+        appBar: AppBar(flexibleSpace: const FvGlassTopBar(),
+          title: const Text('Cobro registrado')),
         body: SafeArea(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -75,10 +77,10 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                   width: 86, height: 86,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: c.ok.withValues(alpha: .10),
-                    border: Border.all(color: c.ok, width: 2),
+                    color: c.ink.withValues(alpha: .075),
+                    border: Border.all(color: c.line, width: 1),
                   ),
-                  child: Icon(Icons.check_rounded, color: c.ok, size: 48),
+                  child: Icon(Icons.check_rounded, color: c.ink, size: 48),
                 ),
                 const SizedBox(height: 18),
                 Text('Venta registrada y cobrada', style: t.textTheme.titleLarge?.copyWith(

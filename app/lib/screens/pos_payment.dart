@@ -5,6 +5,7 @@ import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
+import '../ui/glass_widgets.dart';
 import '../models_pro.dart';
 import '../services/pro_repo.dart';
 import 'client_profile.dart' show StorageImage;
@@ -102,7 +103,7 @@ class PosPaymentBrand extends StatelessWidget {
       'transferencia' => Icons.account_balance_rounded,
       _ => Icons.credit_card_rounded,
     };
-    return Icon(ico, size: size * .66, color: const Color(0xFFB4A7FF));
+    return Icon(ico, size: size * .66, color: const Color(0xFF77777F));
   }
 }
 
@@ -206,6 +207,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
 
   void _confirm() {
     if (!_canConfirm || _method == null) return;
+    HapticFeedback.mediumImpact();
     final note = _method == 'efectivo'
         ? 'Efectivo recibido: ${money(_tendered! / 100, widget.currency)} · '
             'Vuelto: ${money(posChangeDue(chargeCents: _chargeCents, tenderedCents: _tendered!) / 100, widget.currency)}'
@@ -219,8 +221,9 @@ class _PaymentFlowState extends State<_PaymentFlow> {
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? t.colorScheme.surface,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: t.colorScheme.outline),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: t.colorScheme.outlineVariant, width: .65),
+        boxShadow: FvTokens.shadow(t.brightness),
       ),
       child: child,
     );
@@ -261,6 +264,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
     final c = DsColors.of(context);
     return Scaffold(
         appBar: AppBar(
+          flexibleSpace: const FvGlassTopBar(),
           title: Text(method == null ? 'Método de cobro' : 'Cobro ${posMethodLabel(method).toLowerCase()}'),
           leading: IconButton(
             tooltip: method == null ? 'Volver' : 'Cambiar método',
@@ -411,8 +415,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
-                    backgroundColor: FvTokens.emerald,
-                    foregroundColor: Colors.white,
+                    backgroundColor: t.colorScheme.onSurface,
+                    foregroundColor: t.colorScheme.surface,
                   ),
                   onPressed: _canConfirm ? _confirm : null,
                   icon: const Icon(Icons.check_rounded),

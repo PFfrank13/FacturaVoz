@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
+import '../ui/glass_widgets.dart';
 import 'client_profile.dart' show StorageImage;
 
 enum RetailCartAction { collect, credit }
@@ -43,6 +44,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
     final count = items.fold<double>(0, (sum, item) => sum + item.quantity);
     return Scaffold(
         appBar: AppBar(
+          flexibleSpace: const FvGlassTopBar(),
           title: const Text('Carrito de venta'),
           actions: [
             IconButton(
@@ -114,8 +116,8 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: t.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(Radii.lg),
-                              border: Border.all(color: t.colorScheme.outline),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: t.colorScheme.outlineVariant, width: .65),
                             ),
                             child: Row(children: [
                               SizedBox(
@@ -123,11 +125,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(11),
                                   child: imagePath.isEmpty
-                                    ? ColoredBox(
-                                        color: t.colorScheme.surfaceContainerHigh,
-                                        child: Icon(Icons.inventory_2_outlined,
-                                          color: t.colorScheme.primary),
-                                      )
+                                    ? FvProductPhotoFallback(name: item.description)
                                     : StorageImage(path: imagePath),
                                 ),
                               ),

@@ -52,6 +52,9 @@ void main() {
     expect(find.byType(FvProductPhotoFallback), findsWidgets);
     await tester.tap(find.byTooltip('Añadir Agua mineral 625 ml'));
     await tester.pump();
+    await tester.drag(find.byKey(const ValueKey('demo-gallery-scroll')),
+        const Offset(0, -950));
+    await tester.pumpAndSettle();
     expect(find.text('1 artículo de muestra'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
