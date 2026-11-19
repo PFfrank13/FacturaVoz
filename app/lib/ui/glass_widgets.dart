@@ -57,18 +57,24 @@ class FvProductPhotoFallback extends StatelessWidget {
             ? const [Color(0xFF242427), Color(0xFF343439)]
             : const [Color(0xFFF2F2F4), Color(0xFFE8E8EC)],
       )),
-      child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(initials.isEmpty ? '—' : initials,
-          style: t.textTheme.headlineMedium?.copyWith(
-            fontSize: 31, fontWeight: FontWeight.w600, letterSpacing: -1,
-            color: t.colorScheme.onSurface.withValues(alpha: .72))),
-        if (category != null && category!.isNotEmpty)
-          Padding(padding: const EdgeInsets.only(left: 5, right: 5, top: 4),
-            child: Text(category!, maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: t.textTheme.labelSmall?.copyWith(
-                fontSize: 10, color: t.colorScheme.onSurfaceVariant))),
-      ])),
+      child: LayoutBuilder(builder: (context, constraints) {
+        // Miniaturas del carrito y tipografía grande necesitan menos contenido.
+        final compact = constraints.maxWidth < 95 || constraints.maxHeight < 94;
+        return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(initials.isEmpty ? '—' : initials,
+            maxLines: 1,
+            style: t.textTheme.headlineMedium?.copyWith(
+              fontSize: compact ? 20 : 31,
+              fontWeight: FontWeight.w600, letterSpacing: -1,
+              color: t.colorScheme.onSurface.withValues(alpha: .72))),
+          if (!compact && category != null && category!.isNotEmpty)
+            Padding(padding: const EdgeInsets.only(left: 5, right: 5, top: 4),
+              child: Text(category!, maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: t.textTheme.labelSmall?.copyWith(
+                  fontSize: 10, color: t.colorScheme.onSurfaceVariant))),
+        ]));
+      }),
     );
   }
 }
