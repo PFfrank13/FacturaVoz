@@ -15,6 +15,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
+import '../ui/credit_luxe_widgets.dart';
 import 'client_profile.dart';
 import 'trash.dart';
 
@@ -100,7 +101,6 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
     final q = _q.trim().toLowerCase();
     final list = (_list ?? const <CreditBalance>[]).where((b) => (_all || b.balance > 0.004) && (q.isEmpty || b.name.toLowerCase().contains(q))).toList()
       ..sort((a, b) => b.balance.compareTo(a.balance));
@@ -149,7 +149,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                     ),
                     const SizedBox(height: 6),
                     if (list.isEmpty)
-                      const EmptyState(title: 'Nadie te debe 🎉', body: 'Cuando alguien se lleve algo fiado, toca «Anotar fiado», elige el cliente y registra el importe y la fecha de pago.')
+                      const EmptyState(title: 'No hay saldos pendientes', body: 'Para registrar una cuenta por cobrar, toca «Anotar fiado», elige un cliente y escribe el importe y la fecha de pago.')
                     else
                       LayoutBuilder(builder: (context, constraints) {
                         final columns = retailCardColumnCount(constraints.maxWidth, twoColumnMinWidth: 820);
@@ -181,24 +181,20 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                                     ),
                               child: Pressable(
                                 onTap: () => showClientLedger(context, b).then((_) => _load()),
-                                child: SoftCard(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Row(children: [
-                                    Expanded(
-                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                        Text(b.name, style: t.textTheme.titleSmall),
-                                        Text(
-                                          [
-                                            if (b.lastMove != null) 'Último movimiento ${shortDateTime(b.lastMove!)}',
-                                            if (b.oldestDue != null) (b.oldestDue!.compareTo(today) < 0 ? 'VENCIDO desde ${displayDate(b.oldestDue!)}' : 'Paga hasta ${displayDate(b.oldestDue!)}'),
-                                          ].join(' · '),
-                                          style: t.textTheme.bodySmall?.copyWith(color: b.oldestDue != null && b.oldestDue!.compareTo(today) < 0 ? Brand.bad : null),
-                                        ),
-                                        if (b.overLimit) const Padding(padding: EdgeInsets.only(top: 4), child: TagChip('Pasó su límite', color: Brand.bad, icon: Icons.warning_amber_rounded)),
-                                      ]),
-                                    ),
-                                    Money(money(b.balance, _cur), size: 17, weight: FontWeight.w800, color: b.balance > 0 ? Brand.bad : Brand.ok),
-                                  ]),
+                                child: FvCreditBalanceCard(
+                                  name: b.name,
+                                  amount: money(b.balance, _cur),
+                                  hasBalance: b.balance > 0.004,
+                                  overdue: b.balance > 0.004 &&
+                                      b.oldestDue != null &&
+                                      b.oldestDue!.compareTo(today) < 0,
+                                  overLimit: b.balance > 0.004 && b.overLimit,
+                                  lastMovement: b.lastMove == null
+                                      ? null : shortDateTime(b.lastMove!),
+                                  dueLabel: b.balance <= 0.004 || b.oldestDue == null ? null
+                                      : (b.oldestDue!.compareTo(today) < 0
+                                          ? 'Vencido desde ${displayDate(b.oldestDue!)}'
+                                          : 'Paga hasta ${displayDate(b.oldestDue!)}'),
                                 ),
                               ),
                             ),
