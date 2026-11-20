@@ -4,6 +4,7 @@ import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
 import '../ui/glass_widgets.dart';
+import '../ui/design_tokens.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'retail_receipts.dart';
@@ -69,18 +70,32 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
               decoration: BoxDecoration(
                 color: c.surface,
-                borderRadius: BorderRadius.circular(Radii.lg),
+                borderRadius: BorderRadius.circular(FvTokens.sheetRadius),
                 border: Border.all(color: c.line),
+                boxShadow: FvTokens.shadow(t.brightness),
               ),
               child: Column(children: [
-                Container(
-                  width: 86, height: 86,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: c.ink.withValues(alpha: .075),
-                    border: Border.all(color: c.line, width: 1),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: .82, end: 1),
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero : const Duration(milliseconds: 450),
+                  curve: Curves.easeOutBack,
+                  builder: (context, scale, child) =>
+                      Transform.scale(scale: scale, child: child),
+                  child: Container(
+                    width: 86, height: 86,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: t.brightness == Brightness.dark
+                          ? FvLuxe.jade.withValues(alpha: .25)
+                          : FvLuxe.jadeSoft,
+                      border: Border.all(
+                        color: t.colorScheme.primary.withValues(alpha: .33),
+                        width: 1.1),
+                    ),
+                    child: Icon(Icons.check_rounded,
+                      color: t.colorScheme.primary, size: 48),
                   ),
-                  child: Icon(Icons.check_rounded, color: c.ink, size: 48),
                 ),
                 const SizedBox(height: 18),
                 Text('Venta registrada y cobrada', style: t.textTheme.titleLarge?.copyWith(
