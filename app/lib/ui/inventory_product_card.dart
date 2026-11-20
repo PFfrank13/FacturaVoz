@@ -86,7 +86,7 @@ class FvInventoryProductCard extends StatelessWidget {
                                 child: Icon(
                                   isService ? Icons.handyman_rounded
                                       : Icons.inventory_2_rounded,
-                                  color: dark ? FvLuxe.emeraldDark
+                                  color: dark ? FvTokens.emeraldDark
                                       : FvLuxe.jade,
                                   size: 33),
                               ),
