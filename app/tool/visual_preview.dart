@@ -239,6 +239,18 @@ void main() {
         'Venta' => _pos(),
         _ => _inventory(),
       }));
+      if (p == 'Venta') {
+        // A test capture must wait for image decoding, not just layout.
+        // In an actual app the image cache fills asynchronously.
+        final context = tester.element(find.byKey(const ValueKey('preview-root')));
+        await tester.runAsync(() async {
+          await Future.wait([
+            for (final name in const ['water','milk','rice','oil','bread','cookies'])
+              precacheImage(AssetImage('assets/demo/$name.webp'), context),
+          ]);
+        });
+      }
+      await tester.pump();
       await tester.pumpAndSettle();
       await expectLater(find.byKey(const ValueKey('preview-root')),
         matchesGoldenFile('previews/${p.toLowerCase()}.png'));
