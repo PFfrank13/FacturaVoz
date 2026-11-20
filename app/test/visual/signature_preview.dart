@@ -41,6 +41,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:web_socket/testing.dart' as sockets;
+import 'package:web_socket/web_socket.dart'
+    show TextDataReceived, WebSocketConnectionClosed;
+import 'package:web_socket_channel/adapter_web_socket_channel.dart';
 
 // All HTTP responses and device storage in this preview are in memory.
 const _org = 'studio-fixture';
@@ -185,6 +189,39 @@ Object? _response(http.Request request) {
   return [];
 }
 
+// The screens subscribe to Supabase even when the fixture contains no changes.
+// Acknowledge channel joins, leaves and heartbeats over an in-memory socket.
+AdapterWebSocketChannel _realtimeFixture(
+  String url,
+  Map<String, String> headers,
+) {
+  final (client, server) = sockets.fakes();
+  server.events.listen((event) {
+    if (event is! TextDataReceived) return;
+    final frame = jsonDecode(event.text) as List<dynamic>;
+    final [joinRef, ref, topic, action, _] = frame;
+    if (action == 'phx_join' ||
+        action == 'phx_leave' ||
+        action == 'heartbeat') {
+      try {
+        server.sendText(
+          jsonEncode([
+            joinRef,
+            ref,
+            topic,
+            'phx_reply',
+            {'status': 'ok', 'response': <String, dynamic>{}},
+          ]),
+        );
+      } on WebSocketConnectionClosed {
+        // A leave can already be in flight when the app closes the transport.
+        return;
+      }
+    }
+  });
+  return AdapterWebSocketChannel(client);
+}
+
 Future<void> _fonts() async {
   for (final entry in {
     'Inter': [
@@ -252,6 +289,9 @@ void main() {
     await Supabase.initialize(
       url: 'http://127.0.0.1:1',
       publishableKey: 'preview',
+      realtimeClientOptions: const RealtimeClientOptions(
+        transport: _realtimeFixture,
+      ),
       httpClient: MockClient(
         (req) async => http.Response(
           jsonEncode(_response(req)),
