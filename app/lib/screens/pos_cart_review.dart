@@ -18,6 +18,7 @@ class PosCartReviewScreen extends StatefulWidget {
     required this.currency,
     required this.taxRate,
     required this.productImages,
+    this.fixtureAssetPhotos = const {},
     this.canSellOnCredit = false,
     this.sheetScrollController,
   });
@@ -27,6 +28,8 @@ class PosCartReviewScreen extends StatefulWidget {
   final String currency;
   final double taxRate;
   final Map<String, String> productImages;
+  /// Fotos de activos locales solo para previsualizaciones y pruebas.
+  final Map<String, String> fixtureAssetPhotos;
   final bool canSellOnCredit;
   /// El mismo carrito puede ser pantalla completa o sheet draggable.
   final ScrollController? sheetScrollController;
@@ -112,6 +115,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                           final item = items[i];
                           final id = item.productId;
                           final imagePath = widget.productImages[id] ?? '';
+                          final fixtureAsset = widget.fixtureAssetPhotos[id] ?? '';
                           return Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -125,9 +129,13 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                 width: 56, height: 65,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(11),
-                                  child: imagePath.isEmpty
-                                    ? FvProductPhotoFallback(name: item.description)
-                                    : StorageImage(path: imagePath),
+                                  child: imagePath.isNotEmpty
+                                    ? StorageImage(path: imagePath)
+                                    : fixtureAsset.isNotEmpty
+                                        ? Image.asset(fixtureAsset,
+                                            fit: BoxFit.contain,
+                                            filterQuality: FilterQuality.medium)
+                                        : FvProductPhotoFallback(name: item.description),
                                 ),
                               ),
                               const SizedBox(width: 10),
