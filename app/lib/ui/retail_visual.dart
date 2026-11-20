@@ -14,7 +14,7 @@ abstract final class RetailVisual {
   static const violet = FvTokens.ink; // Alias legado; usar roles del tema.
   static const mint = FvTokens.emerald;
 
-  /// Cabecera informativa plana, sin degradados, ornamentos ni sombra neon.
+  /// Cabecera editorial compartida por los módulos operativos.
   /// El contraste se deriva del tema activo (claro/oscuro).
   static Widget hero({
     required BuildContext context,
@@ -35,51 +35,31 @@ abstract final class RetailVisual {
             ? const Color(0xFF476174) : Colors.white, width: 1.1),
         boxShadow: FvTokens.shadow(t.brightness),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 14 : 20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              width: 46, height: 46,
-              decoration: BoxDecoration(
-                color: t.brightness == Brightness.dark
-                    ? FvLuxe.jade.withValues(alpha: .25)
-                    : Colors.white.withValues(alpha: .72),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: .55)),
-              ),
-              child: Icon(icon, color: t.brightness == Brightness.dark
-                  ? FvTokens.emeraldDark : FvLuxe.jade, size: 24),
-            ),
-            const SizedBox(width: Gap.md),
-            Expanded(
-              child: Text(eyebrow, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: t.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w700, color: c.muted,
-                  letterSpacing: .35)),
-            ),
+      clipBehavior: Clip.antiAlias,
+      child: CustomPaint(
+        painter: FvEngraving(c.primaryText.withValues(alpha: MediaQuery.highContrastOf(context) ? 0 : .09)),
+        child: Padding(
+          padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 16 : 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(icon, color: c.primaryText, size: 19),
+              const SizedBox(width: Gap.sm),
+              Expanded(child: Text(eyebrow, style: t.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600, color: c.primaryText))),
+            ]),
+            const SizedBox(height: 14),
+            Text(title, style: t.textTheme.headlineMedium?.copyWith(
+              color: c.ink, fontSize: MediaQuery.sizeOf(context).width < 360 ? 26 : null)),
+            const SizedBox(height: 6),
+            Text(subtitle, style: t.textTheme.bodyMedium?.copyWith(color: c.muted)),
+            if (footer != null) ...[
+              const SizedBox(height: 16),
+              Divider(color: c.line),
+              const SizedBox(height: 14),
+              footer,
+            ],
           ]),
-          const SizedBox(height: 18),
-          Text(title, softWrap: true, style: t.textTheme.headlineSmall?.copyWith(
-            color: c.ink, fontWeight: FontWeight.w800,
-            letterSpacing: -.45)),
-          const SizedBox(height: 8),
-          Text(subtitle, style: t.textTheme.bodyMedium?.copyWith(
-            color: c.muted, height: 1.45)),
-          if (footer != null) ...[
-            const SizedBox(height: 18),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: t.colorScheme.surface.withValues(alpha: .74),
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(color: Colors.white.withValues(alpha: .55)),
-              ),
-              child: footer,
-            ),
-          ],
-        ]),
+        ),
       ),
     );
   }
@@ -97,15 +77,7 @@ abstract final class RetailVisual {
       return Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 12),
         child: Row(children: [
-          Container(
-            width: 38, height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: c.elevated,
-              borderRadius: BorderRadius.circular(14)),
-            child: Text('$number', style: t.textTheme.titleMedium?.copyWith(
-              color: c.ink, fontWeight: FontWeight.w800)),
-          ),
+          Icon(icon, color: c.primaryText, size: 21),
           const SizedBox(width: Gap.md),
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -116,7 +88,7 @@ abstract final class RetailVisual {
             ],
           )),
           const SizedBox(width: Gap.sm),
-          Icon(icon, color: c.muted, size: 21),
+          Text('$number', style: t.textTheme.labelMedium?.copyWith(color: c.muted)),
         ]),
       );
     });

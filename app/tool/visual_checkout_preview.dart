@@ -104,6 +104,7 @@ void main() {
       ..addFont(rootBundle.load('assets/fonts/Inter-Regular.otf'))
       ..addFont(rootBundle.load('assets/fonts/Inter-Bold.otf'));
     await inter.load();
+    await (FontLoader('DM Serif Text')..addFont(rootBundle.load('assets/fonts/DMSerifText-Regular.ttf'))).load();
     final flutterRoot = Platform.environment['FLUTTER_ROOT'] ??
         File(Platform.resolvedExecutable).parent.parent.parent.parent.parent.path;
     final icons = File(

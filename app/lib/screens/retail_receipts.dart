@@ -513,16 +513,15 @@ class RetailReceiptActionTile extends StatelessWidget {
             const SizedBox(width: Gap.md),
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: t.textTheme.titleSmall?.copyWith(
-                    color: c.ink, fontWeight: FontWeight.w800)),
+                Text(label, style: t.textTheme.titleMedium?.copyWith(color: c.ink)),
                 const SizedBox(height: 4),
                 Text(caption,
                   style: t.textTheme.bodySmall?.copyWith(color: c.muted)),
               ],
             )),
             const SizedBox(width: Gap.xs),
-            Icon(Icons.chevron_right_rounded, color: c.muted, size: 20),
+            Icon(onTap == null ? Icons.lock_outline_rounded : Icons.chevron_right_rounded,
+              color: c.muted, size: 20),
           ]),
         ),
       ),

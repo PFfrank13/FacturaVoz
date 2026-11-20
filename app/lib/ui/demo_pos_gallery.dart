@@ -60,7 +60,7 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
             parent: AlwaysScrollableScrollPhysics()),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
         children: [
-          FvGlassSurface(radius: 20, blur: 18,
+          Container(decoration: FvSurfaces.card(t),
             padding: const EdgeInsets.all(16),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Icon(Icons.visibility_outlined, size: 24),
@@ -113,7 +113,7 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
                 quantity: qty > 0 ? '$qty' : null,
                 icon: Icons.shopping_bag_outlined,
                 photo: widget.loadPhotos
-                    ? Image.asset(p.photo, fit: BoxFit.contain,
+                    ? Image.asset(p.photo, fit: BoxFit.cover,
                         width: double.infinity, height: double.infinity,
                         filterQuality: FilterQuality.medium,
                         semanticLabel: 'Foto ilustrativa de ${p.name}',
@@ -127,7 +127,7 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
             },
           ),
           const SizedBox(height: 20),
-          FvGlassSurface(radius: 20, blur: 18,
+          Container(decoration: FvSurfaces.card(t),
             padding: const EdgeInsets.all(18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -167,8 +167,8 @@ class FvDemoInventoryGallery extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      FvGlassSurface(
-        radius: 20, blur: 18, padding: const EdgeInsets.all(16),
+      Container(
+        decoration: FvSurfaces.card(t), padding: const EdgeInsets.all(16),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Icon(Icons.visibility_outlined, size: 23),
           const SizedBox(width: 12),

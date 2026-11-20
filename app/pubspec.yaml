@@ -1,7 +1,7 @@
 name: facturavoz
 description: FacturaVoz - facturación por voz (Android, iOS y Web).
 publish_to: "none"
-version: 3.3.0+8
+version: 3.4.0+9
 
 environment:
   sdk: ">=3.9.0 <4.0.0"
@@ -48,6 +48,8 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  web_socket: ^1.0.1
+  web_socket_channel: ^3.0.3
 
 flutter:
   uses-material-design: true
@@ -55,10 +57,14 @@ flutter:
     - assets/fonts/DejaVuSans.ttf
     - assets/fonts/DejaVuSans-Bold.ttf
     - assets/fonts/Inter-LICENSE.txt
+    - assets/fonts/DMSerifText-LICENSE.txt
     - assets/branding/
     - assets/photos/
     - assets/demo/
   fonts:
+    - family: DM Serif Text
+      fonts:
+        - asset: assets/fonts/DMSerifText-Regular.ttf
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.otf

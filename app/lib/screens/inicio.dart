@@ -279,8 +279,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                   crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Hola, ${AppState.instance.activeOrg?.name ?? 'tu negocio'}',
                       maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: t.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800, letterSpacing: -.8)),
+                      style: t.textTheme.headlineMedium),
                     const SizedBox(height: 4),
                     Text('Así marcha tu negocio hoy',
                       style: t.textTheme.bodyMedium?.copyWith(

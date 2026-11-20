@@ -18,8 +18,8 @@ void main() {
     expect(DsColors.light.bg, FvTokens.canvas);
     expect(DsColors.dark.bg, FvTokens.canvasDark);
     expect(Brand.heroGradient.colors,
-        [const Color(0xFF087F68), const Color(0xFF2864A2)]);
-    expect(Brand.coralGradient.colors.first, const Color(0xFF087F68));
+        [FvLuxe.forest, FvLuxe.jade]);
+    expect(Brand.coralGradient.colors.first, FvLuxe.forest);
   });
 
   test('acciones y textos esenciales cumplen contraste AA en ambos modos', () {

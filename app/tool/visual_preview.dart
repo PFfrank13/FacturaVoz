@@ -205,6 +205,7 @@ void main() {
       ..addFont(rootBundle.load('assets/fonts/Inter-Regular.otf'))
       ..addFont(rootBundle.load('assets/fonts/Inter-Bold.otf'));
     await inter.load();
+    await (FontLoader('DM Serif Text')..addFont(rootBundle.load('assets/fonts/DMSerifText-Regular.ttf'))).load();
     // flutter_test replaces fonts with Ahem by default. Load the real icon
     // font so exported previews are legible and show genuine Flutter icons.
     final flutterRoot = Platform.environment['FLUTTER_ROOT'] ??

@@ -16,6 +16,7 @@ import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
 import '../ui/demo_pos_gallery.dart';
 import '../ui/inventory_product_card.dart';
+import '../ui/glass_widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
@@ -758,7 +759,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     return Scaffold(
       backgroundColor: widget.embedded && Access.instance.rubro == 'bodega'
           ? Colors.transparent : null,
-      appBar: widget.embedded ? null : AppBar(title: const Text('Productos y servicios'), actions: [
+      appBar: widget.embedded ? null : AppBar(title: LayoutBuilder(builder: (context, bounds) =>
+        Text(bounds.maxWidth < MediaQuery.textScalerOf(context).scale(198)
+            ? 'Productos' : 'Productos y servicios', semanticsLabel: 'Productos y servicios')), actions: [
         if (Access.instance.has('stock') && Access.instance.can('products_edit'))
           IconButton(
             tooltip: 'Compras y recepción', icon: const Icon(Icons.local_shipping_outlined),
@@ -768,7 +771,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             },
           ),
       ]),
-      floatingActionButton: !widget.embedded && _canManageProducts
+      floatingActionButton: !widget.embedded && Access.instance.rubro != 'bodega' && _canManageProducts
           ? FloatingActionButton.extended(
               onPressed: () => _edit(),
               icon: const Icon(Icons.add_rounded),
@@ -915,7 +918,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                                 .toString().isNotEmpty
                             ? IgnorePointer(child: StorageImage(
                                 path: (_catalogExtras[p.id]?['image_path'] ?? '').toString(),
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
+                                placeholder: FvProductPhotoFallback(name: p.name),
                               ))
                             : null,
                         onOpen: _canManageProducts ? () => _more(p) : null,

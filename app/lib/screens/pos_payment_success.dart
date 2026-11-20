@@ -78,7 +78,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: .82, end: 1),
                   duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero : const Duration(milliseconds: 450),
+                      ? Duration.zero : FvTokens.transition,
                   curve: Curves.easeOutBack,
                   builder: (context, scale, child) =>
                       Transform.scale(scale: scale, child: child),
@@ -98,10 +98,9 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Text('Venta registrada y cobrada', style: t.textTheme.titleLarge?.copyWith(
-                  color: c.ink, fontWeight: FontWeight.w800)),
+                Text('Venta registrada y cobrada', textAlign: TextAlign.center, style: t.textTheme.headlineSmall),
                 const SizedBox(height: 6),
-                Text(money(total, currency), style: t.textTheme.headlineMedium?.copyWith(
+                Text(money(total, currency), style: t.textTheme.displaySmall?.copyWith(
                   color: c.ink, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Container(

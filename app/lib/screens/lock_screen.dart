@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../pin_logic.dart';
 import '../services/app_lock.dart';
 import '../ui/theme.dart';
+import '../ui/design_tokens.dart';
 import '../ui/widgets.dart';
 
 const _okGreen = Color(0xFF5BE3B0);
@@ -25,7 +26,17 @@ class LockBackdrop extends StatefulWidget {
 }
 
 class _LockBackdropState extends State<LockBackdrop> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 12));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -47,7 +58,7 @@ class _LockBackdropState extends State<LockBackdrop> with SingleTickerProviderSt
     return Stack(fit: StackFit.expand, children: [
       const DecoratedBox(
         decoration: BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1A1940), Color(0xFF2B2480), Color(0xFF14132B)]),
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [FvTokens.canvasDark, FvLuxe.forest, FvTokens.canvasDark]),
         ),
       ),
       RepaintBoundary(
@@ -56,7 +67,7 @@ class _LockBackdropState extends State<LockBackdrop> with SingleTickerProviderSt
           builder: (context, _) {
             final t = _c.value * 2 * math.pi;
             return Stack(fit: StackFit.expand, children: [
-              Align(alignment: Alignment(-0.9 + 0.35 * math.sin(t), -0.75 + 0.2 * math.cos(t)), child: _halo(Brand.lilac, 380)),
+              Align(alignment: Alignment(-0.9 + 0.35 * math.sin(t), -0.75 + 0.2 * math.cos(t)), child: _halo(FvLuxe.jade, 380)),
               Align(alignment: Alignment(0.95 + 0.25 * math.cos(t), 0.85 + 0.15 * math.sin(t)), child: _halo(Brand.gold, 340)),
             ]);
           },

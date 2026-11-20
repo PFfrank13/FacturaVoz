@@ -19,8 +19,10 @@ class RetailPosCartPane extends StatelessWidget {
     required this.currency,
     required this.onReview,
     this.onQuantityChange,
+    this.cartAnchor,
   });
 
+  final Key? cartAnchor;
   final List<LineItem> lines;
   final Totals totals;
   final String currency;
@@ -54,7 +56,7 @@ class RetailPosCartPane extends StatelessWidget {
                 color: cs.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: Icon(Icons.shopping_bag_outlined, color: ds.primaryText, size: 22),
+              child: Icon(Icons.shopping_bag_outlined, key: cartAnchor, color: ds.primaryText, size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -13,6 +13,7 @@ import '../services/live.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/ds.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
 import 'client_profile.dart';
@@ -108,9 +109,9 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
     final today = todayIso();
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Fiados')),
-      floatingActionButton: widget.embedded ? null : FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.add_rounded), label: const Text('Anotar fiado')),
+      floatingActionButton: widget.embedded || (_list != null && _error == null) ? null : FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.add_rounded), label: const Text('Anotar fiado')),
       body: _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          ? Center(child: DsStateView.error(message: _error!, onRetry: _load))
           : _list == null
               ? const SkeletonList()
               : RefreshIndicator(
@@ -138,7 +139,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                         onPressed: _new,
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Anotar fiado'),
-                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54), textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54), textStyle: t.textTheme.labelLarge),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -149,7 +150,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                     ),
                     const SizedBox(height: 6),
                     if (list.isEmpty)
-                      const EmptyState(title: 'Nadie te debe 🎉', body: 'Cuando alguien se lleve algo fiado, toca «Anotar fiado», elige el cliente y registra el importe y la fecha de pago.')
+                      const EmptyState(title: 'Nadie te debe', body: 'Cuando alguien se lleve algo fiado, toca «Anotar fiado», elige el cliente y registra el importe y la fecha de pago.')
                     else
                       LayoutBuilder(builder: (context, constraints) {
                         final columns = retailCardColumnCount(constraints.maxWidth, twoColumnMinWidth: 820);

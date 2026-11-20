@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'design_tokens.dart';
 import 'motion.dart';
+import 'glass_widgets.dart';
 
 /// Presentación del inventario real. Los datos, permisos y cambios de stock
 /// siguen siendo responsabilidad de ProductsScreen y sus repositorios.
@@ -38,7 +39,6 @@ class FvInventoryProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final dark = t.brightness == Brightness.dark;
     final muted = t.colorScheme.onSurfaceVariant;
     final accent = stockIsCritical ? t.colorScheme.error
         : lowStock ? FvLuxe.gold
@@ -80,16 +80,8 @@ class FvInventoryProductCard extends StatelessWidget {
                             child: SizedBox(
                               width: 88,
                               height: 88,
-                              child: photo ?? DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: FvLuxe.productBackdrop(t.brightness)),
-                                child: Icon(
-                                  isService ? Icons.handyman_rounded
-                                      : Icons.inventory_2_rounded,
-                                  color: dark ? FvTokens.emeraldDark
-                                      : FvLuxe.jade,
-                                  size: 33),
-                              ),
+                              child: photo ?? FvProductPhotoFallback(name: name, category: category,
+                                icon: isService ? Icons.handyman_outlined : Icons.inventory_2_outlined),
                             ),
                           ),
                           const SizedBox(width: 13),

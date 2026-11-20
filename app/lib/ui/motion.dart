@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show FrameTiming, ImageFilter, TimingsCallback;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import 'theme.dart';
@@ -44,8 +45,8 @@ bool reduceMotion(BuildContext context) => MediaQuery.of(context).disableAnimati
 class PremiumRoute<T> extends PageRouteBuilder<T> {
   PremiumRoute({required WidgetBuilder builder, super.fullscreenDialog})
       : super(
-          transitionDuration: const Duration(milliseconds: 420),
-          reverseTransitionDuration: const Duration(milliseconds: 320),
+          transitionDuration: const Duration(milliseconds: 260),
+          reverseTransitionDuration: const Duration(milliseconds: 200),
           pageBuilder: (context, _, _) => builder(context),
           transitionsBuilder: (context, animation, secondary, child) {
             if (MediaQuery.of(context).disableAnimations) return child;
@@ -149,8 +150,8 @@ class _FvTactileScaleState extends State<FvTactileScale> {
         child: AnimatedScale(
           scale: widget.enabled && !reduceMotion(context) && _pressed
               ? widget.pressedScale : 1,
-          duration: Motion.d(context, Motion.instant),
-          curve: Curves.easeOutCubic,
+          duration: Motion.d(context, _pressed ? Motion.instant : Motion.fast),
+          curve: _pressed ? Motion.enter : Motion.spring,
           child: widget.child,
         ),
       );
@@ -996,6 +997,19 @@ class TagChip extends StatelessWidget {
 //  · Sombras y radios NUNCA con curvas que rebotan (easeOutBack/elastic dan valores negativos): usa Motion.shadow.
 //  · Los rebotes solo en escalas (scale) y nunca por debajo de 0.
 //  · Respeta "Reducir animaciones" del sistema y el interruptor de la app (reduceMotion(context)).
+class _ControlSpring extends Curve {
+  const _ControlSpring();
+
+  static final _simulation = SpringSimulation(
+    const SpringDescription(mass: 1, stiffness: 360, damping: 32), 0, 1, 0,
+  );
+  static const _settlingTime = 0.36;
+
+  @override
+  double transformInternal(double t) =>
+      _simulation.x(t * _settlingTime) / _simulation.x(_settlingTime);
+}
+
 class Motion {
   static const instant = Duration(milliseconds: 90);
   static const fast = Duration(milliseconds: 180);
@@ -1011,7 +1025,7 @@ class Motion {
   static const emphasized = Curves.easeInOutCubicEmphasized;
 
   /// Rebote suave para escalas (botones, chips). NO usar en sombras ni tamaños que puedan quedar negativos.
-  static const spring = Curves.easeOutBack;
+  static const Curve spring = _ControlSpring();
 
   /// Para sombras, radios y opacidades: sin rebote.
   static const shadow = Curves.easeOutCubic;
