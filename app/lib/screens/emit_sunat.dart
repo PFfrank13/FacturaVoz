@@ -125,7 +125,9 @@ class _EmitSunatScreenState extends State<EmitSunatScreen> {
             if (widget.company.env == 'beta')
               Card(
                 color: scheme.tertiaryContainer,
-                child: const Padding(padding: EdgeInsets.all(12), child: Text('Entorno de PRUEBAS (SUNAT beta): los comprobantes no tienen validez.')),
+                child: Padding(padding: const EdgeInsets.all(12), child: Text(
+                    'Entorno de PRUEBAS (SUNAT beta): los comprobantes no tienen validez.',
+                    style: TextStyle(color: scheme.onTertiaryContainer))),
               ),
             if (r != null) _resultCard(r) else ..._form(t),
           ],

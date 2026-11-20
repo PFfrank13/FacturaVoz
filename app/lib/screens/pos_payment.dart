@@ -18,8 +18,7 @@ class PosPaymentApproval {
   final String note;
 }
 
-/// Brand-inspired marks matching the supplied visual reference. No invented
-/// bank QR or claim that the payment network authorized a transaction.
+/// Identifica el medio de pago también cuando el dispositivo está sin conexión.
 class PosPaymentBrand extends StatelessWidget {
   const PosPaymentBrand(this.method, {super.key, this.size = 53});
   final String method;
