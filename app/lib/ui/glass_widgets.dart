@@ -56,7 +56,7 @@ class FvProductPhotoFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final descriptor = (name + ' ' + (category ?? '')).toLowerCase();
+    final descriptor = '$name ${category ?? ''}'.toLowerCase();
     final pictogram = descriptor.contains('agua') || descriptor.contains('bebida')
         ? Icons.water_drop_outlined
         : descriptor.contains('leche') || descriptor.contains('lácteo')
