@@ -1,5 +1,6 @@
 import 'package:facturavoz/ui/design_tokens.dart';
 import 'package:facturavoz/ui/pos_product_card.dart';
+import 'package:facturavoz/ui/inventory_product_card.dart';
 import 'package:facturavoz/ui/retail_home_premium.dart';
 import 'package:facturavoz/ui/retail_visual.dart';
 import 'package:facturavoz/ui/motion.dart';
@@ -170,39 +171,28 @@ Widget _inventory() => Column(children: [
           subtitle:'Precios, existencias y alertas en un mismo lugar.',
           icon:Icons.inventory_2_outlined)),
         const SizedBox(height:16),
-        for(final p in const [
-          ('Agua mineral 625 ml','S/ 1.80','48','assets/demo/water.webp'),
-          ('Leche fresca 1 L','S/ 4.90','24','assets/demo/milk.webp'),
-          ('Arroz extra 1 kg','S/ 4.50','6','assets/demo/rice.webp'),
-          ('Aceite de oliva','S/ 17.90','18','assets/demo/oil.webp'),
-          ('Pan artesanal','S/ 5.50','12','assets/demo/bread.webp'),
+for (final p in const [
+          ('Agua mineral 625 ml', 'S/ 1.80', '48', 'assets/demo/water.webp', 'Bebidas'),
+          ('Leche fresca 1 L', 'S/ 4.90', '24', 'assets/demo/milk.webp', 'Lácteos'),
+          ('Arroz extra 1 kg', 'S/ 4.50', '6', 'assets/demo/rice.webp', 'Abarrotes'),
+          ('Aceite de oliva', 'S/ 17.90', '18', 'assets/demo/oil.webp', 'Abarrotes'),
+          ('Pan artesanal', 'S/ 5.50', '12', 'assets/demo/bread.webp', 'Panadería'),
         ])
-          Padding(padding:const EdgeInsets.only(bottom:10),
-            child: Container(
-              height:84,padding:const EdgeInsets.all(10),
-              decoration:BoxDecoration(
-                color:Colors.white,borderRadius:BorderRadius.circular(20),
-                border:Border.all(color:const Color(0xFFE3EBF3))),
-              child:Row(children: [
-                ClipRRect(borderRadius:BorderRadius.circular(13),
-                  child:SizedBox(width:58,height:60,
-                    child:Image.asset(p.$4,fit:BoxFit.cover,
-                      filterQuality:FilterQuality.medium))),
-                const SizedBox(width:13),
-                Expanded(child:Column(
-                  crossAxisAlignment:CrossAxisAlignment.start,
-                  mainAxisAlignment:MainAxisAlignment.center,children: [
-                    Text(p.$1,maxLines:1,overflow:TextOverflow.ellipsis,
-                      style:const TextStyle(fontWeight:FontWeight.w600,fontSize:13)),
-                    const SizedBox(height:5),
-                    Text(p.$2,style:const TextStyle(
-                      color:FvLuxe.jade,fontWeight:FontWeight.w700,fontSize:14)),
-                  ])),
-                Text(p.$3,style:const TextStyle(
-                  fontWeight:FontWeight.w700,color:FvLuxe.jade)),
-                const Icon(Icons.chevron_right_rounded,color:Colors.black45),
-              ]),
-            )),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 11),
+            child: FvInventoryProductCard(
+              name: p.$1,
+              price: p.$2,
+              active: true,
+              isService: false,
+              category: p.$5,
+              stockLabel: 'Stock ${p.$3}',
+              photo: Image.asset(p.$4, fit: BoxFit.cover,
+                filterQuality: FilterQuality.medium,
+                semanticLabel: 'Fotografía ilustrativa de ${p.$1}'),
+              onOpen: () {},
+            ),
+          ),
       ]),
     ),
   )),
@@ -239,7 +229,7 @@ void main() {
         'Venta' => _pos(),
         _ => _inventory(),
       }));
-      if (p == 'Venta') {
+      if (p == 'Venta' || p == 'Inventario') {
         // A test capture must wait for image decoding, not just layout.
         // In an actual app the image cache fills asynchronously.
         final context = tester.element(find.byKey(const ValueKey('preview-root')));

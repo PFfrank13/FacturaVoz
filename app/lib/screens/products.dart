@@ -14,8 +14,8 @@ import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
-import '../ui/glass_widgets.dart';
 import '../ui/demo_pos_gallery.dart';
+import '../ui/inventory_product_card.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import '../services/v2_repo.dart';
@@ -886,64 +886,43 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     spacing: 10,
                     runSpacing: 10,
                     children: [
+
               for (final (i, p) in list.indexed)
-                SizedBox(width: itemWidth, child: Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Reveal(
-                    key: ValueKey(p.id),
-                    index: i < 8 ? i : 8,
-                    child: Opacity(
-                      opacity: p.active ? 1 : .5,
-                      child: Pressable(
-                        onTap: _canManageProducts ? () => _more(p) : null,
-                        child: SoftCard(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(children: [
-                            SizedBox(
-                              width: 56, height: 62,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: (_catalogExtras[p.id]?['image_path'] ?? '').toString().isNotEmpty
-                                  ? IgnorePointer(child: StorageImage(
-                                      path: (_catalogExtras[p.id]?['image_path'] ?? '').toString(),
-                                      fit: BoxFit.contain,
-                                    ))
-                                  : FvProductPhotoFallback(
-                                      name: p.name,
-                                      category: (_catalogExtras[p.id]?['category'] ?? '').toString(),)
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                Text(p.active ? (p.isService ? 'Servicio' : 'Producto') : 'Archivado', style: t.textTheme.bodySmall),
-                                if ((_catalogExtras[p.id]?['barcode'] ?? '').toString().isNotEmpty)
-                                  Text('Código: ${_catalogExtras[p.id]!['barcode']}',
-                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.bodySmall),
-                                if (p.tracksStock || p.margin != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Wrap(spacing: 6, runSpacing: 4, children: [
-                                      if (p.tracksStock) StatusPill(p.stock != null && p.stock! < 0
-                                          ? 'Regularizar ${qtyText(-p.stock!)}'
-                                          : 'Stock ${qtyText(p.stock ?? 0)}',
-                                          tone: p.stock != null && p.stock! < 0
-                                              ? PillTone.bad : (p.lowStock ? PillTone.warn : PillTone.ok)),
-                                      if (p.margin != null)
-                                        StatusPill('Margen ${(p.margin! * 100).round()} %', tone: p.margin! < 0.15 ? PillTone.bad : (p.margin! < 0.3 ? PillTone.warn : PillTone.ok)),
-                                    ]),
-                                  ),
-                              ]),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(p.unitPrice.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w700)),
-                          ]),
-                        ),
+                SizedBox(
+                  width: itemWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Reveal(
+                      key: ValueKey(p.id),
+                      index: i < 8 ? i : 8,
+                      child: FvInventoryProductCard(
+                        name: p.name,
+                        price: p.unitPrice.toStringAsFixed(2),
+                        isService: p.isService,
+                        active: p.active,
+                        category: (_catalogExtras[p.id]?['category'] ?? '').toString(),
+                        barcode: (_catalogExtras[p.id]?['barcode'] ?? '').toString(),
+                        stockLabel: p.tracksStock
+                            ? (p.stock != null && p.stock! < 0
+                                ? 'Regularizar ${qtyText(-p.stock!)}'
+                                : 'Stock ${qtyText(p.stock ?? 0)}')
+                            : null,
+                        lowStock: p.lowStock,
+                        stockIsCritical: p.stock != null && p.stock! < 0,
+                        marginLabel: p.margin == null
+                            ? null : 'Margen ${(p.margin! * 100).round()} %',
+                        photo: (_catalogExtras[p.id]?['image_path'] ?? '')
+                                .toString().isNotEmpty
+                            ? IgnorePointer(child: StorageImage(
+                                path: (_catalogExtras[p.id]?['image_path'] ?? '').toString(),
+                                fit: BoxFit.cover,
+                              ))
+                            : null,
+                        onOpen: _canManageProducts ? () => _more(p) : null,
                       ),
                     ),
                   ),
-                )),
+                ),
                     ],
                   );
                 },
