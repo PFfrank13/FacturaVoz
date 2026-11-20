@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/glass_widgets.dart';
+import '../ui/design_tokens.dart';
 import 'client_profile.dart' show StorageImage;
 
 enum RetailCartAction { collect, credit }
@@ -115,8 +116,9 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: t.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(24),
                               border: Border.all(color: t.colorScheme.outlineVariant, width: .65),
+                              boxShadow: FvTokens.shadow(t.brightness),
                             ),
                             child: Row(children: [
                               SizedBox(
@@ -141,37 +143,40 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                     style: t.textTheme.bodySmall?.copyWith(
                                       color: t.colorScheme.onSurfaceVariant)),
                                   const SizedBox(height: 7),
-                                  Row(children: [
-                                    SizedBox(
-                                      width: 33, height: 33,
-                                      child: IconButton.filledTonal(
-                                        tooltip: 'Quitar uno',
-                                        onPressed: id == null ? null : () {
-                                          widget.onChangeQuantity(id, -1);
-                                          setState(() {});
-                                        },
-                                        icon: const Icon(Icons.remove_rounded, size: 18),
-                                        padding: EdgeInsets.zero,
+                                  Wrap(spacing: 4, runSpacing: 5,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      SizedBox.square(dimension: 44,
+                                        child: IconButton.filledTonal(
+                                          tooltip: 'Quitar uno',
+                                          onPressed: id == null ? null : () {
+                                            widget.onChangeQuantity(id, -1);
+                                            setState(() {});
+                                          },
+                                          icon: const Icon(Icons.remove_rounded, size: 19),
+                                          padding: EdgeInsets.zero,
+                                        )),
+                                      AnimatedSwitcher(
+                                        duration: MediaQuery.disableAnimationsOf(context)
+                                            ? Duration.zero : FvTokens.micro,
+                                        child: Padding(
+                                          key: ValueKey('qty-${item.productId}-${item.quantity}'),
+                                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                                          child: Text(qtyText(item.quantity),
+                                            style: const TextStyle(fontWeight: FontWeight.w800)),
+                                        ),
                                       ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text(qtyText(item.quantity),
-                                        style: const TextStyle(fontWeight: FontWeight.w800)),
-                                    ),
-                                    SizedBox(
-                                      width: 33, height: 33,
-                                      child: IconButton.filledTonal(
-                                        tooltip: 'Agregar uno',
-                                        onPressed: id == null ? null : () {
-                                          widget.onChangeQuantity(id, 1);
-                                          setState(() {});
-                                        },
-                                        icon: const Icon(Icons.add_rounded, size: 18),
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                  ]),
+                                      SizedBox.square(dimension: 44,
+                                        child: IconButton.filledTonal(
+                                          tooltip: 'Agregar uno',
+                                          onPressed: id == null ? null : () {
+                                            widget.onChangeQuantity(id, 1);
+                                            setState(() {});
+                                          },
+                                          icon: const Icon(Icons.add_rounded, size: 19),
+                                          padding: EdgeInsets.zero,
+                                        )),
+                                    ]),
                                 ],
                               )),
                               const SizedBox(width: 6),

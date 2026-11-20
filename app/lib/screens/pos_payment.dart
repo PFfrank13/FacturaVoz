@@ -83,20 +83,15 @@ class PosPaymentBrand extends StatelessWidget {
       );
     }
     if (method == 'tarjeta') {
-      return SizedBox(width: size * 1.5, height: size, child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('VISA', style: TextStyle(fontSize: size * .22, fontWeight: FontWeight.w900,
-            fontStyle: FontStyle.italic, letterSpacing: -1.5, color: Colors.white)),
-          SizedBox(height: size * .08),
-          SizedBox(width: size * .65, height: size * .25, child: Stack(children: [
-            Positioned(left: 0, child: Container(width: size * .32, height: size * .25,
-              decoration: const BoxDecoration(color: Color(0xFFEA001B), shape: BoxShape.circle))),
-            Positioned(right: 0, child: Container(width: size * .32, height: size * .25,
-              decoration: BoxDecoration(color: const Color(0xFFF8A500).withValues(alpha: .91), shape: BoxShape.circle))),
-          ])),
-        ],
-      ));
+      return Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(size * .24),
+          color: const Color(0xFFE5F0FF),
+        ),
+        child: Icon(Icons.credit_card_rounded,
+          size: size * .58, color: FvLuxe.blue),
+      );
     }
     final ico = switch (method) {
       'efectivo' => Icons.payments_rounded,
@@ -115,6 +110,74 @@ String posMethodLabel(String method) => switch (method) {
   'transferencia' => 'Transferencia',
   _ => method,
 };
+
+/// Componente visual independiente; no aprueba pagos ni registra cobros.
+class PosPaymentMethodCard extends StatelessWidget {
+  const PosPaymentMethodCard({
+    super.key, required this.method, required this.selected,
+    required this.onSelected,
+  });
+
+  final String method;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final highContrast = MediaQuery.highContrastOf(context);
+    final still = MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: 'Seleccionar ${posMethodLabel(method)}',
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onSelected();
+          },
+          borderRadius: BorderRadius.circular(22),
+          child: AnimatedContainer(
+            duration: still ? Duration.zero : FvTokens.transition,
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 9),
+            decoration: BoxDecoration(
+              color: selected && !highContrast ? null : t.colorScheme.surface,
+              gradient: selected && !highContrast
+                  ? FvLuxe.editorial(t.brightness) : null,
+              border: Border.all(
+                color: selected ? t.colorScheme.primary
+                    : t.colorScheme.outlineVariant,
+                width: selected ? 1.7 : .8,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: selected ? FvTokens.shadow(t.brightness) : null,
+            ),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              PosPaymentBrand(method, size: 45),
+              const SizedBox(height: 10),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Flexible(child: Text(posMethodLabel(method), maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.textTheme.labelLarge?.copyWith(
+                    color: t.colorScheme.onSurface,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600))),
+                if (selected) ...[
+                  const SizedBox(width: 4),
+                  Icon(Icons.check_circle_rounded, color: t.colorScheme.primary,
+                    size: 17),
+                ],
+              ]),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Steps 2 and 3 of the POS reference: method → collection evidence.
 /// Returns only after explicit cashier confirmation; caller commits the sale.
@@ -229,33 +292,14 @@ class _PaymentFlowState extends State<_PaymentFlow> {
     );
   }
 
-  Widget _methodTile(String method) {
-    final selected = _method == method;
-    final t = Theme.of(context);
-    return Material(
-      color: selected ? t.colorScheme.primaryContainer : t.colorScheme.surface,
-      borderRadius: BorderRadius.circular(Radii.lg),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => setState(() { _method = method; _verified = false; }),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: selected ? t.colorScheme.primary : t.colorScheme.outline,
-              width: selected ? 2 : 1),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            PosPaymentBrand(method, size: 51),
-            const SizedBox(height: 8),
-            Text(posMethodLabel(method), style: t.textTheme.titleSmall?.copyWith(
-              color: selected ? t.colorScheme.onPrimaryContainer : t.colorScheme.onSurface,
-              fontWeight: FontWeight.w800)),
-          ]),
-        ),
-      ),
-    );
-  }
+  Widget _methodTile(String method) => PosPaymentMethodCard(
+    method: method,
+    selected: _method == method,
+    onSelected: () => setState(() {
+      _method = method;
+      _verified = false;
+    }),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -286,12 +330,17 @@ class _PaymentFlowState extends State<_PaymentFlow> {
               RetailVisual.journey(step: 3,
                 label: method == null ? 'Elegir medio de pago' : 'Verificar y confirmar'),
               const SizedBox(height: 15),
-              _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _card(
+                color: t.brightness == Brightness.dark
+                    ? const Color(0xFF203746) : FvLuxe.jadeSoft,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Total a cobrar', style: t.textTheme.bodyMedium?.copyWith(
                   color: t.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 5),
                 Text(money(widget.total, widget.currency), style: t.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)),
+                  fontWeight: FontWeight.w800, letterSpacing: -.9,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: t.colorScheme.onSurface)),
                 if (widget.items.isNotEmpty) ...[
                   const Divider(height: 24),
                   Text('Resumen del pedido (${widget.items.length})',
