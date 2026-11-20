@@ -54,7 +54,7 @@ class FvInventoryProductCard extends StatelessWidget {
     return Semantics(
       container: true,
       button: onOpen != null,
-      label: name + ', precio ' + price + ', ' + indicator,
+      label: '$name, precio $price, $indicator',
       child: FvTactileScale(
         enabled: onOpen != null,
         child: DecoratedBox(

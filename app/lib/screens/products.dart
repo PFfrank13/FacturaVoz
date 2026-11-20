@@ -14,7 +14,6 @@ import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
-import '../ui/glass_widgets.dart';
 import '../ui/demo_pos_gallery.dart';
 import '../ui/inventory_product_card.dart';
 import 'package:image_picker/image_picker.dart';
