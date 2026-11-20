@@ -36,7 +36,7 @@ dependencies:
   barcode: ">=2.2.8 <3.0.0"            # QR nivel Q como imagen para ticketeras sin QR nativo (ya lo trae pdf)
   mobile_scanner: ">=6.0.0 <8.0.0"     # leer códigos de barras con la cámara
   print_bluetooth_thermal: ^1.1.6      # ticketeras Bluetooth ESC/POS (Android; iPhone BLE)
-  permission_handler: ^11.3.1          # permiso "Dispositivos cercanos" (Bluetooth) en Android 12+
+  permission_handler: ^13.0.2          # permiso "Dispositivos cercanos" (Bluetooth) en Android 12+
   quick_actions: ^1.1.0                # atajos al mantener presionado el ícono
   flutter_map: ">=7.0.2 <9.0.0"        # mapa del cliente (OpenStreetMap, sin clave)
   latlong2: ^0.9.1

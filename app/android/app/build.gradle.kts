@@ -41,7 +41,8 @@ check(!isReleaseTask || hasSafeReleaseSigning) {
 }
 android {
     namespace = "pe.tuempresa.facturavoz"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android 14.x requiere API 37. No cambia targetSdk.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
