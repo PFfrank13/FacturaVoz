@@ -227,7 +227,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
           IconButton(tooltip: 'Mes anterior', onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left_rounded)),
           Expanded(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
+              duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : FvTokens.micro,
               child: Text(
                 '${monthNames[_month - 1]} $_year',
                 key: ValueKey('$_year-$_month'),
@@ -294,10 +294,14 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
 
   Widget _days(ThemeData t, CurrencyReport r) {
     final days = DateTime(_year, _month + 1, 0).day;
+    final still = MediaQuery.disableAnimationsOf(context);
     final maxV = r.byDay.values.fold<double>(0, (a, b) => b > a ? b : a);
     return SoftCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Por día', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+        Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, runSpacing: 4, children: [
+          Text('Por día', style: t.textTheme.titleMedium),
+          Text('Máximo diario · ${money(maxV, r.currency)}', style: t.textTheme.bodySmall),
+        ]),
         const SizedBox(height: 14),
         SizedBox(
           height: 96,
@@ -310,7 +314,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
                     padding: const EdgeInsets.symmetric(horizontal: 1),
                     child: TweenAnimationBuilder<double>(
                       tween: Tween(begin: 0, end: maxV == 0 ? 0 : (r.byDay[d] ?? 0) / maxV),
-                      duration: Duration(milliseconds: 500 + d * 12),
+                      duration: still ? Duration.zero : FvTokens.transition,
                       curve: Curves.easeOutCubic,
                       builder: (_, f, _) => Container(
                         height: 3 + 93 * f,
@@ -330,6 +334,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
         const SizedBox(height: 6),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('1', style: t.textTheme.bodySmall),
+          Text('15', style: t.textTheme.bodySmall),
           Text('$days', style: t.textTheme.bodySmall),
         ]),
       ]),

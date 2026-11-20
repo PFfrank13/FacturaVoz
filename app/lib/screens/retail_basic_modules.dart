@@ -138,8 +138,7 @@ class _RetailPlanDashboard extends StatelessWidget {
           const SizedBox(width: Gap.md),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Tu negocio, al día', maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: colors.ink, fontWeight: FontWeight.w800, letterSpacing: -.4)),
+              style: theme.textTheme.headlineSmall?.copyWith(color: colors.ink)),
             const SizedBox(height: Gap.xs),
             Text('FacturaVoz · Plan $title',
               style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),

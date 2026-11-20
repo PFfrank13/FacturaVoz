@@ -326,7 +326,11 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     // Tema global: compras no fuerza modo oscuro ni colores privados.
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(
-        title: const Text('Compras y recepción', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: LayoutBuilder(builder: (context, bounds) {
+          final compact = bounds.maxWidth < MediaQuery.textScalerOf(context).scale(190);
+          return Text(compact ? 'Compras' : 'Compras y recepción',
+              semanticsLabel: 'Compras y recepción', style: const TextStyle(fontWeight: FontWeight.w900));
+        }),
         actions: [
           IconButton(
             onPressed: () => _openSettlement(),

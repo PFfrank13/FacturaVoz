@@ -296,61 +296,34 @@ class DataRow2 extends StatelessWidget {
 }
 
 /// Estado vacío: dice qué hacer, no solo que no hay nada. La marca flota suavemente.
-class EmptyState extends StatefulWidget {
+class EmptyState extends StatelessWidget {
   const EmptyState({super.key, required this.title, required this.body});
   final String title;
   final String body;
 
   @override
-  State<EmptyState> createState() => _EmptyStateState();
-}
-
-class _EmptyStateState extends State<EmptyState> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2400),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // No basta con ocultar el AnimatedBuilder: el ticker debe detenerse.
-    // También responde a cambios de accesibilidad sin recrear la pantalla.
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _c.stop();
-    } else if (!_c.isAnimating) {
-      _c.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final reduceMotion = MediaQuery.of(context).disableAnimations;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (reduceMotion)
-          const BrandMark(size: 60)
-        else
-          AnimatedBuilder(
-            animation: _c,
-            builder: (context, child) => Transform.translate(
-              offset: Offset(0, -8 * Curves.easeInOut.transform(_c.value)),
-              child: child,
-            ),
-            child: const BrandMark(size: 60),
-          ),
-        const SizedBox(height: 20),
-        Reveal(index: 1, dy: 12, child: Text(widget.title, textAlign: TextAlign.center, style: t.textTheme.titleLarge)),
-        const SizedBox(height: 8),
-        Reveal(index: 2, dy: 12, child: Text(widget.body, textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant))),
+        ExcludeSemantics(child: SizedBox(width: 84, height: 64,
+          child: Stack(alignment: Alignment.center, children: [
+            Transform.rotate(angle: -.12, child: Container(width: 44, height: 48,
+              decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: .13),
+                borderRadius: BorderRadius.circular(9)))),
+            Transform.translate(offset: const Offset(6, 3),
+              child: Container(width: 44, height: 48,
+                decoration: BoxDecoration(color: t.colorScheme.surface, borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: t.colorScheme.outline)),
+                child: Icon(Icons.receipt_long_outlined, size: 25, color: t.colorScheme.primary))),
+          ]))),
+        const SizedBox(height: 10),
+        Text(title, textAlign: TextAlign.center, style: t.textTheme.headlineSmall),
+        const SizedBox(height: 6),
+        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420),
+          child: Text(body, textAlign: TextAlign.center,
+              style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant))),
       ]),
     );
   }

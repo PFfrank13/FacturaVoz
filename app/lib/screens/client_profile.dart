@@ -657,41 +657,56 @@ String shortDateTime(DateTime d) {
 
 /// Imagen privada del bucket (enlace firmado temporal; nunca pública).
 class StorageImage extends StatefulWidget {
-  const StorageImage({super.key, required this.path, this.fit = BoxFit.cover});
+  const StorageImage({super.key, required this.path, this.fit = BoxFit.cover, this.placeholder});
   final String path;
   final BoxFit fit;
+  final Widget? placeholder;
 
   @override
   State<StorageImage> createState() => _StorageImageState();
 }
 
 class _StorageImageState extends State<StorageImage> {
-  String? _url;
+  late Future<String?> _link = V2Repo.signedUrl(widget.path);
 
   @override
-  void initState() {
-    super.initState();
-    V2Repo.signedUrl(widget.path).then((u) {
-      if (mounted) setState(() => _url = u);
-    });
+  void didUpdateWidget(StorageImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) _link = V2Repo.signedUrl(widget.path);
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final pending = widget.placeholder ?? ColoredBox(color: scheme.surfaceContainerHighest);
+    final missing = widget.placeholder ?? ColoredBox(color: scheme.surfaceContainerHighest,
+      child: Icon(Icons.image_not_supported_outlined, color: scheme.onSurfaceVariant,
+        semanticLabel: 'Imagen no disponible'));
     return ClipRRect(
       borderRadius: BorderRadius.circular(Radii.md),
-      child: _url == null
-          ? Container(color: t.colorScheme.surfaceContainerHighest)
-          : GestureDetector(
-              onTap: () => showDialog<void>(context: context, builder: (_) => Dialog(child: InteractiveViewer(child: Image.network(_url!)))),
-              child: Image.network(
-                _url!,
-                fit: widget.fit,
-                cacheWidth: 600,
-                errorBuilder: (_, _, _) => Container(color: t.colorScheme.surfaceContainerHighest, child: const Icon(Icons.broken_image_rounded)),
-              ),
-            ),
+      child: FutureBuilder<String?>(
+        key: ValueKey(widget.path),
+        future: _link,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) return pending;
+          final url = snapshot.data;
+          if (url == null) return missing;
+          return LayoutBuilder(builder: (context, bounds) {
+            final width = bounds.hasBoundedWidth ? bounds.maxWidth : 600.0;
+            final pixels = width * MediaQuery.devicePixelRatioOf(context);
+            // Quantize to share decoded thumbnails between nearby layout sizes.
+            final cacheWidth = ((pixels / 64).ceil() * 64).clamp(64, 1280);
+            return GestureDetector(
+              onTap: () => showDialog<void>(context: context, builder: (_) => Dialog(
+                child: InteractiveViewer(child: Image.network(url, errorBuilder: (_, _, _) => missing)))),
+              child: Image.network(url, fit: widget.fit, cacheWidth: cacheWidth,
+                frameBuilder: (_, child, frame, synchronous) =>
+                    synchronous || frame != null ? child : pending,
+                errorBuilder: (_, _, _) => missing),
+            );
+          });
+        },
+      ),
     );
   }
 }

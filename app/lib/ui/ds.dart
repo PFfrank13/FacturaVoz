@@ -69,7 +69,7 @@ class DsSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, Gap.xl, 0, Gap.sm),
       child: Row(children: [
-        Expanded(child: Semantics(header: true, child: Text(title, style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)))),
+        Expanded(child: Semantics(header: true, child: Text(title, style: t.textTheme.headlineSmall))),
         if (action != null && onAction != null) TextButton(onPressed: onAction, child: Text(action!)),
       ]),
     );
@@ -111,6 +111,7 @@ class DsStat extends StatelessWidget {
     );
     return Semantics(
       button: onTap != null,
+      onTap: onTap,
       label: '$label: $value${detail == null ? '' : ', $detail'}',
       excludeSemantics: true,
       child: DecoratedBox(
@@ -134,7 +135,8 @@ class DsStatGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      final cols = c.maxWidth >= 600 ? 4 : 2;
+      final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+      final cols = (c.maxWidth / (145 * scale)).floor().clamp(1, 4);
       final w = (c.maxWidth - Gap.md * (cols - 1)) / cols;
       return Wrap(spacing: Gap.md, runSpacing: Gap.md, children: [for (final ch in children) SizedBox(width: w, child: ch)]);
     });
@@ -214,7 +216,12 @@ class DsStateView extends StatelessWidget {
         if (kind == 0)
           const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3))
         else
-          Icon(kind == 2 ? Icons.cloud_off_rounded : Icons.inbox_rounded, size: 32, color: kind == 2 ? ds.bad : ds.muted),
+          DecoratedBox(decoration: BoxDecoration(
+            color: (kind == 2 ? ds.bad : ds.primary).withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(Radii.md)),
+            child: Padding(padding: const EdgeInsets.all(12), child: Icon(
+              kind == 2 ? Icons.cloud_off_outlined : Icons.inbox_outlined,
+              size: 25, color: kind == 2 ? ds.bad : ds.primaryText))),
         const SizedBox(height: Gap.md),
         Text(message, textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: ds.muted)),
         if (actionLabel != null && onAction != null) ...[

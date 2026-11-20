@@ -130,7 +130,8 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(11),
                                   child: imagePath.isNotEmpty
-                                    ? StorageImage(path: imagePath)
+                                    ? StorageImage(path: imagePath, fit: BoxFit.contain,
+                                        placeholder: FvProductPhotoFallback(name: item.description))
                                     : fixtureAsset.isNotEmpty
                                         ? Image.asset(fixtureAsset,
                                             fit: BoxFit.contain,

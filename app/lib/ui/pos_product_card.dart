@@ -76,7 +76,7 @@ class FvPosProductCard extends StatelessWidget {
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: FvLuxe.productBackdrop(t.brightness)),
-                              child: photo ?? FvProductPhotoFallback(name: name, category: category),
+                              child: photo ?? FvProductPhotoFallback(name: name, category: category, icon: icon),
                             ),
                           ),
                         ),
@@ -124,26 +124,8 @@ class FvPosProductCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                      ])),
-                      const SizedBox(height: 10),
-                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: t.textTheme.labelMedium?.copyWith(
-                          color: t.colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        )),
-                      const SizedBox(height: 7),
-                      Row(children: [
-                        Expanded(child: Text(price, maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ))),
-                        const SizedBox(width: 4),
-                        SizedBox.square(
-                          dimension: 43,
+                        Positioned(right: 4, bottom: 4, child: SizedBox.square(
+                          dimension: 44,
                           child: IconButton.filled(
                             tooltip: 'Añadir $name',
                             onPressed: disabled ? null : onAdd,
@@ -154,8 +136,20 @@ class FvPosProductCard extends StatelessWidget {
                               disabledBackgroundColor: t.disabledColor.withValues(alpha: 0.2),
                             ),
                           ),
-                        ),
-                      ]),
+                        )),
+                      ])),
+                      const SizedBox(height: 10),
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: t.textTheme.labelMedium?.copyWith(
+                          color: t.colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        )),
+                      const SizedBox(height: 7),
+                      FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart,
+                        child: Text(price, maxLines: 1,
+                          style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700,
+                            letterSpacing: -.3, fontFeatures: const [FontFeature.tabularFigures()]))),
                     ],
                   ),
                 ),

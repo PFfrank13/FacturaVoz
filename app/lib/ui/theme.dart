@@ -95,12 +95,12 @@ class Brand {
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF087F68), Color(0xFF2864A2)],
+    colors: [FvLuxe.forest, FvLuxe.jade],
   );
   static const coralGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF087F68), Color(0xFF2864A2)],
+    colors: [FvLuxe.forest, FvLuxe.jade],
   );
 
   /// Color propio por función (cada función conserva siempre el mismo; ver featureColor en catalog.dart).
@@ -122,8 +122,8 @@ TextTheme _text(Color ink, Color muted) {
       TextStyle(fontFamily: _font, fontSize: size, fontWeight: w, height: h, letterSpacing: ls, color: c ?? ink);
   return TextTheme(
     displaySmall: s(38, FontWeight.w800, h: 1.09, ls: -1.2),
-    headlineMedium: s(28, FontWeight.w700, h: 1.15, ls: -0.5),
-    headlineSmall: s(23, FontWeight.w700, h: 1.19, ls: -0.55),
+    headlineMedium: s(30, FontWeight.w400, h: 1.12, ls: -.65).copyWith(fontFamily: FvLuxe.editorialFont),
+    headlineSmall: s(25, FontWeight.w400, h: 1.16, ls: -.45).copyWith(fontFamily: FvLuxe.editorialFont),
     titleLarge: s(20, FontWeight.w700, ls: -0.4),
     titleMedium: s(16, FontWeight.w600),
     titleSmall: s(14, FontWeight.w600),
@@ -198,13 +198,14 @@ ThemeData buildTheme(Brightness b) {
     visualDensity: VisualDensity.standard,
     dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
     appBarTheme: AppBarTheme(
-      backgroundColor: bg.withValues(alpha: .94),
+      backgroundColor: bg,
       foregroundColor: ink,
       elevation: 0,
       scrolledUnderElevation: 0,
+      shape: Border(bottom: BorderSide(color: line, width: .7)),
       centerTitle: false,
       systemOverlayStyle: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(statusBarColor: Colors.transparent),
-      titleTextStyle: TextStyle(fontFamily: _font, fontSize: 18, fontWeight: FontWeight.w700, color: ink, letterSpacing: -0.5),
+      titleTextStyle: TextStyle(fontFamily: FvLuxe.editorialFont, fontSize: 23, fontWeight: FontWeight.w400, color: ink, letterSpacing: -.45),
     ),
     cardTheme: CardThemeData(
       color: card,
@@ -232,7 +233,7 @@ ThemeData buildTheme(Brightness b) {
       fillColor: dark ? FvTokens.fieldDark : FvTokens.field,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
+      enabledBorder: border(line),
       focusedBorder: border(primary, 1.4),
       errorBorder: border(scheme.error),
       focusedErrorBorder: border(scheme.error, 2),
@@ -243,7 +244,7 @@ ThemeData buildTheme(Brightness b) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
         elevation: 0,
-        shape: const StadiumBorder(),
+        shape: RoundedRectangleBorder(borderRadius: radius),
         textStyle: const TextStyle(fontFamily: _font, fontSize: 15.5, fontWeight: FontWeight.w600),
       ),
     ),
@@ -281,11 +282,12 @@ ThemeData buildTheme(Brightness b) {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: card,
-      selectedColor: scheme.primaryContainer,
+      selectedColor: Color.alphaBlend(primary.withValues(alpha: dark ? .2 : .13), card),
       side: BorderSide(color: line),
       shape: const StadiumBorder(),
       labelStyle: TextStyle(fontFamily: _font, fontWeight: FontWeight.w600, color: ink),
-      showCheckmark: false,
+      showCheckmark: true,
+      checkmarkColor: primary,
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(

@@ -27,78 +27,24 @@ class PosPaymentBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (method == 'yape' || method == 'plin') {
-      final imageUrl = method == 'yape'
-          ? 'https://upload.wikimedia.org/wikipedia/commons/0/08/Icono_de_la_aplicaci%C3%B3n_Yape.png'
-          : 'https://www.bbva.pe/content/dam/public-web/peru/images/promo-sliders/promo-plin.im1585949297034im.png?imwidth=960';
-      return SizedBox(
-        width: size, height: size,
-        child: Image.network(
-          imageUrl,
-          fit: BoxFit.contain,
-          semanticLabel: method == 'yape' ? 'Yape' : 'Plin',
-          errorBuilder: (_, _, _) => _offlineBrand(),
-          loadingBuilder: (_, child, progress) => progress == null ? child : _offlineBrand(),
-        ),
-      );
-    }
-    return _offlineBrand();
-  }
-
-  Widget _offlineBrand() {
-    if (method == 'yape') {
-      return Container(
-        width: size, height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size * .22),
-          gradient: const LinearGradient(colors: [Color(0xFFA41BC3), Color(0xFF6110A2)]),
-        ),
-        child: Stack(alignment: Alignment.center, children: [
-          Positioned(top: size * .08, right: size * .22, child: Container(
-            width: size * .31, height: size * .31,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(color: Color(0xFF04D7CC), shape: BoxShape.circle),
-            child: Text('S/', style: TextStyle(fontSize: size * .135, color: const Color(0xFF3B188C), fontWeight: FontWeight.w900)),
-          )),
-          Positioned(bottom: size * .15, child: Text('yape', style: TextStyle(
-            color: Colors.white, fontSize: size * .28,
-            fontWeight: FontWeight.w900, fontStyle: FontStyle.italic, letterSpacing: -1.3,
-            decoration: TextDecoration.underline, decorationColor: Colors.white,
-          ))),
-        ]),
-      );
-    }
-    if (method == 'plin') {
-      return Container(
-        width: size, height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF00D7D0),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(size * .4), topRight: Radius.circular(size * .4),
-            bottomLeft: Radius.circular(size * .09), bottomRight: Radius.circular(size * .42),
-          ),
-        ),
-        child: Text('plin', style: TextStyle(color: Colors.white, fontSize: size * .31, fontWeight: FontWeight.w900)),
-      );
-    }
-    if (method == 'tarjeta') {
-      return Container(
-        width: size, height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size * .24),
-          color: const Color(0xFFE5F0FF),
-        ),
-        child: Icon(Icons.credit_card_rounded,
-          size: size * .58, color: FvLuxe.blue),
-      );
-    }
-    final ico = switch (method) {
-      'efectivo' => Icons.payments_rounded,
-      'transferencia' => Icons.account_balance_rounded,
-      _ => Icons.credit_card_rounded,
+    final scheme = Theme.of(context).colorScheme;
+    final glyph = switch (method) {
+      'efectivo' => Icons.payments_outlined,
+      'transferencia' => Icons.account_balance_outlined,
+      'yape' || 'plin' => Icons.qr_code_2_rounded,
+      _ => Icons.credit_card_outlined,
     };
-    return Icon(ico, size: size * .66, color: const Color(0xFF77777F));
+    final accent = switch (method) {
+      'yape' => Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFFE5BBF0) : const Color(0xFF762C80),
+      'tarjeta' || 'transferencia' => scheme.secondary,
+      _ => scheme.primary,
+    };
+    return Semantics(image: true, label: posMethodLabel(method),
+      child: Container(width: size, height: size,
+        decoration: BoxDecoration(color: Color.alphaBlend(accent.withValues(alpha: .11), scheme.surface),
+          borderRadius: BorderRadius.circular(size * .26)),
+        child: Icon(glyph, size: size * .57, color: accent)));
   }
 }
 
@@ -324,7 +270,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
         ),
         body: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
+          child: Column(children: [
+            Expanded(child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
             children: [
               RetailVisual.journey(step: 3,
@@ -337,7 +284,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                 Text('Total a cobrar', style: t.textTheme.bodyMedium?.copyWith(
                   color: t.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 5),
-                Text(money(widget.total, widget.currency), style: t.textTheme.headlineMedium?.copyWith(
+                Text(money(widget.total, widget.currency), style: t.textTheme.displaySmall?.copyWith(
                   fontWeight: FontWeight.w800, letterSpacing: -.9,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: t.colorScheme.onSurface)),
@@ -398,7 +345,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                     color: c.ink, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   Text(money(widget.total, widget.currency),
-                    style: t.textTheme.headlineMedium?.copyWith(
+                    style: t.textTheme.displaySmall?.copyWith(
                       color: c.ink, fontWeight: FontWeight.w800)),
                   if (_merchant?.holder.isNotEmpty == true)
                     Text(_merchant!.holder, textAlign: TextAlign.center,
@@ -460,8 +407,12 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                     : 'He verificado el abono en mi cuenta'),
                   subtitle: const Text('No se conecta automáticamente al banco. Confirma únicamente después de recibir el pago.'),
                 )),
-                const SizedBox(height: 14),
-                FilledButton.icon(
+              ],
+            ],
+          )),
+          if (method != null)
+            SafeArea(top: false, minimum: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+              child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
                     backgroundColor: t.colorScheme.onSurface,
@@ -470,10 +421,9 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   onPressed: _canConfirm ? _confirm : null,
                   icon: const Icon(Icons.check_rounded),
                   label: const Text('Confirmar pago', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ]),
         )),
     );
   }

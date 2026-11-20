@@ -31,7 +31,8 @@ class FvGlassTopBar extends StatelessWidget {
       child: const SizedBox.expand(),
     );
     return contrast ? pane : ClipRect(child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+      filter: ImageFilter.blur(sigmaX: FvLuxe.glassSigma(theme.platform, 18),
+          sigmaY: FvLuxe.glassSigma(theme.platform, 18)),
       child: pane,
     ));
   }
@@ -49,47 +50,32 @@ class FvFloatingGlassDock extends StatelessWidget {
 
 /// Typographic visual for products whose owners have not uploaded a photo.
 class FvProductPhotoFallback extends StatelessWidget {
-  const FvProductPhotoFallback({super.key, required this.name, this.category});
+  const FvProductPhotoFallback({super.key, required this.name, this.category, this.icon});
   final String name;
   final String? category;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final descriptor = '$name ${category ?? ''}'.toLowerCase();
-    final pictogram = descriptor.contains('agua') || descriptor.contains('bebida')
-        ? Icons.water_drop_outlined
-        : descriptor.contains('leche') || descriptor.contains('lácteo')
-            ? Icons.local_drink_outlined
-            : descriptor.contains('pan') || descriptor.contains('galleta')
-                ? Icons.bakery_dining_outlined
-                : descriptor.contains('arroz') || descriptor.contains('abarrote')
-                    ? Icons.shopping_basket_outlined
-                    : Icons.inventory_2_outlined;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: FvLuxe.productBackdrop(t.brightness)),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final compact = constraints.maxWidth < 95 || constraints.maxHeight < 94;
-        return Semantics(
-          label: 'Producto sin fotografía: $name',
-          image: true,
-          child: Center(child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(pictogram, size: compact ? 27 : 38,
-                color: t.colorScheme.primary),
-              if (!compact && category != null && category!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 6, right: 6, top: 6),
-                  child: Text(category!,
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: t.textTheme.labelSmall?.copyWith(
-                      color: t.colorScheme.onSurfaceVariant))),
-            ],
-          )),
-        );
-      }),
+    final scheme = Theme.of(context).colorScheme;
+    final initials = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty)
+        .take(2).map((part) => part.characters.first.toUpperCase()).join();
+    return Semantics(image: true, excludeSemantics: true,
+      label: 'Producto sin fotografía: $name',
+      child: ColoredBox(color: scheme.surfaceContainerHighest,
+        child: CustomPaint(painter: FvEngraving(scheme.primary.withValues(alpha: .10)),
+          child: LayoutBuilder(builder: (context, size) {
+            final showLabel = size.maxWidth >= 100 && size.maxHeight >= 100 &&
+                category?.isNotEmpty == true && MediaQuery.textScalerOf(context).scale(14) <= 22;
+            return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: initials.isEmpty
+                  ? Icon(icon ?? Icons.inventory_2_outlined, color: scheme.primary)
+                  : Text(initials, style: TextStyle(fontFamily: FvLuxe.editorialFont,
+                      fontSize: 37, color: scheme.primary)))),
+              if (showLabel) Text(category!, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall),
+            ]));
+          }))),
     );
   }
 }

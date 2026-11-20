@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme.dart';
+import 'design_tokens.dart';
 import 'widgets.dart';
 
 /// Bienvenida breve y opcional. Usuarios autenticados pasan directo a Caja/Inicio sin espera extra.
@@ -56,7 +57,7 @@ class _LaunchWelcomeState extends State<LaunchWelcome> with SingleTickerProvider
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Container(width: 44, height: 4, decoration: BoxDecoration(color: const Color(0xFF83E6D9), borderRadius: BorderRadius.circular(8))),
                 const SizedBox(height: 18),
-                const Text('Bienvenido a\nFacturaVoz', style: TextStyle(fontSize: 39, fontWeight: FontWeight.w800,
+                const Text('Bienvenido a\nFacturaVoz', style: TextStyle(fontFamily: FvLuxe.editorialFont, fontSize: 43, fontWeight: FontWeight.w400,
                     height: 1.09, color: Colors.white, letterSpacing: -1.2)),
                 const SizedBox(height: 12),
                 const Text('Tu negocio en movimiento. Vende, organiza y factura con confianza.',

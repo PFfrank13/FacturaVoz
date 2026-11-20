@@ -167,7 +167,7 @@ class SettingsScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: t.colorScheme.surface,
+                gradient: FvLuxe.editorial(t.brightness),
                 borderRadius: BorderRadius.circular(FvTokens.cardRadius),
                 border: Border.all(color: t.colorScheme.outlineVariant.withValues(alpha: 0.25)),
                 boxShadow: FvTokens.shadow(t.brightness),
@@ -193,8 +193,7 @@ class SettingsScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(org?.name ?? 'Mi cuenta', maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: t.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                      style: t.textTheme.headlineSmall),
                     const SizedBox(height: 4),
                     Text(email, maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: t.textTheme.bodySmall?.copyWith(

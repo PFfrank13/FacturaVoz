@@ -12,7 +12,13 @@ import 'package:integration_test/integration_test.dart';
 /// Se ejecuta en un emulador Android real de GitHub Actions, sin tocar Supabase,
 /// sin credenciales y sin emitir ventas o comprobantes.
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  Future<void> capture(WidgetTester tester, String name) async {
+    if (!const bool.fromEnvironment('SIGNATURE_CAPTURES')) return;
+    await binding.convertFlutterSurfaceToImage();
+    await tester.pumpAndSettle();
+    await binding.takeScreenshot(name);
+  }
 
   void setLicense(String plan) {
     final a = Access.instance;
@@ -62,6 +68,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('retail-module-pos')), findsOneWidget);
+    await capture(tester, 'plan-basico');
     expect(find.byKey(const ValueKey('retail-basic-modules')), findsOneWidget);
     expect(find.text('FacturaVoz · Plan Básico'), findsOneWidget);
     expect(find.byIcon(Icons.lock_rounded), findsNothing);
@@ -79,6 +86,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('retail-plan-modules')), findsOneWidget);
+    await capture(tester, 'plan-empresa');
     expect(find.text('FacturaVoz · Plan Empresa'), findsOneWidget);
     expect(find.text('Nueva venta'), findsOneWidget);
     expect(find.text('Todas mis funciones'), findsNothing);
@@ -126,6 +134,7 @@ void main() {
     expect(find.byKey(const ValueKey('retail-continue-payment')), findsOneWidget);
     await tester.tap(find.byTooltip('Agregar uno').first);
     await tester.pumpAndSettle();
+    await capture(tester, 'carrito');
     expect(lines.first.quantity, 2);
     expect(tester.takeException(), isNull);
   });
@@ -156,6 +165,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
     expect(find.textContaining('Vuelto: S/ 2.15'), findsWidgets);
+    await capture(tester, 'efectivo');
     await tester.ensureVisible(confirm);
     await tester.tap(confirm);
     await tester.pumpAndSettle();

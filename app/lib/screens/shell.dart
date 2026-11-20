@@ -61,36 +61,36 @@ class _Dest {
   final String semantics;
 }
 
-const _dHome = _Dest('home', Icons.space_dashboard_rounded, 'Inicio', 'Inicio');
-const _dSell = _Dest('sell', Icons.point_of_sale_rounded, 'Vender', 'Vender');
-const _dClients = _Dest('clients', Icons.people_alt_rounded, 'Clientes', 'Clientes');
-const _dCollect = _Dest('collect', Icons.account_balance_wallet_rounded, 'Cobrar', 'Cobrar y pagar');
-const _dBusiness = _Dest('business', Icons.insights_rounded, 'Negocio', 'Mi negocio');
-const _dSettings = _Dest('settings', Icons.settings_rounded, 'Ajustes', 'Ajustes');
-const _dJobs = _Dest('jobs', Icons.assignment_rounded, 'Trabajos', 'Mis trabajos');
-const _dAgenda = _Dest('agenda', Icons.calendar_month_rounded, 'Agenda', 'Agenda');
-const _dFiados = _Dest('fiados', Icons.menu_book_rounded, 'Fiados', 'Fiados');
-const _dCash = _Dest('cash', Icons.account_balance_wallet_rounded, 'Caja', 'Caja');
-const _dStock = _Dest('stock', Icons.inventory_2_rounded, 'Inventario', 'Inventario');
-const _dBodegaSettings = _Dest('settings', Icons.settings_rounded, 'Configuración', 'Configuración');
-const _dRetailSell = _Dest('sell', Icons.point_of_sale_rounded, 'Venta rápida', 'Venta rápida');
-const _dRetailReceipts = _Dest('comprobantes', Icons.receipt_long_rounded, 'Comprobantes', 'Comprobantes');
+const _dHome = _Dest('home', Icons.home_outlined, 'Inicio', 'Inicio');
+const _dSell = _Dest('sell', Icons.point_of_sale_outlined, 'Vender', 'Vender');
+const _dClients = _Dest('clients', Icons.people_alt_outlined, 'Clientes', 'Clientes');
+const _dCollect = _Dest('collect', Icons.account_balance_wallet_outlined, 'Cobrar', 'Cobrar y pagar');
+const _dBusiness = _Dest('business', Icons.insights_outlined, 'Negocio', 'Mi negocio');
+const _dSettings = _Dest('settings', Icons.settings_outlined, 'Ajustes', 'Ajustes');
+const _dJobs = _Dest('jobs', Icons.assignment_outlined, 'Trabajos', 'Mis trabajos');
+const _dAgenda = _Dest('agenda', Icons.calendar_month_outlined, 'Agenda', 'Agenda');
+const _dFiados = _Dest('fiados', Icons.menu_book_outlined, 'Fiados', 'Fiados');
+const _dCash = _Dest('cash', Icons.account_balance_wallet_outlined, 'Caja', 'Caja');
+const _dStock = _Dest('stock', Icons.inventory_2_outlined, 'Inventario', 'Inventario');
+const _dBodegaSettings = _Dest('settings', Icons.settings_outlined, 'Configuración', 'Configuración');
+const _dRetailSell = _Dest('sell', Icons.point_of_sale_outlined, 'Venta rápida', 'Venta rápida');
+const _dRetailReceipts = _Dest('comprobantes', Icons.receipt_long_outlined, 'Comprobantes', 'Comprobantes');
 const _dRetailPurchases = _Dest('compras', Icons.local_shipping_outlined, 'Compras', 'Compras');
-const _dRetailReports = _Dest('reportes', Icons.insights_rounded, 'Reportes', 'Reportes');
+const _dRetailReports = _Dest('reportes', Icons.insights_outlined, 'Reportes', 'Reportes');
 
 /// Íconos de los destinos por rubro (B2). La etiqueta la pone cada rubro ("Pacientes", "Obras", "Mesas"…).
 const _rubroIcons = <String, IconData>{
-  'home': Icons.space_dashboard_rounded,
-  'sell': Icons.point_of_sale_rounded,
-  'clients': Icons.people_alt_rounded,
-  'collect': Icons.account_balance_wallet_rounded,
-  'business': Icons.insights_rounded,
-  'jobs': Icons.assignment_rounded,
-  'agenda': Icons.calendar_month_rounded,
-  'quotes': Icons.request_quote_rounded,
-  'fiados': Icons.menu_book_rounded,
-  'tables': Icons.table_restaurant_rounded,
-  'cash': Icons.lock_clock_rounded,
+  'home': Icons.home_outlined,
+  'sell': Icons.point_of_sale_outlined,
+  'clients': Icons.people_alt_outlined,
+  'collect': Icons.account_balance_wallet_outlined,
+  'business': Icons.insights_outlined,
+  'jobs': Icons.assignment_outlined,
+  'agenda': Icons.calendar_month_outlined,
+  'quotes': Icons.request_quote_outlined,
+  'fiados': Icons.menu_book_outlined,
+  'tables': Icons.table_restaurant_outlined,
+  'cash': Icons.point_of_sale_outlined,
 };
 
 /// ¿El rol puede abrir este destino? (la base de datos igual lo impide)

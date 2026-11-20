@@ -146,13 +146,13 @@ class _EmitSunatScreenState extends State<EmitSunatScreen> {
           Row(children: [
             TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 650),
-              curve: ok ? Curves.elasticOut : Curves.easeOutCubic,
+              duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
               builder: (context, v, child) => Transform.scale(scale: v.clamp(0.0, 1.5), child: child),
               child: Icon(ok ? Icons.verified : Icons.error_outline),
             ),
             const SizedBox(width: 8),
-            Expanded(child: Text(ok ? 'Aceptada por SUNAT' : rejected ? 'Rechazada por SUNAT' : 'SUNAT no respondió', style: Theme.of(context).textTheme.titleMedium)),
+            Expanded(child: Semantics(header: true, liveRegion: true, child: Text(ok ? 'Aceptada por SUNAT' : rejected ? 'Rechazada por SUNAT' : 'SUNAT no respondió', style: Theme.of(context).textTheme.headlineSmall))),
           ]),
           const SizedBox(height: 8),
           Text('Comprobante ${r.number}'),

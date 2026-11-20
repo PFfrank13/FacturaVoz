@@ -41,15 +41,11 @@ class RetailPremiumOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final highContrast = MediaQuery.highContrastOf(context);
-    final ink = theme.colorScheme.onSurface;
-    final surface = theme.colorScheme.surface;
-    final muted = theme.colorScheme.onSurfaceVariant;
-    final cardRadius = BorderRadius.circular(30);
-    final glass = highContrast ? 1.0 : dark ? .76 : .68;
-    final primary = dark ? FvTokens.emeraldDark : FvLuxe.jade;
-
+    final scheme = theme.colorScheme;
+    final strong = MediaQuery.highContrastOf(context);
+    const paper = Color(0xFFFBFCF6);
+    const soft = Color(0xFFCBE4DB);
+    final amount = '$currencySymbol ${salesAmount.toStringAsFixed(2)}';
     return Semantics(
       container: true,
       label: 'Resumen operativo de la bodega',
@@ -57,189 +53,93 @@ class RetailPremiumOverview extends StatelessWidget {
         key: const ValueKey('bodega-enterprise-overview'),
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          borderRadius: cardRadius,
-          border: Border.all(color: dark
-              ? const Color(0xFF515563) : Colors.white, width: 1.1),
-          boxShadow: FvTokens.shadow(theme.brightness),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: dark
-              ? const [Color(0xFF1A3440), Color(0xFF1B3444), Color(0xFF172332)]
-              : const [Color(0xFFDDF5ED), Color(0xFFE2F0FC), Color(0xFFF6FAFF)],
-            stops: const [0, .55, 1],
-          ),
+          borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+          color: scheme.surface,
+          border: Border.all(color: scheme.outlineVariant),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              _AccentIcon(icon: Icons.storefront_rounded,
-                tint: RetailAccent.blue, size: 47),
-              const SizedBox(width: 12),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('TU TIENDA HOY',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: muted, fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2)),
-                  const SizedBox(height: 3),
-                  Text(name.isEmpty ? 'Tu negocio' : name,
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: ink, fontWeight: FontWeight.w800,
-                      letterSpacing: -.6)),
-                ],
-              )),
-              Tooltip(
-                message: loaded ? 'Datos del servidor verificados'
-                    : 'Esperando datos del servidor',
-                child: _AccentIcon(
-                  icon: loaded ? Icons.verified_rounded : Icons.schedule_rounded,
-                  tint: loaded ? RetailAccent.mint : RetailAccent.muted,
-                  size: 38),
-              ),
-            ]),
-            const SizedBox(height: 20),
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(23),
-                border: Border.all(color: Colors.white.withValues(alpha: dark ? .13 : .85)),
-                color: surface.withValues(alpha: glass),
-              ),
-              padding: const EdgeInsets.fromLTRB(17, 17, 17, 15),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          ColoredBox(color: FvLuxe.forest, child: CustomPaint(
+            painter: FvEngraving(FvLuxe.mintInk.withValues(alpha: strong ? 0 : .16)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.storefront_outlined, color: soft, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(name.isEmpty ? 'Tu negocio' : name,
+                    style: theme.textTheme.labelLarge?.copyWith(color: paper))),
+                  Tooltip(message: loaded ? 'Datos cargados' : 'Esperando datos',
+                    child: Icon(loaded ? Icons.check_circle_outline_rounded : Icons.schedule_rounded,
+                      color: soft, size: 18)),
+                ]),
+                const SizedBox(height: 23),
                 Text(showMonth ? 'Ventas de este mes' : 'Tu actividad',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: muted, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 7),
+                  style: theme.textTheme.labelMedium?.copyWith(color: soft)),
+                const SizedBox(height: 3),
                 if (showMonth)
-                  loaded
-                    ? Text('$currencySymbol ${salesAmount.toStringAsFixed(2)}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          color: ink, fontWeight: FontWeight.w800,
-                          fontSize: 36, letterSpacing: -1.7,
-                          fontFeatures: const [FontFeature.tabularFigures()]))
-                    : Text('—', style: theme.textTheme.headlineMedium)
-                else
-                  Text('Operaciones del negocio',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: ink, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  if (loaded)
-                    _MiniFact(icon: Icons.receipt_long_rounded,
-                      label: salesCount == 1 ? '1 venta emitida'
-                          : '$salesCount ventas emitidas',
-                      tint: RetailAccent.blue),
-                  if (todayAmount != null)
-                    _MiniFact(icon: Icons.calendar_today_rounded,
-                      label: 'Hoy $currencySymbol ${todayAmount!.toStringAsFixed(2)}',
-                      tint: RetailAccent.teal)
+                  FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+                    child: Text(loaded ? amount : '—', style: theme.textTheme.displaySmall?.copyWith(
+                      color: paper, fontSize: 42, letterSpacing: -1.6,
+                      fontFeatures: const [FontFeature.tabularFigures()]))),
+                if (!showMonth)
+                  Text('Operaciones del negocio', style: theme.textTheme.titleLarge?.copyWith(color: paper)),
+                const SizedBox(height: 12),
+                Wrap(spacing: 14, runSpacing: 6, children: [
+                  if (loaded) _MiniFact(icon: Icons.receipt_long_outlined,
+                    label: salesCount == 1 ? '1 venta emitida' : '$salesCount ventas emitidas'),
+                  if (todayAmount != null) _MiniFact(icon: Icons.today_outlined,
+                    label: 'Hoy $currencySymbol ${todayAmount!.toStringAsFixed(2)}')
                   else if (todayCount != null && !showMonth)
-                    _MiniFact(icon: Icons.today_rounded,
-                      label: 'Hoy $todayCount ventas',
-                      tint: RetailAccent.teal),
-                  if (loaded && drafts > 0)
-                    _MiniFact(icon: Icons.edit_note_rounded,
-                      label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}',
-                      tint: RetailAccent.violet),
+                    _MiniFact(icon: Icons.today_outlined, label: 'Hoy $todayCount ventas'),
+                  if (loaded && drafts > 0) _MiniFact(icon: Icons.edit_note_outlined,
+                    label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}'),
                 ]),
               ]),
             ),
-            if (showMonth && loaded && chart != null) ...[
-              const SizedBox(height: 20),
-              Row(children: [
-                Icon(Icons.show_chart_rounded, size: 18, color: primary),
-                const SizedBox(width: 7),
-                Expanded(child: Text('Tendencia · últimos 14 días',
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: muted, fontWeight: FontWeight.w700))),
-              ]),
-              const SizedBox(height: 10),
-              SizedBox(height: 56, child: chart),
-            ],
-            if (showMonth) ...[
-              const SizedBox(height: 16),
-              Material(
-                color: surface.withValues(alpha: glass),
-                borderRadius: BorderRadius.circular(18),
-                child: InkWell(
-                  key: const ValueKey('bodega-goal-action'),
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    onGoal();
-                  },
-                  borderRadius: BorderRadius.circular(18),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Row(children: [
-                        Icon(Icons.flag_outlined, size: 20, color: primary),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(goalPercent == null
-                            ? 'Establecer meta del mes' : 'Meta mensual',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: ink, fontWeight: FontWeight.w700))),
-                        if (goalPercent != null)
-                          Text('${(goalPercent! * 100).round()}%',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: ink, fontWeight: FontWeight.w700)),
-                        const SizedBox(width: 5),
-                        Icon(Icons.chevron_right_rounded, size: 20, color: muted),
-                      ]),
-                      if (goalPercent != null) ...[
-                        const SizedBox(height: 12),
-                        LinearProgressIndicator(
-                          value: goalPercent!.clamp(0.0, 1.0),
-                          minHeight: 6,
-                          borderRadius: BorderRadius.circular(8),
-                          color: primary,
-                          backgroundColor: primary.withValues(alpha: .13),
-                        ),
-                      ],
-                    ]),
-                  ),
-                ),
-              ),
-            ],
-          ]),
-        ),
+          )),
+          if (showMonth && loaded && chart != null)
+            Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('Tendencia · últimos 14 días', style: theme.textTheme.labelMedium),
+                const SizedBox(height: 10),
+                SizedBox(height: 45, child: chart),
+              ])),
+          if (showMonth) ...[
+            const Divider(),
+            Material(color: Colors.transparent, child: InkWell(
+              key: const ValueKey('bodega-goal-action'),
+              onTap: () { HapticFeedback.selectionClick(); onGoal(); },
+              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Column(children: [
+                  Row(children: [
+                    Icon(Icons.flag_outlined, color: scheme.primary, size: 19),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(goalPercent == null ? 'Establecer meta del mes' : 'Meta mensual',
+                      style: theme.textTheme.labelLarge)),
+                    if (goalPercent != null) Text('${(goalPercent! * 100).round()}%'),
+                    const Icon(Icons.chevron_right_rounded, size: 19),
+                  ]),
+                  if (goalPercent != null) Padding(padding: const EdgeInsets.only(top: 10),
+                    child: LinearProgressIndicator(value: goalPercent!.clamp(0, 1))),
+                ])),
+            )),
+          ],
+        ]),
       ),
     );
   }
 }
 
 class _MiniFact extends StatelessWidget {
-  const _MiniFact({required this.icon, required this.label, required this.tint});
+  const _MiniFact({required this.icon, required this.label});
   final IconData icon;
   final String label;
-  final Color tint;
   @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: t.colorScheme.surface.withValues(alpha: .75),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 15, color: tint),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 140),
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: t.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: t.colorScheme.onSurface))),
-        ]),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    Icon(icon, size: 15, color: FvLuxe.mintInk),
+    const SizedBox(width: 5),
+    Flexible(child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white))),
+  ]);
 }
 
 class _AccentIcon extends StatelessWidget {
@@ -276,10 +176,10 @@ class RetailHomeQuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     const items = <(String, String, IconData, Color)>[
       ('sell', 'Ventas', Icons.shopping_cart_outlined, RetailAccent.teal),
-      ('stock', 'Inventario', Icons.inventory_2_outlined, RetailAccent.violet),
+      ('stock', 'Inventario', Icons.inventory_2_outlined, RetailAccent.blue),
       ('comprobantes', 'Comprobantes', Icons.receipt_long_outlined, RetailAccent.blue),
       ('cash', 'Caja', Icons.point_of_sale_outlined, RetailAccent.amber),
-      ('fiados', 'Fiados', Icons.account_balance_wallet_outlined, RetailAccent.violet),
+      ('fiados', 'Fiados', Icons.account_balance_wallet_outlined, RetailAccent.teal),
     ];
     final visible = items.where((item) => allowed.contains(item.$1)).toList();
     if (visible.isEmpty) return const SizedBox.shrink();
@@ -348,19 +248,7 @@ class RetailHomeStat extends StatelessWidget {
     final body = Container(
       constraints: const BoxConstraints(minHeight: 158),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(23),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: dark
-              ? [t.colorScheme.surface, tint.withValues(alpha: .21)]
-              : [Colors.white, tint.withValues(alpha: .11)],
-        ),
-        border: Border.all(
-          color: dark ? Colors.white.withValues(alpha: .10) : Colors.white,
-          width: 1),
-        boxShadow: FvTokens.shadow(t.brightness),
-      ),
+      decoration: FvSurfaces.card(t),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           _AccentIcon(icon: icon, tint: tint, size: 43),
@@ -387,7 +275,7 @@ class RetailHomeStat extends StatelessWidget {
                 child: child)),
             child: Text(value, key: ValueKey(value), maxLines: 1,
             style: t.textTheme.headlineSmall?.copyWith(
-              color: tone ?? ink, fontSize: 25,
+              color: tone ?? ink, fontFamily: 'Inter', fontSize: 25,
               fontWeight: FontWeight.w800, letterSpacing: -.6,
               fontFeatures: const [FontFeature.tabularFigures()])))),
         if (detail != null) ...[
@@ -401,6 +289,7 @@ class RetailHomeStat extends StatelessWidget {
       label: '$label: $value${detail == null ? '' : ', $detail'}',
       button: onTap != null,
       excludeSemantics: true,
+      onTap: onTap,
       child: Material(
         color: Colors.transparent, borderRadius: BorderRadius.circular(23),
         child: InkWell(
@@ -447,7 +336,7 @@ class RetailPremiumBottomDock extends StatelessWidget {
             radius: 32, blur: 20,
             padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
             child: SizedBox(
-              height: 62,
+              height: 44 + MediaQuery.textScalerOf(context).scale(14),
               child: Row(children: [
                 for (final item in items)
                   Expanded(
@@ -523,7 +412,7 @@ class _DockDestination extends StatelessWidget {
               duration: still ? Duration.zero : const Duration(milliseconds: 220),
               curve: Curves.easeOutBack,
               child: Icon(icon, size: 22,
-                color: selected ? tint : ink.withValues(alpha: .67))),
+                color: selected ? tint : ink.withValues(alpha: .78))),
             const SizedBox(height: 3),
             Text(label,
               maxLines: 1, overflow: TextOverflow.ellipsis,

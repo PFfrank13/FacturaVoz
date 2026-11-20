@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   String _msg = '';
   int _cooldown = 0;
   Timer? _timer;
-  late final AnimationController _intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
+  late final AnimationController _intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 480));
   bool _started = false;
 
   static const _offlineMsg = 'No hay conexión a internet. Revisa tus datos móviles o el Wi‑Fi e inténtalo de nuevo.';
@@ -282,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     top: y - 70,
                     child: AnimatedOpacity(
                       opacity: kb ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 200),
+                      duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 160),
                       child: _BrandIntro(t: _intro, move: move),
                     ),
                   ),
@@ -294,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           Positioned.fill(
             child: TweenAnimationBuilder<double>(
               tween: Tween(end: kb ? 0.12 : 0.36),
-              duration: const Duration(milliseconds: 260),
+              duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
               builder: (context, target, _) => AnimatedBuilder(
                 animation: _intro,

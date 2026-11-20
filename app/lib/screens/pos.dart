@@ -22,9 +22,11 @@ import '../services/pos_cart_draft.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/motion.dart';
+import '../ui/ds.dart';
 import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/pos_product_card.dart';
+import '../ui/glass_widgets.dart';
 import '../ui/demo_pos_gallery.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_pos_workspace.dart';
@@ -55,6 +57,48 @@ class _PosScreenState extends State<PosScreen> {
   final Map<String, double> _cart = {};
   final _q = TextEditingController();
   final _focus = FocusNode();
+  final _cartAnchor = GlobalKey();
+  OverlayEntry? _flight;
+
+  void _clearFlight() {
+    _flight?.remove();
+    _flight?.dispose();
+    _flight = null;
+  }
+
+  void _addFromTile(Product product, BuildContext tile, IconData icon) {
+    final before = _cart[product.id] ?? 0;
+    _add(product);
+    if ((_cart[product.id] ?? 0) <= before || reduceMotion(context)) return;
+    final box = tile.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final origin = box.localToGlobal(box.size.center(Offset.zero));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || reduceMotion(context)) return;
+      final anchor = _cartAnchor.currentContext?.findRenderObject();
+      if (anchor is! RenderBox || !anchor.attached || !anchor.hasSize) return;
+      final overlay = Overlay.of(context);
+      final layer = overlay.context.findRenderObject() as RenderBox;
+      final start = layer.globalToLocal(origin);
+      final end = layer.globalToLocal(anchor.localToGlobal(anchor.size.center(Offset.zero)));
+      final scheme = Theme.of(context).colorScheme;
+      _clearFlight();
+      _flight = OverlayEntry(builder: (_) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1), duration: FvTokens.transition,
+        curve: Curves.easeOutCubic, onEnd: _clearFlight,
+        child: IgnorePointer(child: ExcludeSemantics(child: DecoratedBox(
+          decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+          child: Icon(icon, size: 15, color: scheme.onPrimary)))),
+        builder: (_, t, child) {
+          final point = Offset.lerp(start, end, t)! - Offset(0, 60 * t * (1 - t));
+          final diameter = 30 - 10 * t;
+          return Positioned(left: point.dx - diameter / 2, top: point.dy - diameter / 2,
+            width: diameter, height: diameter, child: child!);
+        },
+      ));
+      overlay.insert(_flight!);
+    });
+  }
   String _cat = '';
   String? _error;
   ({String code, String kind, double value})? _coupon;
@@ -241,6 +285,7 @@ class _PosScreenState extends State<PosScreen> {
   void dispose() {
     AppState.instance.removeListener(_onSessionContext);
     _table.removeListener(_onTableChanged);
+    _clearFlight();
     _q.dispose();
     _focus.dispose();
     _table.dispose();
@@ -1030,7 +1075,7 @@ class _PosScreenState extends State<PosScreen> {
               ]),
             ))
           : _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+          ? Center(child: DsStateView.error(message: _error!, onRetry: _load))
           : _products == null
               ? const SkeletonList()
               : LayoutBuilder(builder: (context, body) {
@@ -1042,18 +1087,9 @@ class _PosScreenState extends State<PosScreen> {
                   if (retail)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 5),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Punto de venta',
-                            style: t.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-                          const SizedBox(height: 4),
-                          Text('Escanea o selecciona un producto para vender',
-                            style: t.textTheme.bodySmall?.copyWith(
-                              color: t.colorScheme.onSurfaceVariant)),
-                        ],
-                      ),
+                      child: Align(alignment: Alignment.centerLeft,
+                        child: Text('Punto de venta', style: t.textTheme.headlineMedium)),
+
                     ),
 
                   if (widget.embedded && actions.isNotEmpty)
@@ -1134,7 +1170,6 @@ class _PosScreenState extends State<PosScreen> {
                                 final p = list[i];
                                 final n = _cart[p.id] ?? 0;
                                 final img = _extra[p.id]?['image_path'] as String?;
-                                final em = tileEmoji(p.name, _extra[p.id]?['category'] as String?);
                                 final categoryLabel = (_extra[p.id]?['category'] ?? '').toString().trim();
                                 final category = '${p.name} $categoryLabel'.toLowerCase();
                                 final placeholderIcon =
@@ -1165,6 +1200,7 @@ class _PosScreenState extends State<PosScreen> {
                                             child: IgnorePointer(
                                               child: StorageImage(
                                                 path: img,
+                                                placeholder: FvProductPhotoFallback(name: p.name, category: categoryLabel),
                                                 fit: BoxFit.contain,
                                               ),
                                             ),
@@ -1174,7 +1210,7 @@ class _PosScreenState extends State<PosScreen> {
                                         : null,
                                     soldOut: p.tracksStock && p.stock! <= 0,
                                     quantity: n > 0 ? qtyText(n) : null,
-                                    onAdd: () => _add(p),
+                                    onAdd: () => _addFromTile(p, context, placeholderIcon),
                                     onRemove: n > 0 ? () => _add(p, -1) : null,
                                   );
                                 }
@@ -1193,23 +1229,10 @@ class _PosScreenState extends State<PosScreen> {
                                         child: Stack(children: [
                                           Positioned.fill(
                                             child: img == null || img.isEmpty
-                                                ? Container(
-                                                    decoration: BoxDecoration(color: t.colorScheme.primary.withValues(alpha: 0.08), borderRadius: const BorderRadius.vertical(top: Radius.circular(17))),
-                                                    alignment: Alignment.center,
-                                                    child: retail
-                                                        ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                                            Icon(placeholderIcon, size: 42, color: t.colorScheme.primary),
-                                                            const SizedBox(height: 7),
-                                                            Text(categoryLabel.isEmpty ? 'Producto' : categoryLabel,
-                                                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                                                              style: t.textTheme.labelSmall?.copyWith(
-                                                                color: t.colorScheme.onSurfaceVariant)),
-                                                          ])
-                                                        : em == null
-                                                            ? Icon(p.isService ? Icons.handyman_rounded : Icons.shopping_basket_rounded, color: t.colorScheme.primary, size: 34)
-                                                            : Text(em, style: const TextStyle(fontSize: 40)),
-                                                  )
-                                                : ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(17)), child: StorageImage(path: img)),
+                                                ? FvProductPhotoFallback(name: p.name, category: categoryLabel,
+                                                    icon: placeholderIcon)
+                                                : StorageImage(path: img, fit: BoxFit.contain,
+                                                    placeholder: FvProductPhotoFallback(name: p.name, category: categoryLabel)),
                                           ),
                                           if (n > 0)
                                             Positioned(
@@ -1221,11 +1244,7 @@ class _PosScreenState extends State<PosScreen> {
                                                 child: Text(qtyText(n), style: TextStyle(fontFamily: 'Inter', color: t.colorScheme.onPrimary, fontWeight: FontWeight.w800)),
                                               ),
                                             ),
-                                          if (retail && p.tracksStock && p.stock! <= 0)
-                                            const Positioned(left: 6, top: 6, child: TagChip('Sin stock', color: Brand.bad))
-                                          else if (retail && p.lowStock && p.stock! > 0)
-                                            Positioned(left: 6, top: 6, child: TagChip(
-                                              'Quedan ${qtyText(p.stock!)}', color: Brand.warn)),
+
                                         ]),
                                       ),
                                       Padding(
@@ -1248,6 +1267,7 @@ class _PosScreenState extends State<PosScreen> {
                       return Row(children: [
                         Expanded(child: catalog),
                         RetailPosCartPane(
+                          cartAnchor: _cartAnchor,
                           lines: lines,
                           totals: totals,
                           currency: _cur,
@@ -1277,7 +1297,7 @@ class _PosScreenState extends State<PosScreen> {
                               onTap: _reviewRetailCart,
                               borderRadius: BorderRadius.circular(20),
                               child: Row(children: [
-                                const Icon(Icons.shopping_bag_outlined, size: 22),
+                                Icon(Icons.shopping_bag_outlined, key: _cartAnchor, size: 22),
                                 const SizedBox(width: 10),
                                 Flexible(
                                   child: Column(
