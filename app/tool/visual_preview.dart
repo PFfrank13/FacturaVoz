@@ -1,4 +1,5 @@
 import 'package:facturavoz/ui/design_tokens.dart';
+import 'package:facturavoz/ui/cash_luxe_widgets.dart';
 import 'package:facturavoz/ui/pos_product_card.dart';
 import 'package:facturavoz/ui/inventory_product_card.dart';
 import 'package:facturavoz/ui/retail_home_premium.dart';
@@ -198,6 +199,47 @@ for (final p in const [
   )),
 ]);
 
+
+Widget _cash() => Column(children: [
+  Padding(padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+    child: Row(children: [
+      const Icon(Icons.menu_rounded),
+      const SizedBox(width: 15),
+      Text('Caja', style: buildTheme(Brightness.light).textTheme.titleLarge),
+      const Spacer(),
+      const Icon(Icons.calendar_today_rounded),
+    ])),
+  Expanded(child: DecoratedBox(
+    decoration: BoxDecoration(gradient: FvLuxe.ambient(Brightness.light)),
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Builder(builder: (context) => RetailVisual.hero(
+          context: context,
+          eyebrow: 'CAJA · DEMOSTRACIÓN SIN TRANSACCIONES',
+          title: 'Control de caja',
+          subtitle: 'Abre, registra movimientos y realiza el arqueo sin ver el saldo esperado.',
+          icon: Icons.account_balance_wallet_rounded)),
+        const SizedBox(height: 16),
+        const FvCashJourney(opened: true, movements: 2, closed: false),
+        const SizedBox(height: 13),
+        const FvCashBlindPanel(),
+        const SizedBox(height: 17),
+        const Text('Movimientos ilustrativos',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        const SizedBox(height: 10),
+        const FvCashMovementTile(
+          kind: 'apertura', label: 'Apertura de ejemplo',
+          amount: 'S/ 100.00', time: '20 nov · 09:00'),
+        const SizedBox(height: 8),
+        const FvCashMovementTile(
+          kind: 'egreso', label: 'Compra de sencillo · ejemplo',
+          amount: 'S/ 10.00', time: '20 nov · 10:30'),
+      ]),
+    ),
+  )),
+]);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
@@ -219,7 +261,7 @@ void main() {
       await loader.load();
     }
   });
-  for(final p in const <String>['Inicio','Venta','Inventario']) {
+  for(final p in const <String>['Inicio','Venta','Inventario','Caja']) {
     testWidgets('Flutter render preview - $p', (tester) async {
       tester.view.physicalSize = const Size(390,844);
       tester.view.devicePixelRatio = 1;
@@ -227,7 +269,8 @@ void main() {
       await tester.pumpWidget(_frame(switch (p) {
         'Inicio' => _home(),
         'Venta' => _pos(),
-        _ => _inventory(),
+        'Inventario' => _inventory(),
+        _ => _cash(),
       }));
       if (p == 'Venta' || p == 'Inventario') {
         // A test capture must wait for image decoding, not just layout.
