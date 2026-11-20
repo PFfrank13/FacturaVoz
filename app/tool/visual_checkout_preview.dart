@@ -32,6 +32,11 @@ Widget _cart() {
     lines: () => items,
     currency: 'PEN', taxRate: 18,
     productImages: const {},
+    fixtureAssetPhotos: const {
+      'demo-a': 'assets/demo/water.webp',
+      'demo-b': 'assets/demo/milk.webp',
+      'demo-c': 'assets/demo/bread.webp',
+    },
     onChangeQuantity: (id, delta) {
       for(final item in items) {
         if(item.productId == id) item.quantity += delta;
@@ -117,6 +122,16 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(_fixture(name == 'Carrito' ? _cart() : _payment()));
+      if (name == 'Carrito') {
+        final context = tester.element(
+          find.byKey(const ValueKey('checkout-preview')));
+        await tester.runAsync(() async {
+          await Future.wait([
+            for (final asset in const ['water', 'milk', 'bread'])
+              precacheImage(AssetImage('assets/demo/$asset.webp'), context),
+          ]);
+        });
+      }
       await tester.pumpAndSettle();
       await expectLater(find.byKey(const ValueKey('checkout-preview')),
         matchesGoldenFile('previews/${name.toLowerCase()}.png'));

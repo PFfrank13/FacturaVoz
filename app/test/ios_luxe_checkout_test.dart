@@ -99,4 +99,26 @@ void main() {
     expect(tester.hasRunningAnimations, isFalse);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('Carrito puede mostrar fotos de ejemplo sin crear productos', (tester) async {
+    final items = <LineItem>[
+      LineItem(productId: 'ejemplo', description: 'Agua mineral',
+        quantity: 1, unitPrice: 1.80),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.light),
+      home: PosCartReviewScreen(
+        lines: () => items,
+        currency: 'PEN',
+        taxRate: 18,
+        productImages: const {},
+        fixtureAssetPhotos: const {'ejemplo': 'assets/demo/water.webp'},
+        onChangeQuantity: (_, __) {},
+      ),
+    ));
+    await tester.pump();
+    expect(find.byType(Image), findsWidgets);
+    expect(find.text('AM'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
 }
