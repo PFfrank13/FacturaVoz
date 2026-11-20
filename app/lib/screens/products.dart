@@ -756,6 +756,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final q = _q.trim().toLowerCase();
     final list = (all ?? const <Product>[]).where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).toList();
     return Scaffold(
+      backgroundColor: widget.embedded && Access.instance.rubro == 'bodega'
+          ? Colors.transparent : null,
       appBar: widget.embedded ? null : AppBar(title: const Text('Productos y servicios'), actions: [
         if (Access.instance.has('stock') && Access.instance.can('products_edit'))
           IconButton(

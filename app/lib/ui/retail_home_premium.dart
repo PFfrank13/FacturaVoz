@@ -7,11 +7,11 @@ import 'design_tokens.dart';
 /// These tones identify actions, never replace their text labels.
 abstract final class RetailAccent {
   static const ink = Color(0xFF18243A);
-  static const teal = Color(0xFF087D79);
-  static const blue = Color(0xFF285DA8);
+  static const teal = FvLuxe.jade;
+  static const blue = FvLuxe.blue;
   static const violet = Color(0xFF6552A3);
   static const amber = Color(0xFFC36F24);
-  static const mint = Color(0xFF12866D);
+  static const mint = FvLuxe.jade;
   static const muted = Color(0xFF5B6475);
 }
 
@@ -47,8 +47,8 @@ class RetailPremiumOverview extends StatelessWidget {
     final surface = theme.colorScheme.surface;
     final muted = theme.colorScheme.onSurfaceVariant;
     final cardRadius = BorderRadius.circular(30);
-    final glass = highContrast ? 1.0 : dark ? .76 : .86;
-    final primary = dark ? const Color(0xFF80D9C9) : RetailAccent.teal;
+    final glass = highContrast ? 1.0 : dark ? .76 : .68;
+    final primary = dark ? FvTokens.emeraldDark : FvLuxe.jade;
 
     return Semantics(
       container: true,
@@ -64,8 +64,8 @@ class RetailPremiumOverview extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft, end: Alignment.bottomRight,
             colors: dark
-              ? const [Color(0xFF223041), Color(0xFF18272C), Color(0xFF151920)]
-              : const [Color(0xFFE5EDFF), Color(0xFFE4F6F3), Color(0xFFF8F6FF)],
+              ? const [Color(0xFF1A3440), Color(0xFF1B3444), Color(0xFF172332)]
+              : const [Color(0xFFDDF5ED), Color(0xFFE2F0FC), Color(0xFFF6FAFF)],
             stops: const [0, .55, 1],
           ),
         ),
@@ -344,6 +344,7 @@ class RetailHomeStat extends StatelessWidget {
     final dark = t.brightness == Brightness.dark;
     final ink = t.colorScheme.onSurface;
     final effective = dark ? Color.lerp(tint, Colors.white, .25)! : tint;
+    final still = MediaQuery.disableAnimationsOf(context);
     final body = Container(
       constraints: const BoxConstraints(minHeight: 158),
       padding: const EdgeInsets.all(15),
@@ -374,11 +375,21 @@ class RetailHomeStat extends StatelessWidget {
             fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 5),
         FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-          child: Text(value, maxLines: 1,
+          child: AnimatedSwitcher(
+            duration: still ? Duration.zero : const Duration(milliseconds: 240),
+            switchInCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, .22),
+                  end: Offset.zero).animate(animation),
+                child: child)),
+            child: Text(value, key: ValueKey(value), maxLines: 1,
             style: t.textTheme.headlineSmall?.copyWith(
               color: tone ?? ink, fontSize: 25,
               fontWeight: FontWeight.w800, letterSpacing: -.6,
-              fontFeatures: const [FontFeature.tabularFigures()]))),
+              fontFeatures: const [FontFeature.tabularFigures()])))),
         if (detail != null) ...[
           const SizedBox(height: 4),
           Text(detail!, maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -421,7 +432,7 @@ class RetailPremiumBottomDock extends StatelessWidget {
     final t = Theme.of(context);
     final dark = t.brightness == Brightness.dark;
     final ink = t.colorScheme.onSurface;
-    final selectedTint = dark ? const Color(0xFFB9D8F7) : RetailAccent.blue;
+    final selectedTint = dark ? FvTokens.emeraldDark : FvLuxe.jade;
     return SafeArea(
       top: false,
       child: Padding(
@@ -501,10 +512,18 @@ class _DockDestination extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: selected ? tint.withValues(alpha: .13) : Colors.transparent,
+            gradient: selected ? LinearGradient(
+              colors: [tint.withValues(alpha: .21), tint.withValues(alpha: .11)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ) : null,
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 22, color: selected ? tint : ink.withValues(alpha: .67)),
+            AnimatedScale(
+              scale: selected ? 1.09 : 1,
+              duration: still ? Duration.zero : const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              child: Icon(icon, size: 22,
+                color: selected ? tint : ink.withValues(alpha: .67))),
             const SizedBox(height: 3),
             Text(label,
               maxLines: 1, overflow: TextOverflow.ellipsis,

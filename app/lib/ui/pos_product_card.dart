@@ -52,8 +52,8 @@ class FvPosProductCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(FvTokens.cardRadius),
             border: Border.all(
               color: isSelected
-                  ? t.colorScheme.onSurface.withValues(alpha: 0.28)
-                  : (dark ? FvTokens.strokeDark : Colors.transparent),
+                  ? FvLuxe.jade.withValues(alpha: .82)
+                  : (dark ? FvTokens.strokeDark : const Color(0xFFE5EDF5)),
             ),
             boxShadow: FvTokens.shadow(t.brightness),
           ),
@@ -73,8 +73,9 @@ class FvPosProductCard extends StatelessWidget {
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(14),
-                            child: ColoredBox(
-                              color: dark ? FvTokens.fieldDark : const Color(0xFFF5F5F7),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: FvLuxe.productBackdrop(t.brightness)),
                               child: photo ?? FvProductPhotoFallback(name: name, category: category),
                             ),
                           ),
@@ -101,13 +102,25 @@ class FvPosProductCard extends StatelessWidget {
                           Positioned(right: 6, top: 6,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
-                                color: t.colorScheme.onSurface,
+                                color: dark ? FvTokens.emeraldDark : FvLuxe.jade,
                                 borderRadius: BorderRadius.circular(99)),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                child: Text(quantity!, style: TextStyle(
-                                  color: t.colorScheme.surface, fontSize: 11,
-                                  fontWeight: FontWeight.w700)),
+                                child: AnimatedSwitcher(
+                                  duration: MediaQuery.disableAnimationsOf(context)
+                                      ? Duration.zero : const Duration(milliseconds: 210),
+                                  transitionBuilder: (child, animation) =>
+                                      FadeTransition(opacity: animation,
+                                        child: SlideTransition(
+                                          position: Tween<Offset>(
+                                            begin: const Offset(0, .30),
+                                            end: Offset.zero).animate(animation),
+                                          child: child)),
+                                  child: Text(quantity!, key: ValueKey('qty-$quantity'),
+                                    style: TextStyle(
+                                      color: dark ? FvTokens.canvasDark : Colors.white,
+                                      fontSize: 11, fontWeight: FontWeight.w700)),
+                                ),
                               ),
                             ),
                           ),
@@ -136,8 +149,8 @@ class FvPosProductCard extends StatelessWidget {
                             onPressed: disabled ? null : onAdd,
                             icon: const Icon(Icons.add_rounded, size: 23),
                             style: IconButton.styleFrom(
-                              backgroundColor: t.colorScheme.onSurface,
-                              foregroundColor: t.colorScheme.surface,
+                              backgroundColor: t.colorScheme.primary,
+                              foregroundColor: t.colorScheme.onPrimary,
                               disabledBackgroundColor: t.disabledColor.withValues(alpha: 0.2),
                             ),
                           ),

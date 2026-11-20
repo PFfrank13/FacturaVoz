@@ -996,6 +996,7 @@ class _PosScreenState extends State<PosScreen> {
       if (Access.instance.has('precios')) IconButton(tooltip: 'Cupón', onPressed: _applyCoupon, icon: Icon(Icons.local_offer_rounded, color: _coupon != null ? Brand.ok : null)),
     ];
     return Theme(data: t, child: Scaffold(
+      backgroundColor: retail && widget.embedded ? Colors.transparent : null,
       appBar: widget.embedded ? null : AppBar(
         title: Text(_restaurant ? 'Tomar pedido' : 'Venta rápida'),
         actions: actions,

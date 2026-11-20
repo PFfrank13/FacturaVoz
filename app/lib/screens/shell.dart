@@ -602,7 +602,11 @@ class _MainShellState extends State<MainShell> {
                 const SizedBox(width: 8),
               ],
             ) : null,
-            body: Row(children: [
+            body: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: isBodega ? FvLuxe.ambient(Theme.of(context).brightness) : null,
+              ),
+              child: Row(children: [
               if (pinnedSidebar)
                 _bodegaRail(dests)
               else if (workstationRail)
@@ -632,7 +636,7 @@ class _MainShellState extends State<MainShell> {
                   ),
                 ),
               ])),
-            ]),
+            ])),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
             // Evitar que el micrófono cubra Cobrar en el POS o Abrir/Cerrar caja.
             floatingActionButton: isBodega && pinnedSidebar && !keyboard &&
@@ -738,14 +742,19 @@ class _TabSlotState extends State<_TabSlot> {
         duration: Duration(milliseconds: reduce ? 0 : 220),
         curve: Curves.easeOutCubic,
         onEnd: _onFadeEnd,
-        child: AnimatedScale(
-          scale: active ? 1 : 0.985,
+        child: AnimatedSlide(
+          offset: active ? Offset.zero : const Offset(.025, 0),
           duration: Duration(milliseconds: reduce ? 0 : 280),
           curve: Curves.easeOutCubic,
-          child: IgnorePointer(
+          child: AnimatedScale(
+            scale: active ? 1 : .994,
+            duration: Duration(milliseconds: reduce ? 0 : 280),
+            curve: Curves.easeOutCubic,
+            child: IgnorePointer(
             ignoring: !active,
             // Solo las animaciones internas de la pestaña oculta se pausan (ahorra batería y CPU).
             child: TickerMode(enabled: active, child: widget.child),
+            ),
           ),
         ),
       ),

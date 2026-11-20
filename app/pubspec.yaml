@@ -57,6 +57,7 @@ flutter:
     - assets/fonts/Inter-LICENSE.txt
     - assets/branding/
     - assets/photos/
+    - assets/demo/
   fonts:
     - family: Inter
       fonts:

@@ -266,6 +266,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final activity = isBodega ? list.take(4).toList() : list;
     final buyers = _todayBuyers();
     return RetailResponsiveFrame(maxWidth: 1200, child: Scaffold(
+      backgroundColor: isBodega ? Colors.transparent : null,
       body: RefreshIndicator(
         onRefresh: _load,
         edgeOffset: 140,

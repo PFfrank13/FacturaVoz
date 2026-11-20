@@ -3,7 +3,8 @@ import 'design_tokens.dart';
 import 'glass_widgets.dart';
 import 'pos_product_card.dart';
 
-/// Display-only sample. Never saves products or invokes payment APIs.
+/// Display-only, offline picture catalog. Never saves products or invokes payment APIs.
+/// Illustrative assets are bundled to avoid blank squares while offline.
 class _DemoProduct {
   const _DemoProduct(this.name, this.category, this.price, this.photo);
   final String name, category, photo;
@@ -11,17 +12,17 @@ class _DemoProduct {
 }
 const _products = <_DemoProduct>[
   _DemoProduct('Agua mineral 625 ml', 'Bebidas', 1.80,
-    'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=420&fit=crop&q=80'),
+    'assets/demo/water.webp'),
   _DemoProduct('Leche fresca 1 L', 'Lácteos', 4.90,
-    'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=420&fit=crop&q=80'),
+    'assets/demo/milk.webp'),
   _DemoProduct('Arroz extra 1 kg', 'Abarrotes', 4.50,
-    'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=420&fit=crop&q=80'),
+    'assets/demo/rice.webp'),
   _DemoProduct('Aceite de oliva 500 ml', 'Abarrotes', 17.90,
-    'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=420&fit=crop&q=80'),
+    'assets/demo/oil.webp'),
   _DemoProduct('Pan artesanal', 'Panadería', 5.50,
-    'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=420&fit=crop&q=80'),
+    'assets/demo/bread.webp'),
   _DemoProduct('Galletas caseras', 'Snacks', 3.50,
-    'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=420&fit=crop&q=80'),
+    'assets/demo/cookies.webp'),
 ];
 
 /// Shown only for an empty real catalog; no user data is changed.
@@ -112,8 +113,12 @@ class _FvDemoPosGalleryState extends State<FvDemoPosGallery> {
                 quantity: qty > 0 ? '$qty' : null,
                 icon: Icons.shopping_bag_outlined,
                 photo: widget.loadPhotos
-                    ? FvNetworkProductPhoto(
-                        url: p.photo, name: p.name, category: p.category)
+                    ? Image.asset(p.photo, fit: BoxFit.contain,
+                        width: double.infinity, height: double.infinity,
+                        filterQuality: FilterQuality.medium,
+                        semanticLabel: 'Foto ilustrativa de ${p.name}',
+                        errorBuilder: (_, __, ___) =>
+                            FvProductPhotoFallback(name: p.name, category: p.category))
                     : FvProductPhotoFallback(
                         name: p.name, category: p.category),
                 onAdd: () => _change(p, 1),
@@ -193,8 +198,11 @@ class FvDemoInventoryGallery extends StatelessWidget {
               SizedBox(width: 72, height: 78,
                 child: ClipRRect(borderRadius: BorderRadius.circular(13),
                   child: loadPhotos
-                      ? FvNetworkProductPhoto(
-                          url: p.photo, name: p.name, category: p.category)
+                      ? Image.asset(p.photo, fit: BoxFit.cover,
+                          filterQuality: FilterQuality.medium,
+                          semanticLabel: 'Foto ilustrativa de ${p.name}',
+                          errorBuilder: (_, __, ___) =>
+                            FvProductPhotoFallback(name: p.name, category: p.category))
                       : FvProductPhotoFallback(
                           name: p.name, category: p.category))),
               const SizedBox(width: 14),
