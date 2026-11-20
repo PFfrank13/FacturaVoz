@@ -57,7 +57,7 @@ Widget _payment() => Scaffold(
             color: Color(0xFF52647A), fontSize: 11,
             fontWeight: FontWeight.w700, letterSpacing: 1)),
           const SizedBox(height: 5),
-          const Text('S/ 14.00',style: TextStyle(
+          const Text('S/ 16.52',style: TextStyle(
             color: Color(0xFF172337),fontSize: 36,
             fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),

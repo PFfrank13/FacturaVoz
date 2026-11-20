@@ -148,6 +148,12 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                     children: [
                                       SizedBox.square(dimension: 44,
                                         child: IconButton.filledTonal(
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: t.brightness == Brightness.dark
+                                                ? t.colorScheme.surfaceContainerHighest
+                                                : FvLuxe.jadeSoft,
+                                            foregroundColor: t.colorScheme.primary,
+                                          ),
                                           tooltip: 'Quitar uno',
                                           onPressed: id == null ? null : () {
                                             widget.onChangeQuantity(id, -1);
@@ -168,6 +174,12 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                       ),
                                       SizedBox.square(dimension: 44,
                                         child: IconButton.filledTonal(
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: t.brightness == Brightness.dark
+                                                ? t.colorScheme.surfaceContainerHighest
+                                                : FvLuxe.jadeSoft,
+                                            foregroundColor: t.colorScheme.primary,
+                                          ),
                                           tooltip: 'Agregar uno',
                                           onPressed: id == null ? null : () {
                                             widget.onChangeQuantity(id, 1);
