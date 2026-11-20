@@ -50,11 +50,7 @@ Widget _home() => Column(children: [
               values: [0, 0, 8, 14, 0, 0, 0, 6, 1, 0, 5, 0, 0, 0],
               height: 45, color: FvLuxe.jade),
             onGoal: () {})),
-        const SizedBox(height: 14),
-        RetailHomeQuickActions(
-          onNavigate: (_) {},
-          allowed: const {'sell', 'stock', 'comprobantes', 'cash', 'fiados'}),
-        Padding(padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+        Padding(padding: const EdgeInsets.fromLTRB(18, 22, 18, 12),
           child: Text('Hoy', style: buildTheme(Brightness.light).textTheme.headlineSmall)),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(children: [

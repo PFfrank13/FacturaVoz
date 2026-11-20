@@ -163,67 +163,6 @@ class _AccentIcon extends StatelessWidget {
   }
 }
 
-/// Quick actions have one source of navigation truth: the containing MainShell.
-class RetailHomeQuickActions extends StatelessWidget {
-  const RetailHomeQuickActions({
-    super.key, required this.onNavigate,
-    required this.allowed,
-  });
-  final ValueChanged<String> onNavigate;
-  final Set<String> allowed;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = <(String, String, IconData, Color)>[
-      ('sell', 'Ventas', Icons.shopping_cart_outlined, RetailAccent.teal),
-      ('stock', 'Inventario', Icons.inventory_2_outlined, RetailAccent.blue),
-      ('comprobantes', 'Comprobantes', Icons.receipt_long_outlined, RetailAccent.blue),
-      ('cash', 'Caja', Icons.point_of_sale_outlined, RetailAccent.amber),
-      ('fiados', 'Fiados', Icons.account_balance_wallet_outlined, RetailAccent.teal),
-    ];
-    final visible = items.where((item) => allowed.contains(item.$1)).toList();
-    if (visible.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 104,
-      child: ListView(
-        key: const ValueKey('retail-home-shortcuts'),
-        physics: const BouncingScrollPhysics(),
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          for (final (id, label, icon, tint) in visible)
-            Padding(
-              padding: const EdgeInsets.only(right: 13),
-              child: SizedBox(
-                width: 88,
-                child: Semantics(
-                  button: true, label: 'Abrir $label',
-                  child: InkWell(
-                    key: ValueKey('retail-home-quick-$id'),
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      onNavigate(id);
-                    },
-                    borderRadius: BorderRadius.circular(18),
-                    child: Column(children: [
-                      _AccentIcon(icon: icon, tint: tint, size: 58),
-                      const SizedBox(height: 8),
-                      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 11, fontWeight: FontWeight.w700)),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Colored dashboard tile used solely for the retail operational overview.
 class RetailHomeStat extends StatelessWidget {
   const RetailHomeStat({

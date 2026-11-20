@@ -21,7 +21,6 @@ import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_layout.dart';
-import '../ui/retail_home_premium.dart';
 import '../ui/work_queue.dart';
 import '../ux/rubro_experience.dart';
 import 'catalog.dart';
@@ -35,9 +34,7 @@ import '../nav/navigation_contract.dart';
 import '../permissions.dart';
 
 class InicioScreen extends StatefulWidget {
-  const InicioScreen({super.key, this.onNavigate});
-
-  final ValueChanged<String>? onNavigate;
+  const InicioScreen({super.key});
 
   @override
   State<InicioScreen> createState() => _InicioScreenState();
@@ -314,22 +311,6 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               ),
             ),
           ),
-          if (isBodega && widget.onNavigate != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 18, bottom: 7),
-                child: RetailHomeQuickActions(
-                  onNavigate: widget.onNavigate!,
-                  allowed: {
-                    if (a.has('facturar') && a.can('sell')) 'sell',
-                    if (a.has('stock') && (a.can('sell') || a.can('products_edit'))) 'stock',
-                    if (a.has('facturar') && a.allows('sales.read')) 'comprobantes',
-                    if (a.has('caja') && a.can('collect')) 'cash',
-                    if (a.has('fiados') && a.can('collect')) 'fiados',
-                  },
-                ),
-              ),
-            ),
           if ((!isBodega ? _primary(a) : null) case final p?)
             SliverToBoxAdapter(
               child: Padding(

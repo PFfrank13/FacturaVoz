@@ -10,7 +10,6 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       var goalTap = false;
-      final nav = <String>[];
       await tester.pumpWidget(MaterialApp(
         theme: buildTheme(Brightness.light),
         home: Scaffold(body: SingleChildScrollView(
@@ -28,10 +27,6 @@ void main() {
               onGoal: () => goalTap = true,
               chart: const SizedBox(height: 48),
             )),
-            RetailHomeQuickActions(
-              allowed: const {'sell','stock','comprobantes','cash','fiados'},
-              onNavigate: nav.add,
-            ),
             const Padding(padding: EdgeInsets.all(12),
               child: RetailHomeStat(
                 label: 'Estado de mi caja',
@@ -49,8 +44,6 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const ValueKey('bodega-goal-action')));
       expect(goalTap, isTrue);
-      await tester.tap(find.byKey(const ValueKey('retail-home-quick-sell')));
-      expect(nav, ['sell']);
       expect(tester.takeException(), isNull);
     });
   }
@@ -78,24 +71,14 @@ void main() {
       ));
       expect(find.byKey(const ValueKey('bodega-premium-bottom-dock')),
           findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('bodega-dock-sell')));
-      await tester.pump();
-      expect(navigated, ['sell']);
+      for (final id in ['sell', 'stock', 'cash']) {
+        await tester.tap(find.byKey(ValueKey('bodega-dock-$id')));
+        await tester.pump();
+      }
+      expect(navigated, ['sell', 'stock', 'cash']);
       await tester.tap(find.byKey(const ValueKey('bodega-dock-more')));
       expect(more, isTrue);
       expect(tester.takeException(), isNull);
     });
   }
-
-  testWidgets('los accesos se ocultan sin permisos', (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(Brightness.light),
-      home: Scaffold(body: RetailHomeQuickActions(
-        allowed: const {'stock'},
-        onNavigate: (_) {},
-      )),
-    ));
-    expect(find.byKey(const ValueKey('retail-home-quick-stock')), findsOneWidget);
-    expect(find.byKey(const ValueKey('retail-home-quick-sell')), findsNothing);
-  });
 }
