@@ -320,7 +320,7 @@ class _MainShellState extends State<MainShell> {
     if (rubroFor(_settings?.businessType) != null) {
       switch (id) {
         case 'home':
-          return InicioScreen(onNavigate: _go);
+          return const InicioScreen();
         case 'collect':
           return const OwedHubScreen();
         case 'business':

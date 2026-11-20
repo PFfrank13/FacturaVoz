@@ -409,7 +409,7 @@ void main() {
         ),
       ),
     ),
-    'inicio': (_) => InicioScreen(onNavigate: (_) {}),
+    'inicio': (_) => const InicioScreen(),
     'cobrado': (_) => const PosPaymentSuccessScreen(
       invoiceId: 'invoice-1',
       method: 'efectivo',
@@ -521,6 +521,25 @@ void main() {
           find.byKey(const ValueKey('capture')),
           matchesGoldenFile('../../tool/previews/signature/$name.png'),
         );
+        if (name == 'navegacion-390') {
+          for (final label in ['Ventas', 'Inventario', 'Caja']) {
+            expect(find.text(label), findsOneWidget);
+          }
+          await tester.tap(find.byKey(const ValueKey('bodega-dock-more')));
+          await tester.pumpAndSettle();
+          final receipts = find.widgetWithText(
+            NavigationDrawerDestination,
+            'Comprobantes',
+          );
+          expect(
+            find.widgetWithText(NavigationDrawerDestination, 'Fiados'),
+            findsOneWidget,
+          );
+          await tester.ensureVisible(receipts);
+          await tester.tap(receipts);
+          await tester.pumpAndSettle();
+          expect(find.widgetWithText(AppBar, 'Comprobantes'), findsOneWidget);
+        }
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(seconds: 1));
       });
