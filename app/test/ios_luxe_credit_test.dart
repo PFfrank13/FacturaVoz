@@ -33,6 +33,9 @@ void main() {
                   name: 'Cliente con saldo pagado',
                   amount: 'S/ 0.00',
                   hasBalance: false,
+                  overdue: true,
+                  overLimit: true,
+                  dueLabel: 'Vencido desde 15/11/2026',
                 ),
               ]),
             )),
@@ -41,6 +44,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Vencido'), findsOneWidget);
         expect(find.text('Al día'), findsOneWidget);
+        expect(find.text('Vencido desde 15/11/2026'), findsNothing);
         expect(find.text('S/ 1,250.00'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });

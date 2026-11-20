@@ -185,12 +185,13 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                                   name: b.name,
                                   amount: money(b.balance, _cur),
                                   hasBalance: b.balance > 0.004,
-                                  overdue: b.oldestDue != null &&
+                                  overdue: b.balance > 0.004 &&
+                                      b.oldestDue != null &&
                                       b.oldestDue!.compareTo(today) < 0,
-                                  overLimit: b.overLimit,
+                                  overLimit: b.balance > 0.004 && b.overLimit,
                                   lastMovement: b.lastMove == null
                                       ? null : shortDateTime(b.lastMove!),
-                                  dueLabel: b.oldestDue == null ? null
+                                  dueLabel: b.balance <= 0.004 || b.oldestDue == null ? null
                                       : (b.oldestDue!.compareTo(today) < 0
                                           ? 'Vencido desde ${displayDate(b.oldestDue!)}'
                                           : 'Paga hasta ${displayDate(b.oldestDue!)}'),

@@ -91,7 +91,7 @@ class FvCreditBalanceCard extends StatelessWidget {
                   style: t.textTheme.bodySmall?.copyWith(
                     color: t.colorScheme.onSurfaceVariant)),
               ],
-              if (dueLabel != null && dueLabel!.isNotEmpty) ...[
+              if (hasBalance && dueLabel != null && dueLabel!.isNotEmpty) ...[
                 const SizedBox(height: 5),
                 Text(dueLabel!, maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -101,7 +101,7 @@ class FvCreditBalanceCard extends StatelessWidget {
                     fontWeight: overdue ? FontWeight.w700
                         : FontWeight.w500)),
               ],
-              if (overLimit) ...[
+              if (hasBalance && overLimit) ...[
                 const SizedBox(height: 8),
                 Row(children: [
                   Icon(Icons.warning_amber_rounded, size: 16,
