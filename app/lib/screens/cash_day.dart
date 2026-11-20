@@ -331,22 +331,20 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                       const SizedBox(height: 12),
                       Reveal(
                         index: 1,
-                        child: SoftCard(
-                          child: Column(children: [
-                            if (_closing == null)
-                              const FvCashBlindPanel()
-                            else ...[
-                              _line(context, 'Apertura', s.opening),
-                              _line(context, 'Ventas en efectivo', s.cashSales),
-                              _line(context, 'Otros ingresos de efectivo', s.cashIn),
-                              _line(context, 'Salidas de efectivo', -s.cashOut),
-                              const Divider(),
-                              _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
-                              _line(context, 'Contado al cerrar', ((_closing!['counted_cash'] as num?) ?? 0).toDouble()),
-                              _line(context, 'Diferencia', ((_closing!['difference'] as num?) ?? 0).toDouble(), bold: true, signed: true),
-                            ],
-                          ]),
-                        ),
+                        child: _closing == null
+                            ? const FvCashBlindPanel()
+                            : SoftCard(
+                                child: Column(children: [
+                                  _line(context, 'Apertura', s.opening),
+                                  _line(context, 'Ventas en efectivo', s.cashSales),
+                                  _line(context, 'Otros ingresos de efectivo', s.cashIn),
+                                  _line(context, 'Salidas de efectivo', -s.cashOut),
+                                  const Divider(),
+                                  _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
+                                  _line(context, 'Contado al cerrar', ((_closing!['counted_cash'] as num?) ?? 0).toDouble()),
+                                  _line(context, 'Diferencia', ((_closing!['difference'] as num?) ?? 0).toDouble(), bold: true, signed: true),
+                                ]),
+                              ),
                       ),
                       const SizedBox(height: 12),
                       if (_closing != null && s.byMethod.isNotEmpty)
