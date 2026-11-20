@@ -3,6 +3,7 @@ import 'package:facturavoz/ui/glass_widgets.dart';
 import 'package:facturavoz/ui/pos_product_card.dart';
 import 'package:facturavoz/ui/retail_home_premium.dart';
 import 'package:facturavoz/ui/retail_visual.dart';
+import 'package:facturavoz/ui/motion.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,7 +46,9 @@ Widget _home() => Column(children: [
             salesAmount: 29.50, salesCount: 2, drafts: 1,
             todayAmount: 0, todayCount: 0,
             loaded: true, showMonth: true,
-            chart: const SizedBox(height: 45),
+            chart: const Sparkline(
+              values: [0, 0, 8, 14, 0, 0, 0, 6, 1, 0, 5, 0, 0, 0],
+              height: 45, color: FvLuxe.jade),
             onGoal: () {})),
         const SizedBox(height: 14),
         RetailHomeQuickActions(
@@ -114,16 +117,19 @@ Widget _pos() => Column(children: [
           childAspectRatio:.62,
           children: [
             for(final p in const [
-              ('Agua mineral 625 ml','S/ 1.80','Bebidas'),
-              ('Leche fresca 1 L','S/ 4.90','Lácteos'),
-              ('Arroz extra 1 kg','S/ 4.50','Abarrotes'),
-              ('Aceite de oliva','S/ 17.90','Abarrotes'),
-              ('Pan artesanal','S/ 5.50','Panadería'),
-              ('Galletas caseras','S/ 3.50','Snacks'),
+              ('Agua mineral 625 ml','S/ 1.80','Bebidas','assets/demo/water.webp'),
+              ('Leche fresca 1 L','S/ 4.90','Lácteos','assets/demo/milk.webp'),
+              ('Arroz extra 1 kg','S/ 4.50','Abarrotes','assets/demo/rice.webp'),
+              ('Aceite de oliva','S/ 17.90','Abarrotes','assets/demo/oil.webp'),
+              ('Pan artesanal','S/ 5.50','Panadería','assets/demo/bread.webp'),
+              ('Galletas caseras','S/ 3.50','Snacks','assets/demo/cookies.webp'),
             ])
               FvPosProductCard(
                 name:p.$1,price:p.$2,category:p.$3,
                 icon:Icons.shopping_bag_outlined,
+                photo: Image.asset(p.$4, fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                  semanticLabel: 'Fotografía de muestra de ${p.$1}'),
                 onAdd: () {},
               ),
           ],
@@ -166,11 +172,11 @@ Widget _inventory() => Column(children: [
           icon:Icons.inventory_2_outlined)),
         const SizedBox(height:16),
         for(final p in const [
-          ('Agua mineral 625 ml','S/ 1.80','48'),
-          ('Leche fresca 1 L','S/ 4.90','24'),
-          ('Arroz extra 1 kg','S/ 4.50','6'),
-          ('Aceite de oliva','S/ 17.90','18'),
-          ('Pan artesanal','S/ 5.50','12'),
+          ('Agua mineral 625 ml','S/ 1.80','48','assets/demo/water.webp'),
+          ('Leche fresca 1 L','S/ 4.90','24','assets/demo/milk.webp'),
+          ('Arroz extra 1 kg','S/ 4.50','6','assets/demo/rice.webp'),
+          ('Aceite de oliva','S/ 17.90','18','assets/demo/oil.webp'),
+          ('Pan artesanal','S/ 5.50','12','assets/demo/bread.webp'),
         ])
           Padding(padding:const EdgeInsets.only(bottom:10),
             child: Container(
@@ -181,7 +187,8 @@ Widget _inventory() => Column(children: [
               child:Row(children: [
                 ClipRRect(borderRadius:BorderRadius.circular(13),
                   child:SizedBox(width:58,height:60,
-                    child:FvProductPhotoFallback(name:p.$1))),
+                    child:Image.asset(p.$4,fit:BoxFit.cover,
+                      filterQuality:FilterQuality.medium))),
                 const SizedBox(width:13),
                 Expanded(child:Column(
                   crossAxisAlignment:CrossAxisAlignment.start,
