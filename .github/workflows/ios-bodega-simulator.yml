@@ -1,0 +1,92 @@
+name: iOS Bodega simulator
+
+on:
+  pull_request:
+    paths:
+      - 'app/lib/**'
+      - 'app/packages/**'
+      - 'app/assets/**'
+      - 'app/ios/**'
+      - 'app/pubspec.*'
+      - 'app/integration_test/**'
+      - 'app/test/support/**'
+      - 'app/tool/browser_qa/offline_retail.dart'
+      - 'app/test_driver/**'
+      - '.github/workflows/ios-bodega-simulator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-bodega-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator-smoke:
+    name: iPhone simulator smoke (offline fixtures)
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.9
+          channel: stable
+          cache: true
+
+      - name: Start an available iPhone
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list devices available
+          simulator_id="$(xcrun simctl list devices available --json | jq -er '
+            [.devices | to_entries[] | select(.key | contains("SimRuntime.iOS-"))
+             | (.key | split("iOS-")[1] | split("-") | map(tonumber)) as $version
+             | .value[] | select(.name | startswith("iPhone"))
+             | {udid, version: $version, pro: (.name | endswith(" Pro"))}]
+            | max_by([.version, .pro]).udid // error("No available iPhone simulator")')"
+          xcrun simctl bootstatus "$simulator_id" -b
+          echo "IPHONE_UDID=$simulator_id" >> "$GITHUB_ENV"
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Build the unsigned debug app for the simulator
+        run: |
+          flutter build ios --debug --simulator --no-codesign \
+            --target=integration_test/bodega_emulator_smoke_test.dart \
+            --dart-define=SIGNATURE_CAPTURES=true \
+            --dart-define=SUPABASE_URL=https://example.supabase.co \
+            --dart-define=SUPABASE_ANON_KEY=ci \
+            --dart-define=API_BASE_URL=https://example.vercel.app
+
+      - name: Exercise the dashboard, activity island and sales on iPhone
+        env:
+          SIGNATURE_PREVIEW_DIR: ${{ runner.temp }}/bodega-iphone-captures
+        run: |
+          flutter drive --debug --no-dds \
+            --device-id="$IPHONE_UDID" \
+            --use-application-binary=build/ios/iphonesimulator/Runner.app \
+            --driver=test_driver/signature_screenshots.dart \
+            --target=integration_test/bodega_emulator_smoke_test.dart
+          for screen in inicio-bodega tendencia-diaria isla-aviso; do
+            test -s "$SIGNATURE_PREVIEW_DIR/$screen.png"
+            sips -g pixelWidth -g pixelHeight "$SIGNATURE_PREVIEW_DIR/$screen.png"
+          done
+
+      - name: Save iPhone screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: facturavoz-iphone-previews
+          path: |
+            ${{ runner.temp }}/bodega-iphone-captures/inicio-bodega.png
+            ${{ runner.temp }}/bodega-iphone-captures/tendencia-diaria.png
+            ${{ runner.temp }}/bodega-iphone-captures/isla-aviso.png
+          if-no-files-found: error
+          retention-days: 14

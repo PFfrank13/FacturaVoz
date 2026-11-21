@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import 'theme.dart';
 import 'design_tokens.dart';
+import 'motion.dart';
 
 /// Usa el espacio realmente disponible (no la resolución física del dispositivo).
 /// El panel se muestra solamente en Bodega/Tienda integrada al MainShell.
@@ -92,6 +93,7 @@ class RetailPosCartPane extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final line = lines[index];
                   return Container(
+                    key: line.productId == null ? null : ValueKey(line.productId),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerLow,
@@ -126,25 +128,31 @@ class RetailPosCartPane extends StatelessWidget {
                         Row(children: [
                           Expanded(child: Text('Cantidad',
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant))),
-                          IconButton.filledTonal(
-                            key: ValueKey('retail-pos-qty-minus-${line.productId}'),
-                            tooltip: 'Reducir ${line.description}',
-                            onPressed: () => onQuantityChange!(line.productId!,
-                              line.quantity < 1 ? -line.quantity : -1.0),
-                            icon: const Icon(Icons.remove_rounded),
-                            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                          FvTactileScale(
+                            pressedScale: .94,
+                            child: IconButton.filledTonal(
+                              key: ValueKey('retail-pos-qty-minus-${line.productId}'),
+                              tooltip: 'Reducir ${line.description}',
+                              onPressed: () => onQuantityChange!(line.productId!,
+                                line.quantity < 1 ? -line.quantity : -1.0),
+                              icon: const Icon(Icons.remove_rounded),
+                              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                            ),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Text(qtyText(line.quantity),
+                            child: FvQuantityText(qtyText(line.quantity),
                               style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
                           ),
-                          IconButton.filledTonal(
-                            key: ValueKey('retail-pos-qty-plus-${line.productId}'),
-                            tooltip: 'Aumentar ${line.description}',
-                            onPressed: () => onQuantityChange!(line.productId!, 1.0),
-                            icon: const Icon(Icons.add_rounded),
-                            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                          FvTactileScale(
+                            pressedScale: .94,
+                            child: IconButton.filledTonal(
+                              key: ValueKey('retail-pos-qty-plus-${line.productId}'),
+                              tooltip: 'Aumentar ${line.description}',
+                              onPressed: () => onQuantityChange!(line.productId!, 1.0),
+                              icon: const Icon(Icons.add_rounded),
+                              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                            ),
                           ),
                         ]),
                       ],
@@ -168,16 +176,19 @@ class RetailPosCartPane extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, fontFeatures: const [FontFeature.tabularFigures()]))),
             ]),
             const SizedBox(height: 15),
-            FilledButton.icon(
-              key: const ValueKey('retail-pos-desktop-charge'),
-              onPressed: lines.isEmpty ? null : onReview,
-              icon: const Icon(Icons.shopping_cart_checkout_rounded),
-              label: const Text('Revisar y cobrar'),
-              style: FilledButton.styleFrom(
-                backgroundColor: FvTokens.emerald,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(0, 54),
-                shape: const StadiumBorder(),
+            FvTactileScale(
+              enabled: lines.isNotEmpty && onReview != null,
+              child: FilledButton.icon(
+                key: const ValueKey('retail-pos-desktop-charge'),
+                onPressed: lines.isEmpty ? null : onReview,
+                icon: const Icon(Icons.shopping_cart_checkout_rounded),
+                label: const Text('Revisar y cobrar'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: FvTokens.emerald,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 54),
+                  shape: const StadiumBorder(),
+                ),
               ),
             ),
             const SizedBox(height: 7),

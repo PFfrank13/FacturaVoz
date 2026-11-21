@@ -322,7 +322,8 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                           footer: Row(children: [
                             Expanded(child: RetailVisual.microStat('Ventas del día', money(s.salesTotal, _cur))),
                             const SizedBox(width: 10),
-                            Expanded(child: RetailVisual.microStat('Operaciones', '${s.salesCount} ventas')),
+                            Expanded(child: RetailVisual.microStat('Operaciones',
+                                s.salesCount == 1 ? '1 venta' : '${s.salesCount} ventas')),
                           ]),
                         ),
                       ),

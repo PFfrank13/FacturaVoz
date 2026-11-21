@@ -6,6 +6,7 @@
 // Las cifras vienen del servidor con una sola regla (con IGV, sin anuladas, menos notas de crédito).
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl;
 
 import '../access.dart';
 import '../app_state.dart';
@@ -43,6 +44,8 @@ class InicioScreen extends StatefulWidget {
 class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScreen> {
   Map<String, dynamic>? _today;
   Map<String, dynamic>? _month;
+  ({String currency, DateTime end, List<double> days})? _trend;
+  int _trendRequest = 0;
   List<InvoiceRecord>? _items;
   String? _error;
   String _filter = 'all';
@@ -96,6 +99,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     setState(() {
       _today = null;
       _month = null;
+      _trend = null;
       _items = null;
       _goal = null;
       _alerts = const [];
@@ -117,6 +121,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final first = todayIso(DateTime(now.year, now.month, 1));
     final next = todayIso(DateTime(now.year, now.month + 1, 1));
     final seeMoney = Access.instance.can('finance') || Access.instance.can('collect');
+    final trendRequest = ++_trendRequest;
     bool same() => mounted && org == Repo.activeOrgId;
 
     Future<void> piece<V>(Future<V> f, String key, void Function(V v) apply) async {
@@ -133,6 +138,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
 
     // Todo en paralelo y agregado en la base: dos números, no miles de filas.
     await Future.wait<void>([
+      if (seeMoney && Access.instance.rubro == 'bodega' && Access.instance.allows('reports.view')) () async {
+        final days = await V2Repo.salesDaily(today, cur);
+        if (days != null && same() && trendRequest == _trendRequest) {
+          setState(() => _trend = (currency: cur, end: now, days: days));
+        }
+      }(),
       if (_showWork) () async {
         try {
           final jobs = await V2Repo.jobs(openOnly: true, limit: 100,
@@ -263,12 +274,12 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     // Inicio muestra un resumen: la búsqueda completa corresponde a Comprobantes.
     final activity = isBodega ? list.take(4).toList() : list;
     final buyers = _todayBuyers();
-    return RetailResponsiveFrame(maxWidth: 1200, child: Scaffold(
-      backgroundColor: isBodega ? Colors.transparent : null,
-      body: RefreshIndicator(
-        onRefresh: _load,
-        edgeOffset: 140,
-        child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
+    final cupertinoRefresh = isBodega &&
+        (t.platform == TargetPlatform.iOS || t.platform == TargetPlatform.macOS);
+    final scrollView = CustomScrollView(physics: cupertinoRefresh
+        ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+        : const AlwaysScrollableScrollPhysics(), slivers: [
+          if (cupertinoRefresh) CupertinoSliverRefreshControl(onRefresh: _load),
           if (isBodega)
             SliverToBoxAdapter(
               child: Padding(
@@ -303,7 +314,10 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               loaded: seeMoney && _tried && _month != null,
               showMonth: a.allows('reports.view'),
               goal: seeMoney ? _goal : null,
-              series: seeMoney ? dailySeries(_items ?? const <InvoiceRecord>[], currency: cur, today: todayIso()) : const <double>[],
+              series: !seeMoney ? const <double>[] : isBodega
+                  ? (_trend?.currency == cur ? _trend!.days : const <double>[])
+                  : dailySeries(_items ?? const <InvoiceRecord>[], currency: cur, today: todayIso()),
+              seriesEndDate: isBodega ? _trend?.end : null,
               onGoal: () => _setGoal(monthTotal),
               todayTotal: seeMoney && _today != null ? todayTotal : null,
               todayCount: isBodega && _today == null ? null : todayCount,
@@ -471,8 +485,11 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
           ],
           if (isBodega)
             SliverToBoxAdapter(child: SizedBox(height: dockInset + 16)),
-        ]),
-      ),
+        ]);
+    return RetailResponsiveFrame(maxWidth: 1200, child: Scaffold(
+      backgroundColor: isBodega ? Colors.transparent : null,
+      body: cupertinoRefresh ? scrollView : RefreshIndicator(
+        onRefresh: _load, edgeOffset: isBodega ? 0 : 140, child: scrollView),
     ));
   }
 }

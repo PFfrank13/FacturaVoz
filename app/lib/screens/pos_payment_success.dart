@@ -5,6 +5,7 @@ import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
 import '../ui/glass_widgets.dart';
 import '../ui/design_tokens.dart';
+import '../ui/motion.dart';
 import 'invoice_detail.dart';
 import 'pos_payment.dart';
 import 'retail_receipts.dart';
@@ -75,28 +76,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 boxShadow: FvTokens.shadow(t.brightness),
               ),
               child: Column(children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: .82, end: 1),
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero : FvTokens.transition,
-                  curve: Curves.easeOutBack,
-                  builder: (context, scale, child) =>
-                      Transform.scale(scale: scale, child: child),
-                  child: Container(
-                    width: 86, height: 86,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: t.brightness == Brightness.dark
-                          ? FvLuxe.jade.withValues(alpha: .25)
-                          : FvLuxe.jadeSoft,
-                      border: Border.all(
-                        color: t.colorScheme.primary.withValues(alpha: .33),
-                        width: 1.1),
-                    ),
-                    child: Icon(Icons.check_rounded,
-                      color: t.colorScheme.primary, size: 48),
-                  ),
-                ),
+                const FvReceiptCheck(),
                 const SizedBox(height: 18),
                 Text('Venta registrada y cobrada', textAlign: TextAlign.center, style: t.textTheme.headlineSmall),
                 const SizedBox(height: 6),

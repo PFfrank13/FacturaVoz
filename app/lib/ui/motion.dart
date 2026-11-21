@@ -164,6 +164,113 @@ class _FvTactileScaleState extends State<FvTactileScale> {
       );
 }
 
+// Curva de posición de transitions.dev, compartida por las cifras y el trazo.
+const _settle = Cubic(.22, 1, .36, 1);
+
+/// Adaptación de Number Subtle Change. Conserva las cifras que no cambian
+/// y expone al lector de pantalla el valor completo desde el primer cuadro.
+class FvQuantityText extends StatefulWidget {
+  const FvQuantityText(this.value, {super.key, this.style});
+
+  final String value;
+  final TextStyle? style;
+
+  @override
+  State<FvQuantityText> createState() => _FvQuantityTextState();
+}
+
+class _FvQuantityTextState extends State<FvQuantityText> {
+  double _direction = 1;
+
+  @override
+  void didUpdateWidget(FvQuantityText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value == oldWidget.value) return;
+    final previous = double.tryParse(oldWidget.value);
+    final current = double.tryParse(widget.value);
+    _direction = current != null && previous != null && current < previous ? -1 : 1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = widget.value;
+    final style = (widget.style ?? const TextStyle()).copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    if (MediaQuery.disableAnimationsOf(context)) return Text(value, style: style);
+
+    // Indexar por posición decimal conserva las unidades al pasar de 9 a 10.
+    final point = value.indexOf('.');
+    final unitsEnd = point < 0 ? value.length : point;
+    return Semantics(
+      label: value,
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: TextDirection.ltr,
+        children: [
+          for (var i = 0; i < value.length; i++)
+            AnimatedSwitcher(
+              key: ValueKey(i - unitsEnd),
+              duration: const Duration(milliseconds: 220),
+              reverseDuration: const Duration(milliseconds: 140),
+              transitionBuilder: (child, animation) => AnimatedBuilder(
+                animation: animation,
+                child: child,
+                builder: (context, child) {
+                  final t = _settle.transform(animation.value);
+                  final sign = animation.status == AnimationStatus.reverse ? -1 : 1;
+                  return Opacity(
+                    opacity: t,
+                    child: FractionalTranslation(
+                      translation: Offset(0, (1 - t) * .14 * _direction * sign),
+                      child: child,
+                    ),
+                  );
+                },
+              ),
+              child: Text(value[i], key: ValueKey(value[i]), style: style),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Success Check de transitions.dev. El trazo empieza 80 ms después del sello.
+class FvReceiptCheck extends StatelessWidget {
+  const FvReceiptCheck({super.key, this.size = 86});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget paintCheck(double progress) => SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _CheckPainter(progress)),
+    );
+    if (MediaQuery.disableAnimationsOf(context)) return paintCheck(1);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 580),
+      builder: (context, time, _) {
+        final arrival = _settle.transform((time * 580 / 500).clamp(0.0, 1.0));
+        final stroke = _settle.transform(((time * 580 - 80) / 500).clamp(0.0, 1.0));
+        return Opacity(
+          opacity: arrival,
+          child: Transform.translate(
+            offset: Offset(0, 7 * (1 - arrival)),
+            child: Transform.rotate(
+              angle: -.15 * (1 - arrival),
+              child: paintCheck(stroke),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 // ───────────────────────── Carga ─────────────────────────
 
 /// Brillo que recorre el contenido (esqueletos de carga).
