@@ -19,6 +19,7 @@ import '../ui/ds.dart';
 import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
+import '../ui/cash_luxe_widgets.dart';
 import 'client_profile.dart' show shortDateTime;
 import 'pos_payment_logic.dart' show parsePosCents;
 
@@ -331,26 +332,20 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                       const SizedBox(height: 12),
                       Reveal(
                         index: 1,
-                        child: SoftCard(
-                          child: Column(children: [
-                            if (_closing == null)
-                              const ListTile(
-                                leading: Icon(Icons.visibility_off_outlined),
-                                title: Text('Arqueo ciego'),
-                                subtitle: Text('El saldo teórico y sus movimientos se muestran después de cerrar caja.'),
-                              )
-                            else ...[
-                              _line(context, 'Apertura', s.opening),
-                              _line(context, 'Ventas en efectivo', s.cashSales),
-                              _line(context, 'Otros ingresos de efectivo', s.cashIn),
-                              _line(context, 'Salidas de efectivo', -s.cashOut),
-                              const Divider(),
-                              _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
-                              _line(context, 'Contado al cerrar', ((_closing!['counted_cash'] as num?) ?? 0).toDouble()),
-                              _line(context, 'Diferencia', ((_closing!['difference'] as num?) ?? 0).toDouble(), bold: true, signed: true),
-                            ],
-                          ]),
-                        ),
+                        child: _closing == null
+                            ? const FvCashBlindPanel()
+                            : SoftCard(
+                                child: Column(children: [
+                                  _line(context, 'Apertura', s.opening),
+                                  _line(context, 'Ventas en efectivo', s.cashSales),
+                                  _line(context, 'Otros ingresos de efectivo', s.cashIn),
+                                  _line(context, 'Salidas de efectivo', -s.cashOut),
+                                  const Divider(),
+                                  _line(context, 'Debería haber en caja', s.expectedCash, bold: true),
+                                  _line(context, 'Contado al cerrar', ((_closing!['counted_cash'] as num?) ?? 0).toDouble()),
+                                  _line(context, 'Diferencia', ((_closing!['difference'] as num?) ?? 0).toDouble(), bold: true, signed: true),
+                                ]),
+                              ),
                       ),
                       const SizedBox(height: 12),
                       if (_closing != null && s.byMethod.isNotEmpty)
@@ -380,12 +375,18 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                         const SizedBox(height: 14),
                         const SectionTitle('Movimientos de caja'),
                         for (final m in _moves)
-                          ListTile(
-                            dense: true,
-                            leading: Icon(m.kind == 'egreso' ? Icons.north_east_rounded : Icons.south_west_rounded, color: m.kind == 'egreso' ? Brand.bad : Brand.ok),
-                            title: Text(m.note.isEmpty ? (m.kind == 'apertura' ? 'Apertura' : (m.kind == 'egreso' ? 'Salida' : 'Ingreso')) : m.note),
-                            subtitle: m.createdAt == null ? null : Text(shortDateTime(m.createdAt!)),
-                            trailing: Money(money(m.amount, _cur)),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: FvCashMovementTile(
+                              kind: m.kind,
+                              label: m.note.isEmpty
+                                  ? (m.kind == 'apertura' ? 'Apertura'
+                                      : (m.kind == 'egreso' ? 'Salida' : 'Ingreso'))
+                                  : m.note,
+                              time: m.createdAt == null ? null
+                                  : shortDateTime(m.createdAt!),
+                              amount: money(m.amount, _cur),
+                            ),
                           ),
                       ],
                       const SizedBox(height: 18),
@@ -409,16 +410,11 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
   bool get _opened => (_sum?.opening ?? 0) > 0 || _moves.any((m) => m.kind == 'apertura');
 
   /// Apertura → Movimientos → Arqueo → Cierre. Antes del cierre no se muestran montos (arqueo ciego).
-  Widget _steps(BuildContext context) {
-    final closed = _closing != null;
-    final moves = _moves.where((m) => m.kind != 'apertura').length;
-    return Wrap(spacing: 8, runSpacing: 8, children: [
-      DsStatus(_opened ? 'Apertura hecha' : '1 · Apertura pendiente', tone: _opened ? DsTone.ok : DsTone.pending),
-      DsStatus(moves == 0 ? '2 · Sin movimientos' : '2 · $moves movimiento${moves == 1 ? '' : 's'}', tone: DsTone.info),
-      DsStatus(closed ? 'Arqueo hecho' : '3 · Arqueo al cerrar', tone: closed ? DsTone.ok : DsTone.info),
-      DsStatus(closed ? 'Caja cerrada' : '4 · Cierre', tone: closed ? DsTone.ok : DsTone.info),
-    ]);
-  }
+  Widget _steps(BuildContext context) => FvCashJourney(
+    opened: _opened,
+    movements: _moves.where((m) => m.kind != 'apertura').length,
+    closed: _closing != null,
+  );
 
   Widget _line(BuildContext context, String label, double v, {bool bold = false, bool signed = false}) {
     final t = Theme.of(context);
