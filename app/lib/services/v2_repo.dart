@@ -365,8 +365,14 @@ class V2Repo {
   }
 
   // ═══════════ Antifraude ═══════════
-  static Future<List<OwnerAlert>> alerts({int limit = 100}) async =>
-      _rows(await _db.from('owner_alerts').select().eq('org_id', org).order('created_at', ascending: false).limit(limit)).map(OwnerAlert.fromJson).toList();
+  static Future<bool> hasUnreadAlerts() async =>
+      await _db.from('owner_alerts').select('id').eq('org_id', org).isFilter('read_at', null).limit(1).maybeSingle() != null;
+
+  static Future<List<OwnerAlert>> alerts({int limit = 100, bool unreadFirst = false}) async {
+    final query = _db.from('owner_alerts').select().eq('org_id', org);
+    final ordered = unreadFirst ? query.order('read_at', ascending: false, nullsFirst: true) : query;
+    return _rows(await ordered.order('created_at', ascending: false).limit(limit)).map(OwnerAlert.fromJson).toList();
+  }
 
   static Stream<List<OwnerAlert>> watchAlerts() => _db
       .from('owner_alerts')

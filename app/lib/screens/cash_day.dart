@@ -313,6 +313,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                     child: RetailResponsiveFrame(maxWidth: 1000, child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                       Reveal(
                         child: RetailVisual.hero(
+                          chapter: RetailChapter.cash,
                           context: context,
                           eyebrow: isToday ? 'Caja · Hoy' : 'Caja · Histórico',
                           title: 'Control de caja',

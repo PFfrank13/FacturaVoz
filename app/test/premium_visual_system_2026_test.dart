@@ -47,6 +47,7 @@ void main() {
                     const SizedBox(height: 12),
                     Builder(builder: (context) => RetailVisual.hero(
                       context: context,
+                      chapter: RetailChapter.reports,
                       eyebrow: 'Ventas · Bodega',
                       title: 'Resumen del negocio',
                       subtitle: 'Ventas, caja, inventario y comprobantes.',

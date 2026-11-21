@@ -34,6 +34,7 @@ import 'pos.dart';
 import 'products.dart';
 import 'reports.dart';
 import 'retail_purchases.dart';
+import 'retail_notifications.dart';
 import 'retail_receipts.dart';
 import 'profit.dart';
 import 'quotes.dart';
@@ -562,26 +563,19 @@ class _MainShellState extends State<MainShell> {
           },
           child: Scaffold(
             key: _scaffoldKey,
+            extendBody: isBodega && !pinnedSidebar && !keyboard && _tab == 'home',
             // La navegación de Bodega tiene un único dueño: este Scaffold.
             drawer: isBodega && !pinnedSidebar
                 ? _bodegaNavigation(dests) : null,
             appBar: isBodega ? AppBar(
-              automaticallyImplyLeading: !pinnedSidebar,
+              automaticallyImplyLeading: false,
               backgroundColor: Colors.transparent,
               flexibleSpace: const FvGlassTopBar(),
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
-              shape: Border(bottom: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
-                width: 0.8,
-              )),
-              leading: pinnedSidebar ? null : IconButton(
-                key: const ValueKey('bodega-open-menu'),
-                tooltip: 'Abrir menú',
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              ),
+              shape: const Border(),
+              leading: const RetailNotificationBell(),
               title: Text(activeTitle,
                 style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -.35)),
               actions: [
@@ -615,8 +609,8 @@ class _MainShellState extends State<MainShell> {
               Expanded(child: Column(children: [
                 const LicenseBanner(),
                 Expanded(
-                  child: MediaQuery.removePadding(
-                    context: context,
+                  child: Builder(builder: (bodyContext) => MediaQuery.removePadding(
+                    context: bodyContext,
                     removeTop: licenseBannerInfo(Access.instance.license) != null,
                     child: Stack(children: [
                       for (final d in dests)
@@ -633,7 +627,7 @@ class _MainShellState extends State<MainShell> {
                             ),
                           ),
                     ]),
-                  ),
+                  )),
                 ),
               ])),
             ])),

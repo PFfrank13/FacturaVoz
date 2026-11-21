@@ -1,8 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:facturavoz/access.dart';
-import 'package:facturavoz/app_state.dart';
 import 'package:facturavoz/models.dart';
 import 'package:facturavoz/screens/assistant.dart';
 import 'package:facturavoz/screens/home.dart';
@@ -32,195 +29,14 @@ import 'package:facturavoz/screens/products.dart';
 import 'package:facturavoz/screens/pos_payment.dart';
 import 'package:facturavoz/screens/pos_payment_success.dart';
 import 'package:facturavoz/services/live.dart';
-import 'package:facturavoz/services/repo.dart';
 import 'package:facturavoz/ui/theme.dart';
+import 'package:facturavoz/ui/retail_visual.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:web_socket/testing.dart' as sockets;
-import 'package:web_socket/web_socket.dart'
-    show TextDataReceived, WebSocketConnectionClosed;
-import 'package:web_socket_channel/adapter_web_socket_channel.dart';
-
-// All HTTP responses and device storage in this preview are in memory.
-const _org = 'studio-fixture';
-const _user = 'cashier-fixture';
-const _rows = [
-  ('agua', 'Agua mineral', 'Bebidas', 1.80),
-  ('leche', 'Leche fresca', 'Lácteos', 4.90),
-  ('pan', 'Pan artesanal', 'Panadería', 5.50),
-  ('arroz', 'Arroz extra', 'Abarrotes', 4.50),
-];
-
-bool _emptyCatalog = false;
-
-Object? _response(http.Request request) {
-  final path = request.url.pathSegments.last;
-  if (path == 'token') {
-    final exp =
-        DateTime.now().add(const Duration(hours: 2)).millisecondsSinceEpoch ~/
-        1000;
-    final payload = base64Url.encode(
-      utf8.encode(jsonEncode({'sub': _user, 'exp': exp})),
-    );
-    return {
-      'access_token': 'eyJhbGciOiJub25lIn0.$payload.fixture',
-      'token_type': 'bearer',
-      'refresh_token': 'fixture',
-      'expires_in': 7200,
-      'user': {
-        'id': _user,
-        'aud': 'authenticated',
-        'email': 'demo@example.invalid',
-        'app_metadata': {},
-        'user_metadata': {},
-        'created_at': '2026-01-01T00:00:00Z',
-      },
-    };
-  }
-  if (path == 'products') {
-    if (_emptyCatalog) return [];
-    return [
-      for (final (id, name, category, price) in _rows)
-        {
-          'id': id,
-          'name': name,
-          'category': category,
-          'unit_price': price,
-          'active': true,
-          'stock': 14,
-          'unit': 'NIU',
-        },
-    ];
-  }
-  if (path == 'invoices') {
-    final invoices = [
-      for (var day = 1; day <= 12; day += 3)
-        {
-          'id': 'invoice-$day',
-          'number': 'DEMO-$day',
-          'issue_date': todayIso(
-            DateTime(DateTime.now().year, DateTime.now().month, day),
-          ),
-          'status': 'sent',
-          'currency': 'PEN',
-          'tax_rate': 0,
-          'clients': {'name': 'Mercado Oliva'},
-          'invoice_items': [
-            {
-              'description': 'Pan artesanal',
-              'quantity': day,
-              'unit_price': 5.5,
-            },
-          ],
-        },
-    ];
-    if (request.headers['Accept']?.contains('vnd.pgrst.object') == true) {
-      return invoices.first;
-    }
-    return invoices;
-  }
-  if (path == 'quotes') {
-    final quote = {
-      'id': 'cotizacion-demo',
-      'number': 'COT-001',
-      'status': 'draft',
-      'issue_date': todayIso(),
-      'currency': 'PEN',
-      'tax_rate': 0,
-      'clients': {'name': 'Mercado Oliva'},
-      'quote_items': [
-        {'description': 'Pan artesanal', 'quantity': 2, 'unit_price': 5.5},
-      ],
-    };
-    return request.headers['Accept']?.contains('vnd.pgrst.object') == true
-        ? quote
-        : [quote];
-  }
-  if (path == 'clients') {
-    return [
-      {'id': 'cliente-demo', 'name': 'Mercado Oliva'},
-    ];
-  }
-  if (path == 'jobs') {
-    return [
-      {
-        'id': 'trabajo-demo',
-        'title': 'Entrega de pan',
-        'client_id': 'cliente-demo',
-        'clients': {'name': 'Mercado Oliva'},
-        'status': 'nuevo',
-        'amount': 11,
-      },
-    ];
-  }
-  if (path == 'credit_balances') {
-    return [
-      {
-        'client_id': 'cliente-demo',
-        'client_name': 'Mercado Oliva',
-        'balance': 42.50,
-        'charges': 50,
-        'payments': 7.50,
-      },
-    ];
-  }
-  const sales = {'sales_total': 121.0, 'sales_count': 4, 'drafts_count': 0};
-  if (path == 'sales_summary') return sales;
-  if (path == 'day_summary') {
-    return {
-      'sales': sales,
-      'cash_opening': 100,
-      'expected_cash': 221,
-      'cash_sales': 121,
-      'payments_by_method': {'efectivo': 121},
-      'currency': 'PEN',
-    };
-  }
-  if (path == 'org_settings') {
-    return [
-      {'org_id': _org, 'business_type': 'bodega'},
-    ];
-  }
-  return [];
-}
-
-// The screens subscribe to Supabase even when the fixture contains no changes.
-// Acknowledge channel joins, leaves and heartbeats over an in-memory socket.
-AdapterWebSocketChannel _realtimeFixture(
-  String url,
-  Map<String, String> headers,
-) {
-  final (client, server) = sockets.fakes();
-  server.events.listen((event) {
-    if (event is! TextDataReceived) return;
-    final frame = jsonDecode(event.text) as List<dynamic>;
-    final [joinRef, ref, topic, action, _] = frame;
-    if (action == 'phx_join' ||
-        action == 'phx_leave' ||
-        action == 'heartbeat') {
-      try {
-        server.sendText(
-          jsonEncode([
-            joinRef,
-            ref,
-            topic,
-            'phx_reply',
-            {'status': 'ok', 'response': <String, dynamic>{}},
-          ]),
-        );
-      } on WebSocketConnectionClosed {
-        // A leave can already be in flight when the app closes the transport.
-        return;
-      }
-    }
-  });
-  return AdapterWebSocketChannel(client);
-}
+import '../support/retail_fixture.dart';
 
 Future<void> _fonts() async {
   for (final entry in {
@@ -255,95 +71,9 @@ void main() {
   final catalog = featureCatalog();
   setUpAll(() async {
     await _fonts();
-    FlutterSecureStorage.setMockInitialValues({});
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(
-      const MethodChannel('plugins.flutter.io/shared_preferences'),
-      (call) async => call.method == 'getAll' ? <String, Object>{} : true,
-    );
-    for (final channel in [
-      'plugins.flutter.io/quick_actions',
-      'com.llfbandit.record/messages',
-      'xyz.luan/audioplayers.global',
-      'xyz.luan/audioplayers.global/events',
-    ]) {
-      messenger.setMockMethodCallHandler(
-        MethodChannel(channel),
-        (_) async => null,
-      );
-    }
-    messenger.setMockMethodCallHandler(
-      const MethodChannel('xyz.luan/audioplayers'),
-      (call) async {
-        if (call.method == 'create') {
-          final id = call.arguments['playerId'];
-          messenger.setMockMethodCallHandler(
-            MethodChannel('xyz.luan/audioplayers/events/$id'),
-            (_) async => null,
-          );
-        }
-        return null;
-      },
-    );
-    await Supabase.initialize(
-      url: 'http://127.0.0.1:1',
-      publishableKey: 'preview',
-      realtimeClientOptions: const RealtimeClientOptions(
-        transport: _realtimeFixture,
-      ),
-      httpClient: MockClient(
-        (req) async => http.Response(
-          jsonEncode(_response(req)),
-          200,
-          request: req,
-          headers: {'content-type': 'application/json; charset=utf-8'},
-        ),
-      ),
-      authOptions: const FlutterAuthClientOptions(
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUri: false,
-      ),
-    );
-    await Supabase.instance.client.auth.signInWithPassword(
-      email: 'demo@example.invalid',
-      password: 'fixture',
-    );
-    Repo.activeOrgId = _org;
-    AppState.instance.profile = Profile(
-      businessName: 'Mercado Oliva',
-      currency: 'PEN',
-      taxRate: 18,
-      taxLabel: 'IGV',
-      address: 'Dirección de muestra',
-    );
-    AppState.instance.orgs = const [
-      Org(id: _org, name: 'Mercado Oliva', taxId: '', role: 'owner'),
-    ];
-    Access.instance
-      ..rubro = 'bodega'
-      ..role = 'owner'
-      ..isAdmin = true
-      ..licenseCheckedOnline = true
-      ..license = LicenseInfo(
-        source: 'hub',
-        plan: 'EMPRESA',
-        mode: 'full',
-        status: 'activa',
-        enforced: true,
-        activated: true,
-        features: {
-          for (final entry in catalog)
-            if (entry.feature != null) entry.feature!: true,
-        },
-      );
-    LiveHub.instance.start();
+    await startRetailFixture();
   });
-  tearDownAll(() async {
-    LiveHub.instance.stop();
-    await Supabase.instance.dispose();
-  });
+  tearDownAll(stopRetailFixture);
 
   final screens = <String, WidgetBuilder>{
     'assistant': (_) => const RangeSalesScreen(range: 'this_month'),
@@ -418,6 +148,8 @@ void main() {
     ),
     for (final entry in catalog) entry.id: entry.builder,
     'navegacion': (_) => const MainShell(),
+    'notificaciones': (_) => const MainShell(),
+    'inicio-scroll': (_) => const MainShell(),
   };
   const core = {
     'navegacion',
@@ -444,7 +176,8 @@ void main() {
     for (final (width, height, dark, scale) in variants) {
       final name = '${entry.key}-${width.toInt()}';
       testWidgets('Signature $name', (tester) async {
-        _emptyCatalog = entry.key.endsWith('-muestra');
+        fixtureAlertRead = false;
+        emptyRetailCatalog = entry.key.endsWith('-muestra');
         LiveCache.clear();
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = Size(width, height);
@@ -452,6 +185,9 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             debugShowCheckedModeBanner: false,
+            locale: const Locale('es'),
+            supportedLocales: const [Locale('es')],
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
             theme: buildTheme(dark ? Brightness.dark : Brightness.light),
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(
@@ -475,7 +211,8 @@ void main() {
         if (entry.key == 'pago') await tester.tap(find.text('Abrir cobro'));
         final context = tester.element(find.byKey(const ValueKey('capture')));
         final assets = <String>[
-          if (_emptyCatalog)
+          for (final chapter in RetailChapter.values) chapter.asset,
+          if (emptyRetailCatalog)
             for (final name in [
               'water',
               'milk',
@@ -516,11 +253,35 @@ void main() {
         for (var frame = 0; frame < 8; frame++) {
           await tester.pump(const Duration(milliseconds: 200));
         }
+        if (entry.key == 'notificaciones') {
+          await tester.tap(find.byKey(const ValueKey('bodega-notifications')));
+          await tester.pumpAndSettle();
+          expect(find.text('Diferencia en cierre de caja'), findsOneWidget);
+        }
+        if (entry.key == 'inicio-scroll') {
+          await tester.dragFrom(const Offset(110, 510), const Offset(0, -360));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('bodega-notifications')).hitTestable(),
+            findsOneWidget,
+          );
+        }
         expect(tester.takeException(), isNull);
         await expectLater(
           find.byKey(const ValueKey('capture')),
           matchesGoldenFile('../../tool/previews/signature/$name.png'),
         );
+        if (entry.key == 'inicio-scroll' || name == 'navegacion-320') {
+          // The four fixture receipts fit above the dock when scrolled to the
+          // end, including when large text makes the dock use two rows.
+          await tester.dragFrom(const Offset(110, 510), const Offset(0, -3500));
+          await tester.pumpAndSettle();
+          final lastReceipt = find.byKey(const ValueKey('invoice-10'));
+          final dock = find.byKey(const ValueKey('bodega-premium-bottom-dock'));
+          expect(lastReceipt.hitTestable(), findsOneWidget);
+          expect(tester.getBottomLeft(lastReceipt).dy,
+              lessThanOrEqualTo(tester.getTopLeft(dock).dy));
+        }
         if (name == 'navegacion-390') {
           for (final label in ['Ventas', 'Inventario', 'Caja']) {
             expect(find.text(label), findsOneWidget);
@@ -549,7 +310,7 @@ void main() {
     testWidgets('Venta por búsqueda y filtro a ${width.toInt()} dp', (
       tester,
     ) async {
-      _emptyCatalog = false;
+      emptyRetailCatalog = false;
       LiveCache.clear();
       FlutterSecureStorage.setMockInitialValues({});
       tester.view.devicePixelRatio = 1;

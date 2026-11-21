@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FrameTiming, ImageFilter, TimingsCallback;
 
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -50,15 +51,16 @@ class PremiumRoute<T> extends PageRouteBuilder<T> {
           pageBuilder: (context, _, _) => builder(context),
           transitionsBuilder: (context, animation, secondary, child) {
             if (MediaQuery.of(context).disableAnimations) return child;
-            final a = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-            final s = CurvedAnimation(parent: secondary, curve: Curves.easeOutCubic);
+            final easing = CurveTween(curve: Curves.easeOutCubic);
+            final a = animation.drive(easing);
+            final s = secondary.drive(easing);
             return FadeTransition(
-              opacity: Tween<double>(begin: 1, end: 0.6).animate(s),
+              opacity: Tween<double>(begin: 1, end: 0.86).animate(s),
               child: ScaleTransition(
-                scale: Tween<double>(begin: 1, end: 0.96).animate(s),
+                scale: Tween<double>(begin: 1, end: 0.99).animate(s),
                 child: FadeTransition(
                   opacity: a,
-                  child: ScaleTransition(scale: Tween<double>(begin: 0.94, end: 1).animate(a), child: child),
+                  child: ScaleTransition(scale: Tween<double>(begin: 0.985, end: 1).animate(a), child: child),
                 ),
               ),
             );
@@ -66,7 +68,12 @@ class PremiumRoute<T> extends PageRouteBuilder<T> {
         );
 }
 
-Future<T?> pushPremium<T>(BuildContext context, Widget page) => Navigator.of(context).push<T>(PremiumRoute<T>(builder: (_) => page));
+Future<T?> pushPremium<T>(BuildContext context, Widget page) {
+  final route = Theme.of(context).platform == TargetPlatform.iOS && !reduceMotion(context)
+      ? CupertinoPageRoute<T>(builder: (_) => page)
+      : PremiumRoute<T>(builder: (_) => page);
+  return Navigator.of(context).push<T>(route);
+}
 
 /// Cambia de contenido con "fade through" (Material motion): sale con fundido, entra creciendo.
 class FadeThrough extends StatelessWidget {

@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'design_tokens.dart';
+import 'glass_widgets.dart';
+import 'motion.dart';
 
 /// Editorial palette: neutral foundations with restrained functional color.
 /// These tones identify actions, never replace their text labels.
@@ -41,129 +45,262 @@ class RetailPremiumOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final strong = MediaQuery.highContrastOf(context);
-    const paper = Color(0xFFFBFCF6);
-    const soft = Color(0xFFCBE4DB);
-    final amount = '$currencySymbol ${salesAmount.toStringAsFixed(2)}';
-    return Semantics(
-      container: true,
-      label: 'Resumen operativo de la bodega',
-      child: Container(
-        key: const ValueKey('bodega-enterprise-overview'),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(FvTokens.cardRadius),
-          color: scheme.surface,
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          ColoredBox(color: FvLuxe.forest, child: CustomPaint(
-            painter: FvEngraving(FvLuxe.mintInk.withValues(alpha: strong ? 0 : .16)),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  const Icon(Icons.storefront_outlined, color: soft, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(name.isEmpty ? 'Tu negocio' : name,
-                    style: theme.textTheme.labelLarge?.copyWith(color: paper))),
-                  Tooltip(message: loaded ? 'Datos cargados' : 'Esperando datos',
-                    child: Icon(loaded ? Icons.check_circle_outline_rounded : Icons.schedule_rounded,
-                      color: soft, size: 18)),
-                ]),
-                const SizedBox(height: 23),
-                Text(showMonth ? 'Ventas de este mes' : 'Tu actividad',
-                  style: theme.textTheme.labelMedium?.copyWith(color: soft)),
-                const SizedBox(height: 3),
-                if (showMonth)
-                  FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-                    child: Text(loaded ? amount : '—', style: theme.textTheme.displaySmall?.copyWith(
-                      color: paper, fontSize: 42, letterSpacing: -1.6,
-                      fontFeatures: const [FontFeature.tabularFigures()]))),
-                if (!showMonth)
-                  Text('Operaciones del negocio', style: theme.textTheme.titleLarge?.copyWith(color: paper)),
-                const SizedBox(height: 12),
-                Wrap(spacing: 14, runSpacing: 6, children: [
-                  if (loaded) _MiniFact(icon: Icons.receipt_long_outlined,
-                    label: salesCount == 1 ? '1 venta emitida' : '$salesCount ventas emitidas'),
-                  if (todayAmount != null) _MiniFact(icon: Icons.today_outlined,
-                    label: 'Hoy $currencySymbol ${todayAmount!.toStringAsFixed(2)}')
-                  else if (todayCount != null && !showMonth)
-                    _MiniFact(icon: Icons.today_outlined, label: 'Hoy $todayCount ventas'),
-                  if (loaded && drafts > 0) _MiniFact(icon: Icons.edit_note_outlined,
-                    label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}'),
-                ]),
-              ]),
+    final contrast = MediaQuery.highContrastOf(context);
+    final radius = BorderRadius.circular(27);
+    final facts = <Widget>[
+      if (showMonth && loaded) _MiniFact(icon: Icons.receipt_long_outlined,
+        label: salesCount == 1 ? '1 venta emitida' : '$salesCount ventas emitidas'),
+      if (todayAmount != null) _MiniFact(icon: Icons.today_outlined,
+        label: 'Hoy $currencySymbol ${todayAmount!.toStringAsFixed(2)}')
+      else if (todayCount != null && !showMonth)
+        _MiniFact(icon: Icons.today_outlined, label: 'Hoy $todayCount ${todayCount == 1 ? 'venta' : 'ventas'}'),
+      if (showMonth && loaded && drafts > 0) _MiniFact(icon: Icons.edit_note_outlined,
+        label: '$drafts ${drafts == 1 ? 'borrador' : 'borradores'}'),
+    ];
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle, color: const Color(0xFF25484E),
+              border: Border.all(color: const Color(0xFF638279))),
+            child: const Icon(Icons.storefront_outlined, color: Color(0xFFDBF5CE), size: 16),
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Text(showMonth ? 'Ventas de este mes' : 'Tu actividad',
+            style: theme.textTheme.labelLarge?.copyWith(color: const Color(0xFFF0F8EA)))),
+        ]),
+        const SizedBox(height: 14),
+        if (showMonth)
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+            child: Text(loaded ? '$currencySymbol ${salesAmount.toStringAsFixed(2)}' : '—',
+              style: theme.textTheme.displayMedium?.copyWith(
+                color: Colors.white, fontFamily: 'Inter', fontWeight: FontWeight.w600,
+                fontSize: 48, height: 1.04, letterSpacing: -2.5,
+                fontFeatures: const [FontFeature.tabularFigures()]))),
+        if (!showMonth)
+          Text('Operaciones del negocio', style: theme.textTheme.headlineSmall?.copyWith(
+            color: Colors.white, fontFamily: FvLuxe.editorialFont, fontWeight: FontWeight.w400)),
+      ],
+    );
+    final lead = LayoutBuilder(builder: (context, bounds) {
+      final showArt = !contrast && bounds.maxWidth >= 219 &&
+        MediaQuery.textScalerOf(context).scale(16) < 21;
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: summary),
+          if (showArt) ...[
+            const SizedBox(width: 7),
+            SizedBox(
+              width: (bounds.maxWidth * .30).clamp(68, 135).toDouble(),
+              height: 78,
+              child: Image.asset('assets/editorial/reports.webp', excludeFromSemantics: true,
+                filterQuality: FilterQuality.medium, fit: BoxFit.contain),
             ),
-          )),
-          if (showMonth && loaded && chart != null)
-            Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('Tendencia · últimos 14 días', style: theme.textTheme.labelMedium),
-                const SizedBox(height: 10),
-                SizedBox(height: 45, child: chart),
-              ])),
-          if (showMonth) ...[
-            const Divider(),
-            Material(color: Colors.transparent, child: InkWell(
-              key: const ValueKey('bodega-goal-action'),
-              onTap: () { HapticFeedback.selectionClick(); onGoal(); },
-              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Column(children: [
-                  Row(children: [
-                    Icon(Icons.flag_outlined, color: scheme.primary, size: 19),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(goalPercent == null ? 'Establecer meta del mes' : 'Meta mensual',
-                      style: theme.textTheme.labelLarge)),
-                    if (goalPercent != null) Text('${(goalPercent! * 100).round()}%'),
-                    const Icon(Icons.chevron_right_rounded, size: 19),
-                  ]),
-                  if (goalPercent != null) Padding(padding: const EdgeInsets.only(top: 10),
-                    child: LinearProgressIndicator(value: goalPercent!.clamp(0, 1))),
-                ])),
-            )),
           ],
         ]),
+        if (facts.isNotEmpty) ...[
+          const SizedBox(height: 13),
+          Wrap(spacing: 13, runSpacing: 7, children: facts),
+        ],
+      ]);
+    });
+    final trend = showMonth && loaded && chart != null ? _RetailTrend(chart: chart!) : null;
+    return Semantics(
+      container: true, label: 'Resumen operativo de ${name.isEmpty ? 'la bodega' : name}',
+      child: DecoratedBox(
+        key: const ValueKey('bodega-enterprise-overview'),
+        decoration: BoxDecoration(borderRadius: radius, boxShadow: [
+          BoxShadow(color: const Color(0xFF0A232C).withValues(alpha:
+            theme.brightness == Brightness.dark ? .28 : .18),
+            blurRadius: 19, offset: const Offset(0, 8)),
+        ]),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(gradient: LinearGradient(
+              begin: Alignment.topRight, end: Alignment.bottomLeft,
+              colors: [Color(0xFF225453), Color(0xFF14343C), Color(0xFF102932)],
+              stops: [0, .57, 1])),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Stack(children: [
+                if (!contrast && MediaQuery.textScalerOf(context).scale(16) < 21)
+                  const Positioned.fill(child: _RetailCardArt()),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 19, 20, 17),
+                  child: LayoutBuilder(builder: (context, bounds) {
+                    final wide = bounds.maxWidth >= 650 &&
+                      MediaQuery.textScalerOf(context).scale(16) <= 24;
+                    if (wide && trend != null) {
+                      return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Expanded(child: lead), const SizedBox(width: 34),
+                        Expanded(child: trend),
+                      ]);
+                    }
+                    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      lead, if (trend != null) ...[const SizedBox(height: 19), trend],
+                    ]);
+                  }),
+                ),
+              ]),
+              if (showMonth) _RetailGoal(percent: goalPercent, onTap: onGoal),
+            ]),
+          ),
+        ),
       ),
     );
   }
+}
+
+/// Static engraving printed into the card. It deliberately sits above the plot.
+class _RetailCardArt extends StatelessWidget {
+  const _RetailCardArt();
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(child: ClipRect(
+    child: LayoutBuilder(builder: (context, bounds) => Stack(children: [
+      Positioned(top: -55, right: bounds.maxWidth >= 690 ? bounds.maxWidth * .5 - 48 : -50,
+        width: 224, height: 171,
+        child: RepaintBoundary(child: CustomPaint(painter: const _GuillochePainter()))),
+    ])),
+  ));
+}
+
+class _GuillochePainter extends CustomPainter {
+  const _GuillochePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width * .56, size.height * .52);
+    final stroke = Paint()..style = PaintingStyle.stroke..strokeWidth = .78;
+    for (var line = 0; line < 25; line++) {
+      final u = line / 24;
+      final path = Path();
+      for (var step = 0; step <= 180; step++) {
+        final theta = step * 2 * math.pi / 180;
+        final radius = 24 + u * 74 + (5 + 13 * u) * math.sin(7 * theta + u * 4);
+        final x = center.dx + radius * math.cos(theta) * 1.17;
+        final y = center.dy + radius * math.sin(theta) * .83;
+        if (step == 0) { path.moveTo(x, y); } else { path.lineTo(x, y); }
+      }
+      path.close();
+      stroke.color = Color.lerp(const Color(0x348FE3D0), const Color(0x59BACE9D), u)!;
+      canvas.drawPath(path, stroke);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GuillochePainter oldDelegate) => false;
 }
 
 class _MiniFact extends StatelessWidget {
   const _MiniFact({required this.icon, required this.label});
   final IconData icon;
   final String label;
+
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-    Icon(icon, size: 15, color: FvLuxe.mintInk),
+    Icon(icon, size: 14, color: const Color(0xFFABDBC7)),
     const SizedBox(width: 5),
-    Flexible(child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white))),
+    Flexible(child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: const Color(0xFFEDF7F1), fontSize: 12, fontWeight: FontWeight.w500))),
   ]);
 }
 
-class _AccentIcon extends StatelessWidget {
-  const _AccentIcon({required this.icon, required this.tint, this.size = 45});
-  final IconData icon;
-  final Color tint;
-  final double size;
+class _RetailTrend extends StatelessWidget {
+  const _RetailTrend({required this.chart});
+  final Widget chart;
+
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      width: size, height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * .31),
-        color: dark ? tint.withValues(alpha: .24) : tint.withValues(alpha: .12),
-        border: Border.all(color: Colors.white.withValues(alpha: dark ? .12 : .75)),
+    final theme = Theme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text('Tendencia · últimos 14 días', style: theme.textTheme.labelSmall?.copyWith(
+        color: const Color(0xFFD2E5DE), fontWeight: FontWeight.w500)),
+      const SizedBox(height: 9),
+      SizedBox(height: 41, child: Stack(fit: StackFit.expand, children: [
+        const Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Divider(height: 1, color: Color(0x304C7578)),
+          Divider(height: 1, color: Color(0x304C7578)),
+          Divider(height: 1, color: Color(0x506E8E8F)),
+        ]),
+        chart,
+      ])),
+    ]);
+  }
+}
+
+class _RetailGoal extends StatelessWidget {
+  const _RetailGoal({required this.percent, required this.onTap});
+  final double? percent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Material(
+      color: const Color(0xFF1D4147),
+      child: InkWell(
+        key: const ValueKey('bodega-goal-action'),
+        onTap: () { HapticFeedback.selectionClick(); onTap(); },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+          constraints: const BoxConstraints(minHeight: 49),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0xFF426165), width: .7))),
+          child: Column(children: [
+            Row(children: [
+              const Icon(Icons.outlined_flag_rounded, color: Color(0xFFD1E9AC), size: 19),
+              const SizedBox(width: 10),
+              Expanded(child: Text(percent == null ? 'Establecer meta del mes' : 'Meta mensual',
+                style: t.textTheme.labelLarge?.copyWith(color: const Color(0xFFF1F8EC)))),
+              if (percent != null) Text('${(percent! * 100).round()}%',
+                style: t.textTheme.labelMedium?.copyWith(color: Colors.white)),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFCDE2D8), size: 19),
+            ]),
+            if (percent != null) ...[
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: percent!.clamp(0, 1), minHeight: 3,
+                borderRadius: BorderRadius.circular(3),
+                color: const Color(0xFFD1E9AC), backgroundColor: const Color(0xFF486469)),
+            ],
+          ]),
+        ),
       ),
-      child: Icon(icon, size: size * .51, color: dark
-          ? Color.lerp(tint, Colors.white, .35)! : tint),
     );
   }
 }
 
-/// Colored dashboard tile used solely for the retail operational overview.
+
+/// Aligns the bottom edges of adjacent tiles while allowing large text to wrap.
+class RetailHomeStatGrid extends StatelessWidget {
+  const RetailHomeStatGrid({super.key, required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, bounds) {
+    const gap = 12.0;
+    final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+    final columns = ((bounds.maxWidth + gap) / (137 * scale + gap)).floor().clamp(1, 4);
+    return Column(children: [
+      for (int start = 0; start < children.length; start += columns) ...[
+        if (start != 0) const SizedBox(height: gap),
+        IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (int i = 0; i < columns; i++) ...[
+            if (i != 0) const SizedBox(width: gap),
+            Expanded(child: start + i < children.length ? children[start + i] : const SizedBox.shrink()),
+          ],
+        ])),
+      ],
+    ]);
+  });
+}
+
+/// A metric surface keeps the value, status and touch target together.
 class RetailHomeStat extends StatelessWidget {
   const RetailHomeStat({
     super.key, required this.label, required this.value,
@@ -181,67 +318,78 @@ class RetailHomeStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final dark = t.brightness == Brightness.dark;
-    final ink = t.colorScheme.onSurface;
-    final effective = dark ? Color.lerp(tint, Colors.white, .25)! : tint;
-    final still = MediaQuery.disableAnimationsOf(context);
-    final body = Container(
-      constraints: const BoxConstraints(minHeight: 158),
-      padding: const EdgeInsets.all(15),
-      decoration: FvSurfaces.card(t),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          _AccentIcon(icon: icon, tint: tint, size: 43),
-          const Spacer(),
-          if (onTap != null) Icon(Icons.arrow_outward_rounded,
-            color: effective.withValues(alpha: .7), size: 17),
-        ]),
-        const SizedBox(height: 11),
-        Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
-          style: t.textTheme.labelSmall?.copyWith(
-            color: t.colorScheme.onSurfaceVariant,
-            fontSize: 12, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 5),
-        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-          child: AnimatedSwitcher(
-            duration: still ? Duration.zero : const Duration(milliseconds: 240),
-            switchInCurve: Curves.easeOutCubic,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, .22),
-                  end: Offset.zero).animate(animation),
-                child: child)),
-            child: Text(value, key: ValueKey(value), maxLines: 1,
-            style: t.textTheme.headlineSmall?.copyWith(
-              color: tone ?? ink, fontFamily: 'Inter', fontSize: 25,
-              fontWeight: FontWeight.w800, letterSpacing: -.6,
-              fontFeatures: const [FontFeature.tabularFigures()])))),
-        if (detail != null) ...[
-          const SizedBox(height: 4),
-          Text(detail!, maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: t.textTheme.bodySmall?.copyWith(fontSize: 11)),
-        ],
-      ]),
+    final highContrast = MediaQuery.highContrastOf(context);
+    final paper = dark ? const Color(0xFF14242D) : const Color(0xFFFDFAF4);
+    final pigment = Color.lerp(tint, dark ? Colors.white : const Color(0xFF152B36),
+      dark ? .63 : .45)!;
+    final ink = dark ? const Color(0xFFF1F5F2) : const Color(0xFF142E36);
+    final muted = dark ? const Color(0xFFC2D1D1) : const Color(0xFF42565C);
+    final surface = Color.lerp(paper, tint, dark ? .20 : .12)!;
+    final border = Color.lerp(surface, tint, highContrast ? .83 : .34)!;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(21), side: BorderSide(color: border, width: .8),
     );
+    final still = MediaQuery.disableAnimationsOf(context);
     return Semantics(
       label: '$label: $value${detail == null ? '' : ', $detail'}',
-      button: onTap != null,
-      excludeSemantics: true,
-      onTap: onTap,
-      child: Material(
-        color: Colors.transparent, borderRadius: BorderRadius.circular(23),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(23), onTap: onTap,
-          child: body),
+      button: onTap != null, excludeSemantics: true, onTap: onTap,
+      child: FvTactileScale(
+        enabled: onTap != null,
+        child: Material(
+          color: surface, shape: shape, clipBehavior: Clip.antiAlias,
+          child: Ink(
+            decoration: BoxDecoration(gradient: LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [Color.lerp(surface, tint, dark ? .08 : .10)!, surface, paper],
+              stops: const [0, .62, 1])),
+            child: InkWell(
+              customBorder: shape, onTap: onTap,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 151),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(shape: BoxShape.circle,
+                          color: dark ? Color.lerp(surface, tint, .36) : pigment),
+                        child: Icon(icon, size: 18, color: Colors.white),
+                      ),
+                      const Spacer(),
+                      if (onTap != null) Icon(Icons.north_east_rounded, size: 15, color: pigment),
+                    ]),
+                    const SizedBox(height: 14),
+                    Text(label, style: t.textTheme.labelMedium?.copyWith(
+                      color: pigment, fontWeight: FontWeight.w600, height: 1.2)),
+                    const SizedBox(height: 4),
+                    FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+                      child: AnimatedSwitcher(
+                        duration: still ? Duration.zero : const Duration(milliseconds: 190),
+                        switchInCurve: Curves.easeOutCubic,
+                        child: Text(value, key: ValueKey(value), maxLines: 1,
+                          style: t.textTheme.headlineSmall?.copyWith(
+                            color: tone ?? ink, fontSize: 27, fontFamily: 'Inter',
+                            height: 1.15, fontWeight: FontWeight.w600, letterSpacing: -1.1,
+                            fontFeatures: const [FontFeature.tabularFigures()])))),
+                    if (detail != null) ...[
+                      const SizedBox(height: 5),
+                      Text(detail!, style: t.textTheme.bodySmall?.copyWith(
+                        color: muted, height: 1.28, fontSize: 12)),
+                    ],
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
 
-/// iOS-style bottom glass navigation for compact retail screens.
-/// The same MainShell still owns all navigation and permissions.
+/// Floating navigation for the compact retail shell.
 class RetailPremiumBottomDock extends StatelessWidget {
   const RetailPremiumBottomDock({
     super.key,
@@ -257,48 +405,57 @@ class RetailPremiumBottomDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final dark = t.brightness == Brightness.dark;
-    final ink = t.colorScheme.onSurface;
-    final selectedTint = dark ? FvTokens.emeraldDark : FvLuxe.jade;
+    final destinations = [...items, ('more', 'Más', Icons.more_horiz_rounded)];
+    final active = items.any((item) => item.$1 == current) ? current : 'more';
+    final scaler = MediaQuery.textScalerOf(context);
+    final labelStyle = Theme.of(context).textTheme.labelSmall!.copyWith(
+      fontSize: 11, height: 1.15, letterSpacing: -.12, fontWeight: FontWeight.w700,
+    );
+    final widths = <double>[];
+    for (final item in destinations) {
+      final painter = TextPainter(
+        text: TextSpan(text: item.$2, style: labelStyle),
+        textScaler: scaler,
+        textDirection: Directionality.of(context),
+        maxLines: 1,
+      )..layout();
+      widths.add(math.max(48.0, painter.width.ceilToDouble() + 8));
+      painter.dispose();
+    }
+
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
-        child: Container(
-          key: const ValueKey('bodega-premium-bottom-dock'),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: FvTokens.shadow(t.brightness),
-          ),
-          child: FvGlassSurface(
-            radius: 32, blur: 20,
-            padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
-            child: SizedBox(
-              height: 44 + MediaQuery.textScalerOf(context).scale(14),
-              child: Row(children: [
-                for (final item in items)
-                  Expanded(
-                    child: _DockDestination(
-                      id: item.$1,
-                      label: item.$2,
-                      icon: item.$3,
-                      current: current,
-                      tint: selectedTint,
-                      ink: ink,
-                      onTap: () => onNavigate(item.$1),
-                    ),
-                  ),
-                Expanded(child: _DockDestination(
-                  id: 'more',
-                  label: 'Más',
-                  icon: Icons.more_horiz_rounded,
-                  current: current,
-                  tint: selectedTint,
-                  ink: ink,
-                  onTap: onMore,
-                )),
-              ]),
+        padding: const EdgeInsets.fromLTRB(10, 3, 10, 8),
+        child: Align(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 510),
+            child: FvFloatingGlassDock(
+              key: const ValueKey('bodega-premium-bottom-dock'),
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: LayoutBuilder(builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final total = widths.reduce((a, b) => a + b);
+                  final capacity = total <= width ? destinations.length :
+                      math.max(1, (width / widths.reduce(math.max)).floor());
+                  final rows = (destinations.length / capacity).ceil();
+                  final columns = (destinations.length / rows).ceil();
+                  return Column(mainAxisSize: MainAxisSize.min, children: [
+                    for (var i = 0; i < destinations.length; i += columns)
+                      _DockLane(
+                        destinations: destinations.skip(i).take(columns).toList(),
+                        widths: widths.skip(i).take(columns).toList(),
+                        width: width,
+                        height: math.max(54, 32 + scaler.scale(11) * 1.15),
+                        active: active,
+                        labelStyle: labelStyle,
+                        onTap: (id) => id == 'more' ? onMore() : onNavigate(id),
+                      ),
+                  ]);
+                }),
+              ),
             ),
           ),
         ),
@@ -307,58 +464,132 @@ class RetailPremiumBottomDock extends StatelessWidget {
   }
 }
 
-class _DockDestination extends StatelessWidget {
-  const _DockDestination({
-    required this.id, required this.label, required this.icon,
-    required this.current, required this.tint, required this.ink,
+class _DockLane extends StatelessWidget {
+  const _DockLane({
+    required this.destinations,
+    required this.widths,
+    required this.width,
+    required this.height,
+    required this.active,
+    required this.labelStyle,
     required this.onTap,
   });
-  final String id, label, current;
-  final Color tint, ink;
-  final IconData icon;
+
+  final List<(String, String, IconData)> destinations;
+  final List<double> widths;
+  final double width, height;
+  final String active;
+  final TextStyle labelStyle;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final contrast = MediaQuery.highContrastOf(context);
+    final selected = destinations.indexWhere((item) => item.$1 == active);
+    final extra = (width - widths.reduce((a, b) => a + b)) / widths.length;
+    final edges = [0.0];
+    for (final preferred in widths.take(widths.length - 1)) {
+      edges.add(edges.last + preferred + extra);
+    }
+    edges.add(width);
+    return SizedBox(
+      height: height,
+      child: Stack(fit: StackFit.expand, children: [
+        if (selected >= 0)
+          AnimatedPositionedDirectional(
+            key: const ValueKey('retail-dock-selection'),
+            duration: Motion.d(context, const Duration(milliseconds: 220)),
+            curve: Curves.easeOutCubic,
+            top: 1,
+            bottom: 1,
+            start: edges[selected] + 1,
+            width: edges[selected + 1] - edges[selected] - 2,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(26),
+                color: contrast ? theme.colorScheme.primaryContainer : null,
+                gradient: contrast ? null : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: const [0, .55, 1],
+                  colors: dark
+                      ? const [Color(0xFF347364), Color(0xFF1C534D), Color(0xFF265456)]
+                      : const [Color(0xFFE4F8E9), Color(0xFFAFDFC9), Color(0xFFC8E9E1)],
+                ),
+                border: Border.all(color: contrast ? theme.colorScheme.outline :
+                    dark ? const Color(0xA280BCAD) : const Color(0xE8EAFBF1)),
+                boxShadow: contrast ? null : const [
+                  BoxShadow(color: Color(0x28203D38), blurRadius: 3, offset: Offset(0, 1)),
+                ],
+              ),
+            ),
+          ),
+        Material(
+          type: MaterialType.transparency,
+          child: Row(children: [
+            for (var i = 0; i < destinations.length; i++)
+              SizedBox(
+                width: edges[i + 1] - edges[i],
+                height: height,
+                child: _DockDestination(
+                  item: destinations[i],
+                  selected: i == selected,
+                  labelStyle: labelStyle,
+                  onTap: () => onTap(destinations[i].$1),
+                ),
+              ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _DockDestination extends StatelessWidget {
+  const _DockDestination({
+    required this.item,
+    required this.selected,
+    required this.labelStyle,
+    required this.onTap,
+  });
+  final (String, String, IconData) item;
+  final bool selected;
+  final TextStyle labelStyle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final selected = id == current;
-    final still = MediaQuery.disableAnimationsOf(context);
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final contrast = MediaQuery.highContrastOf(context);
+    final ink = contrast
+        ? (selected ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface)
+        : selected
+            ? (dark ? const Color(0xFFE4FFF1) : const Color(0xFF10483B))
+            : (dark ? const Color(0xFFE2ECEB) : const Color(0xFF304644));
+    void activate() {
+      HapticFeedback.selectionClick();
+      onTap();
+    }
     return Semantics(
-      selected: selected,
       button: true,
-      label: label,
+      selected: selected,
+      label: item.$2,
+      onTap: activate,
+      excludeSemantics: true,
       child: InkWell(
-        key: ValueKey('bodega-dock-$id'),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(21),
-        child: AnimatedContainer(
-          duration: still ? Duration.zero : const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: selected ? LinearGradient(
-              colors: [tint.withValues(alpha: .21), tint.withValues(alpha: .11)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-            ) : null,
-          ),
+        key: ValueKey('bodega-dock-${item.$1}'),
+        borderRadius: BorderRadius.circular(26),
+        onTap: activate,
+        child: FvTactileScale(
+          pressedScale: .96,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            AnimatedScale(
-              scale: selected ? 1.09 : 1,
-              duration: still ? Duration.zero : const Duration(milliseconds: 220),
-              curve: Curves.easeOutBack,
-              child: Icon(icon, size: 22,
-                color: selected ? tint : ink.withValues(alpha: .78))),
+            Icon(item.$3, color: ink, size: selected ? 23 : 22),
             const SizedBox(height: 3),
-            Text(label,
-              maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontSize: 10,
-                color: selected ? tint : ink.withValues(alpha: .78),
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w500)),
+            Text(item.$2, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: labelStyle.copyWith(color: ink)),
           ]),
         ),
       ),

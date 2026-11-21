@@ -119,6 +119,7 @@ class _FiadosScreenState extends State<FiadosScreen> with LiveReload<FiadosScree
                   child: RetailResponsiveFrame(maxWidth: 1040, child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
                     Reveal(
                       child: RetailVisual.hero(
+                        chapter: RetailChapter.credit,
                         context: context,
                         eyebrow: 'Clientes · Cuentas por cobrar',
                         title: 'Tus fiados, al día',

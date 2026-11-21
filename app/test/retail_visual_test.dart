@@ -11,6 +11,7 @@ void main() {
         home: Scaffold(body: Builder(builder: (context) => Center(
           child: RetailVisual.hero(
             context: context,
+            chapter: RetailChapter.cash,
             eyebrow: 'Caja · Hoy',
             title: 'Control de caja',
             subtitle: 'Movimientos reales del negocio',
@@ -28,17 +29,14 @@ void main() {
       expect(find.text('Ventas del día'), findsOneWidget);
       expect(find.text('S/ 100'), findsOneWidget);
       expect(find.text('3 ventas'), findsOneWidget);
-      final expected = brightness == Brightness.dark ? DsColors.dark : DsColors.light;
       final title = tester.widget<Text>(find.text('Control de caja'));
-      expect(title.style?.color, expected.ink);
       final subtitle = tester.widget<Text>(find.text('Movimientos reales del negocio'));
-      expect(subtitle.style?.color, expected.muted);
-      final decorated = tester.widgetList<Container>(find.byType(Container))
-          .where((w) => w.decoration is BoxDecoration)
-          .map((w) => w.decoration! as BoxDecoration).toList();
-      // Una única superficie tonal para la cabecera: no se agrega un
-      // BackdropFilter costoso por cada indicador del panel.
-      expect(decorated.any((d) => d.gradient is LinearGradient), isTrue);
+      final brightest = Color(RetailChapter.cash.light).computeLuminance();
+      for (final text in [title, subtitle]) {
+        expect((text.style!.color!.computeLuminance() + .05) / (brightest + .05), greaterThanOrEqualTo(4.5));
+      }
+      final image = tester.widget<Image>(find.byType(Image));
+      expect((image.image as AssetImage).assetName, RetailChapter.cash.asset);
       expect(find.byType(BackdropFilter), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -61,6 +59,7 @@ void main() {
               children: [
                 RetailVisual.hero(
                   context: context,
+                  chapter: RetailChapter.purchases,
                   eyebrow: 'Plan Básico · Compras',
                   title: 'Recibe mercadería',
                   subtitle: 'Productos del proveedor ingresados al inventario.',

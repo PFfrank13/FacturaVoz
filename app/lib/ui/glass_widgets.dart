@@ -6,46 +6,115 @@ import 'motion.dart';
 /// Glass belongs to navigation, not the merchandise grid.
 class FvGlassTopBar extends StatelessWidget {
   const FvGlassTopBar({super.key});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     final contrast = MediaQuery.highContrastOf(context);
     final pane = DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        color: contrast ? theme.colorScheme.surface : null,
+        gradient: contrast ? null : LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: contrast
-            ? [theme.colorScheme.surface, theme.colorScheme.surface]
-            : theme.brightness == Brightness.dark
-                ? const [Color(0xDE1D3343), Color(0xD21B293D)]
-                : const [Color(0xE8FFFFFF), Color(0xC4E6F4F5)],
+          colors: dark
+              ? const [Color(0xE719393C), Color(0xE01C2B35), Color(0xD52B313B)]
+              : const [Color(0xDBDAF3EB), Color(0xC7F8FBFA), Color(0xDCECEAF4)],
+          stops: const [0, .56, 1],
         ),
-        border: Border(bottom: BorderSide(
-          color: theme.brightness == Brightness.dark
-            ? const Color(0xFF3C596B).withValues(alpha: .65)
-            : Colors.white.withValues(alpha: .94),
-          width: .5,
-        )),
+        border: Border(
+          bottom: BorderSide(
+            color: contrast ? theme.colorScheme.outline :
+                dark ? const Color(0x598FBFBA) : const Color(0x3D61958B),
+            width: contrast ? 1 : .8,
+          ),
+        ),
       ),
       child: const SizedBox.expand(),
     );
+    final sigma = FvLuxe.glassSigma(theme.platform, 16);
     return contrast ? pane : ClipRect(child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: FvLuxe.glassSigma(theme.platform, 18),
-          sigmaY: FvLuxe.glassSigma(theme.platform, 18)),
+      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
       child: pane,
     ));
   }
 }
 
-/// One floating navigation dock, with a bounded 20px blur.
+/// One frosted pane with a polished rim lets the page move beneath the lighting.
 class FvFloatingGlassDock extends StatelessWidget {
   const FvFloatingGlassDock({super.key, required this.child});
   final Widget child;
+
   @override
-  Widget build(BuildContext context) => FvGlassSurface(
-    blur: 20, radius: FvTokens.sheetRadius, child: child,
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final contrast = MediaQuery.highContrastOf(context);
+    const radius = 34.0;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: contrast ? null : [
+          BoxShadow(
+            color: dark ? const Color(0x66030F13) : const Color(0x30244943),
+            offset: const Offset(0, 5),
+            blurRadius: 14,
+            spreadRadius: -3,
+          ),
+        ],
+      ),
+      child: FvGlassSurface(
+        radius: radius,
+        blur: 18,
+        child: CustomPaint(
+          foregroundPainter: contrast ? null : _DockEdge(dark),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: contrast ? theme.colorScheme.surface : null,
+              borderRadius: BorderRadius.circular(radius),
+              border: contrast ? Border.all(color: theme.colorScheme.outline) : null,
+              gradient: contrast ? null : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: dark
+                    ? const [Color(0xA62C4546), Color(0x8817242D), Color(0xA62A3144)]
+                    : const [Color(0x90EBFAF2), Color(0x54FFFFFF), Color(0x8FDFEBEF)],
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DockEdge extends CustomPainter {
+  const _DockEdge(this.dark);
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final bounds = Offset.zero & size;
+    final rim = RRect.fromRectAndRadius(bounds.deflate(.9), const Radius.circular(33));
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        stops: const [0, .30, .62, .84, 1],
+        colors: dark
+            ? const [Color(0xC4D7FFF2), Color(0x40579D91), Color(0x244F6476), Color(0x9CB9D7EF), Color(0x6265788A)]
+            : const [Colors.white, Color(0xFFFAFFFC), Color(0x5778A6A0), Color(0xCCCFE5FC), Colors.white],
+      ).createShader(bounds);
+    canvas.drawRRect(rim, edge);
+  }
+
+  @override
+  bool shouldRepaint(_DockEdge oldDelegate) => dark != oldDelegate.dark;
 }
 
 /// Typographic visual for products whose owners have not uploaded a photo.

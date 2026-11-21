@@ -401,6 +401,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                   ),
                   children: [
                     RetailVisual.hero(
+                       chapter: RetailChapter.purchases,
                        context: context,
                        eyebrow: 'Compras · Recepción',
                        title: 'Recibe mercadería',
