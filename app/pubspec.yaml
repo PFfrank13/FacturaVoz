@@ -61,6 +61,7 @@ flutter:
     - assets/branding/
     - assets/photos/
     - assets/demo/
+    - assets/editorial/
   fonts:
     - family: DM Serif Text
       fonts:

@@ -154,6 +154,7 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
           children: [
             if (Access.instance.rubro == 'bodega')
               RetailVisual.hero(
+                chapter: RetailChapter.reports,
                 context: context,
                 eyebrow: 'Análisis · Bodega / Tienda',
                 title: 'Tu negocio, en números',

@@ -1,3 +1,7 @@
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+import '../test/support/retail_fixture.dart';
+import 'package:facturavoz/screens/shell.dart';
 import 'package:facturavoz/access.dart';
 import 'package:facturavoz/models.dart';
 import 'package:facturavoz/screens/pos_cart_review.dart';
@@ -6,6 +10,7 @@ import 'package:facturavoz/screens/retail_basic_modules.dart';
 import 'package:facturavoz/screens/retail_receipts.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -13,11 +18,27 @@ import 'package:integration_test/integration_test.dart';
 /// sin credenciales y sin emitir ventas o comprobantes.
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  const captureKey = ValueKey('android-preview');
+  const captures = bool.fromEnvironment('SIGNATURE_CAPTURES');
+  Future<void> pumpScreen(WidgetTester tester, Widget app) => tester.pumpWidget(
+    captures ? RepaintBoundary(key: captureKey, child: app) : app,
+  );
+
   Future<void> capture(WidgetTester tester, String name) async {
-    if (!const bool.fromEnvironment('SIGNATURE_CAPTURES')) return;
-    await binding.convertFlutterSurfaceToImage();
+    if (!captures) return;
     await tester.pumpAndSettle();
-    await binding.takeScreenshot(name);
+    final surface = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
+    final image = await surface.toImage(pixelRatio: 1.5);
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw StateError('No se pudo capturar $name');
+      final report = binding.reportData ??= <String, dynamic>{};
+      final frames = report.putIfAbsent('screenshots', () => <Map<String, Object>>[])
+          as List<Map<String, Object>>;
+      frames.add({'screenshotName': name, 'bytes': bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes)});
+    } finally {
+      image.dispose();
+    }
   }
 
   void setLicense(String plan) {
@@ -60,7 +81,8 @@ void main() {
 
   testWidgets('Android muestra tablero Bodega Básico sin menús premium', (tester) async {
     setLicense('BASICO');
-    await tester.pumpWidget(MaterialApp(
+    await pumpScreen(tester, MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       home: const Scaffold(body: SingleChildScrollView(
         child: RetailBasicModules(),
@@ -78,7 +100,8 @@ void main() {
 
   testWidgets('Android muestra tablero Empresa sin duplicados de navegación', (tester) async {
     setLicense('EMPRESA');
-    await tester.pumpWidget(MaterialApp(
+    await pumpScreen(tester, MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.dark),
       home: const Scaffold(body: SingleChildScrollView(
         child: RetailPlanModules(),
@@ -96,7 +119,8 @@ void main() {
 
   testWidgets('Android renderiza y permite tocar acción de comprobantes', (tester) async {
     var touched = 0;
-    await tester.pumpWidget(MaterialApp(
+    await pumpScreen(tester, MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       home: Scaffold(body: Center(
         child: RetailReceiptActionTile(
@@ -120,7 +144,8 @@ void main() {
       LineItem(productId: 'p1', description: 'Aceite vegetal',
         quantity: 1, unitPrice: 9.50),
     ];
-    await tester.pumpWidget(MaterialApp(
+    await pumpScreen(tester, MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.dark),
       home: PosCartReviewScreen(
         currency: 'PEN',
@@ -141,7 +166,8 @@ void main() {
   testWidgets('Android valida efectivo insuficiente y vuelto sin registrar ventas',
       (tester) async {
     PosPaymentApproval? result;
-    await tester.pumpWidget(MaterialApp(
+    await pumpScreen(tester, MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       home: Builder(builder: (context) => Scaffold(body: Center(
         child: FilledButton(
@@ -172,6 +198,43 @@ void main() {
     expect(result?.method, 'efectivo');
     expect(result?.note, contains('Vuelto:'));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Android abre avisos desde Inicio y actualiza la campana al leer', (tester) async {
+    await startRetailFixture();
+    try {
+      fixtureAlertRead = false;
+      await pumpScreen(tester, MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.light),
+        locale: const Locale('es'),
+        supportedLocales: const [Locale('es')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: const MainShell(),
+      ));
+      await tester.pumpAndSettle();
+      final bell = find.byKey(const ValueKey('bodega-notifications'));
+      expect(tester.getCenter(bell).dx, lessThan(64));
+      await capture(tester, 'inicio-bodega');
+      await tester.dragFrom(const Offset(120, 480), const Offset(0, -270));
+      await tester.pumpAndSettle();
+      expect(bell.hitTestable(), findsOneWidget);
+      await tester.tap(bell);
+      await tester.pumpAndSettle();
+      expect(find.text('Diferencia en cierre de caja'), findsOneWidget);
+      await capture(tester, 'notificaciones');
+      await tester.tap(find.text('Marcar todas como leídas'));
+      await tester.pumpAndSettle();
+      expect(fixtureAlertRead, isTrue);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Notificaciones'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await stopRetailFixture();
+    }
   });
 
 }

@@ -253,7 +253,10 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
             ],
             if (stats.isNotEmpty) ...[
               const DsSection('Hoy'),
-              DsStatGrid(children: stats),
+              if (a.rubro == 'bodega')
+                RetailHomeStatGrid(children: stats)
+              else
+                DsStatGrid(children: stats),
             ],
             if (widget.showLinks) ...[
               DsSection('Tu trabajo · ${roleForUser(a.rubro, a.role).label}'),

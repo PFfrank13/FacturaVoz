@@ -333,8 +333,14 @@ class SoftPageTransitions extends PageTransitionsBuilder {
   Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation, Widget child) {
     if (MediaQuery.of(context).disableAnimations) return child;
-    final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-    final back = CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return const PageTransitionsTheme().buildTransitions(
+        route, context, animation, secondaryAnimation, child,
+      );
+    }
+    final easing = CurveTween(curve: Curves.easeOutCubic);
+    final curve = animation.drive(easing);
+    final back = secondaryAnimation.drive(easing);
     return SlideTransition(
       position: Tween<Offset>(begin: Offset.zero, end: const Offset(-0.06, 0)).animate(back),
       child: FadeTransition(

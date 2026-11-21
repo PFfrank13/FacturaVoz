@@ -289,6 +289,7 @@ class _RetailReceiptsScreenState extends State<RetailReceiptsScreen> {
                   const SizedBox(height: 8),
                 ] else ...[
                   RetailVisual.hero(
+                    chapter: RetailChapter.receipts,
                     context: context,
                     eyebrow: 'Facturación · Documentos',
                     title: 'Tus comprobantes',

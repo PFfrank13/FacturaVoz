@@ -6,11 +6,7 @@ import 'motion.dart';
 /// Aparece una sola vez cuando un bloque entra realmente al viewport.
 /// Se usa en secciones grandes, no por fila en listas virtualizadas.
 class FvScrollReveal extends StatefulWidget {
-  const FvScrollReveal({
-    super.key,
-    required this.child,
-    this.offset = 14,
-  });
+  const FvScrollReveal({super.key, required this.child, this.offset = 14});
 
   final Widget child;
   final double offset;
@@ -25,6 +21,7 @@ class _FvScrollRevealState extends State<FvScrollReveal>
     vsync: this,
     duration: Motion.medium,
   );
+  late final _progress = _controller.drive(CurveTween(curve: Motion.enter));
   ScrollPosition? _scrollPosition;
   bool _shown = false;
 
@@ -79,17 +76,14 @@ class _FvScrollRevealState extends State<FvScrollReveal>
   @override
   Widget build(BuildContext context) {
     if (reduceMotion(context)) return widget.child;
-    final progress = CurvedAnimation(
-      parent: _controller,
-      curve: Motion.enter,
-    );
     return FadeTransition(
-      opacity: progress,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: Offset(0, widget.offset / 400),
-          end: Offset.zero,
-        ).animate(progress),
+      opacity: _progress,
+      child: AnimatedBuilder(
+        animation: _progress,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, widget.offset * (1 - _progress.value)),
+          child: child,
+        ),
         child: widget.child,
       ),
     );

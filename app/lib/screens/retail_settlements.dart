@@ -177,6 +177,7 @@ class _RetailSettlementScreenState extends State<RetailSettlementScreen> {
               padding: const EdgeInsets.all(20),
               children: [
                 RetailVisual.hero(
+                  chapter: RetailChapter.purchases,
                   context: context,
                   eyebrow: 'Plan Básico · Compras',
                   title: p == null ? 'Paga a tu proveedor' : 'Recupera el pago',

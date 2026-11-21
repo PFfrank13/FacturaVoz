@@ -250,6 +250,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
     final spec = rubroFor(a.rubro);
     final guide = experienceFor(spec?.id);
     final isBodega = a.rubro == 'bodega';
+    final dockInset = MediaQuery.paddingOf(context).bottom;
     final cur = AppState.instance.profile?.currency ?? 'PEN';
     final seeMoney = a.can('finance') || a.can('collect');
     final todayTotal = ((_today?['sales_total'] as num?) ?? 0).toDouble();
@@ -271,16 +272,17 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
           if (isBodega)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 19, 20, 9),
+                padding: const EdgeInsets.fromLTRB(20, 19, 20, 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Hola, ${AppState.instance.activeOrg?.name ?? 'tu negocio'}',
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: t.textTheme.headlineMedium),
-                    const SizedBox(height: 4),
-                    Text('Así marcha tu negocio hoy',
-                      style: t.textTheme.bodyMedium?.copyWith(
-                        color: t.colorScheme.onSurfaceVariant)),
+                    Text(MaterialLocalizations.of(context).formatFullDate(DateTime.now()),
+                      style: t.textTheme.labelMedium?.copyWith(
+                        color: t.colorScheme.primary, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Semantics(header: true, child: Text(
+                      'Hola, ${AppState.instance.activeOrg?.name ?? 'tu negocio'}',
+                      style: t.textTheme.headlineMedium?.copyWith(
+                        fontSize: 33, height: 1.10, letterSpacing: -1.1))),
                   ],
                 ),
               ),
@@ -304,7 +306,7 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
               series: seeMoney ? dailySeries(_items ?? const <InvoiceRecord>[], currency: cur, today: todayIso()) : const <double>[],
               onGoal: () => _setGoal(monthTotal),
               todayTotal: seeMoney && _today != null ? todayTotal : null,
-              todayCount: todayCount,
+              todayCount: isBodega && _today == null ? null : todayCount,
               // La navegación y las acciones de voz viven únicamente en MainShell.
               onMenu: null,
               onSale: null,
@@ -437,13 +439,13 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
             if (activity.isEmpty)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(32, 40, 32, 140),
+                  padding: EdgeInsets.fromLTRB(32, 40, 32, isBodega ? 24 : 140),
                   child: Text('Nada coincide con tu búsqueda.', textAlign: TextAlign.center, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                 ),
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 160),
+                padding: EdgeInsets.fromLTRB(16, 8, 16, isBodega ? 16 : 160),
                 sliver: SliverList.separated(
                   itemCount: activity.length + (!isBodega && _items!.length >= _limit ? 1 : 0),
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -467,6 +469,8 @@ class _InicioScreenState extends State<InicioScreen> with LiveReload<InicioScree
                 ),
               ),
           ],
+          if (isBodega)
+            SliverToBoxAdapter(child: SizedBox(height: dockInset + 16)),
         ]),
       ),
     ));

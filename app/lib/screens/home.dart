@@ -635,7 +635,7 @@ class HomeHeader extends StatelessWidget {
   /// Exclusivo de Bodega; otros rubros conservan su cabecera hasta su fase.
   /// Bento operativo: cifras REALES del servidor, sin indicadores simulados.
   /// El permiso de reportes sigue gobernando los importes mensuales.
-  Widget _retailOverview(BuildContext context) {
+  Widget _retailOverview() {
     final progress = goal == null || goal! <= 0
         ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
     final canShowChart = showMonth && loaded
@@ -653,11 +653,11 @@ class HomeHeader extends StatelessWidget {
       goalPercent: progress?.percent,
       onGoal: onGoal,
       chart: canShowChart
-          ? Sparkline(
-              values: series,
-              height: 56,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF80D9C9) : RetailAccent.teal)
+          ? Semantics(
+              image: true,
+              label: 'Ventas diarias. El periodo empieza en ${money(series.first, currency)} '
+                  'y termina en ${money(series.last, currency)}.',
+              child: Sparkline(values: series, height: 56, color: const Color(0xFFA9F1CE)))
           : null,
     );
   }
@@ -665,7 +665,7 @@ class HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (compact && Access.instance.rubro == 'bodega') {
-      return _retailOverview(context);
+      return _retailOverview();
     }
     final top = compact ? 0.0 : MediaQuery.of(context).padding.top;
     final sym = currencySymbols[currency] ?? currency;
@@ -892,13 +892,15 @@ class InvoiceRow extends StatelessWidget {
     final tone = fiscal == null ? (inv.status == 'paid' ? PillTone.ok : PillTone.neutral) : StatusPill.toneForFiscal(fiscal);
     final overdue = inv.isOverdue(todayIso());
     final partial = inv.receivable && inv.paid > 0;
+    final compact = MediaQuery.sizeOf(context).width < 360 ||
+        MediaQuery.textScalerOf(context).scale(16) > 21;
     final initial = inv.clientName.trim().isEmpty || inv.clientName == '—' ? '·' : inv.clientName.trim().characters.first.toUpperCase();
     return Pressable(
       onTap: onTap,
       child: SoftCard(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(children: [
-          Hero(
+          if (!compact) ...[Hero(
             tag: 'avatar-${inv.id}',
             child: Material(
               type: MaterialType.transparency,
@@ -911,7 +913,7 @@ class InvoiceRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 14)],
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(inv.clientName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.titleSmall),

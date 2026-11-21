@@ -26,11 +26,10 @@ Widget _home() => Column(children: [
   Padding(
     padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
     child: Row(children: [
-      const Icon(Icons.menu_rounded, size: 22),
+      const Icon(Icons.notifications_none_rounded, size: 23),
       const SizedBox(width: 16),
       Text('Inicio', style: buildTheme(Brightness.light).textTheme.titleLarge),
-      const Spacer(),
-      const Icon(Icons.notifications_none_rounded, size: 23),
+
     ]),
   ),
   Expanded(child: DecoratedBox(
@@ -161,7 +160,7 @@ Widget _inventory() => Column(children: [
     child: SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment:CrossAxisAlignment.stretch, children: [
-        Builder(builder: (context) => RetailVisual.hero(context:context,
+        Builder(builder: (context) => RetailVisual.hero(context:context, chapter: RetailChapter.inventory,
           eyebrow:'INVENTARIO · BODEGA',
           title:'Tus productos, bajo control',
           subtitle:'Precios, existencias y alertas en un mismo lugar.',
@@ -226,13 +225,16 @@ void main() {
         'Venta' => _pos(),
         _ => _inventory(),
       }));
-      if (p == 'Venta' || p == 'Inventario') {
+      {
         // A test capture must wait for image decoding, not just layout.
         // In an actual app the image cache fills asynchronously.
         final context = tester.element(find.byKey(const ValueKey('preview-root')));
         await tester.runAsync(() async {
           await Future.wait([
-            for (final name in const ['water','milk','rice','oil','bread','cookies'])
+            if (p == 'Inventario' || p == 'Inicio')
+              precacheImage(AssetImage(p == 'Inicio'
+                  ? RetailChapter.reports.asset : RetailChapter.inventory.asset), context),
+            if (p != 'Inicio') for (final name in const ['water','milk','rice','oil','bread','cookies'])
               precacheImage(AssetImage('assets/demo/$name.webp'), context),
           ]);
         });

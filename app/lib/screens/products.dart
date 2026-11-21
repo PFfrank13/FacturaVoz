@@ -787,6 +787,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           children: [
             if (Access.instance.rubro == 'bodega') ...[
               RetailVisual.hero(
+                chapter: RetailChapter.inventory,
                 context: context,
                 eyebrow: 'Inventario · Bodega / Tienda',
                 title: 'Tus productos',
