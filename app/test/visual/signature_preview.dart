@@ -30,7 +30,6 @@ import 'package:facturavoz/screens/pos_payment.dart';
 import 'package:facturavoz/screens/pos_payment_success.dart';
 import 'package:facturavoz/services/live.dart';
 import 'package:facturavoz/ui/theme.dart';
-import 'package:facturavoz/ui/retail_visual.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -149,6 +148,7 @@ void main() {
     for (final entry in catalog) entry.id: entry.builder,
     'navegacion': (_) => const MainShell(),
     'notificaciones': (_) => const MainShell(),
+    'isla': (_) => const MainShell(),
     'inicio-scroll': (_) => const MainShell(),
   };
   const core = {
@@ -211,7 +211,6 @@ void main() {
         if (entry.key == 'pago') await tester.tap(find.text('Abrir cobro'));
         final context = tester.element(find.byKey(const ValueKey('capture')));
         final assets = <String>[
-          for (final chapter in RetailChapter.values) chapter.asset,
           if (emptyRetailCatalog)
             for (final name in [
               'water',
@@ -252,6 +251,12 @@ void main() {
         );
         for (var frame = 0; frame < 8; frame++) {
           await tester.pump(const Duration(milliseconds: 200));
+        }
+        if (entry.key == 'isla') {
+          await tester.tap(find.byKey(const ValueKey('dynamic-island')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('dynamic-island-notice')), findsOneWidget);
+          expect(find.text('Diferencia en cierre de caja'), findsOneWidget);
         }
         if (entry.key == 'notificaciones') {
           await tester.tap(find.byKey(const ValueKey('bodega-notifications')));

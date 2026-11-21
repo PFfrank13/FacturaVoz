@@ -6,16 +6,17 @@ import 'package:flutter/services.dart';
 import 'design_tokens.dart';
 import 'glass_widgets.dart';
 import 'motion.dart';
+import 'retail_icon.dart';
 
 /// Editorial palette: neutral foundations with restrained functional color.
 /// These tones identify actions, never replace their text labels.
 abstract final class RetailAccent {
   static const ink = Color(0xFF18243A);
   static const teal = FvLuxe.jade;
-  static const blue = FvLuxe.blue;
-  static const violet = Color(0xFF6552A3);
-  static const amber = Color(0xFFC36F24);
-  static const mint = FvLuxe.jade;
+  static const blue = Color(0xFF537AF1);
+  static const coral = Color(0xFFF97A83);
+  static const amber = Color(0xFFEBB32E);
+  static const mint = Color(0xFF37BDAB);
   static const muted = Color(0xFF5B6475);
 }
 
@@ -61,16 +62,11 @@ class RetailPremiumOverview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Container(
-            width: 30, height: 30,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle, color: const Color(0xFF25484E),
-              border: Border.all(color: const Color(0xFF638279))),
-            child: const Icon(Icons.storefront_outlined, color: Color(0xFFDBF5CE), size: 16),
-          ),
+          const RetailIcon(Icons.storefront_outlined,
+            ink: Color(0xFFDDFBF6), accent: Color(0xFF389D9F), size: 23),
           const SizedBox(width: 9),
           Expanded(child: Text(showMonth ? 'Ventas de este mes' : 'Tu actividad',
-            style: theme.textTheme.labelLarge?.copyWith(color: const Color(0xFFF0F8EA)))),
+            style: theme.textTheme.labelLarge?.copyWith(color: const Color(0xFFD7F8F2)))),
         ]),
         const SizedBox(height: 14),
         if (showMonth)
@@ -78,35 +74,24 @@ class RetailPremiumOverview extends StatelessWidget {
             child: Text(loaded ? '$currencySymbol ${salesAmount.toStringAsFixed(2)}' : '—',
               style: theme.textTheme.displayMedium?.copyWith(
                 color: Colors.white, fontFamily: 'Inter', fontWeight: FontWeight.w600,
-                fontSize: 48, height: 1.04, letterSpacing: -2.5,
+                fontSize: 51, height: 1.02, letterSpacing: -2.8,
                 fontFeatures: const [FontFeature.tabularFigures()]))),
         if (!showMonth)
           Text('Operaciones del negocio', style: theme.textTheme.headlineSmall?.copyWith(
             color: Colors.white, fontFamily: FvLuxe.editorialFont, fontWeight: FontWeight.w400)),
       ],
     );
-    final lead = LayoutBuilder(builder: (context, bounds) {
-      final showArt = !contrast && bounds.maxWidth >= 219 &&
-        MediaQuery.textScalerOf(context).scale(16) < 21;
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: summary),
-          if (showArt) ...[
-            const SizedBox(width: 7),
-            SizedBox(
-              width: (bounds.maxWidth * .30).clamp(68, 135).toDouble(),
-              height: 78,
-              child: Image.asset('assets/editorial/reports.webp', excludeFromSemantics: true,
-                filterQuality: FilterQuality.medium, fit: BoxFit.contain),
-            ),
-          ],
-        ]),
-        if (facts.isNotEmpty) ...[
-          const SizedBox(height: 13),
-          Wrap(spacing: 13, runSpacing: 7, children: facts),
-        ],
-      ]);
-    });
+    final lead = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      LayoutBuilder(builder: (context, bounds) {
+        final reserve = !contrast && bounds.maxWidth >= 260 &&
+            MediaQuery.textScalerOf(context).scale(16) <= 20 ? 64.0 : 0.0;
+        return Padding(padding: EdgeInsets.only(right: reserve), child: summary);
+      }),
+      if (facts.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        Wrap(spacing: 14, runSpacing: 7, children: facts),
+      ],
+    ]);
     final trend = showMonth && loaded && chart != null ? _RetailTrend(chart: chart!) : null;
     return Semantics(
       container: true, label: 'Resumen operativo de ${name.isEmpty ? 'la bodega' : name}',
@@ -122,12 +107,13 @@ class RetailPremiumOverview extends StatelessWidget {
           child: DecoratedBox(
             decoration: const BoxDecoration(gradient: LinearGradient(
               begin: Alignment.topRight, end: Alignment.bottomLeft,
-              colors: [Color(0xFF225453), Color(0xFF14343C), Color(0xFF102932)],
+              colors: [Color(0xFF145668), Color(0xFF173453), Color(0xFF121E38)],
               stops: [0, .57, 1])),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Stack(children: [
-                if (!contrast && MediaQuery.textScalerOf(context).scale(16) < 21)
-                  const Positioned.fill(child: _RetailCardArt()),
+                if (!contrast && MediaQuery.textScalerOf(context).scale(16) <= 20)
+                  const PositionedDirectional(top: 0, end: 0, width: 90, height: 76,
+                    child: IgnorePointer(child: ClipRect(child: CustomPaint(painter: _VoiceRings())))),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 19, 20, 17),
                   child: LayoutBuilder(builder: (context, bounds) {
@@ -154,45 +140,25 @@ class RetailPremiumOverview extends StatelessWidget {
   }
 }
 
-/// Static engraving printed into the card. It deliberately sits above the plot.
-class _RetailCardArt extends StatelessWidget {
-  const _RetailCardArt();
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(child: ClipRect(
-    child: LayoutBuilder(builder: (context, bounds) => Stack(children: [
-      Positioned(top: -55, right: bounds.maxWidth >= 690 ? bounds.maxWidth * .5 - 48 : -50,
-        width: 224, height: 171,
-        child: RepaintBoundary(child: CustomPaint(painter: const _GuillochePainter()))),
-    ])),
-  ));
-}
-
-class _GuillochePainter extends CustomPainter {
-  const _GuillochePainter();
+/// Three cropped, flat bands echo the voice motif. They are painted once.
+class _VoiceRings extends CustomPainter {
+  const _VoiceRings();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * .56, size.height * .52);
-    final stroke = Paint()..style = PaintingStyle.stroke..strokeWidth = .78;
-    for (var line = 0; line < 25; line++) {
-      final u = line / 24;
-      final path = Path();
-      for (var step = 0; step <= 180; step++) {
-        final theta = step * 2 * math.pi / 180;
-        final radius = 24 + u * 74 + (5 + 13 * u) * math.sin(7 * theta + u * 4);
-        final x = center.dx + radius * math.cos(theta) * 1.17;
-        final y = center.dy + radius * math.sin(theta) * .83;
-        if (step == 0) { path.moveTo(x, y); } else { path.lineTo(x, y); }
-      }
-      path.close();
-      stroke.color = Color.lerp(const Color(0x348FE3D0), const Color(0x59BACE9D), u)!;
-      canvas.drawPath(path, stroke);
+    final center = Offset(size.width - 4, -15);
+    final stroke = Paint()..style = PaintingStyle.stroke..strokeWidth = 11;
+    for (final (radius, pigment) in const [
+      (27.0, Color(0xFFAEF0D5)),
+      (46.0, Color(0xFF61D3C4)),
+      (65.0, Color(0xFF518AAD)),
+    ]) {
+      canvas.drawCircle(center, radius, stroke..color = pigment);
     }
   }
 
   @override
-  bool shouldRepaint(_GuillochePainter oldDelegate) => false;
+  bool shouldRepaint(_VoiceRings oldDelegate) => false;
 }
 
 class _MiniFact extends StatelessWidget {
@@ -202,10 +168,10 @@ class _MiniFact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-    Icon(icon, size: 14, color: const Color(0xFFABDBC7)),
+    Icon(icon, size: 14, color: const Color(0xFF7FE7CD)),
     const SizedBox(width: 5),
     Flexible(child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(
-      color: const Color(0xFFEDF7F1), fontSize: 12, fontWeight: FontWeight.w500))),
+      color: const Color(0xFFEBF7F8), fontSize: 12, fontWeight: FontWeight.w500))),
   ]);
 }
 
@@ -241,7 +207,7 @@ class _RetailGoal extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Material(
-      color: const Color(0xFF1D4147),
+      color: const Color(0xFF142E45),
       child: InkWell(
         key: const ValueKey('bodega-goal-action'),
         onTap: () { HapticFeedback.selectionClick(); onTap(); },
@@ -252,10 +218,10 @@ class _RetailGoal extends StatelessWidget {
             border: Border(top: BorderSide(color: Color(0xFF426165), width: .7))),
           child: Column(children: [
             Row(children: [
-              const Icon(Icons.outlined_flag_rounded, color: Color(0xFFD1E9AC), size: 19),
+              const Icon(Icons.outlined_flag_rounded, color: Color(0xFFABF3CA), size: 19),
               const SizedBox(width: 10),
               Expanded(child: Text(percent == null ? 'Establecer meta del mes' : 'Meta mensual',
-                style: t.textTheme.labelLarge?.copyWith(color: const Color(0xFFF1F8EC)))),
+                style: t.textTheme.labelLarge?.copyWith(color: const Color(0xFFECF8F6)))),
               if (percent != null) Text('${(percent! * 100).round()}%',
                 style: t.textTheme.labelMedium?.copyWith(color: Colors.white)),
               const SizedBox(width: 8),
@@ -266,7 +232,7 @@ class _RetailGoal extends StatelessWidget {
               LinearProgressIndicator(
                 value: percent!.clamp(0, 1), minHeight: 3,
                 borderRadius: BorderRadius.circular(3),
-                color: const Color(0xFFD1E9AC), backgroundColor: const Color(0xFF486469)),
+                color: const Color(0xFFABF3CA), backgroundColor: const Color(0xFF486469)),
             ],
           ]),
         ),
@@ -319,13 +285,13 @@ class RetailHomeStat extends StatelessWidget {
     final t = Theme.of(context);
     final dark = t.brightness == Brightness.dark;
     final highContrast = MediaQuery.highContrastOf(context);
-    final paper = dark ? const Color(0xFF14242D) : const Color(0xFFFDFAF4);
-    final pigment = Color.lerp(tint, dark ? Colors.white : const Color(0xFF152B36),
-      dark ? .63 : .45)!;
+    final paper = dark ? const Color(0xFF162333) : Colors.white;
+    final pigment = dark ? Color.lerp(tint, Colors.white, .65)!
+        : Color.lerp(tint, const Color(0xFF101E38), .72)!;
     final ink = dark ? const Color(0xFFF1F5F2) : const Color(0xFF142E36);
     final muted = dark ? const Color(0xFFC2D1D1) : const Color(0xFF42565C);
-    final surface = Color.lerp(paper, tint, dark ? .20 : .12)!;
-    final border = Color.lerp(surface, tint, highContrast ? .83 : .34)!;
+    final surface = Color.lerp(paper, tint, dark ? .14 : .17)!;
+    final border = Color.lerp(surface, pigment, highContrast ? .83 : .16)!;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(21), side: BorderSide(color: border, width: .8),
     );
@@ -337,13 +303,10 @@ class RetailHomeStat extends StatelessWidget {
         enabled: onTap != null,
         child: Material(
           color: surface, shape: shape, clipBehavior: Clip.antiAlias,
-          child: Ink(
-            decoration: BoxDecoration(gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Color.lerp(surface, tint, dark ? .08 : .10)!, surface, paper],
-              stops: const [0, .62, 1])),
-            child: InkWell(
+          child: InkWell(
               customBorder: shape, onTap: onTap,
+              hoverColor: tint.withValues(alpha: .10),
+              splashColor: tint.withValues(alpha: .14),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 151),
                 child: Padding(
@@ -351,10 +314,13 @@ class RetailHomeStat extends StatelessWidget {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Container(
-                        width: 34, height: 34,
-                        decoration: BoxDecoration(shape: BoxShape.circle,
-                          color: dark ? Color.lerp(surface, tint, .36) : pigment),
-                        child: Icon(icon, size: 18, color: Colors.white),
+                        width: 37, height: 37,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(11),
+                          color: dark ? Color.lerp(tint, Colors.white, .48) : pigment),
+                        alignment: Alignment.center,
+                        child: RetailIcon(icon, size: 24,
+                          ink: dark ? const Color(0xFF14233A) : Colors.white,
+                          accent: dark ? tint : Color.lerp(tint, Colors.white, .28)!),
                       ),
                       const Spacer(),
                       if (onTap != null) Icon(Icons.north_east_rounded, size: 15, color: pigment),
@@ -380,7 +346,6 @@ class RetailHomeStat extends StatelessWidget {
                   ]),
                 ),
               ),
-            ),
           ),
         ),
       ),
@@ -515,8 +480,8 @@ class _DockLane extends StatelessWidget {
                   end: Alignment.bottomRight,
                   stops: const [0, .55, 1],
                   colors: dark
-                      ? const [Color(0xFF347364), Color(0xFF1C534D), Color(0xFF265456)]
-                      : const [Color(0xFFE4F8E9), Color(0xFFAFDFC9), Color(0xFFC8E9E1)],
+                      ? const [Color(0xFF275868), Color(0xFF1B485E), Color(0xFF28475F)]
+                      : const [Color(0xFFBAF4E3), Color(0xFF85DECA), Color(0xFFC7E9F4)],
                 ),
                 border: Border.all(color: contrast ? theme.colorScheme.outline :
                     dark ? const Color(0xA280BCAD) : const Color(0xE8EAFBF1)),
@@ -586,7 +551,9 @@ class _DockDestination extends StatelessWidget {
         child: FvTactileScale(
           pressedScale: .96,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(item.$3, color: ink, size: selected ? 23 : 22),
+            RetailIcon(item.$3, ink: ink, size: selected ? 24 : 23,
+              accent: contrast ? ink.withValues(alpha: .42)
+                  : dark ? const Color(0xFF45969B) : const Color(0xFF84C8C1)),
             const SizedBox(height: 3),
             Text(item.$2, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: labelStyle.copyWith(color: ink)),

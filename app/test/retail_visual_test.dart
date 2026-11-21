@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:facturavoz/ui/retail_visual.dart';
+import 'package:facturavoz/ui/retail_icon.dart';
 import 'package:facturavoz/ui/theme.dart';
 
 void main() {
@@ -31,12 +32,14 @@ void main() {
       expect(find.text('3 ventas'), findsOneWidget);
       final title = tester.widget<Text>(find.text('Control de caja'));
       final subtitle = tester.widget<Text>(find.text('Movimientos reales del negocio'));
-      final brightest = Color(RetailChapter.cash.light).computeLuminance();
+      final dark = brightness == Brightness.dark;
+      final paper = Color(dark ? RetailChapter.cash.night : RetailChapter.cash.paper);
       for (final text in [title, subtitle]) {
-        expect((text.style!.color!.computeLuminance() + .05) / (brightest + .05), greaterThanOrEqualTo(4.5));
+        final values = [paper.computeLuminance(), text.style!.color!.computeLuminance()]..sort();
+        expect((values.last + .05) / (values.first + .05), greaterThanOrEqualTo(4.5));
       }
-      final image = tester.widget<Image>(find.byType(Image));
-      expect((image.image as AssetImage).assetName, RetailChapter.cash.asset);
+      expect(find.byType(Image), findsNothing);
+      expect(tester.widget<RetailIcon>(find.byType(RetailIcon)).icon, Icons.account_balance_wallet_rounded);
       expect(find.byType(BackdropFilter), findsNothing);
       expect(tester.takeException(), isNull);
     });

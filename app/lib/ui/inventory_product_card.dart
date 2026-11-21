@@ -41,7 +41,7 @@ class FvInventoryProductCard extends StatelessWidget {
     final t = Theme.of(context);
     final muted = t.colorScheme.onSurfaceVariant;
     final accent = stockIsCritical ? t.colorScheme.error
-        : lowStock ? FvLuxe.gold
+        : lowStock ? (t.brightness == Brightness.dark ? const Color(0xFFFFC775) : const Color(0xFF805018))
         : t.colorScheme.primary;
     final subtitle = category == null || category!.trim().isEmpty
         ? (isService ? 'Servicio' : 'Producto')
@@ -106,9 +106,10 @@ class FvInventoryProductCard extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      active ? Icons.circle_rounded
-                                          : Icons.archive_outlined,
-                                      size: 11,
+                                      !active ? Icons.archive_outlined
+                                          : stockIsCritical ? Icons.error_outline_rounded
+                                          : lowStock ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded,
+                                      size: 14,
                                       color: active ? accent : muted),
                                     const SizedBox(width: 5),
                                     Flexible(

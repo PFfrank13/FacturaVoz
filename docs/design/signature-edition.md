@@ -4,9 +4,11 @@ Versión Android 3.4.0 (9). El importe, su período y el siguiente paso de caja 
 
 ## Diseño
 
-En Inicio, el ábaco de cristal acompaña las ventas del mes. La campana superior izquierda abre los avisos del plan y, para quienes tienen permiso, las alertas del negocio. El indicador se actualiza al recibir una alerta o marcarla como leída. La barra inferior flota sobre el contenido durante el desplazamiento y reserva espacio para leer el último comprobante. [Inicio](../../app/tool/previews/signature/navegacion-390.png) · [Notificaciones](../../app/tool/previews/signature/notificaciones-390.png) · [Inicio desplazado](../../app/tool/previews/signature/inicio-scroll-390.png)
+El menú está a la izquierda, la campana a la derecha y la isla de actividad en el centro del encabezado de Bodega. Un aviso nuevo se expande desde la cápsula. Se puede deslizar hacia arriba para cerrarlo o tocar para abrir Notificaciones. La lectura se confirma en la bandeja. Los avisos respetan los permisos y la empresa activa. [Inicio](../../app/tool/previews/signature/navegacion-390.png) · [Isla expandida](../../app/tool/previews/signature/isla-390.png) · [Recorrido grabado en Android](../../app/tool/previews/android/isla-dinamica.mp4) · [Notificaciones](../../app/tool/previews/signature/notificaciones-390.png)
 
-Caja, Inventario, Comprobantes, Compras, Fiados y Reportes usan seis composiciones originales de 352 × 352 píxeles con fondo transparente. Se incluyen como WebP locales. La caja registradora, los paquetes, la impresora, la carretilla, el libro y el ábaco identifican cada módulo junto con su nombre. Los gráficos y las cifras proceden de los datos del negocio.
+La isla se dibuja dentro de Flutter. El paquete incluido adapta la geometría elástica, los tiempos y el gesto de cierre de la plantilla de Expo. [Implementación, revisión original y licencia](../../app/packages/dynamic_notification_island/README.md)
+
+Caja, Inventario, Comprobantes, Compras, Fiados y Reportes combinan símbolos vectoriales bicolor con paletas propias. En Inicio, un motivo abstracto de voz enmarca el resumen. El gráfico y las cifras proceden de los datos del negocio. Las fichas comerciales conservan las fotos de cada producto y usan un monograma cuando falta una imagen.
 
 - **Inicio y reportes.** El importe del período, la tendencia y la meta tienen espacios distintos. Las cifras usan números tabulares. El gráfico diario indica su máximo en la moneda del informe y admite movimiento reducido. [Carbon Design System, gráficos](https://carbondesignsystem.com/data-visualization/chart-types/)
 - **Catálogo.** Las seis imágenes de muestra son composiciones originales generadas para esta edición y exportadas como WebP de 512 × 512. La galería las identifica como muestras. Una ficha real utiliza la foto del negocio o un monograma. Cambiar de producto invalida la petición de la imagen anterior. Las dimensiones de la miniatura determinan la resolución de decodificación. [Google Merchant Center, imágenes de producto](https://support.google.com/merchants/answer/6324350)
@@ -27,7 +29,7 @@ Se instalaron las seis guías pedidas. La guía HIG de dickwu se conserva localm
 | Caja, comprobantes, reportes | [Caja](../../app/tool/previews/signature/caja-320.png) · [Comprobantes](../../app/tool/previews/signature/comprobantes-320.png) · [Reportes](../../app/tool/previews/signature/reportes-768.png) |
 | Android, emulador independiente | [Plan Básico](../../app/tool/previews/android/plan-basico.png) · [Plan Empresa](../../app/tool/previews/android/plan-empresa.png) · [Carrito](../../app/tool/previews/android/carrito.png) · [Efectivo](../../app/tool/previews/android/efectivo.png) |
 
-La suite de rutas monta los constructores del catálogo con un negocio de prueba en memoria. Captura 91 vistas a 390 dp. Once de ellas se ejecutan también a 320, 768 y 1280 dp. Los temas oscuros corresponden a 320 y 768 dp. Se reproducen el filtro, la búsqueda, la adición y la edición de cantidades en móvil y escritorio. El emulador ejecuta por separado seis escenarios de Android con datos de prueba.
+La suite de rutas monta los constructores del catálogo con un negocio de prueba en memoria. Captura 92 vistas a 390 dp. Once de ellas se ejecutan también a 320, 768 y 1280 dp. Los temas oscuros corresponden a 320 y 768 dp. Se reproducen el filtro, la búsqueda, la adición y la edición de cantidades en móvil y escritorio. El emulador ejecuta por separado seis escenarios de Android con datos de prueba.
 
 La revisión de imágenes y las pruebas táctiles permitieron corregir un precio truncado, títulos partidos con letra ampliada, fotos heredadas al reutilizar una fila y botones de alta duplicados. La confirmación del pago queda al pie del área visible, por encima del teclado.
 
@@ -36,6 +38,7 @@ La revisión de imágenes y las pruebas táctiles permitieron corregir un precio
 ```shell
 flutter analyze
 flutter test
+flutter test packages/dynamic_notification_island/test
 flutter test test/visual/signature_preview.dart tool/visual_preview.dart tool/visual_checkout_preview.dart --update-goldens
 ```
 

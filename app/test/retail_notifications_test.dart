@@ -5,6 +5,7 @@ import 'package:facturavoz/access.dart';
 import 'package:facturavoz/logic/data_scope.dart';
 import 'package:facturavoz/screens/retail_notifications.dart';
 import 'package:facturavoz/services/repo.dart';
+import 'package:facturavoz/services/live.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final requests = <http.Request>[];
   final read = <String>{};
+  var alertNumber = 1;
   Completer<void>? waitForOldCompany;
 
   setUpAll(() async {
@@ -43,20 +45,19 @@ void main() {
           read.add(org);
           return http.Response('', 204, request: request);
         }
-        if (org == 'eq.oliva' && params['select'] != 'id') {
+        if (org == 'eq.oliva') {
           await waitForOldCompany?.future;
         }
-        final rows = params['select'] == 'id'
-            ? [
-                if (!read.contains(org)) {'id': 'alert'},
-              ]
-            : [
-                {
-                  'id': 'alert',
-                  'title': 'Cierre de $org',
-                  if (read.contains(org)) 'read_at': '2026-03-01T12:00:00Z',
-                },
-              ];
+        final rows = [
+          if (!read.contains(org) || params['read_at'] != 'is.null')
+            {
+              'id': 'alert-$alertNumber',
+              'title': 'Cierre de $org',
+              'body': 'Detalle $alertNumber',
+              'created_at': '2026-03-0${alertNumber}T12:00:00Z',
+              if (read.contains(org)) 'read_at': '2026-03-08T12:00:00Z',
+            },
+        ];
         return http.Response(
           jsonEncode(rows),
           200,
@@ -90,6 +91,7 @@ void main() {
   setUp(() {
     requests.clear();
     read.clear();
+    alertNumber = 1;
     waitForOldCompany = null;
     Repo.activeOrgId = 'oliva';
     Access.instance
@@ -102,13 +104,25 @@ void main() {
       );
   });
 
-  Future<void> openBell(WidgetTester tester) async {
+  Future<void> mountHeader(WidgetTester tester) async {
+    final scaffold = GlobalKey<ScaffoldState>();
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(appBar: AppBar(leading: const RetailNotificationBell())),
+        home: Scaffold(
+          key: scaffold,
+          drawer: const Drawer(child: Text('Menú de mi negocio')),
+          appBar: RetailNotificationHeader(
+            title: 'Inicio',
+            onMenu: () => scaffold.currentState!.openDrawer(),
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  Future<void> openBell(WidgetTester tester) async {
+    await mountHeader(tester);
     await tester.tap(find.byKey(const ValueKey('bodega-notifications')));
     await tester.pumpAndSettle();
   }
@@ -118,21 +132,128 @@ void main() {
     (tester) async {
       await openBell(tester);
       final first = requests.first.url.queryParameters;
-      expect(first['select'], 'id');
+      expect(first['select'], 'id,title,body,severity,created_at');
       expect(first['read_at'], 'is.null');
       expect(first['limit'], '1');
       expect(find.text('Cierre de eq.oliva'), findsOneWidget);
-      expect(find.text('Sin leer'), findsOneWidget);
+      expect(find.textContaining('Sin leer'), findsOneWidget);
       expect(requests.where((r) => r.method == 'PATCH'), isEmpty);
       await tester.tap(find.text('Marcar todas como leídas'));
       await tester.pumpAndSettle();
       final write = requests.singleWhere((r) => r.method == 'PATCH');
       expect(write.url.queryParameters['org_id'], 'eq.oliva');
       expect(write.url.queryParameters['read_at'], 'is.null');
-      expect(find.text('Sin leer'), findsNothing);
+      expect(find.textContaining('Sin leer'), findsNothing);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.byTooltip('Notificaciones'), findsOneWidget);
+    },
+  );
+
+  testWidgets('menú, isla y campana ocupan sus posiciones a 320 dp', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 720);
+    addTearDown(tester.view.reset);
+    await mountHeader(tester);
+    final menu = find.byKey(const ValueKey('bodega-open-menu'));
+    final bell = find.byKey(const ValueKey('bodega-notifications'));
+    final island = find.byKey(const ValueKey('dynamic-island'));
+    expect(tester.getCenter(menu).dx, lessThan(52));
+    expect(tester.getCenter(island).dx, closeTo(160, 1));
+    expect(tester.getCenter(bell).dx, greaterThan(268));
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    expect(find.text('Menú de mi negocio'), findsOneWidget);
+  });
+
+  testWidgets('la isla anuncia una alerta nueva una sola vez', (tester) async {
+    await mountHeader(tester);
+    final card = find.byKey(const ValueKey('dynamic-island-notice'));
+    expect(card, findsNothing);
+    alertNumber = 2;
+    LiveHub.instance.tick('owner_alerts').value++;
+    await tester.pumpAndSettle();
+    expect(card, findsOneWidget);
+    expect(find.text('Detalle 2'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pumpAndSettle();
+    expect(card, findsNothing);
+    LiveHub.instance.tick('owner_alerts').value++;
+    await tester.pumpAndSettle();
+    expect(card, findsNothing);
+    alertNumber = 1;
+    LiveHub.instance.tick('owner_alerts').value++;
+    await tester.pumpAndSettle();
+    expect(card, findsNothing);
+    await tester.tap(find.byKey(const ValueKey('dynamic-island')));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalle 1'), findsOneWidget);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+    expect(find.text('Alertas del negocio'), findsOneWidget);
+    expect(requests.where((r) => r.method == 'PATCH'), isEmpty);
+  });
+
+  testWidgets('la isla no anuncia al volver del centro ni al reanudar la app', (
+    tester,
+  ) async {
+    await mountHeader(tester);
+    final card = find.byKey(const ValueKey('dynamic-island-notice'));
+    alertNumber = 2;
+    LiveHub.instance.tick('owner_alerts').value++;
+    await tester.pumpAndSettle();
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+    alertNumber = 3;
+    LiveHub.instance.tick('owner_alerts').value++;
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(card, findsNothing);
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pump();
+    alertNumber = 4;
+    LiveHub.instance.tick('owner_alerts').value++;
+    await tester.pumpAndSettle();
+    for (final state in [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+    expect(card, findsNothing);
+    await tester.tap(find.byKey(const ValueKey('dynamic-island')));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalle 4'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'la isla retira datos al cambiar de empresa mientras está abierta',
+    (tester) async {
+      await mountHeader(tester);
+      await tester.tap(find.byKey(const ValueKey('dynamic-island')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cierre de eq.oliva'), findsOneWidget);
+      Repo.activeOrgId = 'nueva';
+      dataScope.value++;
+      await tester.pumpAndSettle();
+      expect(find.text('Cierre de eq.oliva'), findsNothing);
+      expect(find.byKey(const ValueKey('dynamic-island-notice')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('dynamic-island')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cierre de eq.nueva'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     },
   );
 
