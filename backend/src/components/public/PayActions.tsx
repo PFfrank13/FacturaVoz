@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PaymentMark } from "./PaymentMark";
 
 type Props = {
   token: string;
@@ -9,7 +10,7 @@ type Props = {
   pay: { yape: string; plin: string; bankName: string; bankAccount: string; bankCci: string; holder: string; note: string; mp: boolean };
 };
 
-function CopyRow({ label, value, display }: { label: string; value: string; display?: string }) {
+function CopyRow({ label, value, display, wallet }: { label: string; value: string; display?: string; wallet?: "yape" | "plin" }) {
   const [done, setDone] = useState(false);
   return (
     <button
@@ -25,9 +26,12 @@ function CopyRow({ label, value, display }: { label: string; value: string; disp
       }}
       className="flex w-full items-center justify-between rounded-2xl bg-[#f3f1fc] px-4 py-3 text-left transition active:scale-[0.98]"
     >
-      <span>
-        <span className="block text-[12.5px] text-[#77799b]">{label}</span>
-        <span className="block text-[16px] font-semibold tabular-nums tracking-wide">{display ?? value}</span>
+      <span className="flex min-w-0 items-center gap-3">
+        {wallet ? <PaymentMark method={wallet} size={38} /> : null}
+        <span>
+          <span className="block text-[12.5px] text-[#77799b]">{label}</span>
+          <span className="block text-[16px] font-semibold tabular-nums tracking-wide">{display ?? value}</span>
+        </span>
       </span>
       <span className={`text-[13px] font-semibold ${done ? "text-[#23956f]" : "text-[#6a62e2]"}`}>{done ? "¡Copiado!" : "Copiar"}</span>
     </button>
@@ -89,13 +93,13 @@ export default function PayActions({ token, balance, currencySymbol, pay }: Prop
         <button
           disabled={busy}
           onClick={card}
-          className="w-full rounded-2xl bg-gradient-to-br from-[#6a62e2] to-[#b58bf5] py-4 text-base font-semibold text-white shadow-lg shadow-[#6a62e2]/30 transition active:scale-[0.98] disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-[#6a62e2] to-[#b58bf5] py-4 text-base font-semibold text-white shadow-lg shadow-[#6a62e2]/30 transition active:scale-[0.98] disabled:opacity-60"
         >
-          💳 Pagar {currencySymbol} {balance.toFixed(2)} con tarjeta
+          <PaymentMark method="tarjeta" size={32} /> Pagar {currencySymbol} {balance.toFixed(2)} con tarjeta
         </button>
       ) : null}
-      {pay.yape ? <CopyRow label={`Yape${pay.holder ? ` · ${pay.holder}` : ""}`} value={pay.yape} display={fmtPhone(pay.yape)} /> : null}
-      {pay.plin ? <CopyRow label={`Plin${pay.holder ? ` · ${pay.holder}` : ""}`} value={pay.plin} display={fmtPhone(pay.plin)} /> : null}
+      {pay.yape ? <CopyRow wallet="yape" label={`Yape${pay.holder ? ` · ${pay.holder}` : ""}`} value={pay.yape} display={fmtPhone(pay.yape)} /> : null}
+      {pay.plin ? <CopyRow wallet="plin" label={`Plin${pay.holder ? ` · ${pay.holder}` : ""}`} value={pay.plin} display={fmtPhone(pay.plin)} /> : null}
       {pay.bankAccount ? <CopyRow label={`${pay.bankName || "Cuenta"}${pay.holder ? ` · ${pay.holder}` : ""}`} value={pay.bankAccount} /> : null}
       {pay.bankCci ? <CopyRow label="CCI (interbancario)" value={pay.bankCci} /> : null}
       {pay.note ? <p className="rounded-2xl bg-[#c57a12]/10 px-4 py-3 text-[13.5px] text-[#8a5a10]">{pay.note}</p> : null}
@@ -117,8 +121,10 @@ export default function PayActions({ token, balance, currencySymbol, pay }: Prop
                 key={m}
                 type="button"
                 onClick={() => setMethod(m)}
-                className={`rounded-xl px-3 py-2 text-sm font-semibold capitalize ${method === m ? "bg-[#6a62e2] text-white" : "bg-[#f3f1fc] text-[#55577a]"}`}
+                aria-pressed={method === m}
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold capitalize ${method === m ? "bg-[#6a62e2] text-white" : "bg-[#f3f1fc] text-[#55577a]"}`}
               >
+                {m === "yape" || m === "plin" ? <PaymentMark method={m} size={22} /> : null}
                 {m}
               </button>
             ))}

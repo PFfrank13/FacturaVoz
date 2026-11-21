@@ -1,5 +1,6 @@
 {
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':(top)app/lib' ':(top)app/assets' ':(top)app/packages' ':(top)app/web' ':(top)app/pubspec.yaml' ':(top)app/pubspec.lock'",
+  "buildCommand": "bash scripts/build-flutter-web.sh && npm run build",
   "crons": [
     {
       "path": "/api/import/notify",

@@ -40,5 +40,6 @@ export const config = {
   // Todas las rutas /api se autentican a sí mismas (Bearer, cookie, CRON_SECRET o token público); si pasaran por aquí,
   // las apps móviles serían redirigidas a /login. /cotizacion, /pagar y /tienda son páginas públicas para el cliente final.
   // /portal, /comprobante, /encuesta y /reservar (v2.0) también son públicas (cliente final, sin cuenta).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/|cotizacion/|pagar/|tienda/|portal/|comprobante/|encuesta/|reservar/).*)"],
+  // El cliente Flutter en /app arranca sin cookie y autentica su propia sesión.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/|app(?:/|$)|cotizacion/|pagar/|tienda/|portal/|comprobante/|encuesta/|reservar/).*)"],
 };

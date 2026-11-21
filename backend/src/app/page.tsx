@@ -16,6 +16,7 @@ export default async function Home() {
         const organization = row.organizations as unknown as { id: string; name: string } | null;
         return organization && <Link key={row.org_id} href={`/erp/${row.org_id}`}><span>{organization.name}</span><span aria-hidden="true">↗</span></Link>;
       })}{!data?.length && <p>Aún no tienes empresas asignadas. Tu administrador puede incorporarte desde Equipo.</p>}</div>}
+    <a className="fv-button secondary" href="/app">Abrir punto de venta</a>
     <p className="fv-caption">Una empresa · Una licencia · Todos tus dispositivos</p>
   </main>;
 }

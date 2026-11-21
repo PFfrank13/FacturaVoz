@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicStore, StoreProduct } from "@/lib/publicdata";
+import { PaymentMark } from "./PaymentMark";
 
 const SYMBOLS: Record<string, string> = { PEN: "S/", USD: "US$", EUR: "€" };
 const fmt = (n: number, cur: string) => `${SYMBOLS[cur] ?? cur} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -173,8 +174,8 @@ export default function StoreCart({ store, initialProduct = null }: { store: Pub
           {!isMesa && store.pickup ? <span className="rounded-full bg-white/20 px-3 py-1.5">🏪 Recojo en tienda</span> : null}
           {!isMesa && store.delivery ? <span className="rounded-full bg-white/20 px-3 py-1.5">🛵 Delivery</span> : null}
           {!isMesa && store.minOrder != null ? <span className="rounded-full bg-white/20 px-3 py-1.5">Pedido mínimo {fmt(store.minOrder, store.currency)}</span> : null}
-          {!isMesa && store.pay?.yape ? <span className="rounded-full bg-white/20 px-3 py-1.5">Yape</span> : null}
-          {!isMesa && store.pay?.plin ? <span className="rounded-full bg-white/20 px-3 py-1.5">Plin</span> : null}
+          {!isMesa && store.pay?.yape ? <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5"><PaymentMark method="yape" size={20} />Yape</span> : null}
+          {!isMesa && store.pay?.plin ? <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5"><PaymentMark method="plin" size={20} />Plin</span> : null}
           <span className="rounded-full bg-white/20 px-3 py-1.5">{store.products.length} {store.mode === "carta" ? "platos" : "productos"}</span>
         </div>
       </header>
@@ -319,7 +320,8 @@ export default function StoreCart({ store, initialProduct = null }: { store: Pub
                 <legend className="mb-2 text-sm font-semibold">¿Cómo pagas?</legend>
                 <div className="grid grid-cols-3 gap-2">
                   {payOptions.map((o) => (
-                    <button key={o} type="button" aria-pressed={pay === o} onClick={() => setPay(o)} className="rounded-2xl py-3 text-sm font-semibold" style={pay === o ? { background: accent, color: "#fff" } : { background: "#f3f1fc" }}>
+                    <button key={o} type="button" aria-pressed={pay === o} onClick={() => setPay(o)} className="inline-flex flex-wrap items-center justify-center gap-1.5 rounded-2xl py-3 text-sm font-semibold" style={pay === o ? { background: accent, color: "#fff" } : { background: "#f3f1fc" }}>
+                      {o === "yape" || o === "plin" ? <PaymentMark method={o} size={23} /> : null}
                       {o === "yape" ? "Yape" : o === "plin" ? "Plin" : "Efectivo"}
                     </button>
                   ))}

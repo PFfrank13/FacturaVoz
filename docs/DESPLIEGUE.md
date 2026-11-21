@@ -38,9 +38,11 @@ flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co \
             --dart-define=PRIVACY_URL=https://tu-sitio/privacidad
 ```
 Compilar:
-- **Web**: `flutter build web --release` + las mismas `--dart-define`; sube `build/web` a hosting estático
-  copiando `web_hosting/vercel.json` dentro (cambia `TU-API`). La CSP va en modo *Report-Only*: abre la app,
-  revisa la consola, y si no hay violaciones cambia la clave a `Content-Security-Policy`.
+- **Web en Vercel.** La [app de FacturaVoz](https://factura-voz-two.vercel.app/app/) comparte dominio con el ERP y la API.
+  El proyecto con raíz en `backend/` ejecuta `bash scripts/build-flutter-web.sh && npm run build`. El primer paso usa
+  Flutter 3.47.9, el código de `app/lib/main.dart` y las variables públicas `NEXT_PUBLIC_SUPABASE_URL` y
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` del proyecto. La API utiliza `PUBLIC_BASE_URL` o el dominio de producción de FacturaVoz.
+  El build genera `backend/public/app/` con CanvasKit local y la base `/app/`. Vercel lo publica junto al ERP al desplegar `main`.
 - **Android**: crea un keystore (`keytool -genkey -v -keystore upload.jks ...`, guárdalo fuera del repo), configura
   `android/key.properties` y firma; `flutter build appbundle --release --dart-define=...`. Play Console (pago único 25 USD).
 - **iOS**: requiere Mac con Xcode y cuenta Apple Developer (99 USD/año): `flutter build ipa --release --dart-define=...`.
