@@ -137,6 +137,8 @@ List<String> bodegaDrawerIds(Access access) => [
 ];
 
 class _MainShellState extends State<MainShell> {
+  bool _railCollapsed = false;
+  bool _drawerOpen = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _tab = ''; // se resuelve al construir: la app abre donde se vende
   final Set<String> _built = {};
@@ -567,41 +569,25 @@ class _MainShellState extends State<MainShell> {
             // La navegación de Bodega tiene un único dueño: este Scaffold.
             drawer: isBodega && !pinnedSidebar
                 ? _bodegaNavigation(dests) : null,
-            appBar: isBodega ? AppBar(
-              automaticallyImplyLeading: false,
-              backgroundColor: Colors.transparent,
-              flexibleSpace: const FvGlassTopBar(),
-              surfaceTintColor: Colors.transparent,
-              scrolledUnderElevation: 0,
-              elevation: 0,
-              shape: const Border(),
-              leading: const RetailNotificationBell(),
-              title: Text(activeTitle,
-                style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -.35)),
-              actions: [
-                if (canVoiceSell && !pinnedSidebar)
-                  IconButton(
-                    key: const ValueKey('bodega-voice-header'),
-                    tooltip: 'Vender por voz',
-                    icon: const Icon(Icons.mic_none_rounded),
-                    onPressed: _newInvoice,
-                  ),
-                if (canCopilot)
-                  IconButton(
-                    key: const ValueKey('bodega-open-copilot'),
-                    tooltip: 'Copiloto IA',
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    onPressed: () => openCopilot(context),
-                  ),
-                const SizedBox(width: 8),
-              ],
+            onDrawerChanged: (open) => setState(() => _drawerOpen = open),
+            appBar: isBodega ? RetailNotificationHeader(
+              title: activeTitle,
+              allowIsland: !_drawerOpen && !keyboard,
+              menuLabel: pinnedSidebar
+                  ? (_railCollapsed ? 'Mostrar menú lateral' : 'Ocultar menú lateral')
+                  : 'Abrir menú',
+              onMenu: pinnedSidebar
+                  ? () => setState(() => _railCollapsed = !_railCollapsed)
+                  : () => _scaffoldKey.currentState?.openDrawer(),
+              onVoice: canVoiceSell && !pinnedSidebar ? _newInvoice : null,
+              onCopilot: canCopilot ? () => openCopilot(context) : null,
             ) : null,
             body: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: isBodega ? FvLuxe.ambient(Theme.of(context).brightness) : null,
               ),
               child: Row(children: [
-              if (pinnedSidebar)
+              if (pinnedSidebar && !_railCollapsed)
                 _bodegaRail(dests)
               else if (workstationRail)
                 _multirubroRail(

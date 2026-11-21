@@ -78,6 +78,8 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Probar animación y accesibilidad de la isla
+        run: flutter test packages/dynamic_notification_island/test
       # Renders de widgets Flutter reales para revisar el diseño en el PR.
       - name: Exportar vistas Flutter Luxe
         run: flutter test tool/visual_preview.dart --update-goldens

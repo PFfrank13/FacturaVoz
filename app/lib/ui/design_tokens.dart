@@ -28,8 +28,8 @@ abstract final class FvLuxe {
   static LinearGradient ambient(Brightness brightness) => LinearGradient(
     begin: Alignment.topLeft, end: Alignment.bottomRight,
     colors: brightness == Brightness.dark
-      ? const [Color(0xFF101C2B), Color(0xFF13252D), Color(0xFF101925)]
-      : const [Color(0xFFF0F5F3), Color(0xFFF5F7F6), parchment],
+      ? const [Color(0xFF101E32), Color(0xFF102B30), Color(0xFF121C2A)]
+      : const [Color(0xFFE8F5F1), Color(0xFFF4F6FA), parchment],
     stops: const [0, .50, 1],
   );
 
@@ -46,33 +46,6 @@ abstract final class FvLuxe {
       ? const [Color(0xFF243648), Color(0xFF192938)]
       : const [Color(0xFFE7F4F3), Color(0xFFF4F8FE)],
   );
-}
-
-/// Líneas de grabado inspiradas en la impresión de comprobantes.
-class FvEngraving extends CustomPainter {
-  const FvEngraving(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-    canvas.translate(size.width * .94, size.height * .04);
-    canvas.rotate(-.56);
-    final pen = Paint()
-      ..color = color
-      ..strokeWidth = .9
-      ..style = PaintingStyle.stroke;
-    for (var i = 0; i < 15; i++) {
-      canvas.drawOval(Rect.fromCenter(
-        center: Offset.zero, width: 42 + i * 11, height: 94 + i * 14,
-      ), pen);
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(FvEngraving oldDelegate) => color != oldDelegate.color;
 }
 
 /// Tokens visuales globales. No modifica facturación, licencias ni datos.

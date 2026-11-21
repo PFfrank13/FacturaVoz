@@ -657,7 +657,7 @@ class HomeHeader extends StatelessWidget {
               image: true,
               label: 'Ventas diarias. El periodo empieza en ${money(series.first, currency)} '
                   'y termina en ${money(series.last, currency)}.',
-              child: Sparkline(values: series, height: 56, color: const Color(0xFFA9F1CE)))
+              child: Sparkline(values: series, height: 56, color: const Color(0xFF80EBCB)))
           : null,
     );
   }

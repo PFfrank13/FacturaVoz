@@ -1,3 +1,4 @@
+import 'package:dynamic_notification_island/dynamic_notification_island.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -99,49 +100,306 @@ class _NotificationFeedState<T> extends State<_NotificationFeed<T>> {
   );
 }
 
-class RetailNotificationBell extends StatelessWidget {
-  const RetailNotificationBell({super.key});
+/// The bell and the island consume the same scoped, single-row query.
+class RetailNotificationHeader extends StatelessWidget
+    implements PreferredSizeWidget {
+  const RetailNotificationHeader({
+    super.key,
+    required this.title,
+    required this.onMenu,
+    this.menuLabel = 'Abrir menú',
+    this.allowIsland = true,
+    this.onVoice,
+    this.onCopilot,
+  });
+
+  final String title, menuLabel;
+  final bool allowIsland;
+  final VoidCallback onMenu;
+  final VoidCallback? onVoice, onCopilot;
 
   @override
-  Widget build(BuildContext context) => _NotificationFeed<bool>(
-    read: V2Repo.hasUnreadAlerts,
-    empty: false,
-    builder: (context, snap, notice) {
-      final theme = Theme.of(context);
-      final pending = notice != null || snap.data == true;
-      final dark = theme.brightness == Brightness.dark;
-      return IconButton(
-        key: const ValueKey('bodega-notifications'),
-        tooltip: pending ? 'Notificaciones pendientes' : 'Notificaciones',
-        onPressed: () =>
-            pushPremium(context, const RetailNotificationsScreen()),
-        icon: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: dark ? const Color(0xFF213B38) : const Color(0xFFEBF4EB),
-            border: Border.all(
-              color: dark ? const Color(0xFF4C6962) : const Color(0xFFCBDED2),
-            ),
-          ),
-          child: SizedBox.square(
-            dimension: 38,
-            child: Center(
-              child: Badge(
-                isLabelVisible: pending,
-                backgroundColor: theme.colorScheme.error,
-                smallSize: 8,
-                child: Icon(
-                  Icons.notifications_none_rounded,
-                  size: 22,
-                  color: dark ? FvLuxe.mintInk : FvLuxe.forest,
+  Size get preferredSize => const Size.fromHeight(60);
+
+  @override
+  Widget build(BuildContext context) => _NotificationFeed<OwnerAlert?>(
+    read: V2Repo.latestUnreadAlert,
+    empty: null,
+    builder: (context, snapshot, plan) => _RetailNotificationToolbar(
+      key: ValueKey((_currentScope, _canReadBusinessAlerts)),
+      header: this,
+      snapshot: snapshot,
+      plan: plan,
+    ),
+  );
+}
+
+class _RetailNotificationToolbar extends StatefulWidget {
+  const _RetailNotificationToolbar({
+    super.key,
+    required this.header,
+    required this.snapshot,
+    required this.plan,
+  });
+
+  final RetailNotificationHeader header;
+  final AsyncSnapshot<OwnerAlert?> snapshot;
+  final (String, Color)? plan;
+
+  @override
+  State<_RetailNotificationToolbar> createState() =>
+      _RetailNotificationToolbarState();
+}
+
+class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
+    with WidgetsBindingObserver {
+  bool _baselineLoaded = false;
+  bool _planLoaded = false;
+  String? _previousPlan;
+  DateTime? _latestDate;
+  String? _latestId;
+  String? _preferred;
+  int _announcement = 0;
+  int _silentThroughRevision = -1;
+  bool _wasActive = false;
+  AppLifecycleState? _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = WidgetsBinding.instance.lifecycleState;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    setState(() {
+      _lifecycle = state;
+      _silentThroughRevision = LiveHub.instance.tick('owner_alerts').value;
+      _announcement = 0;
+      _planLoaded = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Only a strictly newer unread row can interrupt the user. A read or deletion
+  // can uncover an older row, and a table tick can repeat the same row.
+  bool _observeAlert(OwnerAlert? alert) {
+    final date = alert?.createdAt;
+    final newer =
+        alert != null &&
+        date != null &&
+        (_latestDate == null ||
+            date.isAfter(_latestDate!) ||
+            (date.isAtSameMomentAs(_latestDate!) &&
+                alert.id.compareTo(_latestId!) > 0));
+    if (newer) {
+      _latestDate = date;
+      _latestId = alert.id;
+    }
+    final announce = _baselineLoaded && newer;
+    _baselineLoaded = true;
+    return announce;
+  }
+
+  void _openCenter() {
+    if (ModalRoute.isCurrentOf(context) == false) return;
+    pushPremium(context, const RetailNotificationsScreen());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = widget.header;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final active =
+        h.allowIsland &&
+        ModalRoute.isCurrentOf(context) != false &&
+        (_lifecycle == null || _lifecycle == AppLifecycleState.resumed);
+    // A newly mounted island must not replay an announcement after navigation,
+    // reopening the drawer, or resuming the app.
+    final revision = LiveHub.instance.tick('owner_alerts').value;
+    if (!active || !_wasActive) {
+      _announcement = 0;
+      _silentThroughRevision = revision;
+      _planLoaded = false;
+    }
+    _wasActive = active;
+    final alert = widget.snapshot.data;
+    final plan = widget.plan;
+    final businessNotice = alert == null
+        ? null
+        : DynamicIslandNotice(
+            id: 'alert:${alert.id}',
+            title: alert.title,
+            message: alert.body,
+            accent: alert.severity == 'bad' ? cs.error : cs.primary,
+          );
+    final planNotice = plan == null
+        ? null
+        : DynamicIslandNotice(
+            id: 'plan:${plan.$1}',
+            title: 'Tu plan',
+            message: plan.$1,
+            accent: plan.$2,
+          );
+
+    if (widget.snapshot.connectionState == ConnectionState.done &&
+        !widget.snapshot.hasError) {
+      if (_observeAlert(alert)) {
+        _preferred = businessNotice?.id;
+        if (active && revision > _silentThroughRevision) _announcement++;
+      }
+    }
+    if (_planLoaded && planNotice != null && planNotice.id != _previousPlan) {
+      _preferred = planNotice.id;
+      if (active) _announcement++;
+    }
+    _previousPlan = planNotice?.id;
+    _planLoaded = true;
+    final notice = planNotice != null && planNotice.id == _preferred
+        ? planNotice
+        : businessNotice ?? planNotice;
+
+    return AppBar(
+      automaticallyImplyLeading: false,
+      titleSpacing: 0,
+      toolbarHeight: h.preferredSize.height,
+      backgroundColor: Colors.transparent,
+      flexibleSpace: const FvGlassTopBar(),
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+      elevation: 0,
+      shape: const Border(),
+      excludeHeaderSemantics: true,
+      title: LayoutBuilder(
+        builder: (context, constraints) {
+          final showIsland = constraints.maxWidth >= 272;
+          final sideWidth = (constraints.maxWidth - (showIsland ? 76 : 0)) / 2;
+          final groupActions =
+              h.onVoice != null && h.onCopilot != null && sideWidth < 156;
+          return Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    IconButton(
+                      key: const ValueKey('bodega-open-menu'),
+                      tooltip: h.menuLabel,
+                      icon: const Icon(Icons.menu_rounded),
+                      onPressed: h.onMenu,
+                    ),
+                    Expanded(
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          h.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-        ),
-      );
-    },
-  );
+              if (showIsland)
+                SizedBox(
+                  width: 76,
+                  child: active
+                      ? DynamicNotificationIsland(
+                          notice: notice,
+                          announcement: _announcement == 0
+                              ? null
+                              : _announcement,
+                          compactLabel: notice == null
+                              ? 'Actividad'
+                              : 'Vista previa de notificaciones',
+                          onOpen: _openCenter,
+                        )
+                      : null,
+                ),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (groupActions)
+                      PopupMenuButton<int>(
+                        tooltip: 'Acciones de voz',
+                        icon: const Icon(Icons.mic_none_rounded),
+                        onSelected: (action) =>
+                            action == 0 ? h.onVoice!() : h.onCopilot!(),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 0,
+                            child: Text('Vender por voz'),
+                          ),
+                          PopupMenuItem(value: 1, child: Text('Copiloto IA')),
+                        ],
+                      )
+                    else ...[
+                      if (h.onVoice != null)
+                        IconButton(
+                          key: const ValueKey('bodega-voice-header'),
+                          tooltip: 'Vender por voz',
+                          icon: const Icon(Icons.mic_none_rounded),
+                          onPressed: h.onVoice,
+                        ),
+                      if (h.onCopilot != null)
+                        IconButton(
+                          key: const ValueKey('bodega-open-copilot'),
+                          tooltip: 'Copiloto IA',
+                          icon: const Icon(Icons.auto_awesome_rounded),
+                          onPressed: h.onCopilot,
+                        ),
+                    ],
+                    IconButton(
+                      key: const ValueKey('bodega-notifications'),
+                      tooltip: notice == null
+                          ? 'Notificaciones'
+                          : 'Notificaciones pendientes',
+                      onPressed: _openCenter,
+                      icon: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: .09),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: cs.primary.withValues(alpha: .23),
+                          ),
+                        ),
+                        child: SizedBox.square(
+                          dimension: 34,
+                          child: Center(
+                            child: Badge(
+                              isLabelVisible: notice != null,
+                              backgroundColor: cs.error,
+                              child: Icon(
+                                Icons.notifications_none_rounded,
+                                size: 21,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class RetailNotificationsScreen extends StatefulWidget {

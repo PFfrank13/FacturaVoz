@@ -15,6 +15,7 @@ import '../nav/role_matrix.dart';
 import '../permissions.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
+import '../ui/scroll_reveal.dart';
 import '../ui/ds.dart';
 import '../ui/theme.dart';
 import '../ui/retail_home_premium.dart';
@@ -197,7 +198,7 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
         final owing = c?.where((x) => x.balance > 0.004).toList();
         final total = owing?.fold<double>(0, (s, x) => s + x.balance);
         return _metric(
-          accent: RetailAccent.violet,
+          accent: RetailAccent.coral,
           label: b.label,
           value: total == null ? '…' : _money(total),
           detail: owing == null ? null : owing.length == 1 ? '1 cliente' : '${owing.length} clientes',
@@ -254,7 +255,7 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
             if (stats.isNotEmpty) ...[
               const DsSection('Hoy'),
               if (a.rubro == 'bodega')
-                RetailHomeStatGrid(children: stats)
+                FvScrollReveal(offset: 8, child: RetailHomeStatGrid(children: stats))
               else
                 DsStatGrid(children: stats),
             ],

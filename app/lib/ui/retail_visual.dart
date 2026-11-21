@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'retail_icon.dart';
 import 'theme.dart';
 import 'design_tokens.dart';
 
 enum RetailChapter {
-  cash(0xFF123F38, 0xFF25665A, 0xFFABD7B4),
-  inventory(0xFF243C67, 0xFF496797, 0xFFB1CEF2),
-  receipts(0xFF263E48, 0xFF40636D, 0xFFB1DBDA),
-  purchases(0xFF523927, 0xFF82583B, 0xFFE7C9A1),
-  credit(0xFF51293F, 0xFF82445B, 0xFFF1C4CB),
-  reports(0xFF292B53, 0xFF505382, 0xFFCAC9ED);
+  cash(0xFF103C36, 0xFFD5F5E2, 0xFF123D39, 0xFF71E5B7),
+  inventory(0xFF1B3060, 0xFFDBE7FF, 0xFF1B3058, 0xFF93B9FF),
+  receipts(0xFF113945, 0xFFCFF0F0, 0xFF153B46, 0xFF74DDDA),
+  purchases(0xFF492F19, 0xFFFFE2A5, 0xFF473322, 0xFFFFC354),
+  credit(0xFF562632, 0xFFFFDCD6, 0xFF4D2633, 0xFFFF9F93),
+  reports(0xFF342758, 0xFFE5DEFF, 0xFF30284E, 0xFFBFA9FF);
 
-  const RetailChapter(this.base, this.light, this.accent);
-  final int base;
-  final int light;
-  final int accent;
-  String get asset => 'assets/editorial/$name.webp';
+  const RetailChapter(this.ink, this.paper, this.night, this.accent);
+  final int ink, paper, night, accent;
 }
 
 /// Componentes de presentacion compartidos por los flujos de Bodega/Tienda.
@@ -29,7 +27,7 @@ abstract final class RetailVisual {
   static const violet = FvTokens.ink; // Alias legado; usar roles del tema.
   static const mint = FvTokens.emerald;
 
-  /// Cabecera de cada módulo con su propia paleta y una fotografía local.
+  /// Color de sección e iconografía bicolor de los módulos comerciales.
   static Widget hero({
     required BuildContext context,
     required String eyebrow,
@@ -40,129 +38,55 @@ abstract final class RetailVisual {
     Widget? footer,
   }) {
     final theme = Theme.of(context);
-    final colors = DsColors.of(context);
-    final accent = Color(chapter.accent);
-    final contrast = MediaQuery.highContrastOf(context);
     final dark = theme.brightness == Brightness.dark;
-    final base = Color(chapter.base);
+    final highContrast = MediaQuery.highContrastOf(context);
+    final paper = Color(dark ? chapter.night : chapter.paper);
+    final ink = dark ? Colors.white : Color(chapter.ink);
+    final accent = Color(chapter.accent);
+    final secondary = highContrast ? ink : Color.lerp(ink, paper, .13)!;
+    final symbolBackground = dark ? Color(chapter.paper) : Color(chapter.ink);
+    final symbolInk = dark ? Color(chapter.ink) : Colors.white;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(FvTokens.sheetRadius),
-        border: Border.all(
-          color: dark ? colors.line : base.withValues(alpha: .16),
-        ),
+        border: Border.all(color: Color.lerp(paper, ink, highContrast ? .65 : .18)!),
         boxShadow: FvTokens.shadow(theme.brightness),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomLeft,
-                end: Alignment.topRight,
-                colors: [base, contrast ? base : Color(chapter.light)],
-              ),
-            ),
-            child: LayoutBuilder(
-              builder: (context, box) {
-                final narrow =
-                    box.maxWidth < 332 ||
-                    MediaQuery.textScalerOf(context).scale(16) > 20;
-                final inset = box.maxWidth < 350 ? 16.0 : 20.0;
-                final artSize = narrow
-                    ? 72.0
-                    : (box.maxWidth * .29).clamp(102.0, 158.0).toDouble();
-                final art = Image.asset(
-                  chapter.asset,
-                  width: artSize,
-                  height: artSize,
-                  filterQuality: FilterQuality.medium,
-                  excludeFromSemantics: true,
-                );
-                final label = Row(
-                  children: [
-                    Icon(icon, color: accent, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        eyebrow,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-                final heading = Semantics(
-                  header: true,
-                  child: Text(
-                    title,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontSize: box.maxWidth < 332 ? 26 : null,
-                      height: 1.08,
-                    ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ColoredBox(
+          color: paper,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: symbolBackground, borderRadius: BorderRadius.circular(11),
                   ),
-                );
-                return Padding(
-                  padding: EdgeInsets.all(inset),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (narrow) ...[
-                        Row(
-                          children: [
-                            Expanded(child: label),
-                            const SizedBox(width: 8),
-                            art,
-                          ],
-                        ),
-                        heading,
-                      ] else
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  label,
-                                  const SizedBox(height: 14),
-                                  heading,
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            art,
-                          ],
-                        ),
-                      const SizedBox(height: 8),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 620),
-                        child: Text(
-                          subtitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            height: 1.4,
-                            color: const Color(0xFFF3F5F6),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                  child: Padding(padding: const EdgeInsets.all(8), child: RetailIcon(
+                    icon, ink: symbolInk, accent: dark ? accent : accent.withValues(alpha: .7), size: 24)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(eyebrow, style: theme.textTheme.labelMedium?.copyWith(
+                  color: ink, letterSpacing: .15, fontWeight: FontWeight.w700))),
+              ]),
+              const SizedBox(height: 16),
+              Semantics(header: true, child: Text(title, style: theme.textTheme.headlineMedium?.copyWith(
+                fontSize: MediaQuery.sizeOf(context).width < 350 ? 26 : 32,
+                height: 1.07, color: ink))),
+              const SizedBox(height: 8),
+              ConstrainedBox(constraints: const BoxConstraints(maxWidth: 620),
+                child: Text(subtitle, style: theme.textTheme.bodyMedium?.copyWith(color: secondary, height: 1.38))),
+            ]),
           ),
-          if (footer != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              child: footer,
-            ),
-        ],
-      ),
+        ),
+        if (footer != null) Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: footer,
+        ),
+      ]),
     );
   }
 
