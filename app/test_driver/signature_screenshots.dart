@@ -5,7 +5,7 @@ import 'package:integration_test/integration_test_driver.dart';
 Future<void> main() => integrationDriver(
   responseDataCallback: (data) async {
     final directory = await Directory(
-      'tool/previews/android',
+      Platform.environment['SIGNATURE_PREVIEW_DIR'] ?? 'tool/previews/android',
     ).create(recursive: true);
     for (final capture in data!['screenshots'] as List) {
       final name = capture['screenshotName'] as String;

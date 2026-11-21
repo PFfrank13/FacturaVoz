@@ -6,6 +6,7 @@ import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/glass_widgets.dart';
+import '../ui/motion.dart';
 import '../models_pro.dart';
 import '../services/pro_repo.dart';
 import 'client_profile.dart' show StorageImage;
@@ -411,7 +412,9 @@ class _PaymentFlowState extends State<_PaymentFlow> {
           )),
           if (method != null)
             SafeArea(top: false, minimum: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-              child: FilledButton.icon(
+              child: FvTactileScale(
+                enabled: _canConfirm,
+                child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
                     backgroundColor: t.colorScheme.onSurface,
@@ -420,6 +423,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   onPressed: _canConfirm ? _confirm : null,
                   icon: const Icon(Icons.check_rounded),
                   label: const Text('Confirmar pago', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                ),
               ),
             ),
           ]),

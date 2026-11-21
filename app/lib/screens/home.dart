@@ -19,6 +19,7 @@ import '../ui/motion.dart';
 import '../ui/scroll_reveal.dart';
 import '../ui/theme.dart';
 import '../ui/retail_home_premium.dart';
+import '../ui/retail_sales_trend.dart';
 import '../ui/widgets.dart';
 import '../access.dart';
 import '../models_v2.dart';
@@ -604,6 +605,7 @@ class HomeHeader extends StatelessWidget {
     this.showMonth = true,
     required this.goal,
     required this.series,
+    this.seriesEndDate,
     required this.onGoal,
     this.todayTotal,
     this.todayCount,
@@ -629,6 +631,7 @@ class HomeHeader extends StatelessWidget {
   final bool showMonth;
   final double? goal;
   final List<double> series;
+  final DateTime? seriesEndDate;
   final VoidCallback onGoal;
 
   /// Tablero comercial compacto: cifras reales, contraste alto y una sola acción.
@@ -639,7 +642,7 @@ class HomeHeader extends StatelessWidget {
     final progress = goal == null || goal! <= 0
         ? null : goalProgress(goal: goal!, sales: total, today: todayIso());
     final canShowChart = showMonth && loaded
-        && series.length > 1 && series.any((value) => value > 0);
+        && series.length > 1 && series.any((value) => value != 0);
     return RetailPremiumOverview(
       name: name,
       currencySymbol: currencySymbols[currency] ?? currency,
@@ -653,11 +656,7 @@ class HomeHeader extends StatelessWidget {
       goalPercent: progress?.percent,
       onGoal: onGoal,
       chart: canShowChart
-          ? Semantics(
-              image: true,
-              label: 'Ventas diarias. El periodo empieza en ${money(series.first, currency)} '
-                  'y termina en ${money(series.last, currency)}.',
-              child: Sparkline(values: series, height: 56, color: const Color(0xFF80EBCB)))
+          ? RetailSalesTrend(values: series, currency: currency, lastDay: seriesEndDate ?? DateTime.now())
           : null,
     );
   }

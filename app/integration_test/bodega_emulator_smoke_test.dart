@@ -225,6 +225,12 @@ void main() {
       await tester.tapAt(Offset(width - 5, 140));
       await tester.pumpAndSettle();
       await capture(tester, 'inicio-bodega');
+      final plot = find.byKey(const ValueKey('retail-trend-plot'));
+      final plotBounds = tester.getRect(plot);
+      await tester.tapAt(Offset(plotBounds.right - 2, plotBounds.center.dy));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('· S/ 55.00'), findsOneWidget);
+      await capture(tester, 'tendencia-diaria');
       final island = find.byKey(const ValueKey('dynamic-island'));
       await tester.tap(island);
       await tester.pumpAndSettle();

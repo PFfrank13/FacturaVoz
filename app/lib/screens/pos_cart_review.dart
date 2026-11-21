@@ -4,6 +4,7 @@ import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/glass_widgets.dart';
 import '../ui/design_tokens.dart';
+import '../ui/motion.dart';
 import 'client_profile.dart' show StorageImage;
 
 enum RetailCartAction { collect, credit }
@@ -116,7 +117,31 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                           final id = item.productId;
                           final imagePath = widget.productImages[id] ?? '';
                           final fixtureAsset = widget.fixtureAssetPhotos[id] ?? '';
+                          Widget stepButton(int delta, IconData icon, String tooltip) =>
+                            SizedBox.square(
+                              dimension: 44,
+                              child: FvTactileScale(
+                                enabled: id != null,
+                                pressedScale: .94,
+                                child: IconButton.filledTonal(
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: t.brightness == Brightness.dark
+                                        ? t.colorScheme.surfaceContainerHighest
+                                        : FvLuxe.jadeSoft,
+                                    foregroundColor: t.colorScheme.primary,
+                                  ),
+                                  tooltip: tooltip,
+                                  onPressed: id == null ? null : () {
+                                    widget.onChangeQuantity(id, delta);
+                                    setState(() {});
+                                  },
+                                  icon: Icon(icon, size: 19),
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ),
+                            );
                           return Container(
+                            key: id == null ? null : ValueKey(id),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: t.colorScheme.surface,
@@ -155,48 +180,13 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                   Wrap(spacing: 4, runSpacing: 5,
                                     crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      SizedBox.square(dimension: 44,
-                                        child: IconButton.filledTonal(
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: t.brightness == Brightness.dark
-                                                ? t.colorScheme.surfaceContainerHighest
-                                                : FvLuxe.jadeSoft,
-                                            foregroundColor: t.colorScheme.primary,
-                                          ),
-                                          tooltip: 'Quitar uno',
-                                          onPressed: id == null ? null : () {
-                                            widget.onChangeQuantity(id, -1);
-                                            setState(() {});
-                                          },
-                                          icon: const Icon(Icons.remove_rounded, size: 19),
-                                          padding: EdgeInsets.zero,
-                                        )),
-                                      AnimatedSwitcher(
-                                        duration: MediaQuery.disableAnimationsOf(context)
-                                            ? Duration.zero : FvTokens.micro,
-                                        child: Padding(
-                                          key: ValueKey('qty-${item.productId}-${item.quantity}'),
-                                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                                          child: Text(qtyText(item.quantity),
-                                            style: const TextStyle(fontWeight: FontWeight.w800)),
-                                        ),
+                                      stepButton(-1, Icons.remove_rounded, 'Quitar uno'),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                                        child: FvQuantityText(qtyText(item.quantity),
+                                          style: const TextStyle(fontWeight: FontWeight.w800)),
                                       ),
-                                      SizedBox.square(dimension: 44,
-                                        child: IconButton.filledTonal(
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: t.brightness == Brightness.dark
-                                                ? t.colorScheme.surfaceContainerHighest
-                                                : FvLuxe.jadeSoft,
-                                            foregroundColor: t.colorScheme.primary,
-                                          ),
-                                          tooltip: 'Agregar uno',
-                                          onPressed: id == null ? null : () {
-                                            widget.onChangeQuantity(id, 1);
-                                            setState(() {});
-                                          },
-                                          icon: const Icon(Icons.add_rounded, size: 19),
-                                          padding: EdgeInsets.zero,
-                                        )),
+                                      stepButton(1, Icons.add_rounded, 'Agregar uno'),
                                     ]),
                                 ],
                               )),
@@ -239,16 +229,19 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                     SizedBox(
                       width: double.infinity,
                       height: 54,
-                      child: FilledButton.icon(
-                        key: const ValueKey('retail-continue-payment'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: t.colorScheme.primary,
-                          foregroundColor: t.colorScheme.onPrimary,
-                        ),
-                        onPressed: items.isEmpty ? null : () => Navigator.of(context).pop(RetailCartAction.collect),
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                        label: const Text('Continuar al pago',
+                      child: FvTactileScale(
+                        enabled: items.isNotEmpty,
+                        child: FilledButton.icon(
+                          key: const ValueKey('retail-continue-payment'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: t.colorScheme.primary,
+                            foregroundColor: t.colorScheme.onPrimary,
+                          ),
+                          onPressed: items.isEmpty ? null : () => Navigator.of(context).pop(RetailCartAction.collect),
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                          label: const Text('Continuar al pago',
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                        ),
                       ),
                     ),
                   ]),

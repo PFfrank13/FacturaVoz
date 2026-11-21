@@ -98,25 +98,31 @@ class FvPosProductCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        if (isSelected)
-                          Positioned(right: 6, top: 6,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: dark ? FvTokens.emeraldDark : FvLuxe.jade,
-                                borderRadius: BorderRadius.circular(99)),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                child: AnimatedSwitcher(
-                                  duration: MediaQuery.disableAnimationsOf(context)
-                                      ? Duration.zero : const Duration(milliseconds: 210),
-                                  transitionBuilder: (child, animation) =>
-                                      FadeTransition(opacity: animation,
-                                        child: SlideTransition(
-                                          position: Tween<Offset>(
-                                            begin: const Offset(0, .30),
-                                            end: Offset.zero).animate(animation),
-                                          child: child)),
-                                  child: Text(quantity!, key: ValueKey('qty-$quantity'),
+                        Positioned(right: 6, top: 6,
+                          child: Semantics(
+                            label: isSelected ? '$quantity en el carrito' : null,
+                            excludeSemantics: true,
+                            child: AnimatedSwitcher(
+                              duration: Motion.d(context, const Duration(milliseconds: 260)),
+                              reverseDuration: Motion.d(context, const Duration(milliseconds: 140)),
+                              // Notification Badge: el contador aparece sin desplazar el botón.
+                              transitionBuilder: (child, animation) => FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  alignment: Alignment.topRight,
+                                  scale: Tween<double>(begin: .70, end: 1).chain(
+                                    CurveTween(curve: const Cubic(.34, 1.36, .64, 1)),
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              ),
+                              child: !isSelected ? null : DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: dark ? FvTokens.emeraldDark : FvLuxe.jade,
+                                  borderRadius: BorderRadius.circular(99)),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  child: FvQuantityText(quantity!,
                                     style: TextStyle(
                                       color: dark ? FvTokens.canvasDark : Colors.white,
                                       fontSize: 11, fontWeight: FontWeight.w700)),
@@ -124,6 +130,7 @@ class FvPosProductCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                        ),
                         Positioned(right: 4, bottom: 4, child: SizedBox.square(
                           dimension: 44,
                           child: IconButton.filled(

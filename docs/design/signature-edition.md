@@ -8,6 +8,12 @@ El menú está a la izquierda, la campana a la derecha y la isla de actividad en
 
 La isla se dibuja dentro de Flutter. El paquete incluido adapta la geometría elástica, los tiempos y el gesto de cierre de la plantilla de Expo. [Implementación, revisión original y licencia](../../app/packages/dynamic_notification_island/README.md)
 
+El selector del dock conserva la velocidad al cambiar de destino a mitad del recorrido. En tablet, el mismo material enmarca la navegación lateral. Al ampliar la ventana hasta 1280 dp aparecen las etiquetas y se conserva la sección abierta. El menú, la campana y el destino activo mantienen su contraste cuando se activa el ajuste de accesibilidad. [Guía Apple Design de Emil Kowalski](https://github.com/emilkowalski/skills/tree/main)
+
+La gráfica de Inicio permite recorrer catorce días con el dedo, las flechas del teclado o un lector de pantalla. Cada barra representa el total diario agregado del negocio en la moneda elegida, incluidas las notas de crédito. El gesto vertical desplaza Inicio. En iOS, tirar de la lista descubre el control de actualización junto al contenido.
+
+El recorrido de compra de Zain Mehmood sirvió de referencia para vincular cada transición a una acción. La cantidad del producto aparece al añadirlo, sólo cambian las cifras afectadas al ajustar unidades y la marca de confirmación se dibuja cuando el cobro termina. Las tres interacciones adaptan Notification Badge, Number Subtle Change y Success Check a Flutter y respetan el movimiento reducido. [Reel de la cafetería](https://www.instagram.com/reel/DTIKu-ojZz1/) · [Colección de transiciones](https://github.com/Jakubantalik/transitions.dev)
+
 Caja, Inventario, Comprobantes, Compras, Fiados y Reportes combinan símbolos vectoriales bicolor con paletas propias. En Inicio, un motivo abstracto de voz enmarca el resumen. El gráfico y las cifras proceden de los datos del negocio. Las fichas comerciales conservan las fotos de cada producto y usan un monograma cuando falta una imagen.
 
 - **Inicio y reportes.** El importe del período, la tendencia y la meta tienen espacios distintos. Las cifras usan números tabulares. El gráfico diario indica su máximo en la moneda del informe y admite movimiento reducido. [Carbon Design System, gráficos](https://carbondesignsystem.com/data-visualization/chart-types/)
@@ -43,6 +49,10 @@ flutter test test/visual/signature_preview.dart tool/visual_preview.dart tool/vi
 ```
 
 El flujo de CI exporta las imágenes para inspección. Los PNG documentan el estado final de cada vista. El movimiento y las acciones se comprueban en pruebas de interacción. [Galería completa](../../app/tool/previews/signature/) · [Pruebas de integración Android](../../app/integration_test/bodega_emulator_smoke_test.dart)
+
+Playwright recorre el mismo Inicio, la bandeja de avisos y el proceso de venta con datos locales. Los perfiles de teléfono y tablet reproducen tamaño, entrada táctil, tema y preferencias de movimiento en Chromium y WebKit. El simulador de iPhone ejecuta un binario Flutter de depuración en macOS. [Pruebas en navegador](../../app/tool/browser_qa/) · [Prueba nativa de iPhone](../../.github/workflows/ios-bodega-simulator.yml)
+
+El vídeo recorre una venta de muestra desde la consulta de la gráfica hasta la elección del medio de cobro. También se puede inspeccionar la disposición del carrito en la tablet horizontal con el tema oscuro. [Vídeo del recorrido en Chromium](../../app/tool/previews/browser/recorrido-venta.mp4) · [Venta en tablet](../../app/tool/previews/browser/ipad-venta-oscura.png)
 
 ## Entrega
 

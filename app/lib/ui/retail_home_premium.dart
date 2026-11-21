@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import 'design_tokens.dart';
@@ -92,9 +93,10 @@ class RetailPremiumOverview extends StatelessWidget {
         Wrap(spacing: 14, runSpacing: 7, children: facts),
       ],
     ]);
-    final trend = showMonth && loaded && chart != null ? _RetailTrend(chart: chart!) : null;
+    final trend = showMonth && loaded ? chart : null;
     return Semantics(
-      container: true, label: 'Resumen operativo de ${name.isEmpty ? 'la bodega' : name}',
+      container: true, explicitChildNodes: true,
+      label: 'Resumen operativo de ${name.isEmpty ? 'la bodega' : name}',
       child: DecoratedBox(
         key: const ValueKey('bodega-enterprise-overview'),
         decoration: BoxDecoration(borderRadius: radius, boxShadow: [
@@ -175,29 +177,6 @@ class _MiniFact extends StatelessWidget {
   ]);
 }
 
-class _RetailTrend extends StatelessWidget {
-  const _RetailTrend({required this.chart});
-  final Widget chart;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text('Tendencia · últimos 14 días', style: theme.textTheme.labelSmall?.copyWith(
-        color: const Color(0xFFD2E5DE), fontWeight: FontWeight.w500)),
-      const SizedBox(height: 9),
-      SizedBox(height: 41, child: Stack(fit: StackFit.expand, children: [
-        const Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Divider(height: 1, color: Color(0x304C7578)),
-          Divider(height: 1, color: Color(0x304C7578)),
-          Divider(height: 1, color: Color(0x506E8E8F)),
-        ]),
-        chart,
-      ])),
-    ]);
-  }
-}
-
 class _RetailGoal extends StatelessWidget {
   const _RetailGoal({required this.percent, required this.onTap});
   final double? percent;
@@ -208,7 +187,7 @@ class _RetailGoal extends StatelessWidget {
     final t = Theme.of(context);
     return Material(
       color: const Color(0xFF142E45),
-      child: InkWell(
+      child: Semantics(button: true, container: true, child: InkWell(
         key: const ValueKey('bodega-goal-action'),
         onTap: () { HapticFeedback.selectionClick(); onTap(); },
         child: Container(
@@ -236,7 +215,7 @@ class _RetailGoal extends StatelessWidget {
             ],
           ]),
         ),
-      ),
+      )),
     );
   }
 }
@@ -463,14 +442,9 @@ class _DockLane extends StatelessWidget {
       height: height,
       child: Stack(fit: StackFit.expand, children: [
         if (selected >= 0)
-          AnimatedPositionedDirectional(
-            key: const ValueKey('retail-dock-selection'),
-            duration: Motion.d(context, const Duration(milliseconds: 220)),
-            curve: Curves.easeOutCubic,
-            top: 1,
-            bottom: 1,
-            start: edges[selected] + 1,
-            width: edges[selected + 1] - edges[selected] - 2,
+          _DockSelection(
+            selected: selected,
+            edges: edges,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(26),
@@ -480,8 +454,8 @@ class _DockLane extends StatelessWidget {
                   end: Alignment.bottomRight,
                   stops: const [0, .55, 1],
                   colors: dark
-                      ? const [Color(0xFF275868), Color(0xFF1B485E), Color(0xFF28475F)]
-                      : const [Color(0xFFBAF4E3), Color(0xFF85DECA), Color(0xFFC7E9F4)],
+                      ? const [Color(0xEC347170), Color(0xD123535D), Color(0xDC344E71)]
+                      : const [Color(0xF0C2F7DE), Color(0xD78BDFCB), Color(0xE1CFECFA)],
                 ),
                 border: Border.all(color: contrast ? theme.colorScheme.outline :
                     dark ? const Color(0xA280BCAD) : const Color(0xE8EAFBF1)),
@@ -510,6 +484,81 @@ class _DockLane extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// A selection interrupted in flight keeps its position and velocity, including
+/// when a second tap sends it back across the dock. Interpolating the tab edges
+/// also fits translated labels, text scaling and changes in window width.
+class _DockSelection extends StatefulWidget {
+  const _DockSelection({required this.selected, required this.edges, required this.child});
+  final int selected;
+  final List<double> edges;
+  final Widget child;
+
+  @override
+  State<_DockSelection> createState() => _DockSelectionState();
+}
+
+class _DockSelectionState extends State<_DockSelection> with SingleTickerProviderStateMixin {
+  static final _spring = SpringDescription.withDampingRatio(mass: 1, stiffness: 560);
+  late final _position = AnimationController.unbounded(
+    vsync: this, value: widget.selected.toDouble(),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _position.value = widget.selected.toDouble();
+  }
+
+  @override
+  void didUpdateWidget(_DockSelection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected == widget.selected) return;
+    final target = widget.selected.toDouble();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _position.value = target;
+      return;
+    }
+    _position.animateWith(SpringSimulation(
+      _spring, _position.value, target, _position.velocity, snapToEnd: true,
+      tolerance: const Tolerance(distance: .0005, velocity: .01),
+    ));
+  }
+
+  @override
+  void dispose() {
+    _position.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _position,
+        child: widget.child,
+        builder: (context, child) {
+          final edges = widget.edges;
+          final value = _position.value.clamp(0.0, (edges.length - 2).toDouble());
+          final from = value.floor();
+          final to = value.ceil();
+          final start = edges[from] + (edges[to] - edges[from]) * (value - from);
+          final end = edges[from + 1] + (edges[to + 1] - edges[from + 1]) * (value - from);
+          return Stack(children: [
+            PositionedDirectional(
+              key: const ValueKey('retail-dock-selection'),
+              start: start + 1,
+              width: end - start - 2,
+              top: 1,
+              bottom: 1,
+              child: child!,
+            ),
+          ]);
+        },
+      ),
+    ),
+  );
 }
 
 class _DockDestination extends StatelessWidget {

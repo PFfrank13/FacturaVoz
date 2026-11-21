@@ -176,7 +176,14 @@ class _RoleHomePanelState extends State<RoleHomePanel> {
       case 'today_sales':
         if (_errors.contains('day')) return err();
         final d = _day;
-        return _metric(accent: RetailAccent.blue, label: b.label, value: d == null ? '…' : _money(d.salesTotal), detail: d == null ? null : '${d.salesCount} ventas', icon: Icons.trending_up_rounded, onTap: () => _open(b.route));
+        return _metric(
+          accent: RetailAccent.blue,
+          label: b.label,
+          value: d == null ? '…' : _money(d.salesTotal),
+          detail: d == null ? null : d.salesCount == 1 ? '1 venta' : '${d.salesCount} ventas',
+          icon: Icons.trending_up_rounded,
+          onTap: () => _open(b.route),
+        );
       case 'cash_status':
         if (_errors.contains('day')) return err();
         final d = _day;

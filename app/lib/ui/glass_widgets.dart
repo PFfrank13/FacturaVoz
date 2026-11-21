@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'design_tokens.dart';
 import 'motion.dart';
 
-/// Glass belongs to navigation, not the merchandise grid.
+/// The toolbar catches light along the upper left and the lower rim.
 class FvGlassTopBar extends StatelessWidget {
   const FvGlassTopBar({super.key});
 
@@ -16,17 +16,17 @@ class FvGlassTopBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: contrast ? theme.colorScheme.surface : null,
         gradient: contrast ? null : LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: const Alignment(-1, -.8),
+          end: const Alignment(.95, .65),
           colors: dark
-              ? const [Color(0xE719393C), Color(0xE01C2B35), Color(0xD52B313B)]
-              : const [Color(0xDBDAF3EB), Color(0xC7F8FBFA), Color(0xDCECEAF4)],
-          stops: const [0, .56, 1],
+              ? const [Color(0xDB2B514E), Color(0xD5192C3B), Color(0xD7383C56)]
+              : const [Color(0xD1D0F1E4), Color(0xC8F7FBF7), Color(0xCDDDE3FA)],
+          stops: const [0, .48, 1],
         ),
         border: Border(
           bottom: BorderSide(
             color: contrast ? theme.colorScheme.outline :
-                dark ? const Color(0x598FBFBA) : const Color(0x3D61958B),
+                dark ? const Color(0x798FBFBA) : const Color(0x5261958B),
             width: contrast ? 1 : .8,
           ),
         ),
@@ -41,48 +41,52 @@ class FvGlassTopBar extends StatelessWidget {
   }
 }
 
-/// One frosted pane with a polished rim lets the page move beneath the lighting.
+/// A single optical surface shared by the floating dock and the wide-screen rail.
 class FvFloatingGlassDock extends StatelessWidget {
-  const FvFloatingGlassDock({super.key, required this.child});
+  const FvFloatingGlassDock({super.key, required this.child, this.radius = 34});
   final Widget child;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final contrast = MediaQuery.highContrastOf(context);
-    const radius = 34.0;
+    final rounded = BorderRadius.circular(radius);
+    final pane = DecoratedBox(
+      decoration: BoxDecoration(
+        color: contrast ? theme.colorScheme.surface : null,
+        gradient: contrast ? null : LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [Color(0xDE2F5156), Color(0xD01B293A), Color(0xDC313752)]
+              : const [Color(0xDCE6FBF0), Color(0xC2F2F9F8), Color(0xD5DFE7F8)],
+          stops: const [0, .53, 1],
+        ),
+      ),
+      child: child,
+    );
+    final sigma = FvLuxe.glassSigma(theme.platform, 18);
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: rounded,
         boxShadow: contrast ? null : [
           BoxShadow(
-            color: dark ? const Color(0x66030F13) : const Color(0x30244943),
-            offset: const Offset(0, 5),
-            blurRadius: 14,
-            spreadRadius: -3,
+            color: dark ? const Color(0x70081423) : const Color(0x33204446),
+            offset: const Offset(0, 6),
+            blurRadius: 16,
+            spreadRadius: -4,
           ),
         ],
       ),
-      child: FvGlassSurface(
-        radius: radius,
-        blur: 18,
+      child: ClipRRect(
+        borderRadius: rounded,
         child: CustomPaint(
-          foregroundPainter: contrast ? null : _DockEdge(dark),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: contrast ? theme.colorScheme.surface : null,
-              borderRadius: BorderRadius.circular(radius),
-              border: contrast ? Border.all(color: theme.colorScheme.outline) : null,
-              gradient: contrast ? null : LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: dark
-                    ? const [Color(0xA62C4546), Color(0x8817242D), Color(0xA62A3144)]
-                    : const [Color(0x90EBFAF2), Color(0x54FFFFFF), Color(0x8FDFEBEF)],
-              ),
-            ),
-            child: child,
+          foregroundPainter: _DockEdge(dark, radius, contrast ? theme.colorScheme.outline : null),
+          child: contrast ? pane : BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+            child: pane,
           ),
         ),
       ),
@@ -91,30 +95,48 @@ class FvFloatingGlassDock extends StatelessWidget {
 }
 
 class _DockEdge extends CustomPainter {
-  const _DockEdge(this.dark);
+  const _DockEdge(this.dark, this.radius, this.outline);
   final bool dark;
+  final double radius;
+  final Color? outline;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final bounds = Offset.zero & size;
-    final rim = RRect.fromRectAndRadius(bounds.deflate(.9), const Radius.circular(33));
+    final rim = RRect.fromRectAndRadius(bounds, Radius.circular(radius));
     final edge = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..shader = LinearGradient(
+      ..strokeWidth = 1;
+    if (outline != null) {
+      canvas.drawRRect(rim.deflate(.5), edge..color = outline!);
+      return;
+    }
+    edge.shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        stops: const [0, .30, .62, .84, 1],
+        stops: const [0, .21, .44, .73, 1],
         colors: dark
-            ? const [Color(0xC4D7FFF2), Color(0x40579D91), Color(0x244F6476), Color(0x9CB9D7EF), Color(0x6265788A)]
-            : const [Colors.white, Color(0xFFFAFFFC), Color(0x5778A6A0), Color(0xCCCFE5FC), Colors.white],
+            ? const [Color(0xE7C3F0DD), Color(0x8677C2B1), Color(0x30578888), Color(0x52616D89), Color(0xCED4D8FF)]
+            : const [Colors.white, Color(0xFFD7F9EA), Color(0x8971A399), Color(0x70919FB5), Color(0xFFF4F3FF)],
       ).createShader(bounds);
-    canvas.drawRRect(rim, edge);
+    canvas.drawRRect(rim.deflate(.65), edge..strokeWidth = 1.3);
+    // The inner, opposing reflection gives the slim edge visible thickness.
+    edge.shader = LinearGradient(
+      begin: Alignment.topRight,
+      end: Alignment.bottomLeft,
+      colors: [
+        Colors.white.withValues(alpha: dark ? .18 : .7),
+        Colors.transparent,
+        Colors.white.withValues(alpha: dark ? .11 : .55),
+      ],
+    ).createShader(bounds);
+    canvas.drawRRect(rim.deflate(1.8), edge..strokeWidth = .7);
   }
 
   @override
-  bool shouldRepaint(_DockEdge oldDelegate) => dark != oldDelegate.dark;
+  bool shouldRepaint(_DockEdge oldDelegate) =>
+      dark != oldDelegate.dark || radius != oldDelegate.radius || outline != oldDelegate.outline;
 }
 
 /// Typographic visual for products whose owners have not uploaded a photo.

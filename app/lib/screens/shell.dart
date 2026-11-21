@@ -16,6 +16,7 @@ import '../ui/retail_layout.dart';
 import '../ui/design_tokens.dart';
 import '../ui/glass_widgets.dart';
 import '../ui/retail_home_premium.dart';
+import '../ui/retail_icon.dart';
 import 'assistant.dart';
 import 'catalog.dart';
 import 'clients_hub.dart';
@@ -423,118 +424,133 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// En tablet/escritorio sólo un rail; el POS conserva el resto de ancho.
-  Widget _bodegaRail(List<_Dest> destinations) {
-    final t = Theme.of(context);
-    final cs = t.colorScheme;
-    final selected = destinations.indexWhere((d) => d.id == _tab);
-    return FvGlassSurface(
-      radius: 0,
-      blur: 16,
-      child: NavigationRail(
-        key: const ValueKey('bodega-navigation-rail'),
-        backgroundColor: Colors.transparent,
-        selectedIndex: selected < 0 ? 0 : selected,
-        labelType: NavigationRailLabelType.selected,
-        scrollable: true,
-        groupAlignment: -1,
-        useIndicator: true,
-        indicatorColor: cs.primary.withValues(alpha: 0.09),
-        selectedIconTheme: IconThemeData(color: cs.primary, size: 23),
-        unselectedIconTheme: IconThemeData(color: cs.onSurfaceVariant, size: 22),
-        selectedLabelTextStyle: t.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w800, color: cs.onSurface),
-        unselectedLabelTextStyle: t.textTheme.labelSmall,
-        leading: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 18, 0, 22),
-          child: Tooltip(
-            message: 'FacturaVoz · Solvex',
-            child: Icon(Icons.storefront_rounded, color: cs.primary, size: 27),
-          ),
-        ),
-        destinations: [
-          for (final d in destinations)
-            NavigationRailDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.icon),
-              label: Text(d.label),
-              padding: const EdgeInsets.symmetric(vertical: 2),
-            ),
-        ],
-        onDestinationSelected: (index) {
-          if (index >= 0 && index < destinations.length) _go(destinations[index].id);
-        },
-      ),
-    );
-  }
-
-  /// Rail para salón, restaurante, consultorio, taller y los demás rubros.
-  /// Los destinos provienen de los mismos permisos y licencias que el dock.
-  Widget _multirubroRail(List<_Dest> destinations, {
-    required bool canVoiceSell,
-    required bool canCopilot,
+  /// Una sola barra lateral para los destinos que el plan y el rol habilitan.
+  Widget _navigationRail(
+    List<_Dest> destinations, {
+    required bool bodega,
+    bool canVoiceSell = false,
+    bool canCopilot = false,
   }) {
     final t = Theme.of(context);
     final cs = t.colorScheme;
+    final extended = MediaQuery.sizeOf(context).width >= 1280;
+    final dark = t.brightness == Brightness.dark;
+    final contrast = MediaQuery.highContrastOf(context);
+    final activeFill = contrast
+        ? cs.primaryContainer
+        : dark
+        ? const Color(0xFF23555F)
+        : const Color(0xFFB8EBD9);
+    final activeInk = contrast
+        ? cs.onPrimaryContainer
+        : dark
+        ? const Color(0xFFE0FFF2)
+        : const Color(0xFF10483B);
     final selected = destinations.indexWhere((d) => d.id == _tab);
-    return FvGlassSurface(
-      radius: 0,
-      blur: 16,
-      child: NavigationRail(
-        key: const ValueKey('multirubro-navigation-rail'),
-        backgroundColor: Colors.transparent,
-        selectedIndex: selected < 0 ? 0 : selected,
-        labelType: NavigationRailLabelType.selected,
-        groupAlignment: -1,
-        scrollable: true,
-        useIndicator: true,
-        indicatorColor: cs.primary.withValues(alpha: .09),
-        selectedIconTheme: IconThemeData(color: cs.primary, size: 22),
-        unselectedIconTheme: IconThemeData(
-          color: cs.onSurfaceVariant, size: 22),
-        selectedLabelTextStyle: t.textTheme.labelSmall?.copyWith(
-          color: cs.onSurface, fontWeight: FontWeight.w800),
-        leading: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 16, 0, 20),
-          child: Tooltip(
-            message: 'FacturaVoz',
-            child: Icon(Icons.auto_graph_rounded,
-              color: cs.onSurface, size: 27),
+    final brandIcon = RetailIcon(
+      bodega ? Icons.storefront_rounded : Icons.analytics_rounded,
+      ink: cs.onSurface,
+      accent: cs.primary.withValues(alpha: .40),
+    );
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 0, 8),
+      child: FvFloatingGlassDock(
+        radius: 26,
+        child: NavigationRail(
+          key: ValueKey(bodega ? 'bodega-navigation-rail' : 'multirubro-navigation-rail'),
+          backgroundColor: Colors.transparent,
+          selectedIndex: selected < 0 ? 0 : selected,
+          extended: extended,
+          minWidth: 76,
+          minExtendedWidth: 164,
+          labelType: extended ? NavigationRailLabelType.none : NavigationRailLabelType.selected,
+          groupAlignment: -1,
+          scrollable: true,
+          useIndicator: true,
+          indicatorColor: activeFill,
+          indicatorShape: StadiumBorder(
+            side: BorderSide(color: contrast ? cs.outline : activeInk.withValues(alpha: .18)),
           ),
-        ),
-        trailing: Padding(
-          padding: const EdgeInsets.only(top: 18, bottom: 8),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (canVoiceSell)
-              IconButton(
-                key: const ValueKey('multirubro-voice-action'),
-                tooltip: 'Vender por voz',
-                onPressed: _newInvoice,
-                icon: const Icon(Icons.mic_rounded),
+          selectedLabelTextStyle: t.textTheme.labelSmall?.copyWith(
+            color: cs.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+          unselectedLabelTextStyle: t.textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+          leading: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: extended
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      brandIcon,
+                      const SizedBox(width: 8),
+                      Text(
+                        'FacturaVoz',
+                        style: t.textTheme.titleMedium?.copyWith(
+                          fontFamily: FvLuxe.editorialFont,
+                          fontSize: 20,
+                          letterSpacing: -.5,
+                        ),
+                      ),
+                    ],
+                  )
+                : Tooltip(message: 'FacturaVoz', child: brandIcon),
+          ),
+          trailing: canVoiceSell || canCopilot
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 18, bottom: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (canVoiceSell)
+                        IconButton(
+                          key: const ValueKey('multirubro-voice-action'),
+                          tooltip: 'Vender por voz',
+                          onPressed: _newInvoice,
+                          icon: const Icon(Icons.mic_rounded),
+                        ),
+                      if (canCopilot)
+                        IconButton(
+                          key: const ValueKey('multirubro-copilot-action'),
+                          tooltip: 'Copiloto IA',
+                          onPressed: () => openCopilot(context),
+                          icon: const Icon(Icons.auto_awesome_rounded),
+                        ),
+                    ],
+                  ),
+                )
+              : null,
+          destinations: [
+            for (final d in destinations)
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: d.semantics,
+                  excludeFromSemantics: true,
+                  child: RetailIcon(
+                    d.icon,
+                    ink: cs.onSurfaceVariant,
+                    accent: cs.onSurfaceVariant.withValues(alpha: .16),
+                    size: 23,
+                  ),
+                ),
+                selectedIcon: RetailIcon(
+                  d.icon,
+                  ink: activeInk,
+                  accent: activeInk.withValues(alpha: .24),
+                  size: 23,
+                ),
+                label: Text(d.label),
+                padding: const EdgeInsets.symmetric(vertical: 2),
               ),
-            if (canCopilot)
-              IconButton(
-                key: const ValueKey('multirubro-copilot-action'),
-                tooltip: 'Copiloto IA',
-                onPressed: () => openCopilot(context),
-                icon: const Icon(Icons.auto_awesome_rounded),
-              ),
-          ]),
+          ],
+          onDestinationSelected: (index) {
+            if (index >= 0 && index < destinations.length) {
+              _go(destinations[index].id);
+            }
+          },
         ),
-        destinations: [
-          for (final d in destinations)
-            NavigationRailDestination(
-              icon: Tooltip(message: d.semantics, child: Icon(d.icon)),
-              selectedIcon: Icon(d.icon),
-              label: Text(d.label),
-              padding: const EdgeInsets.symmetric(vertical: 2),
-            ),
-        ],
-        onDestinationSelected: (index) {
-          if (index >= 0 && index < destinations.length) {
-            _go(destinations[index].id);
-          }
-        },
       ),
     );
   }
@@ -588,10 +604,10 @@ class _MainShellState extends State<MainShell> {
               ),
               child: Row(children: [
               if (pinnedSidebar && !_railCollapsed)
-                _bodegaRail(dests)
+                _navigationRail(dests, bodega: true)
               else if (workstationRail)
-                _multirubroRail(
-                  dests, canVoiceSell: canVoiceSell, canCopilot: canCopilot),
+                _navigationRail(dests, bodega: false,
+                  canVoiceSell: canVoiceSell, canCopilot: canCopilot),
               Expanded(child: Column(children: [
                 const LicenseBanner(),
                 Expanded(
