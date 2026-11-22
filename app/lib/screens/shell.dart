@@ -367,7 +367,6 @@ class _MainShellState extends State<MainShell> {
       child: NavigationDrawer(
       key: const ValueKey('bodega-navigation-drawer'),
       backgroundColor: Colors.transparent,
-      indicatorColor: cs.primary.withValues(alpha: 0.12),
       selectedIndex: selected < 0 ? 0 : selected,
       onDestinationSelected: (index) {
         Navigator.of(context).pop();
@@ -412,8 +411,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDrawerDestination(
             icon: Icon(d.icon, color: cs.onSurfaceVariant, size: 21),
             selectedIcon: Icon(d.icon, color: cs.primary, size: 21),
-            label: Text(d.label, style: const TextStyle(
-              fontWeight: FontWeight.w700, fontSize: 14)),
+            label: Text(d.label),
           ),
         const SizedBox(height: 18),
         Padding(
@@ -624,7 +622,13 @@ class _MainShellState extends State<MainShell> {
                   child: Builder(builder: (bodyContext) => MediaQuery.removePadding(
                     context: bodyContext,
                     removeTop: licenseBannerInfo(Access.instance.license) != null,
-                    child: Stack(children: [
+                    // Tab pages paint no background of their own, so the
+                    // aurora shows through every module's glass.
+                    child: Theme(
+                      data: isBodega
+                          ? Theme.of(context).copyWith(scaffoldBackgroundColor: Colors.transparent)
+                          : Theme.of(context),
+                      child: Stack(children: [
                       for (final d in dests)
                         if (_built.contains(d.id))
                           _TabSlot(
@@ -638,7 +642,7 @@ class _MainShellState extends State<MainShell> {
                                       child: _page(d.id)),
                             ),
                           ),
-                    ]),
+                    ])),
                   )),
                 ),
               ])),

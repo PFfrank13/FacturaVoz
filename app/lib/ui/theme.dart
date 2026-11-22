@@ -230,7 +230,14 @@ ThemeData buildTheme(Brightness b) {
     ),
     navigationDrawerTheme: NavigationDrawerThemeData(
       backgroundColor: Colors.transparent,
-      indicatorColor: primary.withValues(alpha: .12),
+      indicatorColor: primary.withValues(alpha: dark ? .22 : .16),
+      // Material's default selected label is onSecondaryContainer, which is
+      // dark on the dark glass drawer. Keep labels on the surface ink.
+      labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+        fontFamily: _font, fontSize: 14,
+        fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
+        color: states.contains(WidgetState.selected) ? ink : muted,
+      )),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
