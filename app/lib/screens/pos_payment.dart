@@ -362,7 +362,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       style: TextStyle(fontWeight: FontWeight.w900,
                         color: _sufficient ? c.ok : c.bad)),
                   ]))
-                else _card(child: CheckboxListTile(
+                else _card(child: Material(type: MaterialType.transparency, child: CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _verified,
                   onChanged: (_requiresAccount && _account.isEmpty && _qrPath.isEmpty) || _loading
@@ -371,7 +371,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                     ? 'El terminal POS autorizó el pago'
                     : 'He verificado el abono en mi cuenta'),
                   subtitle: const Text('No se conecta automáticamente al banco. Confirma únicamente después de recibir el pago.'),
-                )),
+                ))),
               ],
             ],
           )),

@@ -45,12 +45,14 @@ if [[ ! -f "$app_dir/pubspec.yaml" ]]; then
   app_dir="$work_dir/app"
   mkdir -p "$app_dir"
   if git -C "$backend_dir" cat-file -e "$commit:app/pubspec.yaml" 2>/dev/null; then
-    git -C "$backend_dir" archive "$commit:app" | tar -xf - -C "$app_dir"
+    repo_dir="$(git -C "$backend_dir" rev-parse --show-toplevel)"
+    git -C "$repo_dir" archive "$commit:app" | tar -xf - -C "$app_dir"
   else
     curl --fail --silent --show-error --location --retry 3 \
       "https://codeload.github.com/PFfrank13/FacturaVoz/tar.gz/$commit" -o "$work_dir/source.tar.gz"
     tar -xzf "$work_dir/source.tar.gz" -C "$app_dir" --strip-components=2 "FacturaVoz-$commit/app"
   fi
+  test -s "$app_dir/lib/main.dart"
 fi
 
 flutter_bin="$(command -v flutter || true)"
