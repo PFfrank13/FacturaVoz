@@ -450,9 +450,9 @@ String? minPlanFor(String feature, Map<String, Map<String, dynamic>> plans, {Str
   return null;
 }
 
-/// Precio mensual en soles, IGV incluido. Copia de docs/facturavoz-planes.json (PROPUESTOS): el que cobra de verdad es Solvex Hub,
+/// Precio mensual en soles, IGV incluido. Copia de docs/facturavoz-planes.json (confirmado en Solvex Hub): el que cobra de verdad es Solvex Hub,
 /// así que si cambias un precio allá, cámbialo también aquí (una prueba compara con el JSON).
-const planPrices = <String, double>{'BASICO': 29, 'PRO': 59, 'EMPRESA': 119};
+const planPrices = <String, double>{'BASICO': 39, 'PRO': 79, 'EMPRESA': 179};
 
 /// Límites por plan (copia de docs/facturavoz-planes.json → features.max_users / max_branches; -1 = sin límite).
 /// La base aplica los que entrega Solvex Hub para cada empresa (feature_limit); esto es solo para comparar planes.

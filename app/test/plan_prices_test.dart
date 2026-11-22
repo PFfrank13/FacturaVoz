@@ -25,8 +25,9 @@ void main() {
   });
 
   test('texto de precio', () {
-    expect(planPriceText('BASICO'), 'S/ 29 al mes');
-    expect(planPriceText('EMPRESA'), 'S/ 119 al mes');
+    expect(planPriceText('BASICO'), 'S/ 39 al mes');
+    expect(planPriceText('PRO'), 'S/ 79 al mes');
+    expect(planPriceText('EMPRESA'), 'S/ 179 al mes');
     expect(planPriceText('XYZ'), '');
   });
 
