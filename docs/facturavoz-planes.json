@@ -1,5 +1,5 @@
 {
-  "_leeme": "Planes de FacturaVoz para cargar en Solvex Hub (Productos → FACTURAVOZ → Planes). Precios en soles, con IGV incluido, confirmados en Solvex Hub el 22/11/2026 (39 / 79 / 179). Si los cambias allá, cámbialos aquí y en la app. Las claves de 'features' son las que lee la app y la base de datos (private.has_feature). max_users = -1 significa sin límite. v3.1: los 3 planes son iguales para todos los rubros, pero lo que desbloquean cambia según el rubro (matriz en la app y en private.plan_matrix): Básico = esenciales del rubro; Pro = Básico + 1 módulo estrella + Copiloto; Empresa = todo + Copiloto agente (copiloto_agente). Estas marcas de abajo son la UNIÓN de lo que cada plan da a algún rubro: cualquier otra función que actives en una licencia concreta se respeta como complemento (add-on).",
+  "_leeme": "Planes de FacturaVoz para cargar en Solvex Hub (Productos → FACTURAVOZ → Planes). Precios en soles, con IGV incluido, confirmados en Solvex Hub el 22/11/2026 (39 / 79 / 179; 2 / 5 / 20 usuarios; 7 días de prueba). Si los cambias allá, cámbialos aquí y en la app. Las claves de 'features' son las que lee la app y la base de datos (private.has_feature). max_users = -1 significa sin límite. v3.1: los 3 planes son iguales para todos los rubros, pero lo que desbloquean cambia según el rubro (matriz en la app y en private.plan_matrix): Básico = esenciales del rubro; Pro = Básico + 1 módulo estrella + Copiloto; Empresa = todo + Copiloto agente (copiloto_agente). Estas marcas de abajo son la UNIÓN de lo que cada plan da a algún rubro: cualquier otra función que actives en una licencia concreta se respeta como complemento (add-on).",
   "product": {
     "code": "FACTURAVOZ",
     "name": "FacturaVoz",
@@ -13,7 +13,7 @@
       "interval_count": 1,
       "price": "39.00",
       "setup": "0",
-      "trial_days": 3,
+      "trial_days": 7,
       "grace_days": 5,
       "public": true,
       "active": true,
@@ -47,7 +47,7 @@
         "encuestas": false,
         "antifraude": false,
         "copiloto_agente": false,
-        "max_users": 1,
+        "max_users": 2,
         "max_branches": 1
       }
     },
@@ -58,7 +58,7 @@
       "interval_count": 1,
       "price": "79.00",
       "setup": "0",
-      "trial_days": 3,
+      "trial_days": 7,
       "grace_days": 5,
       "public": true,
       "active": true,
@@ -103,7 +103,7 @@
       "interval_count": 1,
       "price": "179.00",
       "setup": "0",
-      "trial_days": 3,
+      "trial_days": 7,
       "grace_days": 5,
       "public": true,
       "active": true,

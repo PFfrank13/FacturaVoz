@@ -36,7 +36,7 @@ cobertura vigente es `test_hub_precedence.sql`. Las pruebas antiguas necesitan u
 
 ## Pendientes reales (ordenados)
 1. **Correr Flutter**: analyze, test y compilación Android; corregir lo que salga.
-2. **Prueba gratis de 7 días**: hoy son **3** (`docs/facturavoz-planes.json` → `trial_days`). Se cambia en Solvex Hub; después en el JSON y en `planTrialDays` (una prueba obliga a que coincidan). No se cambió para no anunciar algo que el Hub no da.
+2. **Prueba gratis de 7 días**: hecho el 22/11/2026, tras confirmarlo en Solvex Hub (`trial_days: 7` en el JSON y en `planTrialDays`; una prueba obliga a que coincidan).
 3. **Roles por rubro en la base** (cocinero, almacenero, docente, jefe de obra…; marcados ⚠ en `01_MATRIZ_RUBRO_PLAN_ROL.md`): columna `rubro_role` y permisos finos (`cash.open` separado de `collect`, compras sin administración). Requiere tu decisión.
 4. **Sucursales**: no hay datos por sucursal; Empresa solo tiene el límite.
 5. Retirar la barra heredada v2 y `home.dart`; unificar Clientes, Ajustes y Tienda; migrar los 257 colores fijos a `DsColors`.

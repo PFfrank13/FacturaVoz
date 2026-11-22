@@ -24,6 +24,13 @@ void main() {
     }
   });
 
+  test('valores comerciales confirmados en Solvex Hub (22/11/2026)', () {
+    expect(planLimits['BASICO'], (users: 2, branches: 1));
+    expect(planLimits['PRO'], (users: 5, branches: 1));
+    expect(planLimits['EMPRESA'], (users: 20, branches: 5));
+    expect(planTrialDays.values.every((d) => d >= 7), isTrue);
+  });
+
   test('texto de precio', () {
     expect(planPriceText('BASICO'), 'S/ 39 al mes');
     expect(planPriceText('PRO'), 'S/ 79 al mes');
