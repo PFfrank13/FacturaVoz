@@ -39,16 +39,38 @@ flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co \
 ```
 Compilar:
 - **Web en Vercel.** La [app de FacturaVoz](https://factura-voz-two.vercel.app/app/) comparte dominio con el ERP y la API.
-  El proyecto con raíz en `backend/` ejecuta `bash scripts/build-flutter-web.sh && npm run build`. El primer paso usa
-  Flutter 3.47.9, el código de `app/lib/main.dart` y las variables públicas `NEXT_PUBLIC_SUPABASE_URL` y
-  `NEXT_PUBLIC_SUPABASE_ANON_KEY` del proyecto. La API utiliza `PUBLIC_BASE_URL` o el dominio de producción de FacturaVoz.
-  El build genera `backend/public/app/` con CanvasKit local y la base `/app/`. Vercel lo publica junto al ERP al desplegar `main`.
+  El proyecto con raíz en `backend/` ejecuta `bash scripts/build-flutter-web.sh && npm run build`. El primer paso
+  verifica que la huella del código Flutter coincida con la registrada en `backend/flutter-web/`, comprueba el SHA-256
+  del archivo y lo extrae en `backend/public/app/`. Sustituye tres marcadores por `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` y el origen de la API (`PUBLIC_BASE_URL` o el dominio de FacturaVoz).
+  Vercel sirve CanvasKit y los recursos desde el mismo dominio. Si el código Flutter cambia, el build compila el nuevo
+  cliente con el SDK fijado en el script. Producción requiere los dos ajustes públicos de Supabase. Una vista previa
+  sin ambos ajustes muestra el login con los servicios desconectados.
 - **Android**: crea un keystore (`keytool -genkey -v -keystore upload.jks ...`, guárdalo fuera del repo), configura
   `android/key.properties` y firma; `flutter build appbundle --release --dart-define=...`. Play Console (pago único 25 USD).
 - **iOS**: requiere Mac con Xcode y cuenta Apple Developer (99 USD/año): `flutter build ipa --release --dart-define=...`.
 
 Tiendas: política de privacidad pública (URL), formulario de seguridad de datos / etiquetas de privacidad
 (audio, correo, datos de clientes), eliminación de cuenta (ya está en Ajustes), credenciales de revisor (paso 1.5).
+
+### Regenerar el paquete web
+
+Desde un checkout que contenga la revisión guardada de la app, ejecuta los comandos desde la raíz con Flutter y Bash.
+La compilación usa el punto de entrada real. La configuración de cada entorno se incorpora al preparar el sitio en Vercel.
+
+```sh
+cd app
+flutter pub get
+flutter build web --release --no-pub --no-wasm-dry-run --no-web-resources-cdn \
+  --base-href=/app/ --target=lib/main.dart --output=build/operator-neutral \
+  --dart-define=SUPABASE_URL=https://fv-config-project.invalid \
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_FVBUILDKEY0000 \
+  --dart-define=API_BASE_URL=https://fv-config-api.invalid
+cd ..
+bash backend/scripts/build-flutter-web.sh --pack app/build/operator-neutral
+```
+
+Incluye el archivo y las dos huellas de `backend/flutter-web/` en el commit de entrega.
 
 ## 4. Verificación manual antes de vender
 1. Dos usuarios A y B: B no ve las facturas de A (lista y consola).
