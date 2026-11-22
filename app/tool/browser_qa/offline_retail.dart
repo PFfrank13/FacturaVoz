@@ -26,6 +26,25 @@ const _rows = [
 
 bool emptyRetailCatalog = false;
 bool fixtureAlertRead = false;
+final _pushedAlerts = <Map<String, Object?>>[];
+
+/// Adds a strictly newer, unread fictitious alert (QA recordings only).
+void pushFixtureAlert({
+  required String title,
+  required String body,
+  String severity = 'good',
+}) {
+  final now = DateTime.now();
+  _pushedAlerts.add({
+    'id': 'alert-live-${_pushedAlerts.length}',
+    'kind': 'demo',
+    'title': title,
+    'body': body,
+    'severity': severity,
+    'created_at': now.toIso8601String(),
+    'read_at': null,
+  });
+}
 
 const _salePrice = 5.50;
 late List<({int quantity, String date})> _sales;
@@ -67,9 +86,14 @@ Object? _response(http.Request request) {
     }
     if (request.url.queryParameters['read_at'] == 'is.null' &&
         fixtureAlertRead) {
-      return [];
+      return _pushedAlerts.reversed.take(1).toList();
+    }
+    if (_pushedAlerts.isNotEmpty &&
+        request.url.queryParameters['limit'] == '1') {
+      return [_pushedAlerts.last];
     }
     return [
+      ..._pushedAlerts.reversed,
       {
         'id': 'alert-demo',
         'kind': 'cash_difference',

@@ -168,6 +168,53 @@ void main() {
     expect(find.text('Menú de mi negocio'), findsOneWidget);
   });
 
+  for (final (device, size, strip, top, height) in const [
+    ('iPhone con Dynamic Island', Size(393, 852), 59.0, 11.0, 37.0),
+    ('Android con cámara perforada', Size(412, 915), 40.0, 3.0, 34.0),
+  ]) {
+    testWidgets('$device: la isla sube a la franja de estado, centrada', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = FakeViewPadding(top: strip);
+      addTearDown(tester.view.reset);
+      await mountHeader(tester);
+      final island = tester.getRect(find.byKey(const ValueKey('dynamic-island')));
+      final title = tester.getRect(find.text('Inicio'));
+      expect(island.center.dx, closeTo(size.width / 2, .5));
+      expect(island.top, closeTo(top, .5));
+      expect(island.height, height);
+      expect(island.width, greaterThanOrEqualTo(150));
+      // Inside the system strip, above the toolbar, never over the title row.
+      expect(island.bottom, lessThanOrEqualTo(strip));
+      expect(title.top, greaterThanOrEqualTo(strip));
+      await tester.tap(find.byKey(const ValueKey('dynamic-island')));
+      await tester.pumpAndSettle();
+      final card = tester.getRect(
+        find.byKey(const ValueKey('dynamic-island-notice')),
+      );
+      // The expanded island grows in place from the strip and stays on screen.
+      expect(card.left, greaterThanOrEqualTo(10));
+      expect(card.right, lessThanOrEqualTo(size.width - 10));
+      expect(card.top, greaterThan(island.bottom));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('sin franja de estado (web) la isla vive en la barra', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 900);
+    addTearDown(tester.view.reset);
+    await mountHeader(tester);
+    final island = tester.getRect(find.byKey(const ValueKey('dynamic-island')));
+    expect(island.center.dx, closeTo(215, .5));
+    expect(island.center.dy, closeTo(30, 1));
+    expect(island.width, 124);
+  });
+
   testWidgets('la isla anuncia una alerta nueva una sola vez', (tester) async {
     await mountHeader(tester);
     final card = find.byKey(const ValueKey('dynamic-island-notice'));

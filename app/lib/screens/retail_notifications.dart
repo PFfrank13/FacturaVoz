@@ -239,7 +239,23 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
             id: 'alert:${alert.id}',
             title: alert.title,
             message: alert.body,
-            accent: alert.severity == 'bad' ? cs.error : cs.primary,
+            category: switch (alert.severity) {
+              'bad' => 'Atención',
+              'warn' => 'Aviso',
+              _ => 'Negocio',
+            },
+            icon: switch (alert.severity) {
+              'bad' => Icons.report_rounded,
+              'warn' => Icons.warning_amber_rounded,
+              'good' => Icons.check_circle_rounded,
+              _ => Icons.notifications_active_rounded,
+            },
+            accent: switch (alert.severity) {
+              'bad' => const Color(0xffff7a6e),
+              'warn' => const Color(0xffffc069),
+              'good' => const Color(0xff3ee6b0),
+              _ => const Color(0xff7cc8ff),
+            },
           );
     final planNotice = plan == null
         ? null
@@ -247,6 +263,8 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
             id: 'plan:${plan.$1}',
             title: 'Tu plan',
             message: plan.$1,
+            category: 'Licencia',
+            icon: Icons.workspace_premium_rounded,
             accent: plan.$2,
           );
 
@@ -267,12 +285,41 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
         ? planNotice
         : businessNotice ?? planNotice;
 
+    // On phones the island lives in the status strip, centered over the
+    // camera, like the system one. Without a strip it sits in the toolbar.
+    final strip = statusBarIslandGeometry(MediaQuery.of(context));
+    Widget island(Size size, IslandPlacement placement) =>
+        DynamicNotificationIsland(
+          notice: notice,
+          announcement: _announcement == 0 ? null : _announcement,
+          compactLabel: notice == null
+              ? 'Actividad'
+              : 'Vista previa de notificaciones',
+          compactSize: size,
+          placement: placement,
+          onOpen: _openCenter,
+        );
+
     return AppBar(
       automaticallyImplyLeading: false,
       titleSpacing: 0,
       toolbarHeight: h.preferredSize.height,
       backgroundColor: Colors.transparent,
-      flexibleSpace: const FvGlassTopBar(),
+      flexibleSpace: Stack(
+        fit: StackFit.expand,
+        children: [
+          const FvGlassTopBar(),
+          if (strip != null && active)
+            Positioned(
+              top: strip.top,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: island(strip.size, IslandPlacement.statusBar),
+              ),
+            ),
+        ],
+      ),
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       elevation: 0,
@@ -280,8 +327,10 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
       excludeHeaderSemantics: true,
       title: LayoutBuilder(
         builder: (context, constraints) {
-          final showIsland = constraints.maxWidth >= 272;
-          final sideWidth = (constraints.maxWidth - (showIsland ? 76 : 0)) / 2;
+          final slot = constraints.maxWidth >= 420 ? 132.0 : 104.0;
+          final showIsland = strip == null && constraints.maxWidth >= 272;
+          final sideWidth =
+              (constraints.maxWidth - (showIsland ? slot : 0)) / 2;
           final groupActions =
               h.onVoice != null && h.onCopilot != null && sideWidth < 156;
           return Row(
@@ -313,17 +362,13 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
               ),
               if (showIsland)
                 SizedBox(
-                  width: 76,
+                  width: slot,
                   child: active
-                      ? DynamicNotificationIsland(
-                          notice: notice,
-                          announcement: _announcement == 0
-                              ? null
-                              : _announcement,
-                          compactLabel: notice == null
-                              ? 'Actividad'
-                              : 'Vista previa de notificaciones',
-                          onOpen: _openCenter,
+                      ? Center(
+                          child: island(
+                            Size(slot - 8, 34),
+                            IslandPlacement.toolbar,
+                          ),
                         )
                       : null,
                 ),
