@@ -12,6 +12,8 @@ import '../models_v2.dart';
 import '../services/live.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
+import '../ui/glass_widgets.dart' show FvGlassTopBar;
+import '../ui/liquid_glass.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -93,8 +95,13 @@ class _TeamScreenState extends State<TeamScreen> with LiveReload<TeamScreen> {
     final t = Theme.of(context);
     final limit = Access.instance.limit('max_users');
     final count = (_members?.length ?? 0) + _invites.length;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Equipo y permisos')),
+    return FvAurora(child: Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Equipo y permisos'),
+        backgroundColor: Colors.transparent,
+        flexibleSpace: const FvGlassTopBar(),
+      ),
       floatingActionButton: FloatingActionButton.extended(onPressed: _invite, icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Invitar')),
       body: _error != null
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
@@ -103,11 +110,8 @@ class _TeamScreenState extends State<TeamScreen> with LiveReload<TeamScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 120), children: [
-                    Text(
-                      'Cada persona entra con su propio correo y ve solo lo que su rol permite.${limit > 0 ? ' Tu plan permite $limit usuarios ($count usados).' : ''}',
-                      style: t.textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 12),
+                    _SeatsCard(count: count, limit: limit),
+                    const SizedBox(height: 14),
                     for (final (i, m) in _members!.indexed)
                       Reveal(
                         key: ValueKey(m.userId),
@@ -119,7 +123,7 @@ class _TeamScreenState extends State<TeamScreen> with LiveReload<TeamScreen> {
                             child: SoftCard(
                               padding: const EdgeInsets.all(14),
                               child: Row(children: [
-                                CircleAvatar(child: Text(m.shownName.isEmpty ? '?' : m.shownName.characters.first.toUpperCase())),
+                                _Avatar(m.shownName, owner: m.role == 'owner'),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -160,10 +164,137 @@ class _TeamScreenState extends State<TeamScreen> with LiveReload<TeamScreen> {
                     const SizedBox(height: 16),
                     const SectionTitle('¿Qué ve cada rol?'),
                     for (final e in staffRoles.entries)
-                      ListTile(dense: true, leading: const Icon(Icons.badge_outlined), title: Text(e.value.$1), subtitle: Text(e.value.$2)),
-                    const ListTile(dense: true, leading: Icon(Icons.admin_panel_settings_outlined), title: Text('Administrador'), subtitle: Text('Todo, menos borrar la empresa. Puede invitar y cambiar permisos.')),
+                      _RoleRow(role: e.key, title: e.value.$1, caption: e.value.$2),
+                    const _RoleRow(role: 'admin', title: 'Administrador', caption: 'Todo, menos borrar la empresa. Puede invitar y cambiar permisos.'),
                   ]),
                 ),
+    ));
+  }
+}
+
+/// Seats used against the plan limit, from the real member and invite count.
+class _SeatsCard extends StatelessWidget {
+  const _SeatsCard({required this.count, required this.limit});
+  final int count, limit;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final contrast = MediaQuery.highContrastOf(context);
+    final ink = contrast ? t.colorScheme.onSurface : Colors.white;
+    final share = limit > 0 ? (count / limit).clamp(0.0, 1.0) : 0.0;
+    return FvLiquidGlass(
+      radius: 28,
+      tone: Brightness.dark,
+      strength: 2.1,
+      blur: 0,
+      tint: const Color(0xFF6FB7FF),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('TU EQUIPO', style: t.textTheme.labelSmall?.copyWith(
+          color: contrast ? ink : const Color(0xFFB9DBFF), letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text('$count', style: TextStyle(fontFamily: 'Inter', fontSize: 40, height: 1,
+            fontWeight: FontWeight.w800, letterSpacing: -1.6, color: ink)),
+          const SizedBox(width: 8),
+          Flexible(child: Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(limit > 0 ? 'de $limit usuarios de tu plan' : count == 1 ? 'persona con acceso' : 'personas con acceso',
+              style: t.textTheme.bodyMedium?.copyWith(color: contrast ? ink : const Color(0xFFC9D5E4))),
+          )),
+        ]),
+        if (limit > 0) ...[
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(height: 6, child: Stack(children: [
+              Positioned.fill(child: ColoredBox(color: Colors.white.withValues(alpha: .12))),
+              FractionallySizedBox(
+                widthFactor: share,
+                child: const DecoratedBox(decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [Color(0xFF6FB7FF), Color(0xFF3EE6B0)]))),
+              ),
+            ])),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text('Cada persona entra con su propio correo y ve solo lo que su rol permite.',
+          style: t.textTheme.bodySmall?.copyWith(color: contrast ? ink : const Color(0xFFAEBDD1))),
+      ]),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar(this.name, {required this.owner});
+  final String name;
+  final bool owner;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = owner
+        ? const [Color(0xFFFFD27A), Color(0xFFE08A2B)]
+        : const [Color(0xFF7CC8FF), Color(0xFF2FD8A8)];
+    return Container(
+      width: 44, height: 44,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+        boxShadow: [BoxShadow(color: colors.first.withValues(alpha: .4), blurRadius: 12)],
+      ),
+      child: Text(name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+        style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0B1424))),
+    );
+  }
+}
+
+/// One role, with its own color and symbol, explained in a glass row.
+class _RoleRow extends StatelessWidget {
+  const _RoleRow({required this.role, required this.title, required this.caption});
+  final String role, title, caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final contrast = MediaQuery.highContrastOf(context);
+    final (icon, color) = switch (role) {
+      'cajero' => (Icons.point_of_sale_rounded, const Color(0xFF3EE6B0)),
+      'vendedor' => (Icons.sell_rounded, const Color(0xFF6FB7FF)),
+      'tecnico' => (Icons.build_rounded, const Color(0xFFFFC069)),
+      'finanzas' => (Icons.account_balance_rounded, const Color(0xFFA98BFF)),
+      _ => (Icons.admin_panel_settings_rounded, const Color(0xFFFF8A7A)),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: FvLiquidGlass(
+        radius: 22,
+        blur: 0,
+        strength: t.brightness == Brightness.dark ? 1.5 : 1.4,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              color: contrast ? t.colorScheme.primaryContainer : null,
+              gradient: contrast ? null : LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [Color.lerp(color, Colors.white, .25)!, Color.lerp(color, const Color(0xFF0B1424), .45)!],
+              ),
+              boxShadow: contrast ? null : [BoxShadow(color: color.withValues(alpha: .4), blurRadius: 14, offset: const Offset(0, 5))],
+            ),
+            child: Icon(icon, size: 21, color: contrast ? t.colorScheme.onPrimaryContainer : Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text(caption, style: t.textTheme.bodySmall),
+          ])),
+        ]),
+      ),
     );
   }
 }

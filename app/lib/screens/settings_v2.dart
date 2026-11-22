@@ -144,7 +144,13 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
 
   Widget _row(IconData icon, String title, String subtitle, VoidCallback onTap, {Widget? trailing, Color? color}) {
     final t = Theme.of(context);
-    final c = color ?? t.colorScheme.primary;
+    final contrast = MediaQuery.highContrastOf(context);
+    // Each setting keeps a stable color of its own, so the list scans by hue.
+    const palette = [
+      Color(0xFF3EE6B0), Color(0xFF6FB7FF), Color(0xFFA98BFF),
+      Color(0xFFFFC069), Color(0xFFFF8A7A), Color(0xFF4FD8D2),
+    ];
+    final c = color ?? palette[title.runes.fold<int>(0, (h, r) => (h * 31 + r) % 9973) % palette.length];
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -153,8 +159,16 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
           Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
-            child: Icon(icon, color: c, size: 21),
+            decoration: BoxDecoration(
+              color: contrast ? c.withValues(alpha: 0.12) : null,
+              gradient: contrast ? null : LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [Color.lerp(c, Colors.white, .22)!, Color.lerp(c, const Color(0xFF0B1424), .48)!],
+              ),
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: contrast ? null : [BoxShadow(color: c.withValues(alpha: .35), blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Icon(icon, color: contrast ? c : Colors.white, size: 21),
           ),
           const SizedBox(width: 14),
           Expanded(

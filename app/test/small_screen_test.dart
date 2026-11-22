@@ -26,7 +26,8 @@ void main() {
     for (final b in Brightness.values) {
       testWidgets('planes a 320 px (letra x$scale, ${b.name})', (tester) async {
         await _pump(tester, PlanCompare(rubro: 'bodega', currentPlan: 'BASICO', onChoose: (_) {}), scale: scale, b: b);
-        expect(find.text('RECOMENDADO'), findsOneWidget);
+        expect(find.text('MÁS RECOMENDADO'), findsOneWidget);
+        expect(find.textContaining('vendido', findRichText: true), findsNothing);
         expect(find.text('Tu plan actual'), findsOneWidget);
         expect(find.text('Elegir Pro'), findsOneWidget);
         expect(tester.takeException(), isNull);
