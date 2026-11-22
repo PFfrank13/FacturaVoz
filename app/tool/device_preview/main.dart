@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:facturavoz/screens/shell.dart';
 import 'package:facturavoz/services/live.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../browser_qa/offline_retail.dart';
@@ -20,7 +22,11 @@ Future<void> main() async {
   if (kReleaseMode) {
     throw StateError('La vista de QA no se compila en modo release.');
   }
-  await startOfflineRetailBackend();
+  final photos = await _servePhotos();
+  await startOfflineRetailBackend(
+    origin: 'http://127.0.0.1:${photos.port}',
+    photos: true,
+  );
   if (const bool.fromEnvironment('DEMO_ISLAND')) _cycleDemoEvents();
   runApp(
     MaterialApp(
@@ -50,4 +56,25 @@ void _cycleDemoEvents() {
     pushFixtureAlert(title: title, body: body, severity: severity);
     LiveHub.instance.tick('owner_alerts').value++;
   });
+}
+
+/// Loopback server for the bundled demo photographs (assets/demo/*.webp).
+/// StorageImage loads them through the same signed-URL path as production.
+Future<HttpServer> _servePhotos() async {
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  server.listen((request) async {
+    final name = request.uri.pathSegments.isEmpty
+        ? ''
+        : request.uri.pathSegments.last;
+    try {
+      final bytes = await rootBundle.load('assets/demo/$name');
+      request.response
+        ..headers.contentType = ContentType('image', 'webp')
+        ..add(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes));
+    } catch (_) {
+      request.response.statusCode = HttpStatus.notFound;
+    }
+    await request.response.close();
+  });
+  return server;
 }

@@ -55,17 +55,43 @@ class PosPaymentMethodCard extends StatelessWidget {
             duration: still ? Duration.zero : FvTokens.transition,
             curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 9),
-            decoration: BoxDecoration(
-              color: selected && !highContrast ? null : t.colorScheme.surface,
-              gradient: selected && !highContrast
-                  ? FvLuxe.editorial(t.brightness) : null,
+            // Glass tiles; the chosen one fills with jade light.
+            decoration: highContrast ? BoxDecoration(
+              color: t.colorScheme.surface,
               border: Border.all(
-                color: selected ? t.colorScheme.primary
-                    : t.colorScheme.outlineVariant,
-                width: selected ? 1.7 : .8,
+                color: selected ? t.colorScheme.primary : t.colorScheme.outline,
+                width: selected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(22),
-              boxShadow: selected ? FvTokens.shadow(t.brightness) : null,
+            ) : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: t.brightness == Brightness.dark
+                    ? selected
+                        ? const [Color(0xCC1F8F78), Color(0xB3123A44)]
+                        : const [Color(0xB31A2A42), Color(0x9E0D1828)]
+                    : selected
+                        ? const [Color(0xF2D9FBEE), Color(0xE6C8EEF9)]
+                        : const [Color(0xE6FFFFFF), Color(0xB8FFFFFF)],
+              ),
+              border: Border.all(
+                color: selected
+                    ? t.colorScheme.primary
+                    : t.brightness == Brightness.dark ? const Color(0x2EFFFFFF) : Colors.white,
+                width: selected ? 1.6 : 1,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: selected
+                      ? t.colorScheme.primary.withValues(alpha: .35)
+                      : Colors.black.withValues(alpha: t.brightness == Brightness.dark ? .35 : .06),
+                  blurRadius: selected ? 22 : 16,
+                  spreadRadius: -6,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               PosPaymentBrand(method, size: 45),
@@ -191,14 +217,11 @@ class _PaymentFlowState extends State<_PaymentFlow> {
 
   Widget _card({required Widget child, EdgeInsets padding = const EdgeInsets.all(16), Color? color}) {
     final t = Theme.of(context);
-    return Container(
+    return FvLiquidGlass(
+      radius: 26,
+      blur: 0,
       padding: padding,
-      decoration: BoxDecoration(
-        color: color ?? t.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: t.colorScheme.outlineVariant, width: .65),
-        boxShadow: FvTokens.shadow(t.brightness),
-      ),
+      strength: color == null ? (t.brightness == Brightness.dark ? 1.5 : 1.4) : 1.9,
       child: child,
     );
   }
@@ -217,8 +240,10 @@ class _PaymentFlowState extends State<_PaymentFlow> {
     final method = _method;
     final t = Theme.of(context);
     final c = DsColors.of(context);
-    return Scaffold(
+    return FvAurora(child: Scaffold(
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
+          backgroundColor: Colors.transparent,
           flexibleSpace: const FvGlassTopBar(),
           title: Text(method == null ? 'Método de cobro' : 'Cobro ${posMethodLabel(method).toLowerCase()}'),
           leading: IconButton(
@@ -382,8 +407,8 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
-                    backgroundColor: t.colorScheme.onSurface,
-                    foregroundColor: t.colorScheme.surface,
+                    backgroundColor: t.brightness == Brightness.dark ? const Color(0xFF3EE6B0) : FvLuxe.jade,
+                    foregroundColor: t.brightness == Brightness.dark ? const Color(0xFF04201A) : Colors.white,
                   ),
                   onPressed: _canConfirm ? _confirm : null,
                   icon: const Icon(Icons.check_rounded),
@@ -393,6 +418,6 @@ class _PaymentFlowState extends State<_PaymentFlow> {
             ),
           ]),
         )),
-    );
+    ));
   }
 }

@@ -24,6 +24,15 @@ const _rows = [
   ('arroz', 'Arroz extra', 'Abarrotes', 4.50),
 ];
 
+// Demo photographs bundled in assets/demo, served by the device preview.
+const _photos = {
+  'agua': 'water',
+  'leche': 'milk',
+  'pan': 'bread',
+  'arroz': 'rice',
+};
+bool _withPhotos = false;
+
 bool emptyRetailCatalog = false;
 bool fixtureAlertRead = false;
 final _pushedAlerts = <Map<String, Object?>>[];
@@ -57,6 +66,15 @@ Map<String, num> _summary(Iterable<({int quantity, String date})> sales) => {
 
 Object? _response(http.Request request) {
   final path = request.url.pathSegments.last;
+  final segments = request.url.pathSegments;
+  final sign = segments.indexOf('sign');
+  if (sign > 0 && segments.contains('storage')) {
+    // Storage signs the path; the image itself is fetched over real HTTP.
+    return {
+      'signedURL':
+          '/object/sign/${segments.skip(sign + 1).join('/')}?token=fixture',
+    };
+  }
   if (path == 'token') {
     final exp =
         DateTime.now().add(const Duration(hours: 2)).millisecondsSinceEpoch ~/
@@ -117,6 +135,7 @@ Object? _response(http.Request request) {
           'active': true,
           'stock': 14,
           'unit': 'NIU',
+          if (_withPhotos) 'image_path': 'demo/${_photos[id]}.webp',
         },
     ];
   }
@@ -256,7 +275,15 @@ AdapterWebSocketChannel _realtimeFixture(
   return AdapterWebSocketChannel(client);
 }
 
-Future<void> startOfflineRetailBackend({DateTime? salesDate}) async {
+/// [origin] is the Supabase URL. API traffic never leaves the in-memory
+/// client; only image downloads use it, so the device preview can serve
+/// demo photographs from a loopback server when [photos] is set.
+Future<void> startOfflineRetailBackend({
+  DateTime? salesDate,
+  String origin = 'http://127.0.0.1:1',
+  bool photos = false,
+}) async {
+  _withPhotos = photos;
   final date = salesDate ?? DateTime.now();
   final today = DateTime.utc(date.year, date.month, date.day);
   _sales = [
@@ -264,7 +291,7 @@ Future<void> startOfflineRetailBackend({DateTime? salesDate}) async {
       (quantity: quantity, date: todayIso(today.subtract(Duration(days: 10 - quantity)))),
   ];
   await Supabase.initialize(
-    url: 'http://127.0.0.1:1',
+    url: origin,
     publishableKey: 'preview',
     realtimeClientOptions: const RealtimeClientOptions(
       transport: _realtimeFixture,

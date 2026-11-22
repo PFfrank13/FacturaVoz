@@ -32,8 +32,8 @@ void main() {
       expect(find.text('3 ventas'), findsOneWidget);
       final title = tester.widget<Text>(find.text('Control de caja'));
       final subtitle = tester.widget<Text>(find.text('Movimientos reales del negocio'));
-      final dark = brightness == Brightness.dark;
-      final paper = Color(dark ? RetailChapter.cash.night : RetailChapter.cash.paper);
+      // Heroes are deep glass in both themes; text is measured against it.
+      const paper = RetailVisual.heroGlass;
       for (final text in [title, subtitle]) {
         final values = [paper.computeLuminance(), text.style!.color!.computeLuminance()]..sort();
         expect((values.last + .05) / (values.first + .05), greaterThanOrEqualTo(4.5));
