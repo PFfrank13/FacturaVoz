@@ -4,6 +4,10 @@ import { workspaceContext } from "@/lib/erp/context";
 import { modules, moduleAllowed, featureLimit, can, hasFeature } from "@/lib/erp/access";
 import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
+import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
+import LiveRefresh from "@/components/erp/LiveRefresh";
+
+const liveProducts = ["products"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
@@ -31,6 +35,21 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   if (id === "equipo") {
     const result = await c.db.rpc("team_members", { p_org: org });
     return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS</p><h1>Equipo</h1></section>{result.error ? <p role="alert">No se pudo cargar el equipo. Pulsa Actualizar para reintentar.</p> : <DataTable rows={result.data ?? []} fields={[["display_name", "Nombre"], ["email", "Correo"], ["role", "Rol"], ["staff_role", "Función"]]} />}</>;
+  }
+  if (id === "productos" || id === "inventario") {
+    // One catalog, shared with the mobile POS: same rows, photos and permissions.
+    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,image_path")
+      .eq("org_id", org).order("name", { ascending: true }).order("id").limit(500);
+    const rows = (result.data ?? []) as Omit<ProductRow, "photo_url">[];
+    const paths = rows.map(r => r.image_path).filter((p): p is string => !!p);
+    const signed = paths.length ? await c.db.storage.from("org-media").createSignedUrls(paths, 3600) : { data: [] };
+    const urls = new Map((signed.data ?? []).map(s => [s.path, s.signedUrl] as const));
+    const products: ProductRow[] = rows.map(r => ({ ...r, photo_url: r.image_path ? urls.get(r.image_path) ?? null : null }));
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{id === "inventario" ? "EXISTENCIAS" : "CATÁLOGO"} / {c.organization.name}</p><LiveRefresh org={org} tables={liveProducts} /></div><h1>{title}</h1><p>El mismo catálogo que vende el móvil. Lo que cambies aquí aparece allá al instante, y al revés.</p></section>
+      {can(c.access, "products_edit") && id === "productos" && <CreateRecord org={org} moduleId={id} />}
+      {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los productos</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} />}
+    </>;
   }
   const rawPage = Number((await searchParams).page ?? 1);
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 10000) : 1;
