@@ -11,6 +11,7 @@ import '../services/pro_repo.dart';
 import '../services/v2_repo.dart';
 import 'client_profile.dart' show StorageImage;
 import '../ui/motion.dart';
+import '../ui/payment_brand.dart';
 import '../ui/theme.dart';
 import '../ui/retail_layout.dart';
 import '../ui/widgets.dart';
@@ -251,7 +252,8 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                           inputFormatters: digits,
                           decoration: const InputDecoration(
                             labelText: 'Celular Yape',
-                            prefixIcon: Icon(Icons.phone_android_rounded)),
+                            prefixIcon: ExcludeSemantics(child: Center(widthFactor: 1,
+                              child: PosPaymentBrand('yape', size: 26)))),
                         );
                         final plin = TextField(
                           controller: _plin,
@@ -259,7 +261,8 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                           inputFormatters: digits,
                           decoration: const InputDecoration(
                             labelText: 'Celular Plin',
-                            prefixIcon: Icon(Icons.phone_iphone_rounded)),
+                            prefixIcon: ExcludeSemantics(child: Center(widthFactor: 1,
+                              child: PosPaymentBrand('plin', size: 26)))),
                         );
                         if (constraints.maxWidth < 700) {
                           return Column(children: [

@@ -61,6 +61,7 @@ flutter:
     - assets/fonts/Inter-LICENSE.txt
     - assets/fonts/DMSerifText-LICENSE.txt
     - assets/branding/
+    - assets/payments/
     - assets/photos/
     - assets/demo/
   fonts:

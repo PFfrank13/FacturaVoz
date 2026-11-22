@@ -163,6 +163,52 @@ void main() {
     expect(lines.first.quantity, 2);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('Los tres medios de cobro conservan su imagen al cambiar de método', (tester) async {
+    await pumpScreen(tester, MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light),
+      home: Builder(builder: (context) => Scaffold(body: Center(child: FilledButton(
+        onPressed: () => choosePosPayment(context, currency: 'PEN', total: 5.50, items: const []),
+        child: const Text('Elegir pago'),
+      )))),
+    ));
+    await tester.tap(find.text('Elegir pago'));
+    await tester.pumpAndSettle();
+
+    Finder brand(String method) => find.byWidgetPredicate((w) => w is PosPaymentBrand && w.method == method);
+    Future<void> checkBrand(String method) async {
+      final mark = brand(method);
+      expect(mark, findsOneWidget);
+      if (method == 'tarjeta') {
+        expect(find.descendant(of: mark, matching: find.byType(CustomPaint)), findsWidgets);
+      } else {
+        final logoWidget = find.descendant(of: mark, matching: find.byType(Image));
+        final provider = tester.widget<Image>(logoWidget).image;
+        final original = provider is ResizeImage ? provider.imageProvider : provider;
+        expect(original, AssetImage('assets/payments/$method.png'));
+        final logo = find.descendant(of: mark, matching: find.byType(RawImage));
+        for (var attempt = 0; attempt < 40 && tester.widget<RawImage>(logo).image == null; attempt++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(tester.widget<RawImage>(logo).image, isNotNull, reason: 'Logo visible de $method');
+      }
+    }
+    for (final method in ['yape', 'plin', 'tarjeta']) {
+      final tile = find.widgetWithText(PosPaymentMethodCard, posMethodLabel(method));
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+      await checkBrand(method);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      await checkBrand(method);
+      expect(find.text('Paga con ${posMethodLabel(method)}'), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Confirmar pago')).onPressed, isNull);
+      await tester.tap(find.byTooltip('Cambiar método'));
+      await tester.pumpAndSettle();
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Android valida efectivo insuficiente y vuelto sin registrar ventas',
       (tester) async {
     PosPaymentApproval? result;

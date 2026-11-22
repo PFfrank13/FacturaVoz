@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:facturavoz/models.dart';
 import 'package:facturavoz/screens/pos_cart_review.dart';
 import 'package:facturavoz/screens/pos_payment.dart';
-import 'package:facturavoz/ui/design_tokens.dart';
 import 'package:facturavoz/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
@@ -13,10 +12,11 @@ import 'package:flutter_test/flutter_test.dart';
 Widget _fixture(Widget child) => MaterialApp(
   debugShowCheckedModeBanner: false,
   theme: buildTheme(Brightness.light),
-  home: RepaintBoundary(
+  builder: (_, navigator) => RepaintBoundary(
     key: const ValueKey('checkout-preview'),
-    child: child,
+    child: navigator!,
   ),
+  home: child,
 );
 
 Widget _cart() {
@@ -45,57 +45,19 @@ Widget _cart() {
   );
 }
 
-Widget _payment() => Scaffold(
-  appBar: AppBar(title: const Text('Método de cobro')),
-  body: DecoratedBox(
-    decoration: BoxDecoration(gradient: FvLuxe.ambient(Brightness.light)),
-    child: ListView(padding: const EdgeInsets.all(16), children: [
-      Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          gradient: FvLuxe.editorial(Brightness.light),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white, width: 1.2),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('TOTAL A COBRAR', style: TextStyle(
-            color: Color(0xFF52647A), fontSize: 11,
-            fontWeight: FontWeight.w700, letterSpacing: 1)),
-          const SizedBox(height: 5),
-          const Text('S/ 16.52',style: TextStyle(
-            color: Color(0xFF172337),fontSize: 36,
-            fontWeight: FontWeight.w800)),
-          const SizedBox(height: 14),
-          Text('4 artículos de muestra · no se realiza ningún cobro',
-            style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 12)),
-        ]),
-      ),
-      const SizedBox(height: 24),
-      const Text('Selecciona cómo te pagarán', style: TextStyle(
-        fontSize: 19, fontWeight: FontWeight.w800,
-        color: Color(0xFF172337))),
-      const SizedBox(height: 14),
-      SizedBox(height: 162, child: Row(children: [
-        Expanded(child: PosPaymentMethodCard(
-          method: 'efectivo', selected: true, onSelected: () {})),
-        const SizedBox(width: 12),
-        Expanded(child: PosPaymentMethodCard(
-          method: 'tarjeta', selected: false, onSelected: () {})),
-      ])),
-      const SizedBox(height: 17),
-      const Text('Yape · Plin · Transferencia', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, color: Color(0xFF697A8E))),
-      const SizedBox(height: 18),
-      const Padding(padding: EdgeInsets.all(10),child: Text(
-        'La confirmación del pago es manual y requiere la comprobación del cajero.',
-        style:TextStyle(color:Color(0xFF697A8E),fontSize:12))),
-      const SizedBox(height: 20),
-      const FilledButton(
-        onPressed: null,
-        child: Text('Continuar · vista de muestra')),
-    ]),
+Widget _payment() => Builder(builder: (context) => Scaffold(body: Center(
+  child: FilledButton(
+    onPressed: () => choosePosPayment(context,
+      currency: 'PEN', total: 16.52,
+      items: [
+        LineItem(description: 'Agua mineral 625 ml', quantity: 2, unitPrice: 1.80),
+        LineItem(description: 'Leche fresca 1 L', quantity: 1, unitPrice: 4.90),
+        LineItem(description: 'Pan artesanal', quantity: 1, unitPrice: 5.50),
+      ],
+    ),
+    child: const Text('Abrir cobro'),
   ),
-);
+)));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -123,16 +85,14 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(_fixture(name == 'Carrito' ? _cart() : _payment()));
-      if (name == 'Carrito') {
-        final context = tester.element(
-          find.byKey(const ValueKey('checkout-preview')));
-        await tester.runAsync(() async {
-          await Future.wait([
-            for (final asset in const ['water', 'milk', 'bread'])
-              precacheImage(AssetImage('assets/demo/$asset.webp'), context),
-          ]);
-        });
-      }
+      if (name == 'Cobro') await tester.tap(find.text('Abrir cobro'));
+      final context = tester.element(find.byKey(const ValueKey('checkout-preview')));
+      final assets = name == 'Carrito'
+          ? const ['assets/demo/water.webp', 'assets/demo/milk.webp', 'assets/demo/bread.webp']
+          : const ['assets/payments/yape.png', 'assets/payments/plin.png'];
+      await tester.runAsync(() => Future.wait([
+        for (final asset in assets) precacheImage(AssetImage(asset), context),
+      ]));
       await tester.pumpAndSettle();
       await expectLater(find.byKey(const ValueKey('checkout-preview')),
         matchesGoldenFile('previews/${name.toLowerCase()}.png'));

@@ -211,6 +211,7 @@ void main() {
         if (entry.key == 'pago') await tester.tap(find.text('Abrir cobro'));
         final context = tester.element(find.byKey(const ValueKey('capture')));
         final assets = <String>[
+          if (entry.key == 'pago') ...['assets/payments/yape.png', 'assets/payments/plin.png'],
           if (emptyRetailCatalog)
             for (final name in [
               'water',

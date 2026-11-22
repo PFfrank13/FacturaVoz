@@ -33,7 +33,9 @@ export default function Login() {
     finally { setPending(false); }
   }
   return <main className="fv-welcome fv-login">
-    <section><p className="fv-eyebrow">FACTURAVOZ / TU ESPACIO DE TRABAJO</p><h1>Menos pasos.<br /><span>Más negocio.</span></h1><p>Las personas, los productos y el trabajo de cada día. Con la misma empresa y los mismos permisos que en tu móvil.</p><p className="fv-caption">FacturaVoz · Solvex Software Labs</p></section>
+    <section><p className="fv-eyebrow">FACTURAVOZ / TU ESPACIO DE TRABAJO</p><h1>Menos pasos.<br /><span>Más negocio.</span></h1><p>Las personas, los productos y el trabajo de cada día. Con la misma empresa y los mismos permisos que en tu móvil.</p><p className="fv-caption">FacturaVoz · Solvex Software Labs</p>
+      <a className="fv-button secondary" href="/app">Abrir punto de venta</a>
+    </section>
     <section className="fv-login-panel" aria-labelledby="login-title"><p className="fv-eyebrow">BIENVENIDO DE NUEVO</p><h2 id="login-title">Entra a tu empresa</h2><p>Usa el correo de tu cuenta de FacturaVoz.</p>
       <form className="fv-form" onSubmit={e => { e.preventDefault(); void send(); }}><label>Correo electrónico<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={e => { setEmail(e.target.value); setSent(false); setCode(""); }} placeholder="tu@empresa.com" /></label><button className="fv-button" disabled={pending}>{pending ? "Un momento…" : sent ? "Reenviar acceso" : "Recibir acceso seguro"}</button></form>
       {sent && <form className="fv-form" onSubmit={e => { e.preventDefault(); void verify(); }}><label>Código de acceso<input inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={12} pattern="[0-9]+" value={code} onChange={e => setCode(e.target.value)} /></label><button className="fv-button secondary" disabled={pending}>Verificar código</button></form>}

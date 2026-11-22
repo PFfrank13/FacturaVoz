@@ -205,9 +205,15 @@ async function checkProfile(profile, origin) {
     await button('Continuar al pago').tap();
     await heading('Método de cobro').waitFor();
     assert.match(await page.locator('body').ariaSnapshot(), /S\/ 4\.25/);
-    await button(/^Seleccionar Yape/).tap();
-    await heading('Cobro yape').waitFor();
-    assert.equal(await button('Confirmar pago').isEnabled(), false);
+    if (profile.name === 'iphone') await capture('metodos-cobro-claro');
+    if (profile.name === 'ipad') await capture('metodos-cobro-oscuro');
+    for (const method of ['Yape', 'Plin', 'Tarjeta']) {
+      await button(new RegExp('^Seleccionar ' + method)).tap();
+      await page.getByRole('heading', { name: new RegExp('^Cobro ' + method + '$', 'i') }).waitFor();
+      assert.equal(await button('Confirmar pago').isEnabled(), false);
+      await button('Cambiar método').tap();
+      await heading('Método de cobro').waitFor();
+    }
     assert.deepEqual(errors, []);
     assert.deepEqual(external, []);
     console.log('OK', profile.device, profile.browser.name(), page.viewportSize(), preferences);

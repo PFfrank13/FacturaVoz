@@ -7,10 +7,13 @@ import '../ui/theme.dart';
 import '../ui/design_tokens.dart';
 import '../ui/glass_widgets.dart';
 import '../ui/motion.dart';
+import '../ui/payment_brand.dart';
 import '../models_pro.dart';
 import '../services/pro_repo.dart';
 import 'client_profile.dart' show StorageImage;
 import 'pos_payment_logic.dart';
+
+export '../ui/payment_brand.dart' show PosPaymentBrand, posMethodLabel;
 
 /// A cash register confirmation, not bank settlement or automatic QR verification.
 class PosPaymentApproval {
@@ -18,44 +21,6 @@ class PosPaymentApproval {
   final String method;
   final String note;
 }
-
-/// Identifica el medio de pago también cuando el dispositivo está sin conexión.
-class PosPaymentBrand extends StatelessWidget {
-  const PosPaymentBrand(this.method, {super.key, this.size = 53});
-  final String method;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final glyph = switch (method) {
-      'efectivo' => Icons.payments_outlined,
-      'transferencia' => Icons.account_balance_outlined,
-      'yape' || 'plin' => Icons.qr_code_2_rounded,
-      _ => Icons.credit_card_outlined,
-    };
-    final accent = switch (method) {
-      'yape' => Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFFE5BBF0) : const Color(0xFF762C80),
-      'tarjeta' || 'transferencia' => scheme.secondary,
-      _ => scheme.primary,
-    };
-    return Semantics(image: true, label: posMethodLabel(method),
-      child: Container(width: size, height: size,
-        decoration: BoxDecoration(color: Color.alphaBlend(accent.withValues(alpha: .11), scheme.surface),
-          borderRadius: BorderRadius.circular(size * .26)),
-        child: Icon(glyph, size: size * .57, color: accent)));
-  }
-}
-
-String posMethodLabel(String method) => switch (method) {
-  'efectivo' => 'Efectivo',
-  'yape' => 'Yape',
-  'plin' => 'Plin',
-  'tarjeta' => 'Tarjeta',
-  'transferencia' => 'Transferencia',
-  _ => method,
-};
 
 /// Componente visual independiente; no aprueba pagos ni registra cobros.
 class PosPaymentMethodCard extends StatelessWidget {
@@ -397,7 +362,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       style: TextStyle(fontWeight: FontWeight.w900,
                         color: _sufficient ? c.ok : c.bad)),
                   ]))
-                else _card(child: CheckboxListTile(
+                else _card(child: Material(type: MaterialType.transparency, child: CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _verified,
                   onChanged: (_requiresAccount && _account.isEmpty && _qrPath.isEmpty) || _loading
@@ -406,7 +371,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                     ? 'El terminal POS autorizó el pago'
                     : 'He verificado el abono en mi cuenta'),
                   subtitle: const Text('No se conecta automáticamente al banco. Confirma únicamente después de recibir el pago.'),
-                )),
+                ))),
               ],
             ],
           )),
