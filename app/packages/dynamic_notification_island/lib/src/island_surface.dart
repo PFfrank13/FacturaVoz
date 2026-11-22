@@ -20,22 +20,26 @@ Color _bright(Color accent) {
 /// empty center, where the camera sits on real hardware.
 class _CompactIsland extends StatelessWidget {
   const _CompactIsland({
-    required this.size,
+    required this.height,
     required this.notice,
     required this.pulse,
+    required this.bare,
     required this.elevated,
   });
 
-  final Size size;
+  final double height;
   final DynamicIslandNotice? notice;
   final Animation<double> pulse;
+
+  /// Plain black, exactly like the hardware island at rest.
+  final bool bare;
   final bool elevated;
 
   @override
   Widget build(BuildContext context) {
     final accent = notice == null ? null : _bright(notice!.accent);
-    final glyph = size.height * .6;
-    final inset = (size.height - glyph) / 2;
+    final glyph = height * .6;
+    final inset = (height - glyph) / 2;
     return DecoratedBox(
       decoration: ShapeDecoration(
         color: _ink,
@@ -54,7 +58,7 @@ class _CompactIsland extends StatelessWidget {
             ),
         ],
       ),
-      child: Padding(
+      child: bare ? const SizedBox.expand() : ClipRect(child: Padding(
         padding: EdgeInsets.symmetric(horizontal: inset),
         child: Row(
           children: [
@@ -74,7 +78,7 @@ class _CompactIsland extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

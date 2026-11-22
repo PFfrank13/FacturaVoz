@@ -7,9 +7,10 @@ La idea original de una gota con cuello elástico procede de [rit3zh/expo-dynami
 ## Ubicación
 
 - `IslandPlacement.statusBar`: la píldora vive en la franja de la hora y la batería, centrada. `statusBarIslandGeometry(MediaQuery.of(context))` calcula su sitio:
-  - iPhone con Dynamic Island (franja ≥ 51 pt): 190 × 37 pt a 11 pt del borde, envolviendo la isla física de 126 pt. El icono y la onda quedan fuera de la cámara.
-  - Notch o cámara perforada de Android: centrada en la franja, de 150 a 190 pt de ancho.
+  - iPhone con Dynamic Island (franja ≥ 51 pt): en reposo mide exactamente lo mismo que la isla física de los iPhone 15–17 Pro y Pro Max, 126 × 37 pt a 11 pt del borde, negra y sin contenido.
+  - Notch o cámara perforada de Android: mismas proporciones, con la altura ajustada a la franja (26–37 pt).
   - Sin franja (web, escritorio, horizontal): devuelve `null` y la isla va en la barra de la app (`IslandPlacement.toolbar`).
+- Mientras hay un aviso pendiente, la píldora se ensancha 32 pt por lado para mostrar el icono y la onda fuera de la cámara, como una Live Activity de iOS.
 - La píldora es negra pura para fundirse con la cámara.
 
 ## Movimiento

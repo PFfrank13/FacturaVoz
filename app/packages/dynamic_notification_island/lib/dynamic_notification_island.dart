@@ -45,12 +45,15 @@ enum IslandPlacement { statusBar, toolbar }
 ({double top, Size size})? statusBarIslandGeometry(MediaQueryData media) {
   final strip = media.padding.top;
   if (strip < 20 || media.size.width < 300) return null;
-  // Around the 126 pt hardware island, 32 pt on each side holds the glyph and
-  // the trace clear of the camera while leaving the clock and icons visible.
-  final width = strip >= 51 ? 190.0 : (media.size.width * .42).clamp(150.0, 190.0);
-  final height = strip >= 51 ? 37.0 : (strip - 6).clamp(26.0, 34.0);
-  final top = strip >= 51 ? 11.0 : math.max(3.0, (strip - height) / 2);
-  return (top: top, size: Size(width, height));
+  // At rest the island has the exact size and position of the hardware one on
+  // iPhone 15–17 Pro and Pro Max: 126 × 37 pt, 11 pt from the top edge. Other
+  // strips (notches, Android punch-holes) keep the same proportions.
+  if (strip >= 51) return (top: 11.0, size: const Size(126, 37));
+  final height = (strip - 6).clamp(26.0, 37.0);
+  return (
+    top: math.max(3.0, (strip - height) / 2),
+    size: Size(height * 126 / 37, height),
+  );
 }
 
 /// An in-app island that morphs from a compact pill into an expanded card.
@@ -68,6 +71,7 @@ class DynamicNotificationIsland extends StatefulWidget {
     this.duration = const Duration(milliseconds: 3600),
     this.compactSize = const Size(126, 34),
     this.placement = IslandPlacement.toolbar,
+    this.activityExtent = 32,
   });
 
   final DynamicIslandNotice? notice;
@@ -75,8 +79,12 @@ class DynamicNotificationIsland extends StatefulWidget {
   final VoidCallback onOpen;
   final String compactLabel;
   final Duration? duration;
+  /// Resting size. In the status strip the resting pill is plain black, like
+  /// the hardware island; while a notice is pending it widens by
+  /// [activityExtent] on each side to show it, as an iOS Live Activity does.
   final Size compactSize;
   final IslandPlacement placement;
+  final double activityExtent;
 
   @override
   State<DynamicNotificationIsland> createState() =>
@@ -114,6 +122,9 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   bool _reduced = false;
   bool _accessible = false;
   bool _announcedInitial = false;
+  Size _size = Size.zero;
+
+  bool get _inStrip => widget.placement == IslandPlacement.statusBar;
 
   @override
   void didChangeDependencies() {
@@ -306,15 +317,29 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   @override
   Widget build(BuildContext context) {
     final notice = widget.notice;
-    final size = widget.compactSize;
+    final rest = widget.compactSize;
+    final active = !_inStrip || notice != null;
+    final size = _size = Size(
+      rest.width + (_inStrip && active ? widget.activityExtent * 2 : 0),
+      rest.height,
+    );
     return OverlayPortal(
       controller: _portal,
       overlayChildBuilder: _overlay,
       child: CompositedTransformTarget(
         link: _link,
-        child: SizedBox.fromSize(
-          key: _anchor,
-          size: size,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: size.width),
+          duration: _reduced
+              ? Duration.zero
+              : const Duration(milliseconds: 560),
+          curve: Curves.easeOutBack,
+          builder: (context, width, child) => SizedBox(
+            key: _anchor,
+            width: width,
+            height: size.height,
+            child: child,
+          ),
           child: Semantics(
             button: true,
             label: widget.compactLabel,
@@ -334,10 +359,11 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
                   child: Opacity(
                     opacity: _portal.isShowing ? 0 : 1,
                     child: _CompactIsland(
-                      size: size,
+                      height: size.height,
                       notice: notice,
                       pulse: _pulse,
-                      elevated: widget.placement == IslandPlacement.toolbar,
+                      bare: _inStrip && !active,
+                      elevated: !_inStrip,
                     ),
                   ),
                 ),
@@ -422,7 +448,7 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
                       onVerticalDragCancel: _dragCancel,
                       child: _IslandMorph(
                         t: t,
-                        compact: widget.compactSize,
+                        compact: _size,
                         expandedWidth: width,
                         shift: shift,
                         accent: notice.accent,

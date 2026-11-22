@@ -138,6 +138,7 @@ List<String> bodegaDrawerIds(Access access) => [
 ];
 
 class _MainShellState extends State<MainShell> {
+  final _auroraScroll = ValueNotifier<double>(0);
   bool _railCollapsed = false;
   bool _drawerOpen = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -163,6 +164,7 @@ class _MainShellState extends State<MainShell> {
     V2Repo.changed.removeListener(_reloadSettings);
     AppState.instance.removeListener(_onApp);
     _licChan?.unsubscribe();
+    _auroraScroll.dispose();
     QuickLaunch.instance.unbind();
     super.dispose();
   }
@@ -579,8 +581,18 @@ class _MainShellState extends State<MainShell> {
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _go(first);
           },
-          child: Scaffold(
+          child: FvAurora(
+            scroll: _auroraScroll,
+            child: NotificationListener<ScrollUpdateNotification>(
+            onNotification: (n) {
+              if (n.metrics.axis == Axis.vertical) {
+                _auroraScroll.value = n.metrics.pixels;
+              }
+              return false;
+            },
+            child: Scaffold(
             key: _scaffoldKey,
+            backgroundColor: isBodega ? Colors.transparent : null,
             extendBody: isBodega && !pinnedSidebar && !keyboard && _tab == 'home',
             // La navegación de Bodega tiene un único dueño: este Scaffold.
             drawer: isBodega && !pinnedSidebar
@@ -599,9 +611,7 @@ class _MainShellState extends State<MainShell> {
               onCopilot: canCopilot ? () => openCopilot(context) : null,
             ) : null,
             body: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: isBodega ? FvLuxe.ambient(Theme.of(context).brightness) : null,
-              ),
+              decoration: const BoxDecoration(),
               child: Row(children: [
               if (pinnedSidebar && !_railCollapsed)
                 _navigationRail(dests, bodega: true)
@@ -688,6 +698,8 @@ class _MainShellState extends State<MainShell> {
                 onMicLong: () => openCopilot(context),
               ),
             ),
+          ),
+          ),
           ),
         );
       },

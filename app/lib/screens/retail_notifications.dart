@@ -483,7 +483,7 @@ class _RetailNotificationsScreenState extends State<RetailNotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
+    return FvAurora(child: Scaffold(
       appBar: AppBar(
         title: const Text('Notificaciones'),
         backgroundColor: Colors.transparent,
@@ -492,8 +492,9 @@ class _RetailNotificationsScreenState extends State<RetailNotificationsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
+      backgroundColor: Colors.transparent,
       body: DecoratedBox(
-        decoration: BoxDecoration(gradient: FvLuxe.ambient(theme.brightness)),
+        decoration: const BoxDecoration(),
         child: SafeArea(
           top: false,
           child: Center(
@@ -616,7 +617,7 @@ class _RetailNotificationsScreenState extends State<RetailNotificationsScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 

@@ -1,44 +1,21 @@
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'design_tokens.dart';
+import 'liquid_glass.dart';
+export 'liquid_glass.dart';
 import 'motion.dart';
 
-/// The toolbar catches light along the upper left and the lower rim.
+/// Liquid glass across the status strip and toolbar.
 class FvGlassTopBar extends StatelessWidget {
   const FvGlassTopBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final contrast = MediaQuery.highContrastOf(context);
-    final pane = DecoratedBox(
-      decoration: BoxDecoration(
-        color: contrast ? theme.colorScheme.surface : null,
-        gradient: contrast ? null : LinearGradient(
-          begin: const Alignment(-1, -.8),
-          end: const Alignment(.95, .65),
-          colors: dark
-              ? const [Color(0xDB2B514E), Color(0xD5192C3B), Color(0xD7383C56)]
-              : const [Color(0xD1D0F1E4), Color(0xC8F7FBF7), Color(0xCDDDE3FA)],
-          stops: const [0, .48, 1],
-        ),
-        border: Border(
-          bottom: BorderSide(
-            color: contrast ? theme.colorScheme.outline :
-                dark ? const Color(0x798FBFBA) : const Color(0x5261958B),
-            width: contrast ? 1 : .8,
-          ),
-        ),
-      ),
-      child: const SizedBox.expand(),
-    );
-    final sigma = FvLuxe.glassSigma(theme.platform, 16);
-    return contrast ? pane : ClipRect(child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-      child: pane,
-    ));
-  }
+  Widget build(BuildContext context) => const FvLiquidGlass(
+    borderRadius: BorderRadius.zero,
+    shadow: false,
+    blur: 24,
+    strength: 1.25,
+    child: SizedBox.expand(),
+  );
 }
 
 /// A single optical surface shared by the floating dock and the wide-screen rail.
@@ -48,95 +25,12 @@ class FvFloatingGlassDock extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final contrast = MediaQuery.highContrastOf(context);
-    final rounded = BorderRadius.circular(radius);
-    final pane = DecoratedBox(
-      decoration: BoxDecoration(
-        color: contrast ? theme.colorScheme.surface : null,
-        gradient: contrast ? null : LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xDE2F5156), Color(0xD01B293A), Color(0xDC313752)]
-              : const [Color(0xDCE6FBF0), Color(0xC2F2F9F8), Color(0xD5DFE7F8)],
-          stops: const [0, .53, 1],
-        ),
-      ),
-      child: child,
-    );
-    final sigma = FvLuxe.glassSigma(theme.platform, 18);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: rounded,
-        boxShadow: contrast ? null : [
-          BoxShadow(
-            color: dark ? const Color(0x70081423) : const Color(0x33204446),
-            offset: const Offset(0, 6),
-            blurRadius: 16,
-            spreadRadius: -4,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: rounded,
-        child: CustomPaint(
-          foregroundPainter: _DockEdge(dark, radius, contrast ? theme.colorScheme.outline : null),
-          child: contrast ? pane : BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-            child: pane,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DockEdge extends CustomPainter {
-  const _DockEdge(this.dark, this.radius, this.outline);
-  final bool dark;
-  final double radius;
-  final Color? outline;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-    final bounds = Offset.zero & size;
-    final rim = RRect.fromRectAndRadius(bounds, Radius.circular(radius));
-    final edge = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    if (outline != null) {
-      canvas.drawRRect(rim.deflate(.5), edge..color = outline!);
-      return;
-    }
-    edge.shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        stops: const [0, .21, .44, .73, 1],
-        colors: dark
-            ? const [Color(0xE7C3F0DD), Color(0x8677C2B1), Color(0x30578888), Color(0x52616D89), Color(0xCED4D8FF)]
-            : const [Colors.white, Color(0xFFD7F9EA), Color(0x8971A399), Color(0x70919FB5), Color(0xFFF4F3FF)],
-      ).createShader(bounds);
-    canvas.drawRRect(rim.deflate(.65), edge..strokeWidth = 1.3);
-    // The inner, opposing reflection gives the slim edge visible thickness.
-    edge.shader = LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
-      colors: [
-        Colors.white.withValues(alpha: dark ? .18 : .7),
-        Colors.transparent,
-        Colors.white.withValues(alpha: dark ? .11 : .55),
-      ],
-    ).createShader(bounds);
-    canvas.drawRRect(rim.deflate(1.8), edge..strokeWidth = .7);
-  }
-
-  @override
-  bool shouldRepaint(_DockEdge oldDelegate) =>
-      dark != oldDelegate.dark || radius != oldDelegate.radius || outline != oldDelegate.outline;
+  Widget build(BuildContext context) => FvLiquidGlass(
+    radius: radius,
+    blur: 24,
+    strength: 1.15,
+    child: child,
+  );
 }
 
 /// Typographic visual for products whose owners have not uploaded a photo.

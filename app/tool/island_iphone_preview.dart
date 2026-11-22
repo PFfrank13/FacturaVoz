@@ -184,6 +184,27 @@ void main() {
   });
   tearDownAll(stopRetailFixture);
 
+  testWidgets('iPhone simulado sin avisos: isla en reposo 126 × 37', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = _device
+      ..devicePixelRatio = 1
+      ..padding = const FakeViewPadding(top: _strip, bottom: 34);
+    addTearDown(tester.view.reset);
+    fixtureAlertRead = true;
+    addTearDown(() => fixtureAlertRead = false);
+    await tester.pumpWidget(_phone(true));
+    await tester.pumpAndSettle();
+    final pill = find.byKey(const ValueKey('dynamic-island'));
+    if (pill.evaluate().isNotEmpty) {
+      expect(tester.getRect(pill), const Rect.fromLTWH(133.5, 11, 126, 37));
+    }
+    await _save(tester, 'iphone-oscuro-sin-avisos');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   for (final dark in const [false, true]) {
     final mode = dark ? 'oscuro' : 'claro';
     testWidgets('iPhone simulado ($mode)', (tester) async {
