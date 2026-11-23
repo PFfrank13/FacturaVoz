@@ -87,7 +87,7 @@ jobs:
         run: flutter test tool/visual_checkout_preview.dart --update-goldens
       - name: Capturar rutas Signature con datos de prueba locales
         run: flutter test test/visual/signature_preview.dart --update-goldens
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: facturavoz-luxe-flutter-previews
           path: app/tool/previews/**/*.png
