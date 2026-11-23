@@ -72,7 +72,7 @@ const allModules = <String, String>{
   'gastos': 'Gastos',
   'cuaderno_ia': 'Del cuaderno a la factura',
   'precios': 'Listas de precios y promociones',
-  'fidelizacion': 'Puntos y cupones',
+  'fidelizacion': 'Puntos para clientes frecuentes',
   'conciliacion': 'Conciliación bancaria',
   'comisiones': 'Comisiones por vendedor',
   'impuestos': 'Cuánto me queda e impuestos',

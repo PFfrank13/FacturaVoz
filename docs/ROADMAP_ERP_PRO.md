@@ -71,7 +71,7 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       salida de caja en una transacción `retail_receive`, idempotente), cuentas
       por pagar a proveedores y su pago (`retail_settle`).
 - [x] Inventario: kardex por producto (compras y ventas con stock resultante).
-- [ ] Inventario: vencimientos por lote y mermas con motivo. **Requiere decisión
+- [x] Inventario: vencimientos por lote y mermas con motivo (v3.6, aprobada y aplicada el 23/11/2026). Antes: **Requiere decisión
       del propietario:** una migración nueva (tablas de lotes y mermas) que debe
       aplicarse en producción con el procedimiento de seguridad.
 
@@ -86,19 +86,19 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 
 ### 7. Según la investigación del rubro (orden de prioridad)
 Fuente: `docs/INVESTIGACION_RETAIL.md`, «Las cinco siguientes» y tabla de 24 funciones.
-- [ ] Conciliación Yape/Plin (fila 1): en Android, leer solo las notificaciones de
+- [x] Conciliación Yape/Plin (fila 1): en Android, leer solo las notificaciones de
       Yape, Plin y bancos (permiso opcional y declarado, procesado en el teléfono),
       avisar por voz, registrar el cobro y emparejarlo con la venta; cuadre por medio
       al cierre. iOS no lo permite: decirlo en la venta. Revisar Ley 29733 y la
       política de Google Play antes de publicar.
-- [ ] Venta suelta y por peso en Básico (fila 2): presentaciones unidad/paquete/
+- [x] Venta suelta y por peso en Básico (fila 2): presentaciones unidad/paquete/
       caja/kilo con conversión de stock (costal → kilos).
-- [ ] Lotes, vencimientos y mermas con motivo (filas 3–4): **una sola migración,
+- [x] Lotes, vencimientos y mermas con motivo (filas 3–4): **una sola migración,
       requiere aprobación del propietario.** El plan Pro ya promete alertas de
       vencimiento: es la deuda comercial más urgente.
 - [ ] Turnos por cajero con fondo, sangrías, entrega de turno, cierre ciego por
       cajero, PIN de supervisor y bitácora (filas 5 y 7), sobre la caja actual.
-- [ ] Pedido sugerido multiproveedor del Copiloto IA al cierre del día (fila 6).
+- [x] Pedido sugerido multiproveedor (fila 6), en Compras web con la venta real; falta llevarlo al Copiloto del móvil.
 - [ ] Correcciones fiscales chicas: ICBPER (bolsa a S/ 0,50 fuera de la base del
       IGV, fila 13) y tope del NRUS por ventas **y compras** (fila 14, `taxes.dart`).
 - [ ] Después: multisucursal real con stock por local (fila 22). Hasta entonces el
@@ -160,3 +160,12 @@ Fuente: `docs/INVESTIGACION_RETAIL.md`, «Las cinco siguientes» y tabla de 24 f
   supermercados, SUNAT y mercado, competencia, proveedores y pagos) con fuentes;
   informe en `docs/INVESTIGACION_RETAIL.md`. Se añade el bloque 7 y se corrige la
   cifra de merma.
+- 23/11/2026: Bloque 7 según la investigación. Migraciones v3.6 (lotes, vencimientos, mermas; compras por kilo) y
+  v3.7 (unidad KGM) probadas en local y aplicadas en producción con el propietario. Web: vencimientos y mermas en
+  Inventario, fecha de vencimiento en Compras, pedido sugerido por proveedor, aviso en Inicio, productos por kilo,
+  módulos «Puntos de clientes» y «Precios y promociones», cuadre por cajero en Caja. Móvil: Vencimientos y mermas,
+  merma con motivo en lugar de la salida sin motivo, vencimiento al recibir compras, venta por kilo o por monto,
+  lector nativo de avisos Yape/Plin (probado en emulador: captura el Yape e ignora lo que no es pago) con «Yape
+  recibido» en el cobro. NRUS: el tope cuenta compras. Pendiente: ICBPER (toca el XML de SUNAT, probar en beta),
+  turnos con fondo y entrega por cajero con PIN, multisucursal con stock por local, cupones en el plan Pro de bodega
+  (hoy los cupones van con «precios»).
