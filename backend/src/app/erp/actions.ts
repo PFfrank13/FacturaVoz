@@ -46,6 +46,7 @@ const productEditSchema = z.object({
   unit_price: z.coerce.number().min(0).max(10_000_000),
   category: z.string().trim().max(60),
   reorder_point: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]),
+  unit_cost: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]).optional(),
   active: z.enum(["on"]).optional(),
 });
 
@@ -64,9 +65,11 @@ export async function updateProduct(org: string, productId: string, _previous: F
   if ("error" in ctx) return { ok: false, message: ctx.error! };
   const parsed = productEditSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { ok: false, message: "Revisa el nombre, el precio y el stock mínimo." };
-  const { name: productName, unit_price, category, reorder_point, active } = parsed.data;
+  const { name: productName, unit_price, category, reorder_point, unit_cost, active } = parsed.data;
   const result = await ctx.c.db.from("products")
-    .update({ name: productName, unit_price, category: category || null, reorder_point: reorder_point === "" ? null : reorder_point, active: active === "on" })
+    .update({ name: productName, unit_price, category: category || null, reorder_point: reorder_point === "" ? null : reorder_point, active: active === "on",
+      // Only touch the cost when the form sends it, so other editors never erase it.
+      ...(unit_cost === undefined ? {} : { unit_cost: unit_cost === "" ? null : unit_cost }) })
     .eq("org_id", org).eq("id", productId).select("id").maybeSingle();
   if (result.error || !result.data) return { ok: false, message: "No se pudo guardar. El producto no existe o no tienes acceso." };
   revalidatePath(`/erp/${org}`, "layout");

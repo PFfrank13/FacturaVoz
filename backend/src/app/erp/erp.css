@@ -85,7 +85,7 @@
 .fv-button:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -10px var(--erp-glow); filter: brightness(1.05); }
 .fv-button:active { transform: scale(.97); }
 .fv-button.secondary { background: var(--erp-pane); color: var(--erp-ink); border: 1px solid var(--erp-rim); box-shadow: none; }
-.fv-button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.fv-button:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; filter: saturate(.4); }
 .fv-icon-button { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--erp-pane); border: 1px solid var(--erp-rim); cursor: pointer; color: var(--erp-ink); transition: transform .2s var(--erp-ease); }
 .fv-icon-button:hover { transform: rotate(90deg); }
 
@@ -183,6 +183,10 @@
 .fv-sheet-form { margin: 18px 0 0; }
 .fv-photo-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .fv-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fv-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.fv-file:focus-within { outline: 3px solid var(--erp-accent); outline-offset: 3px; }
+.fv-margin { align-self: end; font-size: 13px; font-weight: 700; color: var(--erp-accent); padding: 12px 4px; }
+.fv-margin.is-bad { color: #e0457b; }
 .fv-check { flex-direction: row !important; align-items: center; gap: 10px !important; color: var(--erp-ink) !important; }
 .fv-check input { width: 20px; height: 20px; accent-color: var(--erp-accent); }
 .fv-ok, .fv-error { width: 100%; font-size: 13px; font-weight: 700; padding: 10px 14px; border-radius: 12px; animation: fv-fade .3s ease both; }

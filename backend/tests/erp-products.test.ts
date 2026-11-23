@@ -34,6 +34,13 @@ it("updates only the verified company's product with validated fields", async ()
   expect(mock.eq).toHaveBeenCalledWith("id", PRODUCT);
 });
 
+it("updates the cost when sent and leaves it alone when the form omits it", async () => {
+  await updateProduct("org", PRODUCT, previous, form({ name: "Arroz", unit_price: "5.2", category: "", reorder_point: "", unit_cost: "4.1", active: "on" }));
+  expect(mock.update).toHaveBeenLastCalledWith(expect.objectContaining({ unit_cost: 4.1 }));
+  await updateProduct("org", PRODUCT, previous, form({ name: "Arroz", unit_price: "5.2", category: "", reorder_point: "", active: "on" }));
+  expect(mock.update.mock.lastCall![0]).not.toHaveProperty("unit_cost");
+});
+
 it("an unchecked box archives the product and an empty minimum clears it", async () => {
   await updateProduct("org", PRODUCT, previous, form({ name: "Pan", unit_price: "1", category: "", reorder_point: "" }));
   expect(mock.update).toHaveBeenCalledWith({ name: "Pan", unit_price: 1, category: null, reorder_point: null, active: false });

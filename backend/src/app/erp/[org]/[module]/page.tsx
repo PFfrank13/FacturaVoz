@@ -38,7 +38,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   }
   if (id === "productos" || id === "inventario") {
     // One catalog, shared with the mobile POS: same rows, photos and permissions.
-    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,image_path")
+    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path")
       .eq("org_id", org).order("name", { ascending: true }).order("id").limit(500);
     const rows = (result.data ?? []) as Omit<ProductRow, "photo_url">[];
     const paths = rows.map(r => r.image_path).filter((p): p is string => !!p);

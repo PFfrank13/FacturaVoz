@@ -1,10 +1,11 @@
 "use client";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { updateProduct, uploadProductPhoto, type FormResult } from "@/app/erp/actions";
 
 export type ProductRow = {
   id: string; name: string; unit_price: number | string; unit: string; active: boolean;
-  category: string | null; stock: number | string | null; reorder_point: number | string | null;
+  category: string | null; stock: number | string | null; reorder_point: number | string | null; unit_cost: number | string | null;
   image_path: string | null; photo_url: string | null;
 };
 
@@ -64,14 +65,17 @@ function ProductPanel({ org, product, currency, canEdit, onClose }: { org: strin
   }, [onClose]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   const photo = preview ?? product.photo_url;
-  return <div className="fv-sheet-layer" onClick={onClose}>
+  // Mounted at the workspace root: above the sticky top bar, and still inside
+  // the element that defines the theme's color variables.
+  const root = typeof document === "undefined" ? null : document.querySelector(".fv-workspace");
+  const sheet = <div className="fv-sheet-layer" onClick={onClose}>
     <div ref={panel} tabIndex={-1} className="fv-sheet" role="dialog" aria-modal="true" aria-labelledby="fv-sheet-title" onClick={e => e.stopPropagation()}>
       <header><div><small>{product.category || "Producto"}</small><h2 id="fv-sheet-title">{product.name}</h2></div>
         <button className="fv-icon-button" onClick={onClose} aria-label="Cerrar">✕</button></header>
       <div className="fv-studio is-large">{photo ? <img src={photo} alt={`Fotografía de ${product.name}`} /> : <b aria-hidden="true">{initials(product.name)}</b>}</div>
       {canEdit ? <>
         <form action={upload} className="fv-photo-form">
-          <label className="fv-button secondary">Elegir foto<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" hidden
+          <label className="fv-button secondary fv-file">Elegir foto<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" className="fv-visually-hidden"
             onChange={e => { const f = e.target.files?.[0]; setPreview(f ? URL.createObjectURL(f) : null); }} /></label>
           <button className="fv-button" disabled={uploading || !preview}>{uploading ? "Subiendo…" : "Subir foto"}</button>
           {photoState.message && <p role={photoState.ok ? "status" : "alert"} className={photoState.ok ? "fv-ok" : "fv-error"}>{photoState.message}</p>}
@@ -80,7 +84,11 @@ function ProductPanel({ org, product, currency, canEdit, onClose }: { org: strin
           <label>Nombre<input name="name" defaultValue={product.name} required maxLength={120} /></label>
           <div className="fv-two">
             <label>Precio (sin IGV)<input name="unit_price" type="number" min="0" max="10000000" step="0.01" defaultValue={Number(product.unit_price)} required /></label>
+            <label>Costo (sin IGV)<input name="unit_cost" type="number" min="0" max="10000000" step="0.01" defaultValue={product.unit_cost == null ? "" : Number(product.unit_cost)} /></label>
+          </div>
+          <div className="fv-two">
             <label>Stock mínimo<input name="reorder_point" type="number" min="0" step="1" defaultValue={product.reorder_point == null ? "" : Number(product.reorder_point)} /></label>
+            <MarginHint price={Number(product.unit_price)} cost={product.unit_cost == null ? null : Number(product.unit_cost)} />
           </div>
           <label>Categoría<input name="category" defaultValue={product.category ?? ""} maxLength={60} /></label>
           <label className="fv-check"><input type="checkbox" name="active" defaultChecked={product.active} /> Activo en el punto de venta</label>
@@ -94,4 +102,12 @@ function ProductPanel({ org, product, currency, canEdit, onClose }: { org: strin
       </dl>}
     </div>
   </div>;
+  return root ? createPortal(sheet, root) : sheet;
+}
+
+/** Margin from the saved price and cost, the same figure the mobile app shows. */
+function MarginHint({ price, cost }: { price: number; cost: number | null }) {
+  if (cost == null || price <= 0) return <p className="fv-margin">Margen: añade el costo</p>;
+  const margin = Math.round(((price - cost) / price) * 100);
+  return <p className={`fv-margin${margin < 0 ? " is-bad" : ""}`}>Margen guardado: {margin} %</p>;
 }
