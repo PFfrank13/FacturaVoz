@@ -43,9 +43,9 @@ export default function ProductBoard({ org, rows, currency, canEdit, canKardex =
           {p.stock != null && <em className={low(p) ? "is-low" : ""}>Stock {Number(p.stock)}</em>}
         </span>
         <span className="fv-product-body">
-          <small>{p.category || (p.unit === "ZZ" ? "Servicio" : "Producto")}</small>
+          <small>{p.category || (p.unit === "ZZ" ? "Servicio" : p.unit === "KGM" ? "Por kilo" : "Producto")}</small>
           <strong>{p.name}</strong>
-          <span className="fv-price">{fmt(Number(p.unit_price), currency)}</span>
+          <span className="fv-price">{fmt(Number(p.unit_price), currency)}{p.unit === "KGM" ? " / kg" : ""}</span>
         </span>
       </button>)}
     </div>

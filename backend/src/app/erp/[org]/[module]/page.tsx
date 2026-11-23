@@ -14,6 +14,8 @@ import ClientsBoard from "@/components/erp/ClientsBoard";
 import CashBoard from "@/components/erp/CashBoard";
 import PurchasesBoard, { type PurchaseProduct } from "@/components/erp/PurchasesBoard";
 import PaymentsBoard from "@/components/erp/PaymentsBoard";
+import LoyaltyBoard from "@/components/erp/LoyaltyBoard";
+import type { Coupon, LoyaltyRow, Promotion } from "@/lib/erp/loyalty";
 import { monthBounds, parseMonth, type PaymentRow } from "@/lib/erp/payments";
 import { lastSupplierByProduct, suggestOrder, type PurchaseRow, type Velocity } from "@/lib/erp/purchases";
 import type { CashMove, DayClosing } from "@/lib/erp/cash";
@@ -95,6 +97,27 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       {receipts.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar las compras</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <PurchasesBoard org={org} rows={rows} products={((products.data ?? []) as PurchaseProduct[]).map(p => ({ ...p, unit_cost: p.unit_cost === null ? null : Number(p.unit_cost), stock: p.stock === null ? null : Number(p.stock) }))} currency={c.organization.currency || "PEN"} month={limaDate(new Date()).slice(0, 7)}
             suggestions={suggestOrder(((velocity.data ?? []) as Velocity[]).filter(v => ((products.data ?? []) as PurchaseProduct[]).some(p => p.id === v.product_id)), lastSupplierByProduct(rows))} />}
+    </>;
+  }
+  if (id === "puntos" || id === "promociones") {
+    // The mobile «Puntos y fidelización» and «Precios y promociones», on the same tables (RLS + Hub feature guards).
+    const points = id === "puntos";
+    const [settings, balances, promos, coupons] = await Promise.all([
+      points ? c.db.from("org_settings").select("loyalty_rate").eq("org_id", org).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      points ? c.db.rpc("loyalty_balances", { p_org: org }) : Promise.resolve({ data: [], error: null }),
+      points ? Promise.resolve({ data: [], error: null }) : c.db.from("promotions").select("id,name,kind,value,min_qty,starts_on,ends_on,active,product_ids").eq("org_id", org).order("created_at", { ascending: false }).limit(200),
+      points ? Promise.resolve({ data: [], error: null }) : c.db.from("coupons").select("id,code,kind,value,max_uses,uses,expires_on,active").eq("org_id", org).order("created_at", { ascending: false }).limit(200),
+    ]);
+    const failed = balances.error || promos.error || coupons.error;
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{points ? "FIDELIZACIÓN" : "PRECIOS"} / {c.organization.name}</p><LiveRefresh org={org} tables={livePayments} /></div><h1>{title}</h1>
+      <p>{points ? "Cada cobro a un cliente identificado le suma puntos; aquí ves quién tiene más y registras sus canjes." : "Descuentos y cupones que el punto de venta del móvil aplica solo en sus fechas."}</p></section>
+      {failed ? <div className="fv-empty" role="alert"><h2>No pudimos cargar esta sección</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <LoyaltyBoard org={org} view={points ? "puntos" : "promociones"} currency={c.organization.currency || "PEN"} today={limaDate(new Date())}
+            rate={settings.data ? Number((settings.data as { loyalty_rate: number | string }).loyalty_rate) || null : null}
+            balances={((balances.data ?? []) as LoyaltyRow[]).map(b => ({ ...b, points: Number(b.points) }))}
+            promotions={((promos.data ?? []) as Promotion[]).map(p => ({ ...p, value: Number(p.value), min_qty: p.min_qty == null ? null : Number(p.min_qty) }))}
+            coupons={((coupons.data ?? []) as Coupon[]).map(x => ({ ...x, value: Number(x.value), uses: Number(x.uses ?? 0), max_uses: x.max_uses == null ? null : Number(x.max_uses) }))}
+            canEditPromos={can(c.access, "products_edit")} canSetRate={can(c.access, "settings")} canRedeem={can(c.access, "collect")} />}
     </>;
   }
   if (id === "cobros") {

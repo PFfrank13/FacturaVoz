@@ -18,6 +18,8 @@ export type TaxInput = {
   monthSalesTax: number; // IGV de ventas del mes
   monthPurchasesTax: number; // IGV de compras del mes (crédito fiscal)
   yearSalesBase: number; // ventas acumuladas del año (sin IGV), incluido este mes
+  monthPurchasesTotal?: number; // compras del mes con IGV (el tope del NRUS también mira las compras)
+  yearPurchasesTotal?: number; // compras del año con IGV
 };
 
 export type TaxEstimate = {
@@ -42,10 +44,17 @@ export function estimateTaxes(i: TaxInput): TaxEstimate {
   switch (i.regime) {
     case "nrus": {
       const monthTotal = r2(base + Math.max(0, i.monthSalesTax));
-      const cuota = monthTotal <= 5000 ? 20 : monthTotal <= 8000 ? 50 : 50;
+      const monthBuys = r2(Math.max(0, i.monthPurchasesTotal ?? 0));
+      const yearBuys = r2(Math.max(0, i.yearPurchasesTotal ?? 0));
+      // La categoría la decide lo mayor entre lo que vendes y lo que compras en el mes.
+      const cuota = Math.max(monthTotal, monthBuys) <= 5000 ? 20 : 50;
       if (monthTotal > 8000) warnings.push("Este mes pasaste S/ 8,000: el Nuevo RUS ya no te corresponde. Habla con tu contador para cambiar de régimen.");
+      if (monthBuys > 8000) warnings.push("Este mes tus compras pasaron S/ 8,000: el tope del Nuevo RUS también cuenta las compras. Habla con tu contador.");
       if (i.yearSalesBase > 96000) warnings.push("En el año pasaste S/ 96,000: superaste el tope del Nuevo RUS.");
       else if (i.yearSalesBase > 96000 * 0.8) warnings.push(`Vas por ${Math.round((i.yearSalesBase / 96000) * 100)} % del tope anual del Nuevo RUS (S/ 96,000).`);
+      if (yearBuys > 96000) warnings.push("En el año tus compras pasaron S/ 96,000: superaste el tope del Nuevo RUS.");
+      else if (yearBuys > 96000 * 0.8) warnings.push(`Tus compras del año van por ${Math.round((yearBuys / 96000) * 100)} % del tope del Nuevo RUS (S/ 96,000).`);
+      if (monthTotal > 8000 || monthBuys > 8000 || i.yearSalesBase > 96000 || yearBuys > 96000) notes.push("Si sales del Nuevo RUS, desde el mes siguiente debes emitir comprobantes electrónicos (RS 000075-2026).");
       notes.push("En el Nuevo RUS la cuota mensual ya incluye IGV y renta. Solo puedes emitir boletas.");
       return { regime: "nrus", igv: 0, renta: cuota, total: cuota, rentaRate: null, notes, warnings };
     }

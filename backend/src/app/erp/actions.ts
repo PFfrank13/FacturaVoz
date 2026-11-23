@@ -10,11 +10,12 @@ import { parseAmount } from "@/lib/erp/cash";
 import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
 import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
 import { lossProblem, type LotStatus } from "@/lib/erp/lots";
+import { couponProblem, promoProblem } from "@/lib/erp/loyalty";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
 const clientSchema = z.object({ name, email: z.union([z.literal(""), z.email().max(200)]), phone: z.string().trim().max(30), tax_id: z.string().trim().max(20) });
-const productSchema = z.object({ name, unit_price: z.coerce.number().min(0).max(10_000_000), unit: z.enum(["NIU", "ZZ"]) });
+const productSchema = z.object({ name, unit_price: z.coerce.number().min(0).max(10_000_000), unit: z.enum(["NIU", "ZZ", "KGM"]) });
 const jobSchema = z.object({ title: z.string().trim().min(1).max(140) });
 
 /** All mutations re-read server rights, then execute with the user's RLS client. */
@@ -472,4 +473,107 @@ export async function getProductLots(org: string, productId: string): Promise<{ 
     .map(l => ({ ...l, quantity: Number(l.quantity), remaining: Number(l.remaining), days_left: Number(l.days_left) }))
     .sort((a, b) => a.expires_on.localeCompare(b.expires_on));
   return { ok: true, lots };
+}
+
+/** Promotions and coupons: products_edit rights and the «precios» feature, like the mobile «Precios y promociones». */
+async function promosContext(org: string) {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "promociones")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  return { c, error: "" } as const;
+}
+
+const optionalDate = z.union([z.literal(""), z.iso.date()]).default("");
+const promoSchema = z.object({ name: z.string().max(80), kind: z.string().max(20), value: z.string().max(20), min_qty: z.string().max(20).default(""), starts_on: optionalDate, ends_on: optionalDate });
+
+export async function savePromotion(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await promosContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = promoSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Revisa el nombre, el descuento y las fechas." };
+  const d = parsed.data;
+  const value = parseAmount(d.value);
+  const minQty = d.min_qty ? parseAmount(d.min_qty) : null;
+  const problem = promoProblem({ name: d.name, kind: d.kind, value, minQty, startsOn: d.starts_on, endsOn: d.ends_on });
+  if (problem) return { ok: false, message: problem };
+  const { error } = await ctx.c.db.from("promotions").insert({
+    org_id: org, name: d.name.trim(), kind: d.kind, value, product_ids: [], min_qty: d.kind === "volumen" ? minQty : null,
+    starts_on: d.starts_on || null, ends_on: d.ends_on || null, active: true,
+  });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo crear la promoción.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Promoción creada: el punto de venta la aplica sola en sus fechas." };
+}
+
+export async function togglePromotion(org: string, id: string, active: boolean): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "Promoción no válida." };
+  const ctx = await promosContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("promotions").update({ active }).eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo cambiar la promoción.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: active ? "Promoción reanudada." : "Promoción pausada." };
+}
+
+const couponSchema = z.object({ code: z.string().max(20), kind: z.string().max(20), value: z.string().max(20), max_uses: z.string().max(10).default(""), expires_on: optionalDate });
+
+export async function createCoupon(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await promosContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = couponSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Revisa el código y el descuento." };
+  const d = parsed.data;
+  const value = parseAmount(d.value);
+  const maxUses = d.max_uses.trim() ? Number(d.max_uses) : null;
+  const problem = couponProblem({ code: d.code, kind: d.kind, value, maxUses });
+  if (problem) return { ok: false, message: problem };
+  const { error } = await ctx.c.db.from("coupons").insert({ org_id: org, code: d.code.trim().toUpperCase(), kind: d.kind, value, max_uses: maxUses, expires_on: d.expires_on || null });
+  if (error) return { ok: false, message: /duplicate|unique/i.test(error.message) ? "Ya existe un cupón con ese código." : dbMessage(error.message, "No se pudo crear el cupón.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Cupón creado: se canjea escribiendo el código al cobrar en el móvil." };
+}
+
+export async function toggleCoupon(org: string, id: string, active: boolean): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "Cupón no válido." };
+  const ctx = await promosContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("coupons").update({ active }).eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo cambiar el cupón.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: active ? "Cupón reanudado." : "Cupón pausado." };
+}
+
+/** Points program: the «fidelizacion» feature; the rate is a company setting (settings rights). */
+async function pointsContext(org: string) {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "puntos")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  return { c, error: "" } as const;
+}
+
+export async function setLoyaltyRate(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await pointsContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!can(ctx.c.access, "settings")) return { ok: false, message: "El programa de puntos lo configura el dueño o un administrador." };
+  const rate = parseAmount(String(form.get("rate") ?? "0") || "0");
+  if (rate == null || rate < 0 || rate > 100) return { ok: false, message: "Escribe cuántos puntos da cada sol (0 a 100)." };
+  const { error } = await ctx.c.db.from("org_settings").update({ loyalty_rate: Math.round(rate * 10000) / 10000 }).eq("org_id", org);
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar el programa de puntos.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: rate > 0 ? `Listo: cada sol cobrado suma ${rate} ${rate === 1 ? "punto" : "puntos"}.` : "Programa de puntos apagado." };
+}
+
+export async function redeemPoints(org: string, clientId: string, balance: number, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(clientId).success) return { ok: false, message: "Cliente no válido." };
+  const ctx = await pointsContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!can(ctx.c.access, "collect")) return { ok: false, message: "Tu rol no puede canjear puntos." };
+  const points = Number(String(form.get("points") ?? "").trim());
+  if (!Number.isInteger(points) || points <= 0) return { ok: false, message: "Escribe cuántos puntos canjea (número entero)." };
+  if (points > balance) return { ok: false, message: `Solo tiene ${balance} puntos.` };
+  const reason = String(form.get("reason") ?? "").trim().slice(0, 120) || "Canje";
+  const { error } = await ctx.c.db.from("loyalty_ledger").insert({ org_id: org, client_id: clientId, points: -points, reason });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo canjear.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: `Canjeados ${points} puntos.` };
 }

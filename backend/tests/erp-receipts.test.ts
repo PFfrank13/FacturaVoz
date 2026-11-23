@@ -46,7 +46,7 @@ describe("draft receipts", () => {
     expect(draftProblem({ client_name: "x", tax_rate: 18, items: [{ ...line, description: " " }] })).toBe("Escribe la descripción.");
     expect(draftProblem({ client_name: "x", tax_rate: 18, items: [line, { ...line, quantity: 0 }] })).toBe("La cantidad del artículo 2 debe ser mayor que cero.");
     expect(draftProblem({ client_name: "x", tax_rate: 120, items: [line] })).toContain("IGV");
-  });
+  }, 20_000); // the dynamic import of schemas can exceed 5 s when the whole suite runs in parallel
 });
 
 describe("receipt date range and sending", () => {

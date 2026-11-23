@@ -95,3 +95,13 @@ describe("inicio", () => {
     expect(list.find(a => a.id === "por-vencer")?.text).toMatch(/Un lote vence esta semana \(S\/ 12.00\)/);
   });
 });
+
+import { estimateTaxes } from "@/lib/taxes";
+describe("tope del NRUS", () => {
+  it("cuenta también las compras", () => {
+    const e = estimateTaxes({ regime: "nrus", monthSalesBase: 3000, monthSalesTax: 0, monthPurchasesTax: 0, yearSalesBase: 30000, monthPurchasesTotal: 6000, yearPurchasesTotal: 97000 });
+    expect(e.renta).toBe(50);
+    expect(e.warnings.join(" ")).toMatch(/año tus compras pasaron S\/ 96,000/);
+    expect(e.notes.join(" ")).toMatch(/comprobantes electrónicos/);
+  });
+});
