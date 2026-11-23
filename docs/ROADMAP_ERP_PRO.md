@@ -70,8 +70,10 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       aplicarse en producción con el procedimiento de seguridad.
 
 ### 5. ERP web — Panel y diseño
-- [ ] Inicio con ventas del día/mes, ticket promedio, top productos, stock bajo,
-      fiados por cobrar (datos reales).
+- [x] Inicio con ventas del día y del mes, comparación con los mismos días del
+      mes pasado, ticket promedio, ritmo de ventas por hora, productos estrella y
+      «Para resolver hoy» (SUNAT, stock bajo, fiados vencidos, deuda a
+      proveedores, caja), todo con datos reales y según plan y rol.
 - [ ] Diseño premium coherente con el móvil (skill frontend-design).
 
 ### 6. Móvil — pulido
@@ -100,3 +102,6 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   pagar» (stock 20 → 32, costo actualizado) y pago en efectivo posterior.
 - 23/11/2026: Kardex en la ficha del producto (solo dueño/administrador, como
   exige RLS), verificado con la compra local (+12 → 32).
+- 23/11/2026: Inicio rediseñado (skill frontend-design): una frase con la venta
+  del día y el ritmo por hora como elemento principal; verificado en escritorio
+  y a 375 px con ventas locales de prueba.
