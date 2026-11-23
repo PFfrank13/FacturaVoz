@@ -56,6 +56,7 @@ const productEditSchema = z.object({
   reorder_point: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]),
   unit_cost: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]).optional(),
   active: z.enum(["on"]).optional(),
+  icbper: z.enum(["on"]).optional(),
 });
 
 /** Product edits from the web: same table and columns the mobile app reads. */
@@ -73,11 +74,13 @@ export async function updateProduct(org: string, productId: string, _previous: F
   if ("error" in ctx) return { ok: false, message: ctx.error! };
   const parsed = productEditSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { ok: false, message: "Revisa el nombre, el precio y el stock mínimo." };
-  const { name: productName, unit_price, category, reorder_point, unit_cost, active } = parsed.data;
+  const { name: productName, unit_price, category, reorder_point, unit_cost, active, icbper } = parsed.data;
   const result = await ctx.c.db.from("products")
     .update({ name: productName, unit_price, category: category || null, reorder_point: reorder_point === "" ? null : reorder_point, active: active === "on",
       // Only touch the cost when the form sends it, so other editors never erase it.
-      ...(unit_cost === undefined ? {} : { unit_cost: unit_cost === "" ? null : unit_cost }) })
+      ...(unit_cost === undefined ? {} : { unit_cost: unit_cost === "" ? null : unit_cost }),
+      // The bag checkbox is only rendered for unit products; its hidden marker says the form carried it.
+      ...(form.get("icbper_shown") === "1" ? { icbper: icbper === "on" } : {}) })
     .eq("org_id", org).eq("id", productId).select("id").maybeSingle();
   if (result.error || !result.data) return { ok: false, message: "No se pudo guardar. El producto no existe o no tienes acceso." };
   revalidatePath(`/erp/${org}`, "layout");
@@ -476,10 +479,12 @@ export async function getProductLots(org: string, productId: string): Promise<{ 
 }
 
 /** Promotions and coupons: products_edit rights and the «precios» feature, like the mobile «Precios y promociones». */
-async function promosContext(org: string) {
+async function promosContext(org: string, coupons = false) {
   const c = await workspaceContext(org);
-  const entry = modules.find(m => m.id === "promociones")!;
-  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  const allowed = (id: string) => moduleAllowed(modules.find(m => m.id === id)!, c.license, c.access, c.sector);
+  // Coupons also come with «Puntos» (fidelizacion, plan Pro de bodega, v3.8a); changing them needs products_edit.
+  const ok = allowed("promociones") || (coupons && allowed("puntos") && can(c.access, "products_edit"));
+  if (!ok) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
   return { c, error: "" } as const;
 }
 
@@ -518,7 +523,7 @@ export async function togglePromotion(org: string, id: string, active: boolean):
 const couponSchema = z.object({ code: z.string().max(20), kind: z.string().max(20), value: z.string().max(20), max_uses: z.string().max(10).default(""), expires_on: optionalDate });
 
 export async function createCoupon(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
-  const ctx = await promosContext(org);
+  const ctx = await promosContext(org, true);
   if (!ctx.c) return { ok: false, message: ctx.error };
   const parsed = couponSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { ok: false, message: "Revisa el código y el descuento." };
@@ -535,7 +540,7 @@ export async function createCoupon(org: string, _previous: FormResult, form: For
 
 export async function toggleCoupon(org: string, id: string, active: boolean): Promise<FormResult> {
   if (!uuid.safeParse(id).success) return { ok: false, message: "Cupón no válido." };
-  const ctx = await promosContext(org);
+  const ctx = await promosContext(org, true);
   if (!ctx.c) return { ok: false, message: ctx.error };
   const { error } = await ctx.c.db.from("coupons").update({ active }).eq("org_id", org).eq("id", id);
   if (error) return { ok: false, message: dbMessage(error.message, "No se pudo cambiar el cupón.") };
@@ -576,4 +581,50 @@ export async function redeemPoints(org: string, clientId: string, balance: numbe
   if (error) return { ok: false, message: dbMessage(error.message, "No se pudo canjear.") };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: `Canjeados ${points} puntos.` };
+}
+
+/** Cashier shifts (v3.8c): any role that collects opens its own shift; the database closes it blind. */
+export async function openShift(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await cashContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const amount = parseAmount(String(form.get("float") ?? ""));
+  if (amount == null) return { ok: false, message: "Escribe el fondo inicial, por ejemplo 50.00." };
+  const { error } = await ctx.c.db.rpc("shift_open", { p_org: org, p_float: amount });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo abrir el turno.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Turno abierto. Ciérralo al terminar contando tu cajón." };
+}
+
+export async function closeShift(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await cashContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const counted = parseAmount(String(form.get("counted") ?? ""));
+  if (counted == null) return { ok: false, message: "Escribe el efectivo que contaste." };
+  const note = String(form.get("note") ?? "").trim().slice(0, 300);
+  const { data, error } = await ctx.c.db.rpc("shift_close", { p_org: org, p_counted: counted, p_note: note || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo cerrar el turno.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  const diff = (data as { difference?: number } | null)?.difference;
+  if (diff === undefined) return { ok: true, message: "Turno cerrado. El dueño revisará el cuadre." };
+  const d = Math.round(Number(diff) * 100) / 100;
+  return { ok: true, message: Math.abs(d) <= 0.01 ? "Turno cerrado: cuadró exacto." : `Turno cerrado: ${d > 0 ? "sobraron" : "faltaron"} S/ ${Math.abs(d).toFixed(2)}.` };
+}
+
+const transferSchema = z.object({ request_id: uuid, to_org: uuid, from_product: uuid, to_product: uuid, quantity: z.number(), note: z.string().max(200) });
+
+/** Moves goods from this store to another one of the same owner (stock_transfer, idempotent, plan Empresa). */
+export async function transferStock(org: string, input: { request_id: string; to_org: string; from_product: string; to_product: string; quantity: number; note: string }): Promise<FormResult> {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "sucursales")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  if (!c.access.is_admin) return { ok: false, message: "Los traslados los hace el dueño o un administrador." };
+  const parsed = transferSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Revisa los productos y la cantidad." };
+  const d = parsed.data;
+  if (!(d.quantity > 0) || Math.abs(d.quantity * 100 - Math.round(d.quantity * 100)) > 1e-6) return { ok: false, message: "La cantidad debe ser mayor que cero, con hasta 2 decimales." };
+  const { data, error } = await c.db.rpc("stock_transfer", { p_request_id: d.request_id, p_from_org: org, p_to_org: d.to_org, p_from_product: d.from_product, p_to_product: d.to_product, p_quantity: d.quantity, p_note: d.note.trim() || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo trasladar. Inténtalo de nuevo: no se duplicará.") };
+  const row = Array.isArray(data) ? data[0] as { from_stock?: number; to_stock?: number; reused?: boolean } | undefined : undefined;
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: row?.reused ? "Ese traslado ya estaba registrado." : `Trasladado. Aquí quedan ${Number(row?.from_stock ?? 0)}; en el destino hay ${Number(row?.to_stock ?? 0)}.` };
 }

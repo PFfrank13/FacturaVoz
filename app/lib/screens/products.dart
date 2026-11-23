@@ -216,6 +216,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     const steps = ['Datos del producto', 'Código y foto', 'Presentaciones',
       'Costos y precios', 'Stock inicial', 'Revisar y guardar'];
     var unit = p?.unit ?? (guided ? 'NIU' : 'ZZ');
+    var isBag = p?.icbper ?? false;
     var track = p?.tracksStock ?? guided;
     final stock = TextEditingController(text: p?.stock == null ? '' : qtyText(p!.stock!));
     final reorder = TextEditingController(text: p?.reorderPoint == null ? '' : qtyText(p!.reorderPoint!));
@@ -490,6 +491,13 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 ),
               ]),
               ],
+              if ((!guided || wizardStep == 0) && unit == 'NIU') SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: isBag,
+                onChanged: (v) => setS(() => isBag = v),
+                title: const Text('Es bolsa plástica'),
+                subtitle: const Text('El comprobante declara el impuesto a la bolsa (S/ 0.50 c/u) dentro de su precio. Ponle un precio mayor, por ejemplo S/ 0.60.'),
+              ),
               if ((!guided || wizardStep == 4) && unit != 'ZZ') ...[
                 const SizedBox(height: 6),
                 SwitchListTile(
@@ -583,6 +591,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final costValue = parseDecimal(cost.text);
     final growthChanged = costValue != p?.unitCost || inStore != (p?.inStore ?? true);
     final extraFields = <String, dynamic>{
+      if (unit == 'NIU') 'icbper': isBag,
       'barcode': barcode.text.trim().isEmpty ? null : barcode.text.trim(),
       'category': category.text.trim().isEmpty ? null : category.text.trim(),
       'description': description.text.trim().isEmpty ? null : description.text.trim(),

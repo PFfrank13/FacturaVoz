@@ -461,3 +461,15 @@
 .fv-reorder-card li b { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 900px) { .fv-expiry .fv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .fv-expiry .fv-kpis { grid-template-columns: 1fr; } .fv-lots li { grid-template-columns: 1fr; } }
+.fv-coupons { margin-top: 16px; }
+
+/* Sucursales (v3.8d) */
+.fv-branches { display: grid; gap: 10px; margin-bottom: 16px; }
+.fv-branches li { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 10px; align-items: center; padding: 16px 20px; border-radius: 20px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); font-size: 14px; font-variant-numeric: tabular-nums; }
+.fv-branches li.is-current { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--erp-accent) 55%, transparent); }
+.fv-branches li > div { display: grid; gap: 2px; }
+.fv-branches small { color: var(--erp-muted); }
+.fv-branches small a { color: var(--erp-accent); text-decoration: underline; }
+.fv-branches .is-out { color: #ffb35c; font-weight: 700; }
+@media (max-width: 720px) { .fv-branches li { grid-template-columns: 1fr 1fr; } }

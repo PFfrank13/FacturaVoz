@@ -8,7 +8,7 @@ import { ProductLots } from "@/components/erp/LotsAndLosses";
 export type ProductRow = {
   id: string; name: string; unit_price: number | string; unit: string; active: boolean;
   category: string | null; stock: number | string | null; reorder_point: number | string | null; unit_cost: number | string | null;
-  image_path: string | null; photo_url: string | null;
+  image_path: string | null; photo_url: string | null; icbper?: boolean | null;
 };
 
 const empty: FormResult = { ok: false, message: "" };
@@ -94,6 +94,8 @@ function ProductPanel({ org, product, currency, canEdit, canKardex, canLots, onC
           </div>
           <label>Categoría<input name="category" defaultValue={product.category ?? ""} maxLength={60} /></label>
           <label className="fv-check"><input type="checkbox" name="active" defaultChecked={product.active} /> Activo en el punto de venta</label>
+          {product.unit === "NIU" && <><input type="hidden" name="icbper_shown" value="1" />
+            <label className="fv-check"><input type="checkbox" name="icbper" defaultChecked={product.icbper === true} /> Es bolsa plástica: el comprobante declara el impuesto a la bolsa (S/ 0.50 c/u) dentro del precio</label></>}
           <button className="fv-button" disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</button>
           {state.message && <p role={state.ok ? "status" : "alert"} className={state.ok ? "fv-ok" : "fv-error"}>{state.message}</p>}
         </form>

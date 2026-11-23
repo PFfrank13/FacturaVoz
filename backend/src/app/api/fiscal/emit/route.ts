@@ -10,7 +10,7 @@ export const OPTIONS = preflight;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type ItemRow = { description: string; quantity: number | string; unit_price: number | string; position: number };
+type ItemRow = { description: string; quantity: number | string; unit_price: number | string; position: number; product: { icbper: boolean | null } | { icbper: boolean | null }[] | null };
 
 /**
  * Emite (o reintenta) el comprobante electrónico de una factura guardada.
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   // La factura (RLS: solo si eres miembro de su empresa) define la empresa emisora
   const { data: inv } = await supabase
     .from("invoices")
-    .select("id, org_id, status, currency, tax_rate, due_date, client_id, import_job_id, voided_at, doc_kind, clients(id, name), invoice_items(description, quantity, unit_price, position)")
+    .select("id, org_id, status, currency, tax_rate, due_date, client_id, import_job_id, voided_at, doc_kind, clients(id, name), invoice_items(description, quantity, unit_price, position, product:products(icbper))")
     .eq("id", invoiceId)
     .order("position", { referencedTable: "invoice_items", ascending: true })
     .maybeSingle();
@@ -94,6 +94,7 @@ export async function POST(req: Request) {
       description: i.description,
       quantity: Number(i.quantity),
       unit_price: Number(i.unit_price),
+      icbper: (Array.isArray(i.product) ? i.product[0]?.icbper : i.product?.icbper) === true,
     })),
   } as const;
   const problem = validateFiscalInput(input);

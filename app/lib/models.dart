@@ -480,7 +480,7 @@ class ClientCard {
 
 /// Producto o servicio del catálogo de la empresa.
 class Product {
-  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active, this.stock, this.reorderPoint, this.unitCost, this.inStore = true});
+  Product({required this.id, required this.name, required this.unitPrice, required this.unit, required this.active, this.stock, this.reorderPoint, this.unitCost, this.inStore = true, this.icbper = false});
   final String id;
   final String name;
   final double unitPrice;
@@ -498,6 +498,9 @@ class Product {
 
   /// Visible en la tienda en línea.
   final bool inStore;
+
+  /// Bolsa plástica: el comprobante declara el ICBPER (S/ 0.50 por bolsa) dentro de su precio.
+  final bool icbper;
 
   /// Margen sobre el precio (0..1) o null si no hay costo.
   double? get margin => unitCost == null || unitPrice <= 0 ? null : (unitPrice - unitCost!) / unitPrice;
@@ -517,6 +520,7 @@ class Product {
         reorderPoint: j['reorder_point'] == null ? null : _num(j['reorder_point']),
         unitCost: j['unit_cost'] == null ? null : _num(j['unit_cost']),
         inStore: j['in_store'] != false,
+        icbper: j['icbper'] == true,
       );
 }
 

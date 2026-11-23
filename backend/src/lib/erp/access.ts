@@ -42,6 +42,7 @@ export const modules: readonly Module[] = [
   { id: "promociones", title: "Precios y promociones", feature: "precios", permission: "products_edit" },
   { id: "puntos", title: "Puntos de clientes", feature: "fidelizacion", permission: "sell" },
   { id: "cobros", title: "Cobros", feature: "cobros", permission: "collect", table: "payments", columns: "id,amount,paid_on,method,note", fields: [["amount", "Importe registrado"], ["paid_on", "Fecha"], ["method", "Medio"], ["note", "Nota"]], order: "paid_on" },
+  { id: "sucursales", title: "Sucursales", feature: "multisucursal", permission: "team" },
   { id: "equipo", title: "Equipo", permission: "team" },
   { id: "reportes", title: "Reportes", feature: "reportes", permission: "finance" },
   { id: "plan", title: "Mi plan", permission: "license" },

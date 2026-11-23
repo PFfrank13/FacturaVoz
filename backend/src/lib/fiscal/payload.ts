@@ -1,5 +1,6 @@
 import { amountLegend } from "./words";
-import { calc, type Afectacion, type Line } from "./calc";
+import { round2 } from "./calc";
+import { calc, splitIcbper, type Afectacion, type Line } from "./calc";
 
 export type Issuer = {
   ruc: string;
@@ -43,6 +44,8 @@ export function validateFiscalInput(i: BuildInput): string | null {
   if (i.docType === "01" && i.client.tipoDoc !== "6") return "La factura requiere el RUC del cliente";
   const c = calc(i.lines, i.afectacion, i.taxRate);
   if (c.lines.some((l) => l.quantity <= 0 || l.valorUnitario < 0 || !l.description)) return "Hay líneas con datos no válidos";
+  if (i.lines.some((l) => l.icbper) && !splitIcbper(c, i.lines, i.afectacion, i.taxRate))
+    return "Las bolsas se venden por unidad entera y su precio debe pasar el impuesto de S/ 0.50 por bolsa (por ejemplo S/ 0.60: S/ 0.10 de la bolsa + S/ 0.50 de ICBPER).";
   if (c.total <= 0) return "El total debe ser mayor que cero";
   // Boleta: identificar al comprador desde S/ 700 (o siempre en USD)
   if (i.docType === "03" && i.client.tipoDoc === "-" && (i.currency === "USD" || c.total >= 700))
@@ -58,7 +61,10 @@ export function validateFiscalInput(i: BuildInput): string | null {
 
 /** Construye el JSON de Lycet/Greenter (sin serie ni correlativo: los asigna la base de datos). */
 export function buildInvoicePayload(i: BuildInput) {
-  const c = calc(i.lines, i.afectacion, i.taxRate);
+  const raw = calc(i.lines, i.afectacion, i.taxRate);
+  // Bolsas plásticas: el ICBPER sale del precio de la línea; el total cobrado no cambia (validado antes).
+  const split = i.lines.some((l) => l.icbper) ? splitIcbper(raw, i.lines, i.afectacion, i.taxRate) : null;
+  const c = split ?? { ...raw, lines: raw.lines.map((l) => ({ ...l, icbper: 0, factorIcbper: 0 })), icbper: 0 };
   const tipAfe = { gravado: "10", exonerado: "20", inafecto: "30" }[i.afectacion];
   const address = {
     ubigueo: i.issuer.ubigeo,
@@ -74,6 +80,7 @@ export function buildInvoicePayload(i: BuildInput) {
     exoneradas: i.afectacion === "exonerado" ? c.base : 0,
     inafectas: i.afectacion === "inafecto" ? c.base : 0,
     igv: c.igv,
+    ...(c.icbper > 0 ? { icbper: c.icbper } : {}),
     total: c.total,
   };
   const legend = amountLegend(c.total, i.currency);
@@ -105,7 +112,8 @@ export function buildInvoicePayload(i: BuildInput) {
     mtoOperExoneradas: totals.exoneradas,
     mtoOperInafectas: totals.inafectas,
     mtoIGV: totals.igv,
-    totalImpuestos: totals.igv,
+    ...(c.icbper > 0 ? { icbper: c.icbper } : {}),
+    totalImpuestos: round2(totals.igv + c.icbper),
     valorVenta: c.base,
     subTotal: c.total,
     mtoImpVenta: c.total,
@@ -120,7 +128,8 @@ export function buildInvoicePayload(i: BuildInput) {
       porcentajeIgv: i.afectacion === "gravado" ? i.taxRate : 0,
       igv: l.igv,
       tipAfeIgv: tipAfe,
-      totalImpuestos: l.igv,
+      ...(l.icbper > 0 ? { factorIcbper: l.factorIcbper, icbper: l.icbper } : {}),
+      totalImpuestos: round2(l.igv + l.icbper),
       mtoPrecioUnitario: l.precioUnitario,
     })),
     legends: [{ code: "1000", value: legend }],

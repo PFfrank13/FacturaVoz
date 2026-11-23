@@ -40,7 +40,7 @@ const _featureNames = <String, String>{
   'cuaderno_ia': 'Del cuaderno a la factura',
   'portal_cliente': 'Portal del cliente',
   'precios': 'Precios y promociones',
-  'fidelizacion': 'Puntos para clientes frecuentes',
+  'fidelizacion': 'Puntos y cupones',
   'carta_qr': 'Carta QR y comandas',
   'conciliacion': 'Conciliación bancaria',
   'comisiones': 'Comisiones',

@@ -45,6 +45,7 @@ export function buildNotePayload(orig: Json, reasonCode: NoteReason, reasonText:
     ...pick("mtoOperExoneradas"),
     ...pick("mtoOperInafectas"),
     mtoIGV: orig.mtoIGV,
+    ...pick("icbper"),
     totalImpuestos: orig.totalImpuestos,
     valorVenta: orig.valorVenta,
     subTotal: orig.subTotal,
@@ -57,6 +58,7 @@ export function buildNotePayload(orig: Json, reasonCode: NoteReason, reasonText:
     exoneradas: Number(orig.mtoOperExoneradas ?? 0),
     inafectas: Number(orig.mtoOperInafectas ?? 0),
     igv: Number(orig.mtoIGV ?? 0),
+    icbper: Number(orig.icbper ?? 0),
     total: Number(orig.mtoImpVenta ?? 0),
   };
   return { payload, totals };

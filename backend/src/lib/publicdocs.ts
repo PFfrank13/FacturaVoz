@@ -130,6 +130,7 @@ export async function buildPrintDoc(db: SupabaseClient, invoiceId: string, signL
         ...(n(t.exoneradas) > 0 ? [{ label: "Op. Exonerada", value: n(t.exoneradas) }] : []),
         ...(n(t.inafectas) > 0 ? [{ label: "Op. Inafecta", value: n(t.inafectas) }] : []),
         { label: `IGV (${rate}%)`, value: igv },
+        ...(n(t.icbper ?? p.icbper) > 0 ? [{ label: "ICBPER (bolsas)", value: n(t.icbper ?? p.icbper) }] : []),
         { label: "IMPORTE TOTAL", value: total, strong: true },
       ],
       legend: String(fd.legend ?? ""),

@@ -20,6 +20,7 @@ import '../ui/widgets.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
 import 'client_profile.dart' show shortDateTime;
+import 'my_shift.dart';
 import 'pos_payment_logic.dart' show parsePosCents;
 
 class CashDayScreen extends StatefulWidget {
@@ -329,6 +330,7 @@ class _CashDayScreenState extends State<CashDayScreen> with LiveReload<CashDaySc
                       ),
                       const SizedBox(height: 12),
                       if (isToday) _steps(context),
+                      if (isToday) ...[const SizedBox(height: 12), MyShiftCard(currency: _cur)],
                       const SizedBox(height: 12),
                       Reveal(
                         index: 1,

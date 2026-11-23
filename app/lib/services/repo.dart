@@ -395,13 +395,17 @@ class Repo {
 
     dynamic rows;
     try {
-      rows = await run('id, name, unit_price, unit, active, stock, reorder_point, unit_cost, in_store');
+      rows = await run('id, name, unit_price, unit, active, stock, reorder_point, unit_cost, in_store, icbper');
     } on PostgrestException {
+     try {
+      rows = await run('id, name, unit_price, unit, active, stock, reorder_point, unit_cost, in_store'); // migración v3.8b pendiente
+     } on PostgrestException {
       try {
         rows = await run('id, name, unit_price, unit, active, stock, reorder_point'); // migración 20261102 pendiente
       } on PostgrestException {
         rows = await run('id, name, unit_price, unit, active'); // migración de stock aún no aplicada
       }
+     }
     }
     return (rows as List).map((r) => Product.fromJson(Map<String, dynamic>.from(r as Map))).toList();
   }

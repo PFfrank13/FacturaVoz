@@ -18,7 +18,10 @@ import 'team.dart' show dbMessage;
 const promoKinds = {'porcentaje': '% de descuento', 'monto': 'Monto fijo menos', 'volumen': 'Llevando N o más (% menos)'};
 
 class PromosScreen extends StatefulWidget {
-  const PromosScreen({super.key});
+  const PromosScreen({super.key, this.couponsOnly = false});
+
+  /// Solo cupones: el plan Pro de bodega los trae con «Puntos y fidelización» (v3.8a), sin promociones.
+  final bool couponsOnly;
 
   @override
   State<PromosScreen> createState() => _PromosScreenState();
@@ -54,7 +57,7 @@ class _PromosScreenState extends State<PromosScreen> with LiveReload<PromosScree
 
   Future<void> _load() async {
     try {
-      final p = await V2Repo.promotions();
+      final p = widget.couponsOnly ? const <Promo>[] : await V2Repo.promotions();
       final c = await V2Repo.coupons();
       final prods = await Repo.listProducts(activeOnly: true).catchError((_) => <Product>[]);
       LiveCache.put('promos.p', p);
@@ -121,10 +124,40 @@ class _PromosScreenState extends State<PromosScreen> with LiveReload<PromosScree
     }
   }
 
+  Widget _couponList() => ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 100), children: [
+                      if (_coupons.isEmpty) const EmptyState(title: 'Sin cupones', body: 'Crea códigos para tus clientes (redes, WhatsApp) y úsalos al vender.'),
+                      for (final c in _coupons)
+                        Card(
+                          child: SwitchListTile(
+                            value: c.active,
+                            onChanged: (v) async {
+                              await V2Repo.setCouponActive(c.id, v).catchError((_) {});
+                              _load();
+                            },
+                            title: Text(c.code, style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w800, letterSpacing: 1)),
+                            subtitle: Text([
+                              c.kind == 'monto' ? '${money(c.value, 'PEN')} menos' : '${c.value.toStringAsFixed(0)} % menos',
+                              '${c.uses}${c.maxUses != null ? '/${c.maxUses}' : ''} usos',
+                              if (c.expiresOn != null) 'vence ${displayDate(c.expiresOn!)}',
+                            ].join(' · ')),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(onPressed: _newCoupon, icon: const Icon(Icons.add_rounded), label: const Text('Nuevo cupón')),
+                    ]);
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final today = todayIso();
+    if (widget.couponsOnly) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Cupones')),
+        body: _error != null
+            ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+            : _promos == null ? const SkeletonList() : _couponList(),
+      );
+    }
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -156,27 +189,7 @@ class _PromosScreenState extends State<PromosScreen> with LiveReload<PromosScree
                       const SizedBox(height: 8),
                       FilledButton.icon(onPressed: () => _editPromo(), icon: const Icon(Icons.add_rounded), label: const Text('Nueva promoción')),
                     ]),
-                    ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 100), children: [
-                      if (_coupons.isEmpty) const EmptyState(title: 'Sin cupones', body: 'Crea códigos para tus clientes (redes, WhatsApp) y úsalos al vender.'),
-                      for (final c in _coupons)
-                        Card(
-                          child: SwitchListTile(
-                            value: c.active,
-                            onChanged: (v) async {
-                              await V2Repo.setCouponActive(c.id, v).catchError((_) {});
-                              _load();
-                            },
-                            title: Text(c.code, style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w800, letterSpacing: 1)),
-                            subtitle: Text([
-                              c.kind == 'monto' ? '${money(c.value, 'PEN')} menos' : '${c.value.toStringAsFixed(0)} % menos',
-                              '${c.uses}${c.maxUses != null ? '/${c.maxUses}' : ''} usos',
-                              if (c.expiresOn != null) 'vence ${displayDate(c.expiresOn!)}',
-                            ].join(' · ')),
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(onPressed: _newCoupon, icon: const Icon(Icons.add_rounded), label: const Text('Nuevo cupón')),
-                    ]),
+                    _couponList(),
                   ]),
       ),
     );

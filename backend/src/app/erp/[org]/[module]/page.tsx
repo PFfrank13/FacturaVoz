@@ -12,6 +12,8 @@ import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
 import type { ReceiptRow } from "@/lib/erp/receipts";
 import ClientsBoard from "@/components/erp/ClientsBoard";
 import CashBoard from "@/components/erp/CashBoard";
+import ShiftPanel, { type ShiftRow } from "@/components/erp/ShiftPanel";
+import BranchesBoard, { type Branch, type BranchProduct, type TransferRow } from "@/components/erp/BranchesBoard";
 import PurchasesBoard, { type PurchaseProduct } from "@/components/erp/PurchasesBoard";
 import PaymentsBoard from "@/components/erp/PaymentsBoard";
 import LoyaltyBoard from "@/components/erp/LoyaltyBoard";
@@ -24,9 +26,11 @@ import { limaDate, parseRange } from "@/lib/erp/receipts";
 import { mergeClients, type ClientActivity, type ClientBalance, type ClientRow } from "@/lib/erp/clients";
 
 const liveProducts = ["products"] as const;
+/** Next calendar day (sales_summary takes an exclusive end date). */
+const addDay = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
 const liveReceipts = ["invoices"] as const;
 const liveClients = ["clients", "credit_ledger", "invoices"] as const;
-const liveCash = ["cash_movements", "payments", "invoices", "credit_ledger"] as const;
+const liveCash = ["cash_movements", "payments", "invoices", "credit_ledger", "cash_shifts"] as const;
 const livePurchases = ["products"] as const;
 const livePayments = ["payments"] as const;
 const liveInventory = ["products", "product_lots", "stock_losses"] as const;
@@ -106,7 +110,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       points ? c.db.from("org_settings").select("loyalty_rate").eq("org_id", org).maybeSingle() : Promise.resolve({ data: null, error: null }),
       points ? c.db.rpc("loyalty_balances", { p_org: org }) : Promise.resolve({ data: [], error: null }),
       points ? Promise.resolve({ data: [], error: null }) : c.db.from("promotions").select("id,name,kind,value,min_qty,starts_on,ends_on,active,product_ids").eq("org_id", org).order("created_at", { ascending: false }).limit(200),
-      points ? Promise.resolve({ data: [], error: null }) : c.db.from("coupons").select("id,code,kind,value,max_uses,uses,expires_on,active").eq("org_id", org).order("created_at", { ascending: false }).limit(200),
+      c.db.from("coupons").select("id,code,kind,value,max_uses,uses,expires_on,active").eq("org_id", org).order("created_at", { ascending: false }).limit(200),
     ]);
     const failed = balances.error || promos.error || coupons.error;
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{points ? "FIDELIZACIÓN" : "PRECIOS"} / {c.organization.name}</p><LiveRefresh org={org} tables={livePayments} /></div><h1>{title}</h1>
@@ -118,6 +122,44 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
             promotions={((promos.data ?? []) as Promotion[]).map(p => ({ ...p, value: Number(p.value), min_qty: p.min_qty == null ? null : Number(p.min_qty) }))}
             coupons={((coupons.data ?? []) as Coupon[]).map(x => ({ ...x, value: Number(x.value), uses: Number(x.uses ?? 0), max_uses: x.max_uses == null ? null : Number(x.max_uses) }))}
             canEditPromos={can(c.access, "products_edit")} canSetRate={can(c.access, "settings")} canRedeem={can(c.access, "collect")} />}
+    </>;
+  }
+  if (id === "sucursales") {
+    // Each store is its own company (stock, receipts, till). The owner sees all of them and moves goods between them.
+    const memberships = await c.db.from("organization_members").select("org_id,role,organization:organizations(id,name)").eq("user_id", c.user.id).in("role", ["owner", "admin"]).limit(20);
+    type M = { org_id: string; organization: { id: string; name: string } | { id: string; name: string }[] | null };
+    const orgs = ((memberships.data ?? []) as unknown as M[]).map(m => { const o = Array.isArray(m.organization) ? m.organization[0] : m.organization; return { id: m.org_id, name: o?.name ?? "Local" }; });
+    const today = limaDate(new Date());
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const next = new Date(`${today}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+    const tomorrow = next.toISOString().slice(0, 10); // sales_summary takes an exclusive end date
+    const cur = c.organization.currency || "PEN";
+    const ids = orgs.map(o => o.id);
+    const [stats, prods, transfers] = await Promise.all([
+      Promise.all(orgs.map(o => Promise.all([
+        c.db.rpc("sales_summary", { p_org: o.id, p_from: today, p_to: tomorrow, p_currency: cur }),
+        c.db.rpc("sales_summary", { p_org: o.id, p_from: monthStart, p_to: tomorrow, p_currency: cur }),
+      ]))),
+      c.db.from("products").select("id,org_id,name,stock,unit,reorder_point").in("org_id", ids).eq("active", true).neq("unit", "ZZ").order("name").limit(3000),
+      c.db.from("stock_transfers").select("id,created_at,quantity,note,from_org,to_org,from_product").or(`from_org.eq.${org},to_org.eq.${org}`).order("created_at", { ascending: false }).limit(30),
+    ]);
+    const productRows = (prods.data ?? []) as (BranchProduct & { reorder_point: number | null })[];
+    const names = new Map(orgs.map(o => [o.id, o.name] as const));
+    const productNames = new Map(productRows.map(p => [p.id, p.name] as const));
+    const branches: Branch[] = orgs.map((o, i) => {
+      const [d, m] = stats[i];
+      const sd = (d.data ?? {}) as { sales_total?: number | string; sales_count?: number };
+      const sm = (m.data ?? {}) as { sales_total?: number | string };
+      return { id: o.id, name: o.name, today: Number(sd.sales_total ?? 0), todayCount: Number(sd.sales_count ?? 0), month: Number(sm.sales_total ?? 0), current: o.id === org,
+        low: productRows.filter(p => p.org_id === o.id && p.stock != null && p.reorder_point != null && Number(p.stock) <= Number(p.reorder_point)).length };
+    });
+    const rows: TransferRow[] = ((transfers.data ?? []) as { id: string; created_at: string; quantity: number | string; note: string | null; from_org: string; to_org: string; from_product: string }[])
+      .map(t => ({ id: t.id, created_at: t.created_at, quantity: Number(t.quantity), note: t.note, from: names.get(t.from_org) ?? "Otro local", to: names.get(t.to_org) ?? "Otro local", product: productNames.get(t.from_product) ?? "Producto" }));
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">SUCURSALES / {c.organization.name}</p><LiveRefresh org={org} tables={liveProducts} /></div><h1>{title}</h1>
+      <p>Tus locales en una sola vista: ventas de hoy y del mes, stock bajo y traslados de mercadería entre ellos.</p></section>
+      {memberships.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar tus locales</h2><p>Pulsa Actualizar para reintentar.</p></div>
+        : <BranchesBoard org={org} branches={branches} currency={cur} canTransfer={c.access.is_admin === true}
+            products={productRows.map(p => ({ id: p.id, org_id: p.org_id, name: p.name, unit: p.unit, stock: p.stock == null ? null : Number(p.stock) }))} transfers={rows} />}
     </>;
   }
   if (id === "cobros") {
@@ -147,13 +189,22 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     const asked = (await searchParams).dia ?? "";
     const day = /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= today && Number.isFinite(Date.parse(asked)) ? asked : today;
     const finance = can(c.access, "finance");
-    const [summary, moves, closing, dayPayments, members] = await Promise.all([
+    const [summary, moves, closing, dayPayments, members, shiftRes, mineRes] = await Promise.all([
       c.db.rpc("day_summary", { p_org: org, p_day: day }),
       c.db.from("cash_movements").select("id,kind,amount,method,note,created_at,user_id").eq("org_id", org).eq("day", day).order("created_at"),
       c.db.from("day_closings").select("counted_cash,expected_cash,difference,note,created_at").eq("org_id", org).eq("day", day).maybeSingle(),
       finance ? c.db.from("payments").select("user_id,method,amount").eq("org_id", org).eq("paid_on", day).limit(3000) : Promise.resolve({ data: [] }),
       finance ? c.db.from("organization_members").select("user_id,display_name").eq("org_id", org) : Promise.resolve({ data: [] }),
+      finance ? c.db.rpc("shift_report", { p_org: org, p_from: day, p_to: day }) : Promise.resolve({ data: null, error: null }),
+      c.db.from("cash_shifts").select("opened_at,opening_float").eq("org_id", org).eq("user_id", c.user.id).is("closed_at", null).maybeSingle(),
     ]);
+    const num = (v: unknown) => (v == null ? null : Number(v));
+    const shifts: ShiftRow[] | null = finance && !shiftRes.error ? ((shiftRes.data ?? []) as Record<string, unknown>[]).map(r => ({
+      id: String(r.id), name: String(r.name ?? "Sin nombre"), opened_at: String(r.opened_at), closed_at: (r.closed_at as string | null) ?? null,
+      opening_float: Number(r.opening_float), cash_sales: Number(r.cash_sales), digital_sales: Number(r.digital_sales), cash_in: Number(r.cash_in), cash_out: Number(r.cash_out),
+      expected_cash: Number(r.expected_cash), counted_cash: num(r.counted_cash), difference: num(r.difference), note: (r.note as string | null) ?? null,
+    })) : null;
+    const mine = mineRes.data ? { opened_at: String((mineRes.data as { opened_at: string }).opened_at), opening_float: Number((mineRes.data as { opening_float: number }).opening_float) } : null;
     const cashMoves = ((moves.data ?? []) as CashMove[]).map(m => ({ ...m, amount: Number(m.amount) }));
     const cashiers = finance ? cashierBreakdown((dayPayments.data ?? []) as { user_id: string; method: string; amount: number }[], cashMoves,
       new Map(((members.data ?? []) as { user_id: string; display_name: string | null }[]).map(m => [m.user_id, m.display_name] as const))) : [];
@@ -162,6 +213,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
         : <CashBoard org={org} day={day} today={today} summary={summary.data as DaySummary}
             moves={cashMoves} cashiers={cashiers}
             closing={(closing.data ?? null) as DayClosing | null} showExpected={finance} />}
+      {!summary.error && summary.data && !mineRes.error && <ShiftPanel org={org} mine={mine} shifts={shifts} currency={c.organization.currency || "PEN"} isToday={day === today} />}
     </>;
   }
   if (id === "clientes") {
@@ -179,7 +231,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   }
   if (id === "productos" || id === "inventario") {
     // One catalog, shared with the mobile POS: same rows, photos and permissions.
-    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path")
+    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path,icbper")
       .eq("org_id", org).order("name", { ascending: true }).order("id").limit(500);
     const rows = (result.data ?? []) as Omit<ProductRow, "photo_url">[];
     const paths = rows.map(r => r.image_path).filter((p): p is string => !!p);
@@ -195,7 +247,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       c.db.from("stock_losses").select("id,product_id,quantity,reason,note,unit_cost,created_at,user_id,product:products(name),lot:product_lots(lot_code,expires_on)")
         .eq("org_id", org).gte("created_at", `${monthStart}T05:00:00Z`).order("created_at", { ascending: false }).limit(300),
       c.db.from("organization_members").select("user_id,display_name").eq("org_id", org),
-      can(c.access, "finance") ? c.db.rpc("sales_summary", { p_org: org, p_from: monthStart, p_to: today, p_currency: c.organization.currency || "PEN" }) : Promise.resolve({ data: null }),
+      can(c.access, "finance") ? c.db.rpc("sales_summary", { p_org: org, p_from: monthStart, p_to: addDay(today), p_currency: c.organization.currency || "PEN" }) : Promise.resolve({ data: null }),
     ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: null }];
     const lots = ((lotRes.data ?? []) as LotStatus[]).map(l => ({ ...l, quantity: Number(l.quantity), remaining: Number(l.remaining), days_left: Number(l.days_left), unit_cost: l.unit_cost == null ? null : Number(l.unit_cost), unit_price: l.unit_price == null ? null : Number(l.unit_price) }));
     const names = new Map(((members.data ?? []) as { user_id: string; display_name: string | null }[]).map(m => [m.user_id, m.display_name] as const));

@@ -29,7 +29,14 @@ export default function LoyaltyBoard({ org, view, currency, today, rate, balance
   canEditPromos: boolean; canSetRate: boolean; canRedeem: boolean;
 }) {
   const money = (v: number) => new Intl.NumberFormat("es-PE", { style: "currency", currency }).format(v);
-  if (view === "puntos") return <Points org={org} rate={rate} balances={balances} canSetRate={canSetRate} canRedeem={canRedeem} />;
+  if (view === "puntos") return <>
+    <Points org={org} rate={rate} balances={balances} canSetRate={canSetRate} canRedeem={canRedeem} />
+    <section className="fv-create fv-cash-card fv-coupons">
+      <h3>Cupones</h3>
+      <CouponList org={org} coupons={coupons} today={today} money={money} canEdit={canEditPromos} />
+      {canEditPromos && <CouponForm org={org} />}
+    </section>
+  </>;
   const running = promotions.filter(p => promoState(p, today) === "activa").length;
   const live = coupons.filter(c => couponState(c, today) === "vigente").length;
   return <section className="fv-board">
@@ -50,15 +57,19 @@ export default function LoyaltyBoard({ org, view, currency, today, rate, balance
       </section>
       <section className="fv-create fv-cash-card">
         <h3>Cupones</h3>
-        {coupons.length ? <ul className="fv-lines fv-ledger">{coupons.map(c => {
-          const s = couponState(c, today);
-          return <li key={c.id}><span><b>{c.code}</b> {discountLabel(c.kind, c.value, null, money)} · {c.uses}{c.max_uses != null ? ` de ${c.max_uses}` : ""} usos{c.expires_on ? ` · vence ${day(c.expires_on)}` : ""}</span>
-            <span><span className={`fv-pill ${tone[s]}`}>{stateLabel[s]}</span>{canEditPromos && <Toggle onToggle={() => toggleCoupon(org, c.id, !c.active)} label={c.active ? "Pausar" : "Reanudar"} />}</span></li>;
-        })}</ul> : <p className="fv-muted">Sin cupones. Un código como VECINO10 sirve para premiar a quien vuelve.</p>}
+        <CouponList org={org} coupons={coupons} today={today} money={money} canEdit={canEditPromos} />
         {canEditPromos && <CouponForm org={org} />}
       </section>
     </div>
   </section>;
+}
+
+function CouponList({ org, coupons, today, money, canEdit }: { org: string; coupons: Coupon[]; today: string; money: (v: number) => string; canEdit: boolean }) {
+  return coupons.length ? <ul className="fv-lines fv-ledger">{coupons.map(c => {
+    const s = couponState(c, today);
+    return <li key={c.id}><span><b>{c.code}</b> {discountLabel(c.kind, c.value, null, money)} · {c.uses}{c.max_uses != null ? ` de ${c.max_uses}` : ""} usos{c.expires_on ? ` · vence ${day(c.expires_on)}` : ""}</span>
+      <span><span className={`fv-pill ${tone[s]}`}>{stateLabel[s]}</span>{canEdit && <Toggle onToggle={() => toggleCoupon(org, c.id, !c.active)} label={c.active ? "Pausar" : "Reanudar"} />}</span></li>;
+  })}</ul> : <p className="fv-muted">Sin cupones. Un código como VECINO10 sirve para premiar a quien vuelve.</p>;
 }
 
 function Toggle({ onToggle, label }: { onToggle: () => Promise<FormResult>; label: string }) {
