@@ -1,0 +1,157 @@
+name: Android release (actualización automática)
+
+# Cada fusión a main publica un APK firmado y su manifiesto. La app instalada lo
+# detecta, lo descarga, verifica su SHA-256 y abre el instalador de Android.
+#
+# Requiere estos secretos del repositorio (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64  facturavoz-release.jks en base64
+#   ANDROID_STORE_PASSWORD   contraseña del keystore
+#   ANDROID_KEY_ALIAS        alias de la llave
+#   ANDROID_KEY_PASSWORD     contraseña de la llave
+# y estas variables públicas (pestaña Variables):
+#   SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE_URL
+# Sin los secretos el flujo termina sin publicar nada.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/lib/**'
+      - 'app/assets/**'
+      - 'app/packages/**'
+      - 'app/android/**'
+      - 'app/pubspec.*'
+      - '.github/workflows/android-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: APK firmado y manifiesto
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_STORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+    steps:
+      - name: Sin secretos de firma, no se publica
+        if: env.HAS_SIGNING != 'true'
+        run: echo "::notice::Faltan los secretos de firma de Android; no se publicó ninguna versión."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_SIGNING == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        if: env.HAS_SIGNING == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        if: env.HAS_SIGNING == 'true'
+        with:
+          flutter-version: 3.47.9
+          channel: stable
+          cache: true
+
+      - name: Llave de firma fuera del repositorio
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          dir="$HOME/FacturaVoz-Signing"
+          mkdir -p "$dir"
+          printf '%s' "$KEYSTORE" | base64 -d > "$dir/facturavoz-release.jks"
+          {
+            echo "storeFile=$dir/facturavoz-release.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > "$dir/signing.properties"
+          chmod 600 "$dir/signing.properties" "$dir/facturavoz-release.jks"
+
+      - name: Configuración pública de producción
+        if: env.HAS_SIGNING == 'true'
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          for v in SUPABASE_URL SUPABASE_ANON_KEY API_BASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::Falta la variable $v"; exit 1; }
+          done
+          version_name=$(grep '^version:' app/pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
+          # 1000+ keeps every CI build above any build installed by hand.
+          echo "VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$version_name" >> "$GITHUB_ENV"
+          python3 - <<'EOF'
+          import json, os
+          json.dump({
+            "SUPABASE_URL": os.environ["SUPABASE_URL"],
+            "SUPABASE_ANON_KEY": os.environ["SUPABASE_ANON_KEY"],
+            "API_BASE_URL": os.environ["API_BASE_URL"],
+          }, open("/tmp/defines.json", "w"))
+          EOF
+          python3 - <<EOF
+          import json
+          d = json.load(open("/tmp/defines.json")); d["APP_VERSION"] = "$version_name"
+          json.dump(d, open("/tmp/defines.json", "w"))
+          EOF
+
+      - name: Pruebas y compilación firmada
+        if: env.HAS_SIGNING == 'true'
+        working-directory: app
+        run: |
+          set -euo pipefail
+          flutter pub get --enforce-lockfile
+          flutter test
+          flutter build apk --release \
+            --build-name="$VERSION_NAME" --build-number="$VERSION_CODE" \
+            --dart-define-from-file=/tmp/defines.json
+
+      - name: Verificar firma y preparar manifiesto
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          set -euo pipefail
+          apk=app/build/app/outputs/flutter-apk/app-release.apk
+          cp "$apk" facturavoz.apk
+          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs facturavoz.apk | grep -m1 'SHA-256'
+          sha=$(sha256sum facturavoz.apk | cut -d' ' -f1)
+          notes=$(git log -1 --pretty=%s | head -c 140)
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-v${VERSION_CODE}/facturavoz.apk"
+          python3 - "$sha" "$url" "$notes" <<'EOF'
+          import json, os, sys
+          sha, url, notes = sys.argv[1:4]
+          json.dump({
+            "versionCode": int(os.environ["VERSION_CODE"]),
+            "versionName": os.environ["VERSION_NAME"],
+            "apkUrl": url, "sha256": sha, "notes": notes, "mandatory": False,
+          }, open("android-update.json", "w"), ensure_ascii=False, indent=2)
+          EOF
+          cat android-update.json
+
+      - name: Publicar release
+        if: env.HAS_SIGNING == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-v${VERSION_CODE}" facturavoz.apk android-update.json \
+            --repo "$GITHUB_REPOSITORY" --latest \
+            --title "FacturaVoz ${VERSION_NAME} (${VERSION_CODE})" \
+            --notes "Actualización automática para Android. Commit ${GITHUB_SHA::7}."
+
+      - name: Borrar la llave del runner
+        if: always() && env.HAS_SIGNING == 'true'
+        run: rm -rf "$HOME/FacturaVoz-Signing" /tmp/defines.json

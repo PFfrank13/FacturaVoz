@@ -11,6 +11,7 @@ import '../services/quick_launch.dart';
 import '../services/repo.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
+import '../ui/update_banner.dart';
 import '../ui/theme.dart';
 import '../ui/retail_layout.dart';
 import '../ui/design_tokens.dart';
@@ -618,6 +619,7 @@ class _MainShellState extends State<MainShell> {
                   canVoiceSell: canVoiceSell, canCopilot: canCopilot),
               Expanded(child: Column(children: [
                 const LicenseBanner(),
+                const UpdateBanner(),
                 Expanded(
                   child: Builder(builder: (bodyContext) => MediaQuery.removePadding(
                     context: bodyContext,
