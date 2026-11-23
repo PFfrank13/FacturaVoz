@@ -751,6 +751,9 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     if (approved == RetailCartAction.collect) {
+      // Let the cart sheet finish closing before the payment screen enters (they used to overlap ~100 ms).
+      if (!MediaQuery.disableAnimationsOf(context)) await Future<void>.delayed(const Duration(milliseconds: 180));
+      if (!mounted) return;
       await _chargeSheet();
     } else if (approved == RetailCartAction.credit) {
       await _checkout(credit: true);

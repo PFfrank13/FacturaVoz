@@ -80,7 +80,7 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       mes pasado, ticket promedio, ritmo de ventas por hora, productos estrella y
       «Para resolver hoy» (SUNAT, stock bajo, fiados vencidos, deuda a
       proveedores, caja), todo con datos reales y según plan y rol.
-- [ ] Diseño premium coherente con el móvil (skill frontend-design). Hecho:
+- [x] Diseño premium coherente con el móvil (skill frontend-design). Hecho (23/11: también reportes, plan, configuración, equipo y listas):
       inicio, acceso, comprobantes, clientes, caja, compras y cobros. Falta:
       cotizaciones, equipo, reportes, plan y configuración (aún con tabla genérica).
 
@@ -108,8 +108,8 @@ Fuente: `docs/INVESTIGACION_RETAIL.md`, «Las cinco siguientes» y tabla de 24 f
       plan Empresa no debe venderse con «5 sucursales» como argumento central.
 
 ### 6. Móvil — pulido
-- [ ] Inicio de sesión y asistente de primera vez con el nuevo diseño.
-- [ ] Transición carrito → cobro sin mezcla de pantallas.
+- [x] Inicio de sesión con el nuevo diseño (campos con fondo, barra de estado legible sobre la foto, enlaces agrupados). El asistente de primera vez no se revisó en pantalla: requiere crear una cuenta nueva.
+- [x] Transición carrito → cobro sin mezcla de pantallas (la hoja termina de cerrarse y el cobro entra con fundido opaco).
 
 ## Registro
 - 22/11/2026: ERP con edición de productos y foto, verificado móvil ↔ ERP en

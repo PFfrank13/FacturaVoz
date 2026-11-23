@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
@@ -262,7 +263,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final t = Theme.of(context);
     final dark = t.brightness == Brightness.dark;
     final kb = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return Scaffold(
+    // Íconos de la barra de estado claros: van sobre la foto oscura de la tienda.
+    return AnnotatedRegion<SystemUiOverlayStyle>(value: SystemUiOverlayStyle.light, child: Scaffold(
       resizeToAvoidBottomInset: true,
       body: LayoutBuilder(builder: (context, c) {
         final h = c.maxHeight;
@@ -327,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
         ]);
       }),
-    );
+    ));
   }
 
   Widget _social(ThemeData t, String label, Widget mark, VoidCallback onTap) => Expanded(
@@ -348,8 +350,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         ),
       );
 
-  Widget _form(ThemeData t) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+  Widget _form(ThemeData base) {
+    // Campos con fondo y borde redondeado: se reconocen como campos (antes parecían texto suelto).
+    final t = base.copyWith(inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      filled: true,
+      fillColor: base.colorScheme.surfaceContainerHighest.withValues(alpha: base.brightness == Brightness.dark ? .55 : .7),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: base.colorScheme.outlineVariant)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: base.colorScheme.primary, width: 2)),
+    ));
+    return Theme(data: t, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(_sent ? 'Revisa tu correo' : (_usePassword ? (_signup ? 'Crea tu cuenta' : 'Bienvenido de nuevo') : 'Crea tu cuenta'), style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: 4),
       Text(
@@ -457,7 +468,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         ),
       ),
       if (!_sent) ...[
-        const SizedBox(height: 14),
+        const SizedBox(height: 0),
+        TextButton(
+          onPressed: () => setState(() {
+            _usePassword = !_usePassword;
+            _msg = '';
+          }),
+          child: Text(_usePassword ? '¿Primera vez? Crea tu cuenta con un código' : 'Ya tengo contraseña'),
+        ),
+      ],
+      if (!_sent) ...[
+        const SizedBox(height: 18),
+        Row(children: [
+          Expanded(child: Divider(color: t.colorScheme.outlineVariant)),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('¿Te invitó tu empleador?', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant))),
+          Expanded(child: Divider(color: t.colorScheme.outlineVariant)),
+        ]),
+        const SizedBox(height: 12),
         // v2.0: acceso de empleados invitados por su empresa (mismo correo de la invitación).
         OutlinedButton.icon(
           onPressed: _busy ? null : () => showEmployeeLogin(context),
@@ -491,18 +518,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
         ]),
       ],
-      if (!_sent) ...[
-        const SizedBox(height: 6),
-        TextButton(
-          onPressed: () => setState(() {
-            _usePassword = !_usePassword;
-            _msg = '';
-          }),
-          child: Text(_usePassword ? '¿Primera vez? Crea tu cuenta con un código' : 'Ya tengo contraseña'),
-        ),
-      ],
       if (Config.privacyUrl.isNotEmpty) TextButton(onPressed: openPrivacyPolicy, child: const Text('Política de privacidad')),
-    ]);
+    ]));
   }
 }
 

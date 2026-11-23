@@ -124,9 +124,26 @@ Future<PosPaymentApproval?> choosePosPayment(
   required String currency,
   required double total,
   required List<LineItem> items,
-}) => Navigator.of(context).push<PosPaymentApproval>(MaterialPageRoute(
-  builder: (_) => _PaymentFlow(currency: currency, total: total, items: items),
+}) => Navigator.of(context).push<PosPaymentApproval>(_paymentRoute(
+  (_) => _PaymentFlow(currency: currency, total: total, items: items),
 ));
+
+/// Opaque route that fades and rises in only after the cart sheet has left the screen, so the two never blend.
+/// Without animations (accessibility setting) it appears at once.
+PageRoute<PosPaymentApproval> _paymentRoute(WidgetBuilder builder) => PageRouteBuilder<PosPaymentApproval>(
+  opaque: true,
+  transitionDuration: const Duration(milliseconds: 260),
+  reverseTransitionDuration: const Duration(milliseconds: 200),
+  pageBuilder: (context, _, _) => builder(context),
+  transitionsBuilder: (context, animation, _, child) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(position: Tween(begin: const Offset(0, .04), end: Offset.zero).animate(curved), child: child),
+    );
+  },
+);
 
 /// Compatibility entry point for integrations that already selected a method.
 Future<PosPaymentApproval?> confirmPosPayment(
@@ -134,8 +151,8 @@ Future<PosPaymentApproval?> confirmPosPayment(
   required String method,
   required String currency,
   required double total,
-}) => Navigator.of(context).push<PosPaymentApproval>(MaterialPageRoute(
-  builder: (_) => _PaymentFlow(currency: currency, total: total, items: const [], initialMethod: method),
+}) => Navigator.of(context).push<PosPaymentApproval>(_paymentRoute(
+  (_) => _PaymentFlow(currency: currency, total: total, items: const [], initialMethod: method),
 ));
 
 class _PaymentFlow extends StatefulWidget {
