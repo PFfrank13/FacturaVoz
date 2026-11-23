@@ -22,6 +22,7 @@ import '../services/pos_cart_draft.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
 import '../logic/scale_barcode.dart';
+import '../services/product_codes.dart';
 import '../ui/motion.dart';
 import '../ui/ds.dart';
 import '../ui/theme.dart';
@@ -54,6 +55,7 @@ class PosScreen extends StatefulWidget {
 class _PosScreenState extends State<PosScreen> {
   List<Product>? _products;
   Map<String, Map<String, dynamic>> _extra = const {};
+  Map<String, String> _extraCodes = const {}; // códigos adicionales → producto (v3.9)
   List<Promo> _promos = const [];
   final Map<String, double> _cart = {};
   final _q = TextEditingController();
@@ -352,6 +354,7 @@ class _PosScreenState extends State<PosScreen> {
         LiveCache.put('pos.products.$org', p);
       }
       final e = await V2Repo.productExtras();
+      final codes = await ProductCodes.extraCodes();
       List<Promo> promos = const [];
       if (Access.instance.has('precios')) {
         try {
@@ -363,6 +366,7 @@ class _PosScreenState extends State<PosScreen> {
         setState(() {
           _products = p;
           _extra = e;
+          _extraCodes = codes;
           _promos = promos;
         });
       }
@@ -443,7 +447,7 @@ class _PosScreenState extends State<PosScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Etiqueta de balanza con PLU ${scale.plu}: pon ese número como código de barras del producto (por kilo).')));
       return;
     }
-    final byExtra = _extra.entries.where((e) => (e.value['barcode'] ?? '') == code).map((e) => e.key).firstOrNull;
+    final byExtra = _extra.entries.where((e) => (e.value['barcode'] ?? '') == code).map((e) => e.key).firstOrNull ?? _extraCodes[code];
     final p = byExtra == null ? null : _products?.where((x) => x.id == byExtra).firstOrNull;
     if (p != null) {
       final previousQuantity = _cart[p.id] ?? 0;
@@ -463,8 +467,45 @@ class _PosScreenState extends State<PosScreen> {
       setState(() {});
       _focus.requestFocus();
     } else if (RegExp(r'^\d{6,14}$').hasMatch(code)) {
+      // Código nuevo: en vez de un error, «¿de qué producto es?». Se elige de la lista (sin escribir) o se crea.
+      await _unknownCode(code);
+    }
+  }
+
+  Future<void> _unknownCode(String code) async {
+    final canEdit = Access.instance.can('products_edit');
+    if (!canEdit) {
       setState(() => _shake++);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No hay producto con el código $code. Agrégalo en Productos.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('El código $code no está registrado. Pídele al dueño que lo agregue.')));
+      return;
+    }
+    final products = (_products ?? const <Product>[]).where((p) => !p.isService).toList();
+    final picked = await showModalBottomSheet<Object>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (ctx) => _UnknownCodeSheet(code: code, products: products, currency: _cur),
+    );
+    if (!mounted || picked == null) return;
+    try {
+      Product? product;
+      if (picked is Product) {
+        await ProductCodes.add(picked.id, code);
+        product = picked;
+      } else if (picked is (String, double)) {
+        // Puede ser de un producto archivado (no sale en la venta): nunca se crea un duplicado.
+        final taken = await ProductCodes.owner(code);
+        if (taken != null) throw AppException('${codeTakenMessage(code, taken.name)} Reactívalo en Productos.');
+        final id = await Repo.saveProduct(name: picked.$1, unitPrice: picked.$2, unit: 'NIU');
+        await V2Repo.saveProductExtra(id, {'barcode': code});
+        await _load();
+        product = _products?.where((x) => x.id == id).firstOrNull;
+      }
+      if (product == null || !mounted) return;
+      setState(() => _extraCodes = {..._extraCodes, code: product!.id});
+      _add(product);
+      _q.clear();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Código guardado en ${product.name}. La próxima vez se agrega solo.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendly(e))));
     }
   }
 
@@ -1472,3 +1513,85 @@ class _PosScreenState extends State<PosScreen> {
   }
 }
 
+/// «Código nuevo»: elegir el producto al que pertenece (búsqueda, sin escribir el nombre completo) o crearlo.
+/// Devuelve el Product elegido o (nombre, precio sin IGV) para crear uno.
+class _UnknownCodeSheet extends StatefulWidget {
+  const _UnknownCodeSheet({required this.code, required this.products, required this.currency});
+  final String code;
+  final List<Product> products;
+  final String currency;
+
+  @override
+  State<_UnknownCodeSheet> createState() => _UnknownCodeSheetState();
+}
+
+class _UnknownCodeSheetState extends State<_UnknownCodeSheet> {
+  final _q = TextEditingController();
+  final _name = TextEditingController();
+  final _price = TextEditingController();
+  bool _creating = false;
+  String? _err;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    _name.dispose();
+    _price.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final q = _q.text.trim().toLowerCase();
+    final list = widget.products.where((p) => q.isEmpty || p.name.toLowerCase().contains(q)).take(60).toList();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .72,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Código nuevo: ${widget.code}', style: t.textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(_creating ? 'Crea el producto una vez; después este código se vende solo.' : '¿De qué producto es? Elígelo y este código quedará guardado en él.',
+            style: t.textTheme.bodySmall),
+          const SizedBox(height: 12),
+          if (!_creating) ...[
+            TextField(controller: _q, autofocus: false, onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Busca el producto (ej.: papel)', isDense: true)),
+            const SizedBox(height: 8),
+            Expanded(child: ListView.builder(
+              itemCount: list.length,
+              itemBuilder: (_, i) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(list[i].name),
+                subtitle: Text(money(list[i].unitPrice, widget.currency)),
+                trailing: const Icon(Icons.add_link_rounded),
+                onTap: () => Navigator.pop(context, list[i]),
+              ),
+            )),
+            OutlinedButton.icon(onPressed: () => setState(() { _creating = true; _name.text = _q.text.trim(); }),
+              icon: const Icon(Icons.add_rounded), label: const Text('No está en la lista: crear producto')),
+          ] else ...[
+            TextField(controller: _name, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Nombre del producto')),
+            const SizedBox(height: 10),
+            TextField(controller: _price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Precio (sin IGV)')),
+            if (_err != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_err!, style: TextStyle(color: t.colorScheme.error))),
+            const Spacer(),
+            FilledButton.icon(
+              icon: const Icon(Icons.check_rounded), label: const Text('Crear y agregar a la venta'),
+              onPressed: () {
+                final price = parseDecimal(_price.text);
+                if (_name.text.trim().isEmpty || price == null || price < 0) {
+                  setState(() => _err = 'Escribe el nombre y un precio válido.');
+                  return;
+                }
+                Navigator.pop(context, (_name.text.trim(), price));
+              },
+            ),
+            TextButton(onPressed: () => setState(() => _creating = false), child: const Text('Volver a la lista')),
+          ],
+        ]),
+      ),
+    );
+  }
+}

@@ -20,6 +20,8 @@ import '../ui/glass_widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
 import 'stock_lots.dart';
+import '../services/product_codes.dart';
+import 'product_codes_sheet.dart';
 import '../services/v2_repo.dart';
 import '../services/v2_api.dart';
 import '../ui/barcode_scanner.dart';
@@ -550,7 +552,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
               GradientButton(
                 label: guided && wizardStep < 5 ? 'Siguiente' : 'Guardar producto',
                 icon: guided && wizardStep < 5 ? Icons.arrow_forward_rounded : Icons.check_rounded,
-                onPressed: processingImage ? null : () {
+                onPressed: processingImage ? null : () async {
                   if (guided && wizardStep < 5) {
                     if (wizardStep == 0 && name.text.trim().isEmpty) {
                       setS(() => err = 'Escribe el nombre del producto.');
@@ -575,7 +577,21 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   } else if (wholesale.text.trim().isNotEmpty && (parseDecimal(wholesale.text) == null || parseDecimal(wholesaleMin.text) == null)) {
                     setS(() => err = 'Para el precio por mayor indica también desde cuántas unidades.');
                   } else {
-                    Navigator.pop(ctx, true);
+                    // Un código de barras solo puede ser de un producto: se avisa ANTES de guardar nada.
+                    final code = barcode.text.trim();
+                    if (code.isNotEmpty) {
+                      setS(() => err = 'Revisando el código de barras…');
+                      CodeOwner? taken;
+                      try {
+                        taken = await ProductCodes.owner(code, except: p?.id);
+                      } catch (_) {}
+                      if (taken != null) {
+                        setS(() => err = codeTakenMessage(code, taken!.name));
+                        return;
+                      }
+                      setS(() => err = '');
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx, true);
                   }
                 },
               ),
@@ -629,7 +645,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           }
         }
       } catch (e) {
-        _snack(e.toString().contains('23505') ? 'Guardado, pero ese código de barras ya lo tiene otro producto.' : 'Guardado. ${V2Repo.missingHint(e)}');
+        _snack(e.toString().contains('23505') ? 'Guardado sin el código de barras: ese código ya lo tiene otro producto.' : 'Guardado. ${V2Repo.missingHint(e)}');
       }
       if (stockChanged) {
         try {
@@ -684,6 +700,13 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
               subtitle: const Text('Vencido, dañado, robo o consumo: queda con su motivo'),
               onTap: () => Navigator.pop(ctx, 'loss'),
             ),
+          if (!p.isService)
+            ListTile(
+              leading: const Icon(Icons.qr_code_2_rounded),
+              title: const Text('Códigos de barras'),
+              subtitle: const Text('Agrega los códigos de otras presentaciones escaneando'),
+              onTap: () => Navigator.pop(ctx, 'codes'),
+            ),
           if (p.tracksStock && Access.instance.has('stock'))
             ListTile(
               leading: const Icon(Icons.event_rounded),
@@ -714,6 +737,9 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
         case 'loss':
           if (!mounted) return;
           if (await showLossSheet(context, productId: p.id, productName: p.name, stock: p.stock) == true) _load();
+        case 'codes':
+          if (!mounted) return;
+          await showProductCodes(context, product: p, mainCode: (_catalogExtras[p.id]?['barcode'] ?? '').toString());
         case 'lot':
           if (!mounted) return;
           await showAddLotSheet(context, productId: p.id, productName: p.name, unit: p.unit);

@@ -692,3 +692,50 @@ export async function applyBulkPrices(org: string, input: { ids: string[]; mode:
   if (!changed) return { ok: failed === 0, message: failed ? "No se pudieron cambiar los precios." : "Los precios ya estaban así." };
   return { ok: true, message: `Precios cambiados en ${changed} ${changed === 1 ? "producto" : "productos"}${failed ? ` (${failed} sin cambiar)` : ""}. Imprime las etiquetas nuevas.` };
 }
+
+const codeRe = /^[0-9A-Za-z.-]{4,40}$/;
+
+/** Main and extra barcodes of a product (v3.9). */
+export async function getProductCodes(org: string, productId: string): Promise<{ ok: true; main: string | null; extra: { id: string; code: string }[] } | { ok: false; message: string }> {
+  if (!uuid.safeParse(productId).success) return { ok: false, message: "Producto no válido." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "productos")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  const [main, extra] = await Promise.all([
+    c.db.from("products").select("barcode").eq("org_id", org).eq("id", productId).maybeSingle(),
+    c.db.from("product_barcodes").select("id,code").eq("org_id", org).eq("product_id", productId).order("created_at"),
+  ]);
+  if (main.error) return { ok: false, message: "No se pudieron cargar los códigos." };
+  return { ok: true, main: (main.data as { barcode: string | null } | null)?.barcode ?? null, extra: (extra.data ?? []) as { id: string; code: string }[] };
+}
+
+/** Adds a barcode to a product: the main one if it has none, otherwise an extra one. Never a code of another product. */
+export async function addProductCode(org: string, productId: string, raw: string): Promise<FormResult> {
+  if (!uuid.safeParse(productId).success) return { ok: false, message: "Producto no válido." };
+  const code = raw.trim();
+  if (!codeRe.test(code)) return { ok: false, message: "Código no válido: usa de 4 a 40 letras o números." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "productos")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector) || !can(c.access, "products_edit")) return { ok: false, message: "Los códigos los registra el dueño, un administrador o finanzas." };
+  const { data: owner } = await c.db.rpc("product_code_owner", { p_org: org, p_code: code });
+  const o = Array.isArray(owner) ? owner[0] as { product_id: string; name: string } | undefined : undefined;
+  if (o) return { ok: false, message: o.product_id === productId ? "Ese código ya está en este producto." : `El código ${code} ya es de «${o.name}». Un código solo puede ser de un producto.` };
+  const { data: prod } = await c.db.from("products").select("barcode").eq("org_id", org).eq("id", productId).maybeSingle();
+  const hasMain = !!(prod as { barcode: string | null } | null)?.barcode;
+  const r = hasMain
+    ? await c.db.from("product_barcodes").insert({ org_id: org, product_id: productId, code })
+    : await c.db.from("products").update({ barcode: code }).eq("org_id", org).eq("id", productId);
+  if (r.error) return { ok: false, message: /23505|ya es de otro/.test(`${r.error.code} ${r.error.message}`) ? `El código ${code} ya es de otro producto.` : dbMessage(r.error.message, "No se pudo guardar el código.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: hasMain ? `Código ${code} agregado: también vende este producto.` : `Código ${code} guardado como principal.` };
+}
+
+export async function removeProductCode(org: string, codeId: string): Promise<FormResult> {
+  if (!uuid.safeParse(codeId).success) return { ok: false, message: "Código no válido." };
+  const c = await workspaceContext(org);
+  if (!can(c.access, "products_edit")) return { ok: false, message: "Tu rol no puede quitar códigos." };
+  const { error } = await c.db.from("product_barcodes").delete().eq("org_id", org).eq("id", codeId);
+  if (error) return { ok: false, message: "No se pudo quitar el código." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Código quitado." };
+}

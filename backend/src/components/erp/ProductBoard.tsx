@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getKardex, updateProduct, uploadProductPhoto, type FormResult } from "@/app/erp/actions";
+import { addProductCode, getKardex, getProductCodes, removeProductCode, updateProduct, uploadProductPhoto, type FormResult } from "@/app/erp/actions";
 import { kardexTotals, type KardexEntry } from "@/lib/erp/kardex";
 import { ProductLots } from "@/components/erp/LotsAndLosses";
 
@@ -104,6 +104,7 @@ function ProductPanel({ org, product, currency, canEdit, canKardex, canLots, onC
         <dt>Existencias</dt><dd>{product.stock == null ? "No controla stock" : Number(product.stock)}</dd>
         <p className="fv-caption">Tu rol puede consultar el catálogo, pero no editarlo.</p>
       </dl>}
+      {product.unit !== "ZZ" && <ProductCodes org={org} productId={product.id} canEdit={canEdit} />}
       {canLots && product.stock != null && <ProductLots org={org} productId={product.id} unit={product.unit} stock={Number(product.stock)} canEdit={canEdit} />}
       {canKardex && product.stock != null && <Kardex org={org} productId={product.id} />}
     </div>
@@ -142,5 +143,42 @@ function Kardex({ org, productId }: { org: string; productId: string }) {
           <span>{r.delta > 0 ? "+" : ""}{units(r.delta)} → {units(r.after)}</span>
         </li>)}</ul>
       </>}
+  </section>;
+}
+
+/** Barcodes of the product: the main one and the extras (other presentations or lots of the same product). */
+function ProductCodes({ org, productId, canEdit }: { org: string; productId: string; canEdit: boolean }) {
+  const [data, setData] = useState<Awaited<ReturnType<typeof getProductCodes>> | null>(null);
+  const [version, setVersion] = useState(0);
+  const [code, setCode] = useState("");
+  const [msg, setMsg] = useState<FormResult>({ ok: false, message: "" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    getProductCodes(org, productId).then(d => { if (alive) setData(d); });
+    return () => { alive = false; };
+  }, [org, productId, version]);
+  async function add() {
+    if (busy || !code.trim()) return;
+    setBusy(true);
+    const r = await addProductCode(org, productId, code).catch(() => ({ ok: false, message: "Sin conexión." }));
+    setBusy(false); setMsg(r);
+    if (r.ok) { setCode(""); setVersion(v => v + 1); }
+  }
+  return <section className="fv-client-block">
+    <h3>Códigos de barras</h3>
+    {!data ? <div className="fv-skeleton" aria-label="Cargando códigos"><i /></div>
+      : !data.ok ? <p role="alert" className="fv-error">{data.message}</p>
+      : <ul className="fv-lines fv-ledger">
+        {data.main ? <li><span><b>{data.main}</b> principal</span><span /></li> : <li><span className="fv-muted">Sin código principal</span><span /></li>}
+        {data.extra.map(x => <li key={x.id}><span>{x.code}</span><span>{canEdit && <button className="fv-link" onClick={async () => { const r = await removeProductCode(org, x.id); setMsg(r); if (r.ok) setVersion(v => v + 1); }}>Quitar</button>}</span></li>)}
+      </ul>}
+    {canEdit && <div className="fv-fiado-form">
+      <label className="fv-grow"><span>Agregar código (escanéalo con la pistola o escríbelo)</span>
+        <input value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); void add(); } }} placeholder="7751234567890" inputMode="numeric" /></label>
+      <button className="fv-button secondary" disabled={busy || !code.trim()} onClick={add}>{busy ? "Guardando…" : "Agregar"}</button>
+    </div>}
+    {msg.message && <p className={msg.ok ? "fv-ok" : "fv-error"} role={msg.ok ? "status" : "alert"}>{msg.message}</p>}
+    <p className="fv-caption">Todos los códigos venden este mismo producto con su precio. Con lector de códigos, escanea uno tras otro: cada Enter lo guarda.</p>
   </section>;
 }
