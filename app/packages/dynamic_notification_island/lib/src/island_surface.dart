@@ -1,212 +1,558 @@
 part of '../dynamic_notification_island.dart';
 
-const _cardTop = 38.0;
-const _islandInk = Color(0xff121722);
-const _cardInk = Color(0xff1b2635);
+// Pure black merges with camera cut-outs and the hardware Dynamic Island.
+const _ink = Color(0xff000000);
+const _bodyRadius = 30.0;
+// Distance between the pill and the card it pours into. With the pill in the
+// status strip this places the card right under the system clock and icons,
+// which the OS always draws on top and must stay readable.
+const _gap = 10.0;
 
-class _ActivityMark extends CustomPainter {
-  const _ActivityMark(this.accent);
+Color _bright(Color accent) {
+  final hsl = HSLColor.fromColor(accent);
+  return hsl
+      .withLightness(math.max(hsl.lightness, .64))
+      .withSaturation(math.min(1, hsl.saturation + .08))
+      .toColor();
+}
+
+/// The resting pill: a leading glyph and a trailing activity trace flanking an
+/// empty center, where the camera sits on real hardware.
+class _CompactIsland extends StatelessWidget {
+  const _CompactIsland({
+    required this.height,
+    required this.notice,
+    required this.pulse,
+    required this.bare,
+    required this.elevated,
+  });
+
+  final double height;
+  final DynamicIslandNotice? notice;
+  final Animation<double> pulse;
+
+  /// Plain black, exactly like the hardware island at rest.
+  final bool bare;
+  final bool elevated;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = notice == null ? null : _bright(notice!.accent);
+    final glyph = height * .6;
+    final inset = (height - glyph) / 2;
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: _ink,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: elevated ? .10 : .06),
+            width: .6,
+          ),
+        ),
+        shadows: [
+          if (elevated)
+            const BoxShadow(
+              color: Color(0x38000000),
+              blurRadius: 14,
+              offset: Offset(0, 5),
+            ),
+        ],
+      ),
+      child: bare ? const SizedBox.expand() : ClipRect(child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: inset),
+        child: Row(
+          children: [
+            _Glyph(
+              size: glyph,
+              accent: accent,
+              icon: notice?.icon,
+              pulse: pulse,
+            ),
+            const Spacer(),
+            AnimatedBuilder(
+              animation: pulse,
+              builder: (context, _) => CustomPaint(
+                size: Size(glyph * .9, glyph * .7),
+                painter: _ActivityTrace(accent, pulse.value),
+              ),
+            ),
+          ],
+        ),
+      )),
+    );
+  }
+}
+
+class _Glyph extends StatelessWidget {
+  const _Glyph({
+    required this.size,
+    required this.accent,
+    required this.icon,
+    required this.pulse,
+  });
+  final double size;
   final Color? accent;
+  final IconData? icon;
+  final Animation<double> pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final idle = accent == null;
+    final colors = idle
+        ? const [Color(0xff9ff3df), Color(0xff6fb7ff)]
+        : [accent!, Color.lerp(accent, const Color(0xff1d2b4a), .38)!];
+    return AnimatedBuilder(
+      animation: pulse,
+      builder: (context, child) {
+        // One soft breath when a notice arrives; still otherwise.
+        final p = pulse.isAnimating ? math.sin(pulse.value * math.pi) : 0.0;
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: colors,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colors.first.withValues(alpha: .28 + .4 * p),
+                blurRadius: 6 + 8 * p,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+      child: Icon(
+        idle ? Icons.receipt_long_rounded : icon,
+        size: size * .6,
+        color: const Color(0xff07121c),
+      ),
+    );
+  }
+}
+
+/// A small waveform; it swells once with [phase] when a notice arrives.
+class _ActivityTrace extends CustomPainter {
+  const _ActivityTrace(this.accent, this.phase);
+  final Color? accent;
+  final double phase;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final mid = size.height / 2;
+    const bars = [.42, .86, .58, 1.0];
+    final gap = size.width / (bars.length * 2 - 1);
     final pen = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round
-      ..color = accent ?? const Color(0xffaab6c8);
-    final path = Path()
-      ..moveTo(1, mid + 2)
-      ..cubicTo(6, mid + 2, 7, mid - 4, 11, mid - 4)
-      ..cubicTo(15, mid - 4, 15, mid + 3, 19, mid + 3)
-      ..quadraticBezierTo(21, mid + 3, 24, mid);
-    canvas.drawPath(path, pen);
-    if (accent != null) {
-      pen.style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(size.width - 2, mid), 2.1, pen);
+      ..strokeWidth = gap
+      ..color = accent ?? const Color(0xff5d6b7e);
+    final mid = size.height / 2;
+    for (var i = 0; i < bars.length; i++) {
+      final wave = phase == 0 || phase == 1
+          ? 0.0
+          : math.sin((phase * 3 + i / bars.length) * math.pi * 2) *
+                math.sin(phase * math.pi) *
+                .35;
+      final h = (bars[i] + wave).clamp(.25, 1.2) * size.height / 2;
+      final x = gap / 2 + i * gap * 2;
+      canvas.drawLine(Offset(x, mid - h), Offset(x, mid + h), pen);
     }
   }
 
   @override
-  bool shouldRepaint(_ActivityMark oldDelegate) => accent != oldDelegate.accent;
+  bool shouldRepaint(_ActivityTrace old) =>
+      accent != old.accent || phase != old.phase;
 }
 
-/// Derived from rit3zh/expo-dynamic-notifications buildNotificationGeometry
-/// and neckProfile. Translates their droplet stretch and neck break to Canvas.
-class _DropletPainter extends CustomPainter {
-  const _DropletPainter(this.progress, this.anchorX);
-  final double progress;
-  final double anchorX;
+/// The expanded island: the pill stays where it rests, and a card pours out
+/// below it through a short liquid neck, then settles with a spring. The card
+/// child is laid out once at full width and revealed through its growing clip,
+/// so text never reflows while the shape moves.
+class _IslandMorph extends SingleChildRenderObjectWidget {
+  const _IslandMorph({
+    required this.t,
+    required this.compact,
+    required this.expandedWidth,
+    required this.shift,
+    required this.accent,
+    super.child,
+  });
+
+  final double t;
+  final Size compact;
+  final double expandedWidth;
+  final double shift;
+  final Color accent;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || size.height <= _cardTop) return;
-    final drop = const Interval(
-      0,
-      .62,
-      curve: Curves.easeOutCubic,
-    ).transform(progress);
-    final expand = const Interval(
-      340 / 780,
-      1,
-      curve: Curves.easeOutCubic,
-    ).transform(progress);
-    final tint = const Interval(110 / 780, .85).transform(progress);
-    final grow = 1 - math.pow(1 - (drop / .7).clamp(0.0, 1.0), 1.25);
-    final phase = (drop / .82).clamp(0.0, 1.0);
-    const peak = 1.6 / (1.6 + 1.4);
-    final norm = math.pow(peak, 1.6) * math.pow(1 - peak, 1.4);
-    final neck = math.pow(phase, 1.6) * math.pow(1 - phase, 1.4) / norm;
-    final stretch = 1 + .38 * neck;
-    final diameter = 46.0 * grow;
-    final w = lerpDouble(diameter / stretch, size.width, expand)!;
-    final h = lerpDouble(diameter * stretch, size.height - _cardTop, expand)!;
-    final cx = lerpDouble(anchorX, size.width / 2, drop)!;
-    final cy = lerpDouble(4.2, _cardTop + (size.height - _cardTop) / 2, drop)!;
-    final pen = Paint()..color = Color.lerp(_islandInk, _cardInk, tint)!;
-    if (neck > 0 && w > 0) {
-      final half = math.min(w, 46.0) * neck / 2;
-      canvas.drawPath(
-        Path()
-          ..moveTo(anchorX - half, 0)
-          ..quadraticBezierTo(cx - half * .45, cy * .52, cx - half, cy)
-          ..lineTo(cx + half, cy)
-          ..quadraticBezierTo(cx + half * .45, cy * .52, anchorX + half, 0)
-          ..close(),
-        pen,
-      );
-    }
-    final radius = math.min(
-      lerpDouble(diameter / 2, 23, expand)!,
-      math.min(w, h) / 2,
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderIslandMorph(t, compact, expandedWidth, shift, accent);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderIslandMorph r) {
+    r
+      ..t = t
+      ..compact = compact
+      ..expandedWidth = expandedWidth
+      ..shift = shift
+      ..accent = accent;
+  }
+}
+
+class _RenderIslandMorph extends RenderProxyBox {
+  _RenderIslandMorph(
+    this._t,
+    this._compact,
+    this._width,
+    this._shift,
+    this._accent,
+  );
+
+  double _t;
+  set t(double v) {
+    if (v == _t) return;
+    _t = v;
+    markNeedsLayout();
+  }
+
+  Size _compact;
+  set compact(Size v) {
+    if (v == _compact) return;
+    _compact = v;
+    markNeedsLayout();
+  }
+
+  double _width;
+  set expandedWidth(double v) {
+    if (v == _width) return;
+    _width = v;
+    markNeedsLayout();
+  }
+
+  double _shift;
+  set shift(double v) {
+    if (v == _shift) return;
+    _shift = v;
+    markNeedsLayout();
+  }
+
+  Color _accent;
+  set accent(Color v) {
+    if (v == _accent) return;
+    _accent = v;
+    markNeedsPaint();
+  }
+
+  final _clip = LayerHandle<ClipRRectLayer>();
+  late Rect _pill;
+  late RRect _body;
+  Offset _childOffset = Offset.zero;
+  double _grow = 0;
+
+  @override
+  void performLayout() {
+    final c = child!;
+    c.layout(BoxConstraints.tightFor(width: _width), parentUsesSize: true);
+    final t = _t;
+    // 0 → 0.3: the body slides out from behind the pill, stretching the neck.
+    // 0.15 → 1: it widens and fills. The width keeps the spring's overshoot.
+    final drop = Curves.easeOutCubic.transform((t / .3).clamp(0.0, 1.0));
+    final open = (t - .15) / .85;
+    _grow = open.clamp(0.0, 1.0);
+    final bodyW = lerpDouble(_compact.width * .62, _width, open)!;
+    final bodyH = lerpDouble(_compact.height * .8, c.size.height, _grow)!;
+    final bodyTop = lerpDouble(_compact.height * .1, _compact.height + _gap, drop)!;
+    final span = _width + _shift.abs() * 2;
+    final w = math.max(_compact.width, math.max(span, bodyW + _shift.abs() * 2));
+    size = constraints.constrain(Size(w, math.max(_compact.height, bodyTop + bodyH)));
+    final mid = size.width / 2;
+    _pill = Rect.fromCenter(
+      center: Offset(mid, _compact.height / 2),
+      width: _compact.width,
+      height: _compact.height,
     );
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy), width: w, height: h),
-      Radius.circular(radius),
+    final bodyCenter = mid + _shift * _grow;
+    _body = RRect.fromRectAndRadius(
+      Rect.fromLTWH(bodyCenter - bodyW / 2, bodyTop, bodyW, bodyH),
+      Radius.circular(
+        math.min(lerpDouble(_compact.height * .45, _bodyRadius, _grow)!, bodyH / 2),
+      ),
     );
-    if (expand > 0) {
+    _childOffset = Offset(bodyCenter - _width / 2, bodyTop);
+  }
+
+  // A metaball bridge: narrow under the pill, flaring into the card's top edge.
+  Path _neck() {
+    final top = _pill.bottom - 2;
+    final bottom = _body.top + 1;
+    if (bottom <= top + .5) return Path();
+    final cx = (_pill.center.dx + _body.center.dx) / 2;
+    final waist = math.min(_compact.width * .2, 24.0);
+    final flare = math.min(waist + 16, _body.width / 2 - _body.tlRadiusX * .3);
+    final h = bottom - top;
+    return Path()
+      ..moveTo(cx - waist, top)
+      ..cubicTo(cx - waist, top + h * .55, cx - flare + 4, bottom, cx - flare, bottom + 2)
+      ..lineTo(cx + flare, bottom + 2)
+      ..cubicTo(cx + flare - 4, bottom, cx + waist, top + h * .55, cx + waist, top)
+      ..close();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final canvas = context.canvas;
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    final pill = RRect.fromRectAndRadius(_pill, Radius.circular(_pill.height / 2));
+    final g = _grow;
+    final ink = Paint()..color = _ink;
+    if (g > 0) {
       canvas.drawShadow(
-        Path()..addRRect(rect),
-        const Color(0xff0b162a).withValues(alpha: .36 * expand),
-        7,
+        Path()..addRRect(_body),
+        Colors.black.withValues(alpha: .55 * g),
+        20 * g,
         false,
       );
     }
-    canvas.drawRRect(rect, pen);
-    if (expand > .65) {
-      pen
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: .21 * expand);
-      canvas.drawRRect(rect.deflate(.5), pen);
+    canvas.drawRRect(_body, ink);
+    canvas.drawPath(_neck(), ink);
+    canvas.drawRRect(pill, ink);
+    if (g > .05) {
+      // Contextual light: the notice color glows from the leading corner, and
+      // a faint sheen along the top edge suggests a polished surface.
+      final glow = _bright(_accent);
+      final r = _body.outerRect;
+      canvas.save();
+      canvas.clipRRect(_body);
+      canvas.drawRect(
+        r,
+        Paint()
+          ..shader = RadialGradient(
+            center: const Alignment(-1, -1.2),
+            radius: 1.3,
+            colors: [glow.withValues(alpha: .30 * g), glow.withValues(alpha: 0)],
+          ).createShader(r),
+      );
+      final sheen = Rect.fromLTWH(r.left, r.top, r.width, 28);
+      canvas.drawRect(
+        sheen,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white.withValues(alpha: .08 * g),
+              Colors.white.withValues(alpha: 0),
+            ],
+          ).createShader(sheen),
+      );
+      canvas.restore();
+      canvas.drawRRect(
+        _body.deflate(.3),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .6
+          ..color = Colors.white.withValues(alpha: .12 * g),
+      );
     }
+    canvas.restore();
+    _clip.layer = context.pushClipRRect(
+      needsCompositing,
+      offset,
+      _body.outerRect,
+      _body,
+      (context, offset) => context.paintChild(child!, offset + _childOffset),
+      oldLayer: _clip.layer,
+    );
   }
 
   @override
-  bool hitTest(Offset position) => false;
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    if (!_body.contains(position)) return false;
+    return result.addWithPaintOffset(
+      offset: _childOffset,
+      position: position,
+      hitTest: (result, local) => child!.hitTest(result, position: local),
+    );
+  }
+
   @override
-  bool shouldRepaint(_DropletPainter oldDelegate) =>
-      progress != oldDelegate.progress || anchorX != oldDelegate.anchorX;
+  bool hitTestSelf(Offset position) =>
+      _body.contains(position) || _pill.contains(position);
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    transform.translateByDouble(_childOffset.dx, _childOffset.dy, 0, 1);
+  }
+
+  @override
+  void dispose() {
+    _clip.layer = null;
+    super.dispose();
+  }
 }
 
-class _NoticeCard extends StatelessWidget {
-  const _NoticeCard({
+/// The card's content.
+class _ExpandedIsland extends StatelessWidget {
+  const _ExpandedIsland({
     required this.notice,
     required this.onOpen,
     required this.onClose,
   });
+
   final DynamicIslandNotice notice;
   final VoidCallback onOpen, onClose;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // An upstream accent may be dark. Preserve its hue in the symbol and keep
-    // the text on a stable accessible foreground in both app themes.
-    final accent = Color.lerp(notice.accent, Colors.white, .45)!;
+    final accent = _bright(notice.accent);
     return Semantics(
       key: const ValueKey('dynamic-island-notice'),
       container: true,
       liveRegion: true,
       child: Material(
         type: MaterialType.transparency,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 74),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: onOpen,
-                  borderRadius: BorderRadius.circular(23),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 13, 0, 13),
-                    child: Row(
-                      children: [
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: .13),
-                            border: Border.all(
-                              color: accent.withValues(alpha: .32),
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Icon(
-                              Icons.notifications_outlined,
-                              color: accent,
-                              size: 19,
-                            ),
-                          ),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(_bodyRadius),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(13),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            accent,
+                            Color.lerp(accent, const Color(0xff13233d), .45)!,
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                notice.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  color: Colors.white,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              if (notice.message.isNotEmpty) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  notice.message,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: const Color(0xffdce6f3),
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ],
-                            ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withValues(alpha: .42),
+                            blurRadius: 16,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Icon(
+                        notice.icon,
+                        size: 22,
+                        color: const Color(0xff07121c),
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (notice.category != null)
+                            Text(
+                              notice.category!.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: accent,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                          const SizedBox(height: 2),
+                          Text(
+                            notice.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              height: 1.18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).closeButtonTooltip,
+                      onPressed: onClose,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 40,
+                        height: 40,
+                      ),
+                      icon: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: .13),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 52, right: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notice.message,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xffc3cdda),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      DecoratedBox(
+                        decoration: ShapeDecoration(
+                          shape: const StadiumBorder(),
+                          color: accent,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 9,
+                          ),
+                          child: Text(
+                            notice.actionLabel,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: const Color(0xff07121c),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                onPressed: onClose,
-                icon: const Icon(
-                  Icons.close_rounded,
-                  size: 19,
-                  color: Color(0xffcfdaea),
-                ),
-              ),
-              const SizedBox(width: 4),
-            ],
+              ],
+            ),
           ),
         ),
       ),

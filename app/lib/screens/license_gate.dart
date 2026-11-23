@@ -10,6 +10,8 @@ import '../app_state.dart';
 import '../rubros.dart' show planName;
 import '../services/repo.dart';
 import '../services/v2_api.dart';
+import '../ui/glass_widgets.dart' show FvGlassTopBar;
+import '../ui/liquid_glass.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -352,8 +354,13 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mi plan')),
+    return FvAurora(child: Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Mi plan'),
+        backgroundColor: Colors.transparent,
+        flexibleSpace: const FvGlassTopBar(),
+      ),
       body: ListenableBuilder(
         listenable: Access.instance,
         builder: (context, _) {
@@ -369,9 +376,13 @@ class _PlanScreenState extends State<PlanScreen> {
             onRefresh: Access.instance.load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 40), children: [
               Reveal(
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(gradient: Brand.heroGradient, borderRadius: BorderRadius.circular(Radii.xl)),
+                child: FvLiquidGlass(
+                  radius: Radii.xl,
+                  tone: Brightness.dark,
+                  strength: 2.1,
+                  blur: 0,
+                  tint: planLight(l.plan).$1,
+                  padding: const EdgeInsets.all(22),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(l.dev || (l.source == 'hub' && !l.activated) ? 'Pendiente de activación' : 'Plan ${planName(l.plan)}', style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
@@ -397,7 +408,10 @@ class _PlanScreenState extends State<PlanScreen> {
               if (a.allows('subscription.manage') && l.payUrl.isNotEmpty) GradientButton(label: 'Pagar o mejorar mi plan', icon: Icons.payments_rounded, onPressed: () => openPayUrl(context, l.payUrl)),
               const SizedBox(height: 18),
               const SectionTitle('Incluido en tu plan'),
-              SoftCard(
+              FvLiquidGlass(
+                radius: 24,
+                blur: 0,
+                padding: const EdgeInsets.all(16),
                 child: Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final k in included) TagChip(featureName(k), color: Brand.ok, icon: Icons.check_rounded),
                 ]),
@@ -424,7 +438,7 @@ class _PlanScreenState extends State<PlanScreen> {
           );
         },
       ),
-    );
+    ));
   }
 }
 

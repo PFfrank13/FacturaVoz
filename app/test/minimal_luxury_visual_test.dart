@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('neutral tokens', () {
-    expect(FvTokens.canvas, const Color(0xFFF5F6F2));
-    expect(FvTokens.canvasDark, const Color(0xFF101B1D));
+    expect(FvTokens.canvas, const Color(0xFFF2F6FB));
+    expect(FvTokens.canvasDark, const Color(0xFF060B14));
     expect(buildTheme(Brightness.light).scaffoldBackgroundColor,
         FvTokens.canvas);
   });

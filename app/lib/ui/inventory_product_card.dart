@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'design_tokens.dart';
 import 'motion.dart';
 import 'glass_widgets.dart';
 
@@ -57,15 +56,18 @@ class FvInventoryProductCard extends StatelessWidget {
       label: '$name, precio $price, $indicator',
       child: FvTactileScale(
         enabled: onOpen != null,
-        child: DecoratedBox(
-          decoration: FvSurfaces.card(t),
+        child: FvLiquidGlass(
+          radius: 26,
+          blur: 0,
+          strength: t.brightness == Brightness.dark ? 1.5 : 1.4,
+          tint: lowStock || stockIsCritical ? accent : null,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+            borderRadius: BorderRadius.circular(26),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: onOpen,
-                borderRadius: BorderRadius.circular(FvTokens.cardRadius),
+                borderRadius: BorderRadius.circular(26),
                 child: Padding(
                   padding: const EdgeInsets.all(15),
                   child: Column(
@@ -75,13 +77,19 @@ class FvInventoryProductCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(17),
-                            child: SizedBox(
-                              width: 88,
-                              height: 88,
-                              child: photo ?? FvProductPhotoFallback(name: name, category: category,
-                                icon: isService ? Icons.handyman_outlined : Icons.inventory_2_outlined),
+                          SizedBox(
+                            width: 92,
+                            height: 92,
+                            child: FvProductStudio(
+                              radius: 20,
+                              child: Padding(
+                                padding: EdgeInsets.all(photo == null ? 0 : 7),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(13),
+                                  child: photo ?? FvProductPhotoFallback(name: name, category: category,
+                                    icon: isService ? Icons.handyman_outlined : Icons.inventory_2_outlined),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 13),

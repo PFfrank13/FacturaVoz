@@ -48,6 +48,49 @@ Widget frame({
 );
 
 void main() {
+  test('resting island matches the iPhone Pro / Pro Max hardware island', () {
+    final iphone = statusBarIslandGeometry(
+      const MediaQueryData(
+        size: Size(440, 956),
+        padding: EdgeInsets.only(top: 62),
+      ),
+    )!;
+    expect(iphone.size, const Size(126, 37));
+    expect(iphone.top, 11);
+    final android = statusBarIslandGeometry(
+      const MediaQueryData(size: Size(412, 915), padding: EdgeInsets.only(top: 40)),
+    )!;
+    expect(android.size.height, 34);
+    expect(android.size.aspectRatio, closeTo(126 / 37, .001));
+    expect(
+      statusBarIslandGeometry(const MediaQueryData(size: Size(1280, 800))),
+      isNull,
+    );
+  });
+
+  testWidgets('in the status strip it rests bare and widens for a notice', (
+    tester,
+  ) async {
+    Widget strip(DynamicIslandNotice? current) => MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: DynamicNotificationIsland(
+            notice: current,
+            onOpen: () {},
+            compactSize: const Size(126, 37),
+            placement: IslandPlacement.statusBar,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(strip(null));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(pill), const Size(126, 37));
+    await tester.pumpWidget(strip(notice));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(pill), const Size(190, 37));
+  });
+
   testWidgets(
     'compact island expands, leaves the page interactive, and opens the inbox',
     (tester) async {

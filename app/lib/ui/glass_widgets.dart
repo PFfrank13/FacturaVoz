@@ -1,44 +1,20 @@
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-import 'design_tokens.dart';
+import 'liquid_glass.dart';
+export 'liquid_glass.dart';
 import 'motion.dart';
 
-/// The toolbar catches light along the upper left and the lower rim.
+/// Liquid glass across the status strip and toolbar.
 class FvGlassTopBar extends StatelessWidget {
   const FvGlassTopBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final contrast = MediaQuery.highContrastOf(context);
-    final pane = DecoratedBox(
-      decoration: BoxDecoration(
-        color: contrast ? theme.colorScheme.surface : null,
-        gradient: contrast ? null : LinearGradient(
-          begin: const Alignment(-1, -.8),
-          end: const Alignment(.95, .65),
-          colors: dark
-              ? const [Color(0xDB2B514E), Color(0xD5192C3B), Color(0xD7383C56)]
-              : const [Color(0xD1D0F1E4), Color(0xC8F7FBF7), Color(0xCDDDE3FA)],
-          stops: const [0, .48, 1],
-        ),
-        border: Border(
-          bottom: BorderSide(
-            color: contrast ? theme.colorScheme.outline :
-                dark ? const Color(0x798FBFBA) : const Color(0x5261958B),
-            width: contrast ? 1 : .8,
-          ),
-        ),
-      ),
-      child: const SizedBox.expand(),
-    );
-    final sigma = FvLuxe.glassSigma(theme.platform, 16);
-    return contrast ? pane : ClipRect(child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-      child: pane,
-    ));
-  }
+  Widget build(BuildContext context) => const FvLiquidGlass(
+    borderRadius: BorderRadius.zero,
+    shadow: false,
+    blur: 24,
+    strength: 1.25,
+    child: SizedBox.expand(),
+  );
 }
 
 /// A single optical surface shared by the floating dock and the wide-screen rail.
@@ -48,98 +24,71 @@ class FvFloatingGlassDock extends StatelessWidget {
   final double radius;
 
   @override
+  Widget build(BuildContext context) => FvLiquidGlass(
+    radius: radius,
+    blur: 24,
+    strength: 1.15,
+    child: child,
+  );
+}
+
+/// A lit product well: a soft key light from above, a cool rim from the side
+/// and a contact shadow, so cut-out product photos sit on a surface.
+class FvProductStudio extends StatelessWidget {
+  const FvProductStudio({super.key, required this.child, this.radius = 18});
+  final Widget child;
+  final double radius;
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final contrast = MediaQuery.highContrastOf(context);
-    final rounded = BorderRadius.circular(radius);
-    final pane = DecoratedBox(
-      decoration: BoxDecoration(
-        color: contrast ? theme.colorScheme.surface : null,
-        gradient: contrast ? null : LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xDE2F5156), Color(0xD01B293A), Color(0xDC313752)]
-              : const [Color(0xDCE6FBF0), Color(0xC2F2F9F8), Color(0xD5DFE7F8)],
-          stops: const [0, .53, 1],
-        ),
-      ),
-      child: child,
-    );
-    final sigma = FvLuxe.glassSigma(theme.platform, 18);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: rounded,
-        boxShadow: contrast ? null : [
-          BoxShadow(
-            color: dark ? const Color(0x70081423) : const Color(0x33204446),
-            offset: const Offset(0, 6),
-            blurRadius: 16,
-            spreadRadius: -4,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: rounded,
-        child: CustomPaint(
-          foregroundPainter: _DockEdge(dark, radius, contrast ? theme.colorScheme.outline : null),
-          child: contrast ? pane : BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-            child: pane,
-          ),
-        ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: CustomPaint(
+        painter: contrast ? null : _StudioLight(dark),
+        child: child,
       ),
     );
   }
 }
 
-class _DockEdge extends CustomPainter {
-  const _DockEdge(this.dark, this.radius, this.outline);
+class _StudioLight extends CustomPainter {
+  const _StudioLight(this.dark);
   final bool dark;
-  final double radius;
-  final Color? outline;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-    final bounds = Offset.zero & size;
-    final rim = RRect.fromRectAndRadius(bounds, Radius.circular(radius));
-    final edge = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    if (outline != null) {
-      canvas.drawRRect(rim.deflate(.5), edge..color = outline!);
-      return;
-    }
-    edge.shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        stops: const [0, .21, .44, .73, 1],
-        colors: dark
-            ? const [Color(0xE7C3F0DD), Color(0x8677C2B1), Color(0x30578888), Color(0x52616D89), Color(0xCED4D8FF)]
-            : const [Colors.white, Color(0xFFD7F9EA), Color(0x8971A399), Color(0x70919FB5), Color(0xFFF4F3FF)],
-      ).createShader(bounds);
-    canvas.drawRRect(rim.deflate(.65), edge..strokeWidth = 1.3);
-    // The inner, opposing reflection gives the slim edge visible thickness.
-    edge.shader = LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
-      colors: [
-        Colors.white.withValues(alpha: dark ? .18 : .7),
-        Colors.transparent,
-        Colors.white.withValues(alpha: dark ? .11 : .55),
-      ],
-    ).createShader(bounds);
-    canvas.drawRRect(rim.deflate(1.8), edge..strokeWidth = .7);
+    final r = Offset.zero & size;
+    canvas.drawRect(r, Paint()..shader = LinearGradient(
+      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+      colors: dark
+          ? const [Color(0xFF203552), Color(0xFF111D31)]
+          : const [Color(0xFFFFFFFF), Color(0xFFE5EEF7)],
+    ).createShader(r));
+    canvas.drawRect(r, Paint()..shader = RadialGradient(
+      center: const Alignment(0, -1.1), radius: 1.05,
+      colors: [Colors.white.withValues(alpha: dark ? .20 : .95), Colors.white.withValues(alpha: 0)],
+    ).createShader(r));
+    canvas.drawRect(r, Paint()..shader = RadialGradient(
+      center: const Alignment(1.2, .3), radius: .9,
+      colors: [const Color(0xFF5BD5FF).withValues(alpha: dark ? .16 : .14), const Color(0x005BD5FF)],
+    ).createShader(r));
+    // Contact shadow where products rest.
+    final floor = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height * .86),
+      width: size.width * .62, height: size.height * .09);
+    canvas.drawOval(floor, Paint()
+      ..color = Colors.black.withValues(alpha: dark ? .45 : .16)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * .035));
   }
 
   @override
-  bool shouldRepaint(_DockEdge oldDelegate) =>
-      dark != oldDelegate.dark || radius != oldDelegate.radius || outline != oldDelegate.outline;
+  bool shouldRepaint(_StudioLight old) => old.dark != dark;
 }
 
-/// Typographic visual for products whose owners have not uploaded a photo.
+/// Visual for products whose owners have not uploaded a photo: a monogram
+/// with a gradient fill and the category, sitting in the studio light.
 class FvProductPhotoFallback extends StatelessWidget {
   const FvProductPhotoFallback({super.key, required this.name, this.category, this.icon});
   final String name;
@@ -158,50 +107,67 @@ class FvProductPhotoFallback extends StatelessWidget {
     final palette = _catalogInks[seed.runes.fold<int>(0, (hash, rune) => (hash * 31 + rune) % 997) % _catalogInks.length];
     final contrast = MediaQuery.highContrastOf(context);
     final dark = theme.brightness == Brightness.dark;
-    final paper = contrast ? scheme.surface : dark ? palette.dark : palette.paper;
-    final ink = contrast ? scheme.onSurface : dark ? palette.paper : palette.dark;
     return Semantics(
       image: true, excludeSemantics: true, label: 'Producto sin fotografía: $name',
-      child: ColoredBox(color: paper, child: LayoutBuilder(builder: (context, size) {
-        final showLabel = size.maxWidth >= 100 && size.maxHeight >= 100 &&
-            group != null && group.isNotEmpty && MediaQuery.textScalerOf(context).scale(14) <= 22;
-        return Stack(alignment: Alignment.center, fit: StackFit.expand, children: [
-          if (!contrast) CustomPaint(painter: _CatalogCorner(ink.withValues(alpha: dark ? .14 : .10))),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      child: CustomPaint(
+        painter: contrast ? null : _MonogramGlow(palette.$1, dark),
+        child: LayoutBuilder(builder: (context, size) {
+          final showLabel = size.maxWidth >= 100 && size.maxHeight >= 100 &&
+              group != null && group.isNotEmpty && MediaQuery.textScalerOf(context).scale(14) <= 22;
+          final mark = initials.isEmpty
+              ? Icon(icon ?? Icons.inventory_2_outlined, size: 44, color: Colors.white)
+              : Text(initials, style: const TextStyle(fontFamily: 'Inter',
+                  fontSize: 44, height: 1.05, letterSpacing: -2, fontWeight: FontWeight.w800,
+                  color: Colors.white));
+          return Padding(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: initials.isEmpty
-                  ? Icon(icon ?? Icons.inventory_2_outlined, color: ink)
-                  : Text(initials, style: TextStyle(fontFamily: FvLuxe.editorialFont,
-                      fontSize: 37, height: 1.1, letterSpacing: -1.2, color: ink)))),
-              if (showLabel) Text(group, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(color: ink)),
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: contrast
+                  ? DefaultTextStyle.merge(style: TextStyle(color: scheme.onSurface), child: mark)
+                  : ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (r) => LinearGradient(
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        colors: [palette.$1, palette.$2],
+                      ).createShader(r),
+                      child: mark))),
+              if (showLabel) Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(group.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: dark ? const Color(0xFFB9C8DA) : const Color(0xFF52627A),
+                    letterSpacing: 1.1, fontWeight: FontWeight.w700, fontSize: 10)),
+              ),
             ]),
-          ),
-        ]);
-      })),
+          );
+        }),
+      ),
     );
   }
 }
 
+// (light, deep) gradient pairs per category.
 const _catalogInks = [
-  (paper: Color(0xFFCAF1E4), dark: Color(0xFF154C46)),
-  (paper: Color(0xFFD5E2FF), dark: Color(0xFF253F73)),
-  (paper: Color(0xFFFFDBCF), dark: Color(0xFF733E39)),
-  (paper: Color(0xFFEDE8B6), dark: Color(0xFF444D26)),
+  (Color(0xFF3EE6B0), Color(0xFF0E8C7A)),
+  (Color(0xFF7CC8FF), Color(0xFF3B5BDB)),
+  (Color(0xFFFFA48A), Color(0xFFE0457B)),
+  (Color(0xFFFFD36E), Color(0xFFE07B24)),
+  (Color(0xFFC3A6FF), Color(0xFF6D4AE0)),
 ];
 
-class _CatalogCorner extends CustomPainter {
-  const _CatalogCorner(this.color);
+class _MonogramGlow extends CustomPainter {
+  const _MonogramGlow(this.color, this.dark);
   final Color color;
+  final bool dark;
   @override
   void paint(Canvas canvas, Size size) {
-    final corner = size.shortestSide * .40;
-    final mark = Path()..moveTo(size.width - corner, 0)..lineTo(size.width, 0)
-        ..lineTo(size.width, corner)..close();
-    canvas.drawPath(mark, Paint()..color = color);
+    final r = Offset.zero & size;
+    canvas.drawRect(r, Paint()..shader = RadialGradient(
+      radius: .55,
+      colors: [color.withValues(alpha: dark ? .30 : .26), color.withValues(alpha: 0)],
+    ).createShader(r));
   }
   @override
-  bool shouldRepaint(_CatalogCorner oldDelegate) => color != oldDelegate.color;
+  bool shouldRepaint(_MonogramGlow old) => old.color != color || old.dark != dark;
 }
 
 /// Demo photographs can fail offline; the UI degrades to typography.

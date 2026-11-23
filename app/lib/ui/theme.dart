@@ -230,14 +230,21 @@ ThemeData buildTheme(Brightness b) {
     ),
     navigationDrawerTheme: NavigationDrawerThemeData(
       backgroundColor: Colors.transparent,
-      indicatorColor: primary.withValues(alpha: .12),
+      indicatorColor: primary.withValues(alpha: dark ? .22 : .16),
+      // Material's default selected label is onSecondaryContainer, which is
+      // dark on the dark glass drawer. Keep labels on the surface ink.
+      labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+        fontFamily: _font, fontSize: 14,
+        fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
+        color: states.contains(WidgetState.selected) ? ink : muted,
+      )),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: dark ? FvTokens.fieldDark : FvTokens.field,
+      fillColor: dark ? const Color(0x9E15243A) : const Color(0xD9FFFFFF),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
-      enabledBorder: border(line),
+      enabledBorder: border(dark ? const Color(0x33FFFFFF) : Colors.white, 1.1),
       focusedBorder: border(primary, 1.4),
       errorBorder: border(scheme.error),
       focusedErrorBorder: border(scheme.error, 2),
@@ -256,7 +263,8 @@ ThemeData buildTheme(Brightness b) {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(64, 52),
         foregroundColor: ink,
-        side: BorderSide(color: line),
+        backgroundColor: dark ? const Color(0x6615243A) : const Color(0xB3FFFFFF),
+        side: BorderSide(color: dark ? const Color(0x40FFFFFF) : Colors.white, width: 1.1),
         shape: RoundedRectangleBorder(borderRadius: radius),
         textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w600),
       ),
@@ -285,9 +293,9 @@ ThemeData buildTheme(Brightness b) {
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: card,
-      selectedColor: Color.alphaBlend(primary.withValues(alpha: dark ? .2 : .13), card),
-      side: BorderSide(color: line),
+      backgroundColor: dark ? const Color(0x8C15243A) : const Color(0xCCFFFFFF),
+      selectedColor: dark ? const Color(0xCC1E7F6E) : const Color(0xFFCFF5E8),
+      side: BorderSide(color: dark ? const Color(0x33FFFFFF) : Colors.white, width: 1.1),
       shape: const StadiumBorder(),
       labelStyle: TextStyle(fontFamily: _font, fontWeight: FontWeight.w600, color: ink),
       showCheckmark: true,
@@ -341,13 +349,16 @@ class SoftPageTransitions extends PageTransitionsBuilder {
     final easing = CurveTween(curve: Curves.easeOutCubic);
     final curve = animation.drive(easing);
     final back = secondaryAnimation.drive(easing);
+    // The incoming page becomes opaque within the first 40 % and keeps
+    // sliding, so two text-heavy screens never sit half-blended on glass.
+    final reveal = animation.drive(CurveTween(curve: const Interval(0, .4, curve: Curves.easeOut)));
     return SlideTransition(
       position: Tween<Offset>(begin: Offset.zero, end: const Offset(-0.06, 0)).animate(back),
       child: FadeTransition(
         opacity: Tween<double>(begin: 1, end: 0.92).animate(back),
         child: SlideTransition(
           position: Tween<Offset>(begin: const Offset(0.0, 0.06), end: Offset.zero).animate(curve),
-          child: FadeTransition(opacity: curve, child: child),
+          child: FadeTransition(opacity: reveal, child: child),
         ),
       ),
     );

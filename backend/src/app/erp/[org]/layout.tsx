@@ -2,6 +2,8 @@ import Link from "next/link";
 import { workspaceContext } from "@/lib/erp/context";
 import { sectors, visibleModules } from "@/lib/erp/access";
 import RefreshAccess from "@/components/erp/RefreshAccess";
+import RailNav from "@/components/erp/RailNav";
+import "../erp.css";
 
 export const dynamic = "force-dynamic";
 export default async function WorkspaceLayout({ children, params }: { children: React.ReactNode; params: Promise<{ org: string }> }) {
@@ -13,10 +15,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       <Link className="fv-wordmark" href="/">Factura<span>Voz</span><i aria-hidden="true">▂▅▃▇</i></Link>
       <p className="fv-eyebrow">{c.sector ? sectors[c.sector].name : "TU EMPRESA"}</p>
       <strong className="fv-org-name">{c.organization.name}</strong>
-      <nav aria-label="Navegación de la empresa">
-        <Link href={`/erp/${org}`}>Inicio</Link>
-        {visibleModules(c.license, c.access, c.sector).map(m => <Link key={m.id} href={`/erp/${org}/${m.id}`}>{m.id === "clientes" && c.sector === "consultorio" ? "Pacientes" : m.id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title}</Link>)}
-      </nav>
+      <RailNav links={[{ href: `/erp/${org}`, label: "Inicio" }, ...visibleModules(c.license, c.access, c.sector).map(m => ({ href: `/erp/${org}/${m.id}`, label: m.id === "clientes" && c.sector === "consultorio" ? "Pacientes" : m.id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title }))]} />
       <Link className="fv-switch" href="/">⇄ Cambiar empresa</Link>
     </aside>
     <div className="fv-workarea">

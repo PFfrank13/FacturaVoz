@@ -12,6 +12,7 @@ import '../models.dart';
 import '../reports.dart';
 import '../services/live.dart';
 import '../services/repo.dart';
+import '../ui/liquid_glass.dart';
 import '../ui/theme.dart';
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
@@ -245,51 +246,75 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
         ]),
       );
 
-  Widget _hero(ThemeData t, CurrencyReport r) => Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: t.colorScheme.surface,
-          borderRadius: BorderRadius.circular(FvTokens.cardRadius),
-          border: Border.all(color: t.colorScheme.outline.withValues(alpha: .2)),
-          boxShadow: FvTokens.shadow(t.brightness),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Ventas del mes', style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 6),
-          CountUp(
-            value: r.total,
-            builder: (_, v) => Text(
+  Widget _hero(ThemeData t, CurrencyReport r) {
+    final contrast = MediaQuery.highContrastOf(context);
+    final ink = contrast ? t.colorScheme.onSurface : Colors.white;
+    final soft = contrast ? t.colorScheme.onSurfaceVariant : const Color(0xFFC9D5E4);
+    return FvLiquidGlass(
+      radius: FvTokens.sheetRadius,
+      tone: Brightness.dark,
+      strength: 2.1,
+      blur: 0,
+      tint: const Color(0xFFA98BFF),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('VENTAS DEL MES', style: t.textTheme.labelSmall?.copyWith(
+          color: contrast ? soft : const Color(0xFFD2C4FF), letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        CountUp(
+          value: r.total,
+          builder: (_, v) => FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
               money(v, r.currency),
-              style: t.textTheme.headlineMedium?.copyWith(color: t.colorScheme.onSurface, fontWeight: FontWeight.w800),
+              style: TextStyle(fontFamily: 'Inter', fontSize: 44, height: 1.05,
+                letterSpacing: -2.2, fontWeight: FontWeight.w700, color: ink,
+                fontFeatures: const [FontFeature.tabularFigures()]),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${r.count} ${r.count == 1 ? 'comprobante' : 'comprobantes'} · promedio ${money(r.average, r.currency)}',
-            style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
-          ),
-        ]),
-      );
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '${r.count} ${r.count == 1 ? 'comprobante' : 'comprobantes'} · promedio ${money(r.average, r.currency)}',
+          style: t.textTheme.bodyMedium?.copyWith(color: soft),
+        ),
+      ]),
+    );
+  }
 
   Widget _split(ThemeData t, CurrencyReport r) => Column(children: [
         Row(children: [
-          Expanded(child: _stat(t, 'Subtotal', money(r.subtotal, r.currency))),
+          Expanded(child: _stat(t, 'Subtotal', money(r.subtotal, r.currency), tint: const Color(0xFF6FB7FF))),
           const SizedBox(width: 12),
-          Expanded(child: _stat(t, 'Impuesto', money(r.tax, r.currency))),
+          Expanded(child: _stat(t, 'Impuesto', money(r.tax, r.currency), tint: const Color(0xFFA98BFF))),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _stat(t, 'Por cobrar', money(r.receivable, r.currency))),
+          Expanded(child: _stat(t, 'Por cobrar', money(r.receivable, r.currency), tint: const Color(0xFFFFB35C))),
           const SizedBox(width: 12),
-          Expanded(child: _stat(t, 'Vencido', money(r.overdue, r.currency), color: r.overdue > 0 ? Brand.bad : null)),
+          Expanded(child: _stat(t, 'Vencido', money(r.overdue, r.currency), color: r.overdue > 0 ? Brand.bad : null, tint: const Color(0xFFFF7A6E))),
         ]),
       ]);
 
-  Widget _stat(ThemeData t, String label, String value, {Color? color}) => SoftCard(
+  // Each figure carries its own light, so the four read apart at a glance.
+  Widget _stat(ThemeData t, String label, String value, {Color? color, required Color tint}) => FvLiquidGlass(
+        radius: 22,
+        blur: 0,
+        tint: tint,
+        strength: t.brightness == Brightness.dark ? 1.5 : 1.4,
+        padding: const EdgeInsets.fromLTRB(15, 14, 15, 15),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: t.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Money(value, size: 18, weight: FontWeight.w700, color: color)),
+          Row(children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(
+              shape: BoxShape.circle, color: tint,
+              boxShadow: [BoxShadow(color: tint.withValues(alpha: .7), blurRadius: 8)])),
+            const SizedBox(width: 7),
+            Flexible(child: Text(label, style: t.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700, color: t.colorScheme.onSurfaceVariant))),
+          ]),
+          const SizedBox(height: 8),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Money(value, size: 21, weight: FontWeight.w800, color: color)),
         ]),
       );
 
@@ -317,15 +342,26 @@ class _ReportsScreenState extends State<ReportsScreen> with LiveReload<ReportsSc
                       tween: Tween(begin: 0, end: maxV == 0 ? 0 : (r.byDay[d] ?? 0) / maxV),
                       duration: still ? Duration.zero : FvTokens.transition,
                       curve: Curves.easeOutCubic,
-                      builder: (_, f, _) => Container(
-                        height: 3 + 93 * f,
-                        decoration: BoxDecoration(
-                          color: (r.byDay[d] ?? 0) > 0
-                              ? t.colorScheme.primary
-                              : t.colorScheme.outline.withValues(alpha: .5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
+                      builder: (_, f, _) {
+                        final value = r.byDay[d] ?? 0;
+                        final peak = value > 0 && value == maxV;
+                        return Container(
+                          height: 3 + 93 * f,
+                          decoration: BoxDecoration(
+                            gradient: value > 0 ? LinearGradient(
+                              begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                              colors: peak
+                                  ? const [Color(0xFF19D3A2), Color(0xFFB8FFE6)]
+                                  : const [Color(0xFF2A6FD6), Color(0xFF4FD8D2)],
+                            ) : null,
+                            color: value > 0 ? null : t.colorScheme.outline.withValues(alpha: .35),
+                            borderRadius: BorderRadius.circular(5),
+                            boxShadow: peak ? const [
+                              BoxShadow(color: Color(0x8019D3A2), blurRadius: 12),
+                            ] : null,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),

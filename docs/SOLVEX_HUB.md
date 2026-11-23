@@ -10,7 +10,7 @@ Panel del Hub → **Productos** → Nuevo:
 ## 2. Planes (una vez)
 Dentro del producto → **Planes** → crea los tres de `docs/facturavoz-planes.json` (BASICO, PRO, EMPRESA).
 - Copia tal cual el bloque `features` de cada plan (son las claves que la app y la base de datos leen).
-- `trial_days: 3` y `grace_days: 5`. Los precios del archivo son una **propuesta**: ajústalos.
+- `trial_days: 7` y `grace_days: 5`. Precios S/ 39 / 79 / 179 y 2 / 5 / 20 usuarios, confirmados en Solvex Hub el 22/11/2026.
 - `max_users` limita las personas por empresa (lo aplica la base de datos al invitar).
 
 ## 3. Instancia (una por ambiente)

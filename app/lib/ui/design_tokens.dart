@@ -1,7 +1,8 @@
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
+
+import 'liquid_glass.dart';
 
 /// Paleta editorial con brillo controlado y color solo donde comunica una acción.
 /// No utiliza materiales propietarios de UIKit.
@@ -28,8 +29,8 @@ abstract final class FvLuxe {
   static LinearGradient ambient(Brightness brightness) => LinearGradient(
     begin: Alignment.topLeft, end: Alignment.bottomRight,
     colors: brightness == Brightness.dark
-      ? const [Color(0xFF101E32), Color(0xFF102B30), Color(0xFF121C2A)]
-      : const [Color(0xFFE8F5F1), Color(0xFFF4F6FA), parchment],
+      ? const [Color(0xFF0A1B2C), Color(0xFF07111F), Color(0xFF0D0F22)]
+      : const [Color(0xFFDDF7EE), Color(0xFFEFF5FC), Color(0xFFF8EEF2)],
     stops: const [0, .50, 1],
   );
 
@@ -50,20 +51,20 @@ abstract final class FvLuxe {
 
 /// Tokens visuales globales. No modifica facturación, licencias ni datos.
 abstract final class FvTokens {
-  static const Color canvas = Color(0xFFF5F6F2);
-  static const Color canvasDark = Color(0xFF101B1D);
+  static const Color canvas = Color(0xFFF2F6FB);
+  static const Color canvasDark = Color(0xFF060B14);
   static const Color surface = Colors.white;
-  static const Color surfaceDark = Color(0xFF1B282A);
-  static const Color field = Color(0xFFEDF2EF);
-  static const Color fieldDark = Color(0xFF283738);
-  static const Color ink = Color(0xFF172337);
-  static const Color inkDark = Color(0xFFF5F8FC);
-  static const Color muted = Color(0xFF627184);
-  static const Color mutedDark = Color(0xFFBEC9D6);
+  static const Color surfaceDark = Color(0xFF101B2C);
+  static const Color field = Color(0xFFE8EFF7);
+  static const Color fieldDark = Color(0xFF17253B);
+  static const Color ink = Color(0xFF0D1B2E);
+  static const Color inkDark = Color(0xFFF3F8FF);
+  static const Color muted = Color(0xFF55657A);
+  static const Color mutedDark = Color(0xFFAEBDD1);
   static const Color emerald = Color(0xFF087F68);
-  static const Color emeraldDark = Color(0xFF91DEBF);
-  static const Color stroke = Color(0xFFDAE3DD);
-  static const Color strokeDark = Color(0xFF384A49);
+  static const Color emeraldDark = Color(0xFF5BEBBE);
+  static const Color stroke = Color(0xFFDAE4EF);
+  static const Color strokeDark = Color(0xFF24344D);
 
   static const double cardRadius = 22;
   static const double sheetRadius = 30;
@@ -102,6 +103,8 @@ abstract final class FvTokens {
 /// Superficies sólidas para tarjetas: sensación de profundidad sin desenfocar
 /// cada fila. Comparte el aspecto entre todos los módulos y mantiene FPS.
 abstract final class FvSurfaces {
+  /// A glass pane without backdrop blur: over the aurora a blur adds nothing
+  /// visible, so lists of cards stay fast while matching the liquid glass.
   static BoxDecoration card(ThemeData theme, {
     Color? color,
     double radius = FvTokens.cardRadius,
@@ -113,15 +116,20 @@ abstract final class FvSurfaces {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: dark
-          ? const [Color(0xFF223032), Color(0xFF1B282A)]
-          : const [Color(0xFFFFFFFF), Color(0xFFFBFCF9)],
+          ? const [Color(0xB31A2A42), Color(0x9E0D1828)]
+          : const [Color(0xE6FFFFFF), Color(0xB8FFFFFF)],
       ) : null,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: dark ? FvTokens.strokeDark : FvTokens.stroke,
-        width: .9,
+        color: dark ? const Color(0x2EFFFFFF) : Colors.white,
+        width: 1,
       ),
-      boxShadow: FvTokens.shadow(theme.brightness),
+      boxShadow: [
+        BoxShadow(
+          color: dark ? const Color(0x66000000) : const Color(0x1A1B3550),
+          blurRadius: 24, spreadRadius: -6, offset: const Offset(0, 10),
+        ),
+      ],
     );
   }
 }
@@ -144,46 +152,10 @@ class FvGlassSurface extends StatelessWidget {
   final double blur;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final highContrast = MediaQuery.highContrastOf(context);
-    final rounded = BorderRadius.circular(radius);
-    final layer = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-            ? [
-                const Color(0xFF30475C).withValues(alpha: highContrast ? 1 : .62),
-                const Color(0xFF1A2937).withValues(alpha: highContrast ? 1 : .46),
-              ]
-            : [
-                Colors.white.withValues(alpha: highContrast ? 1 : .62),
-                const Color(0xFFEAF5FC).withValues(alpha: highContrast ? 1 : .40),
-              ],
-        ),
-        borderRadius: rounded,
-        border: Border.all(
-          color: dark ? const Color(0xFF7895A8) : Colors.white,
-          width: 1,
-        ),
-        boxShadow: FvTokens.shadow(theme.brightness),
-      ),
-      child: Padding(padding: padding, child: child),
-    );
-    final sigma = FvLuxe.glassSigma(theme.platform, blur);
-    return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: rounded,
-        child: highContrast || sigma == 0
-          ? layer
-          : BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-              child: layer,
-            ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => FvLiquidGlass(
+    radius: radius,
+    padding: padding,
+    blur: blur * 1.6,
+    child: child,
+  );
 }

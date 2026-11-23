@@ -5,6 +5,8 @@ import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
 import '../services/repo.dart';
+import '../ui/liquid_glass.dart';
+import '../ui/motion.dart' show FvTactileScale;
 import '../ui/retail_visual.dart';
 import '../ui/retail_layout.dart';
 import '../ui/design_tokens.dart';
@@ -490,26 +492,36 @@ class RetailReceiptActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = DsColors.of(context);
     final t = Theme.of(context);
-    return Material(
-      color: c.surface,
-      borderRadius: BorderRadius.circular(Radii.lg),
+    final contrast = MediaQuery.highContrastOf(context);
+    const glow = Color(0xFF4FD8D2);
+    return FvTactileScale(
+      enabled: onTap != null,
+      child: FvLiquidGlass(
+      radius: 24,
+      blur: 0,
+      strength: t.brightness == Brightness.dark ? 1.5 : 1.4,
+      child: Material(
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(Radii.lg),
+        borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Radii.lg),
-            border: Border.all(color: c.line),
-          ),
           child: Row(children: [
             Container(
-              width: 44, height: 44,
+              width: 46, height: 46,
               decoration: BoxDecoration(
-                color: c.elevated,
-                borderRadius: BorderRadius.circular(Radii.md),
+                color: contrast ? c.elevated : null,
+                gradient: contrast ? null : const LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [Color(0xFF7FF0E6), Color(0xFF16717A)],
+                ),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: contrast ? null : [
+                  BoxShadow(color: glow.withValues(alpha: .42), blurRadius: 16, offset: const Offset(0, 6)),
+                ],
               ),
-              child: Icon(icon, color: c.primaryText, size: 23),
+              child: Icon(icon, color: contrast ? c.primaryText : Colors.white, size: 23),
             ),
             const SizedBox(width: Gap.md),
             Expanded(child: Column(
@@ -526,6 +538,6 @@ class RetailReceiptActionTile extends StatelessWidget {
           ]),
         ),
       ),
-    );
+    )));
   }
 }

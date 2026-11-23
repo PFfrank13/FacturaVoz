@@ -1086,13 +1086,18 @@ class _PosScreenState extends State<PosScreen> {
                   return Column(children: [
                   if (retail)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 5),
-                      child: Align(alignment: Alignment.centerLeft,
-                        child: Text('Punto de venta', style: t.textTheme.headlineMedium)),
-
+                      padding: const EdgeInsets.fromLTRB(18, 16, 14, 8),
+                      child: Row(children: [
+                        Expanded(child: Text('Punto de venta', style: t.textTheme.headlineMedium)),
+                        // Page actions share the title row as glass controls.
+                        for (final action in actions) Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: FvLiquidGlass(radius: 99, blur: 0, strength: 1.5, child: action),
+                        ),
+                      ]),
                     ),
 
-                  if (widget.embedded && actions.isNotEmpty)
+                  if (!retail && widget.embedded && actions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
                       child: Align(
@@ -1198,10 +1203,13 @@ class _PosScreenState extends State<PosScreen> {
                                             // En POS tocar una fotografía debe agregar el
                                             // producto, no abrir el visor de imagen.
                                             child: IgnorePointer(
-                                              child: StorageImage(
-                                                path: img,
-                                                placeholder: FvProductPhotoFallback(name: p.name, category: categoryLabel),
-                                                fit: BoxFit.contain,
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(14),
+                                                child: StorageImage(
+                                                  path: img,
+                                                  placeholder: FvProductPhotoFallback(name: p.name, category: categoryLabel),
+                                                  fit: BoxFit.contain,
+                                                ),
                                               ),
                                             ),
                                           ),

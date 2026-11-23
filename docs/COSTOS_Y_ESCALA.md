@@ -32,7 +32,7 @@ consultas DNI/RUC/día (la caché ahorra ~60 %).
 | ElevenLabs Starter (60 000 caracteres/mes) | con tope global `TTS_GLOBAL_DAILY_CHARS=600` ≈ 18 000/mes | voz premium para ~30 negocios con uso moderado (la caché repite frases gratis) |
 
 **Conclusión:** para un piloto con 1 rubro y 5–10 negocios: Vercel Pro + Supabase Pro + Groq Developer
-(≈ US$ 45–60/mes en total). Con el plan Pro de FacturaVoz a S/ 59 alcanzan **4–5 clientes pagando** para cubrirlo.
+(≈ US$ 45–60/mes en total). Con el plan Pro de FacturaVoz a S/ 79 (IGV incluido) alcanzan **3–4 clientes pagando** para cubrirlo.
 
 ## Cómo FacturaVoz controla el consumo
 - **Copiloto:** modelo más rápido y barato (`openai/gpt-oss-20b`), respuesta en tiempo real, cuota por usuario

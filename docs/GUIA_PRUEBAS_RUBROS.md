@@ -53,8 +53,8 @@ Antes: ejecuta `20261119_v31_tiempo_real.sql` en Supabase.
 
 ## Prueba de la Fase 23 (plan del rubro en Ajustes)
 
-1. Ajustes → fila **Mi plan**: debe decir, por ejemplo, `Plan Pro · S/ 59 al mes · Bodega o tienda` (plan de tu licencia, su precio y el rubro elegido).
-2. Toca **Mi plan** → arriba tu estado; en **Incluido en tu plan** lo que tu licencia da de verdad; abajo **Planes para <tu rubro>** con 3 tarjetas (Básico S/ 29, Pro S/ 59, Empresa S/ 119):
+1. Ajustes → fila **Mi plan**: debe decir, por ejemplo, `Plan Pro · S/ 79 al mes · Bodega o tienda` (plan de tu licencia, su precio y el rubro elegido).
+2. Toca **Mi plan** → arriba tu estado; en **Incluido en tu plan** lo que tu licencia da de verdad; abajo **Planes para <tu rubro>** con 3 tarjetas (Básico S/ 39, Pro S/ 79, Empresa S/ 179):
    - Básico = lo esencial del rubro; Pro = "Todo lo de Básico, más:" (su módulo estrella + Copiloto); Empresa = "Todo lo de Pro, más:" (el resto + Copiloto agente).
    - Tu plan lleva el borde violeta y "Tu plan"; los planes que ya incluyes salen en verde con ✓ y los de arriba en gris con candado.
 3. Cambia de rubro (desde el SQL, ver `OPERACION_PRODUCCION.md` §8) y vuelve: las herramientas de cada tarjeta cambian.
