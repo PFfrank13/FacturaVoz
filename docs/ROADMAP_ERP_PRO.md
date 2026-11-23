@@ -74,3 +74,10 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 - 23/11/2026: Comprobantes web verificados contra Supabase local (lista, detalle,
   A4, ticket, XML, CDR, borrador). La impresión del ERP reutiliza la del portal
   público (`buildPrintDoc` + `ReceiptPrint`), leída con la sesión del usuario (RLS).
+- 23/11/2026: OTA móvil (bloque 1, ítem App) revisada y verificada: la descarga
+  reutiliza el APK ya verificado, cierra el archivo antes de borrarlo si se corta
+  la conexión y acepta una carpeta de prueba. `flutter analyze` sin avisos,
+  `flutter test` 514 OK (10 en `app_updater_test.dart`: hash correcto, APK
+  manipulado, HTTP 404, aviso y «Más tarde»), `flutter build apk --debug` OK
+  (Kotlin + FileProvider compilan). No probado en dispositivo. Bloque 1 ítem 3
+  depende del propietario (secretos en GitHub).
