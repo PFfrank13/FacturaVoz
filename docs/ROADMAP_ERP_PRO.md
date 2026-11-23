@@ -75,7 +75,7 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       «Para resolver hoy» (SUNAT, stock bajo, fiados vencidos, deuda a
       proveedores, caja), todo con datos reales y según plan y rol.
 - [ ] Diseño premium coherente con el móvil (skill frontend-design). Hecho:
-      inicio, acceso, comprobantes, clientes, caja y compras. Falta: cobros,
+      inicio, acceso, comprobantes, clientes, caja, compras y cobros. Falta:
       cotizaciones, equipo, reportes, plan y configuración (aún con tabla genérica).
 
 ### 6. Móvil — pulido
@@ -120,3 +120,13 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   (nuevas: `erp-receipt-share.test.ts` y rangos/mensajes en `erp-receipts.test.ts`).
   **No verificado en el navegador:** no se pudo arrancar la vista previa local en
   esta ejecución; conviene probar el envío con Supabase local.
+- 23/11/2026 (sesión automática): Cobros rediseñado (bloque 5, ítem sigue abierto):
+  mes a mes con `?mes=YYYY-MM` (nunca futuro), cobrado del mes, cobro promedio,
+  % de pagos digitales, reparto por medio, barras día a día con el mejor día,
+  búsqueda por comprobante/cliente/DNI/RUC/nota, filtro por medio y lista agrupada
+  por día con subtotal. Lee `payments` + comprobante y cliente con RLS del usuario
+  (límite 500 por mes, con aviso); cobros en otra moneda no se mezclan. En vivo
+  con `LiveRefresh` (payments está en `supabase_realtime`). Lógica pura en
+  `lib/erp/payments.ts`. Verificado: `tsc` OK, eslint sin errores (2 avisos
+  previos de `<img>`), `vitest` 220 OK (nueva: `erp-payments.test.ts`, 6 casos).
+  **No verificado en el navegador:** no se autorizó arrancar la vista previa local.

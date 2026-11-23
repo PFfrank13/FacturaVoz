@@ -11,6 +11,8 @@ import type { ReceiptRow } from "@/lib/erp/receipts";
 import ClientsBoard from "@/components/erp/ClientsBoard";
 import CashBoard from "@/components/erp/CashBoard";
 import PurchasesBoard, { type PurchaseProduct } from "@/components/erp/PurchasesBoard";
+import PaymentsBoard from "@/components/erp/PaymentsBoard";
+import { monthBounds, parseMonth, type PaymentRow } from "@/lib/erp/payments";
 import type { PurchaseRow } from "@/lib/erp/purchases";
 import type { CashMove, DayClosing } from "@/lib/erp/cash";
 import type { DaySummary } from "@/lib/dayclose";
@@ -22,10 +24,11 @@ const liveReceipts = ["invoices"] as const;
 const liveClients = ["clients", "credit_ledger", "invoices"] as const;
 const liveCash = ["cash_movements", "payments", "invoices", "credit_ledger"] as const;
 const livePurchases = ["products"] as const;
+const livePayments = ["payments"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
-export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string }> }) {
+export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string }> }) {
   const { org, module: id } = await params;
   const c = await workspaceContext(org);
   const m = modules.find(m => m.id === id);
@@ -87,6 +90,27 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">COMPRAS / {c.organization.name}</p><LiveRefresh org={org} tables={livePurchases} /></div><h1>Compras a proveedores</h1><p>Registra lo que te llega: el stock, el costo y la caja se actualizan juntos, igual que en el móvil. Lleva lo que debes a cada proveedor.</p></section>
       {receipts.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar las compras</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <PurchasesBoard org={org} rows={rows} products={((products.data ?? []) as PurchaseProduct[]).map(p => ({ ...p, unit_cost: p.unit_cost === null ? null : Number(p.unit_cost), stock: p.stock === null ? null : Number(p.stock) }))} currency={c.organization.currency || "PEN"} month={limaDate(new Date()).slice(0, 7)} />}
+    </>;
+  }
+  if (id === "cobros") {
+    // Every payment recorded against a receipt, here or on the mobile app (RLS: company members).
+    const today = limaDate(new Date());
+    const month = parseMonth((await searchParams).mes, today);
+    const { from, to } = monthBounds(month);
+    const result = await c.db.from("payments")
+      .select("id,amount,paid_on,method,note,created_at,invoice:invoices(id,number,currency,amt_total,client:clients(name,tax_id),fiscal:fiscal_documents(series,correlative))")
+      .eq("org_id", org).gte("paid_on", from).lte("paid_on", to)
+      .order("paid_on", { ascending: false }).order("created_at", { ascending: false }).limit(500);
+    const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] : v) ?? null;
+    type Raw = Omit<PaymentRow, "invoice" | "amount"> & { amount: number | string; invoice: unknown };
+    type RawInvoice = Omit<NonNullable<PaymentRow["invoice"]>, "client" | "fiscal" | "amt_total"> & { amt_total: number | string | null; client: unknown; fiscal: unknown };
+    const rows: PaymentRow[] = ((result.data ?? []) as unknown as Raw[]).map(p => {
+      const inv = one(p.invoice as RawInvoice | RawInvoice[] | null);
+      return { ...p, amount: Number(p.amount), invoice: inv ? { ...inv, amt_total: inv.amt_total === null ? null : Number(inv.amt_total), client: one(inv.client as NonNullable<PaymentRow["invoice"]>["client"]), fiscal: one(inv.fiscal as NonNullable<PaymentRow["invoice"]>["fiscal"]) } : null };
+    });
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">COBROS / {c.organization.name}</p><LiveRefresh org={org} tables={livePayments} /></div><h1>Cobros</h1><p>Todo lo que te pagaron por tus comprobantes, mes a mes y por medio de pago. Los cobros del móvil aparecen aquí al instante.</p></section>
+      {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los cobros</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <PaymentsBoard rows={rows} currency={c.organization.currency || "PEN"} month={month} today={today} capped={rows.length >= 500} />}
     </>;
   }
   if (id === "caja") {

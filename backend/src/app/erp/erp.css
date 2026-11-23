@@ -415,3 +415,14 @@
 .fv-door-msg { font-size: 14px; line-height: 1.55; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--erp-accent) 12%, transparent); }
 .fv-door :focus-visible { outline: 3px solid var(--erp-accent); outline-offset: 3px; }
 @media (max-width: 860px) { .fv-door { grid-template-columns: 1fr; align-items: start; } .fv-door-copy h1 { margin: 18px 0 12px; } }
+
+/* Cobros: month rhythm and payments grouped by day */
+.fv-month-rhythm { margin: 0; }
+.fv-month-rhythm .fv-rhythm-bars { grid-template-columns: repeat(var(--cols, 31), minmax(0, 1fr)); gap: 3px; height: 120px; }
+.fv-month-rhythm .fv-rhythm-bars span.is-future { opacity: .35; }
+.fv-pay-day { margin: 0 0 18px; }
+.fv-pay-day header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 0 2px 8px; }
+.fv-pay-day header strong { font-size: 15px; font-weight: 800; }
+.fv-pay-day header strong::first-letter { text-transform: uppercase; }
+.fv-pay-day header span { font-weight: 800; font-variant-numeric: tabular-nums; color: #3ee6b0; }
+@media (max-width: 900px) { .fv-month-rhythm .fv-rhythm-bars { gap: 2px; height: 90px; } }
