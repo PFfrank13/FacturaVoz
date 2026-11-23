@@ -51,6 +51,17 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/update_paths" />
         </provider>
+        <!-- Avisos de Yape/Plin automáticos: solo si el dueño concede «Acceso a notificaciones».
+             Lee únicamente Yape y bancos con Plin, y solo pagos recibidos (PaymentNoticeListener). -->
+        <service
+            android:name=".PaymentNoticeListener"
+            android:label="FacturaVoz: avisos de Yape y Plin"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

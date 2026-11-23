@@ -504,6 +504,9 @@ class Product {
 
   bool get isService => unit == 'ZZ';
 
+  /// Se vende por peso (kilos) o por monto en soles: «S/ 2 de azúcar».
+  bool get byWeight => unit == 'KGM';
+
   factory Product.fromJson(Map<String, dynamic> j) => Product(
         id: j['id'] as String,
         name: (j['name'] ?? '') as String,
@@ -549,4 +552,13 @@ class Payment {
         method: (j['method'] ?? 'otro') as String,
         note: (j['note'] ?? '') as String,
       );
+}
+
+/// Kilos para vender: los escritos, o los que corresponden a un monto en soles al precio por kilo.
+/// Redondeado a 10 g (2 decimales, como el stock y el comprobante). null si no alcanza para 10 g.
+double? weightFor({double? kilos, double? amount, required double pricePerKilo}) {
+  final kg = kilos ?? (amount != null && pricePerKilo > 0 ? amount / pricePerKilo : null);
+  if (kg == null || !kg.isFinite || kg <= 0) return null;
+  final r = (kg * 100).round() / 100;
+  return r >= 0.01 ? r : null;
 }

@@ -19,6 +19,7 @@ import '../ui/inventory_product_card.dart';
 import '../ui/glass_widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'retail_purchases.dart';
+import 'stock_lots.dart';
 import '../services/v2_repo.dart';
 import '../services/v2_api.dart';
 import '../ui/barcode_scanner.dart';
@@ -341,6 +342,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 segments: const [
                   ButtonSegment(value: 'ZZ', label: Text('Servicio'), icon: Icon(Icons.handyman_rounded)),
                   ButtonSegment(value: 'NIU', label: Text('Producto'), icon: Icon(Icons.inventory_2_rounded)),
+                  ButtonSegment(value: 'KGM', label: Text('Por kilo'), icon: Icon(Icons.scale_rounded)),
                 ],
                 selected: {unit},
                 onSelectionChanged: (s) => setS(() => unit = s.first),
@@ -350,7 +352,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 value: inStore,
                 onChanged: (v) => setS(() => inStore = v),
                 title: const Text('Mostrar en mi tienda en línea'),
-                subtitle: inStore ? Text(unit == 'NIU' ? 'Para publicarlo necesita foto y código de barras.' : 'Para publicarlo necesita una foto.') : null,
+                subtitle: inStore ? Text(unit != 'ZZ' ? 'Para publicarlo necesita foto y código de barras.' : 'Para publicarlo necesita una foto.') : null,
               ),
               // ── Foto (se comprime en el teléfono antes de subirla; se guarda en Storage privado) ──
               if (!guided || wizardStep == 1) Row(children: [
@@ -488,7 +490,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 ),
               ]),
               ],
-              if ((!guided || wizardStep == 4) && unit == 'NIU') ...[
+              if ((!guided || wizardStep == 4) && unit != 'ZZ') ...[
                 const SizedBox(height: 6),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -560,7 +562,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     setS(() => err = 'Escribe un precio válido');
                   } else if (inStore && !hasImage) {
                     setS(() => err = 'Para mostrarlo en la tienda agrega una foto (o apaga "Mostrar en mi tienda").');
-                  } else if (inStore && unit == 'NIU' && barcode.text.trim().isEmpty) {
+                  } else if (inStore && unit != 'ZZ' && barcode.text.trim().isEmpty) {
                     setS(() => err = 'Para mostrarlo en la tienda agrega su código de barras (o apaga "Mostrar en mi tienda").');
                   } else if (wholesale.text.trim().isNotEmpty && (parseDecimal(wholesale.text) == null || parseDecimal(wholesaleMin.text) == null)) {
                     setS(() => err = 'Para el precio por mayor indica también desde cuántas unidades.');
@@ -575,8 +577,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       ),
     );
     final values = (name.text, price.text.trim().isEmpty ? 0.0 : (parseDecimal(price.text) ?? 0.0), unit);
-    final stockValue = track && unit == 'NIU' ? (parseDecimal(stock.text) ?? 0.0) : null;
-    final reorderValue = track && unit == 'NIU' ? parseDecimal(reorder.text) : null;
+    final stockValue = track && unit != 'ZZ' ? (parseDecimal(stock.text) ?? 0.0) : null;
+    final reorderValue = track && unit != 'ZZ' ? parseDecimal(reorder.text) : null;
     final stockChanged = stockValue != p?.stock || reorderValue != p?.reorderPoint;
     final costValue = parseDecimal(cost.text);
     final growthChanged = costValue != p?.unitCost || inStore != (p?.inStore ?? true);
@@ -662,9 +664,23 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           if (p.tracksStock)
             ListTile(
               leading: const Icon(Icons.move_down_rounded),
-              title: const Text('Registrar entrada o salida de stock'),
+              title: const Text('Registrar entrada de stock'),
               subtitle: Text('Stock actual: ${qtyText(p.stock ?? 0)}'),
               onTap: () => Navigator.pop(ctx, 'stock'),
+            ),
+          if (p.tracksStock && (p.stock ?? 0) > 0)
+            ListTile(
+              leading: const Icon(Icons.remove_circle_outline_rounded),
+              title: const Text('Registrar merma'),
+              subtitle: const Text('Vencido, dañado, robo o consumo: queda con su motivo'),
+              onTap: () => Navigator.pop(ctx, 'loss'),
+            ),
+          if (p.tracksStock && Access.instance.has('stock'))
+            ListTile(
+              leading: const Icon(Icons.event_rounded),
+              title: const Text('Anotar fecha de vencimiento'),
+              subtitle: const Text('Te avisamos antes de que venza'),
+              onTap: () => Navigator.pop(ctx, 'lot'),
             ),
           ListTile(
             leading: Icon(p.active ? Icons.archive_outlined : Icons.unarchive_outlined),
@@ -686,6 +702,12 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
           await _edit(p);
         case 'stock':
           await _adjust(p);
+        case 'loss':
+          if (!mounted) return;
+          if (await showLossSheet(context, productId: p.id, productName: p.name, stock: p.stock) == true) _load();
+        case 'lot':
+          if (!mounted) return;
+          await showAddLotSheet(context, productId: p.id, productName: p.name, unit: p.unit);
         case 'toggle':
           await Repo.setProductActive(p.id, !p.active);
           _load();
@@ -699,11 +721,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     }
   }
 
-  /// Entrada (compra) o salida (merma, uso interno) de stock. Atómico en la base de datos.
+  /// Entrada manual de stock (conteo o reposición sin compra). Las salidas van como merma con motivo
+  /// (showLossSheet): una salida sin motivo escondía vencidos, robos y consumo interno.
   Future<void> _adjust(Product p) async {
     if (!_canManageProducts) return;
     final qty = TextEditingController();
-    var inbound = true;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -715,14 +737,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
             Text(p.name, style: Theme.of(ctx).textTheme.titleLarge),
             Text('Stock actual: ${qtyText(p.stock ?? 0)}', style: Theme.of(ctx).textTheme.bodySmall),
             const SizedBox(height: 14),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: true, label: Text('Entrada'), icon: Icon(Icons.add_box_outlined)),
-                ButtonSegment(value: false, label: Text('Salida'), icon: Icon(Icons.indeterminate_check_box_outlined)),
-              ],
-              selected: {inbound},
-              onSelectionChanged: (s) => setS(() => inbound = s.first),
-            ),
+            Text('Suma unidades sin registrar una compra. Para lo que sale (vencido, dañado, robo) usa «Registrar merma».',
+              style: Theme.of(ctx).textTheme.bodySmall),
             const SizedBox(height: 12),
             TextField(
               controller: qty,
@@ -741,7 +757,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     disposeAfterClose([qty]);
     if (ok != true || v == null || v <= 0) return;
     try {
-      final now = await ProRepo.stockAdjust(p.id, inbound ? v : -v);
+      final now = await ProRepo.stockAdjust(p.id, v);
       Haptics.success();
       _snack('Stock actualizado: ${qtyText(now ?? 0)}');
       _load();

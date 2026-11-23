@@ -18,7 +18,7 @@ import LoyaltyBoard from "@/components/erp/LoyaltyBoard";
 import type { Coupon, LoyaltyRow, Promotion } from "@/lib/erp/loyalty";
 import { monthBounds, parseMonth, type PaymentRow } from "@/lib/erp/payments";
 import { lastSupplierByProduct, suggestOrder, type PurchaseRow, type Velocity } from "@/lib/erp/purchases";
-import type { CashMove, DayClosing } from "@/lib/erp/cash";
+import { cashierBreakdown, type CashMove, type DayClosing } from "@/lib/erp/cash";
 import type { DaySummary } from "@/lib/dayclose";
 import { limaDate, parseRange } from "@/lib/erp/receipts";
 import { mergeClients, type ClientActivity, type ClientBalance, type ClientRow } from "@/lib/erp/clients";
@@ -146,16 +146,22 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     const today = limaDate(new Date());
     const asked = (await searchParams).dia ?? "";
     const day = /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= today && Number.isFinite(Date.parse(asked)) ? asked : today;
-    const [summary, moves, closing] = await Promise.all([
+    const finance = can(c.access, "finance");
+    const [summary, moves, closing, dayPayments, members] = await Promise.all([
       c.db.rpc("day_summary", { p_org: org, p_day: day }),
-      c.db.from("cash_movements").select("id,kind,amount,method,note,created_at").eq("org_id", org).eq("day", day).order("created_at"),
+      c.db.from("cash_movements").select("id,kind,amount,method,note,created_at,user_id").eq("org_id", org).eq("day", day).order("created_at"),
       c.db.from("day_closings").select("counted_cash,expected_cash,difference,note,created_at").eq("org_id", org).eq("day", day).maybeSingle(),
+      finance ? c.db.from("payments").select("user_id,method,amount").eq("org_id", org).eq("paid_on", day).limit(3000) : Promise.resolve({ data: [] }),
+      finance ? c.db.from("organization_members").select("user_id,display_name").eq("org_id", org) : Promise.resolve({ data: [] }),
     ]);
+    const cashMoves = ((moves.data ?? []) as CashMove[]).map(m => ({ ...m, amount: Number(m.amount) }));
+    const cashiers = finance ? cashierBreakdown((dayPayments.data ?? []) as { user_id: string; method: string; amount: number }[], cashMoves,
+      new Map(((members.data ?? []) as { user_id: string; display_name: string | null }[]).map(m => [m.user_id, m.display_name] as const))) : [];
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">CAJA / {c.organization.name}</p><LiveRefresh org={org} tables={liveCash} /></div><h1>Caja y cierre del día</h1><p>Apertura, retiros, cobros por medio de pago y arqueo ciego. Es la misma caja que lleva el móvil.</p></section>
       {summary.error || !summary.data ? <div className="fv-empty" role="alert"><h2>No pudimos cargar la caja</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <CashBoard org={org} day={day} today={today} summary={summary.data as DaySummary}
-            moves={((moves.data ?? []) as CashMove[]).map(m => ({ ...m, amount: Number(m.amount) }))}
-            closing={(closing.data ?? null) as DayClosing | null} showExpected={can(c.access, "finance")} />}
+            moves={cashMoves} cashiers={cashiers}
+            closing={(closing.data ?? null) as DayClosing | null} showExpected={finance} />}
     </>;
   }
   if (id === "clientes") {

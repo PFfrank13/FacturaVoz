@@ -31,3 +31,17 @@ describe("caja", () => {
     expect(parseAmount("-5")).toBeNull();
   });
 });
+
+import { cashierBreakdown } from "@/lib/erp/cash";
+describe("cuadre por cajero", () => {
+  it("separa efectivo y digital por persona y calcula lo que debe tener cada cajón", () => {
+    const rows = cashierBreakdown(
+      [{ user_id: "a", method: "efectivo", amount: 30 }, { user_id: "a", method: "yape", amount: 12.5 }, { user_id: "b", method: "efectivo", amount: "8.40" }],
+      [{ id: "1", kind: "apertura", amount: 50, method: "efectivo", note: null, created_at: "", user_id: "a" },
+       { id: "2", kind: "egreso", amount: 10, method: "efectivo", note: "pasajes", created_at: "", user_id: "a" },
+       { id: "3", kind: "ingreso", amount: 5, method: "yape", note: null, created_at: "", user_id: "b" }],
+      new Map([["a", "Rosa"], ["b", null]]));
+    expect(rows[0]).toMatchObject({ name: "Rosa", cashSales: 30, digital: 12.5, opening: 50, cashOut: 10, expected: 70, count: 2 });
+    expect(rows[1]).toMatchObject({ name: "Sin nombre", cashSales: 8.4, cashIn: 0, expected: 8.4 });
+  });
+});

@@ -66,7 +66,57 @@ class _PosScreenState extends State<PosScreen> {
     _flight = null;
   }
 
-  void _addFromTile(Product product, BuildContext tile, IconData icon) {
+  /// Producto por kilo: pide los kilos o el monto en soles («S/ 2 de azúcar») y lo convierte.
+  Future<double?> _askWeight(Product p) async {
+    final ctrl = TextEditingController();
+    var bySoles = true;
+    final value = await showDialog<double>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
+        final typed = parseDecimal(ctrl.text);
+        final kg = weightFor(kilos: bySoles ? null : typed, amount: bySoles ? typed : null, pricePerKilo: p.unitPrice);
+        final cur = AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
+        return AlertDialog(
+          title: Text(p.name),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('${money(p.unitPrice, cur)} el kilo', style: Theme.of(ctx).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Por monto')),
+                ButtonSegment(value: false, label: Text('Por kilos')),
+              ],
+              selected: {bySoles},
+              onSelectionChanged: (v) => setD(() => bySoles = v.first),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl, autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(labelText: bySoles ? 'Monto en soles' : 'Kilos', hintText: bySoles ? '2.00' : '0.50'),
+              onChanged: (_) => setD(() {}),
+            ),
+            const SizedBox(height: 8),
+            Text(kg == null ? 'Escribe cuánto quiere el cliente.' : bySoles ? 'Son ${qtyText(kg)} kg' : 'Son ${money(kg * p.unitPrice, cur)}',
+              style: Theme.of(ctx).textTheme.titleMedium),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            FilledButton(onPressed: kg == null ? null : () => Navigator.pop(ctx, kg), child: const Text('Agregar')),
+          ],
+        );
+      }),
+    );
+    disposeAfterClose([ctrl]);
+    return value;
+  }
+
+  Future<void> _addFromTile(Product product, BuildContext tile, IconData icon) async {
+    if (product.byWeight) {
+      final kg = await _askWeight(product);
+      if (kg != null && mounted) _add(product, kg);
+      return;
+    }
     final before = _cart[product.id] ?? 0;
     _add(product);
     if ((_cart[product.id] ?? 0) <= before || reduceMotion(context)) return;

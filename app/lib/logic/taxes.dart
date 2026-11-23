@@ -1,6 +1,7 @@
 // Estimador de impuestos del mes (REFERENCIAL: "revísalo con tu contador"). Mismas reglas que el servidor
 // (backend/src/lib/taxes.ts). UIT 2026 = S/ 5,500 (D.S. 301-2025-EF).
 //  NRUS: cuota S/ 20 (cat. 1, hasta S/ 5,000/mes) o S/ 50 (cat. 2, hasta S/ 8,000/mes); tope S/ 96,000 al año.
+//        Los topes valen para ingresos Y para compras (SUNAT Emprender; docs/INVESTIGACION_RETAIL.md, fila 14).
 //  RER: IGV + 1.5 % de los ingresos netos; tope S/ 525,000.
 //  RMT: IGV + 1 % hasta 300 UIT acumuladas en el año, luego 1.5 % o coeficiente; tope 1,700 UIT.
 //  General: IGV + 1.5 % o coeficiente.
@@ -34,6 +35,8 @@ TaxEstimate estimateTaxes({
   required double monthSalesTax,
   required double monthPurchasesTax,
   required double yearSalesBase,
+  double? monthPurchasesTotal,
+  double? yearPurchasesTotal,
 }) {
   final notes = <String>[];
   final warnings = <String>[];
@@ -44,12 +47,24 @@ TaxEstimate estimateTaxes({
   switch (regime) {
     case 'nrus':
       final monthTotal = _r2(base + math.max(0.0, monthSalesTax));
-      final cuota = monthTotal <= 5000 ? 20.0 : 50.0;
+      final monthBuys = _r2(math.max(0.0, monthPurchasesTotal ?? 0));
+      final yearBuys = _r2(math.max(0.0, yearPurchasesTotal ?? 0));
+      // La categoría la decide lo mayor entre lo que vendes y lo que compras en el mes.
+      final cuota = math.max(monthTotal, monthBuys) <= 5000 ? 20.0 : 50.0;
       if (monthTotal > 8000) warnings.add('Este mes pasaste S/ 8,000: el Nuevo RUS ya no te corresponde. Habla con tu contador para cambiar de régimen.');
+      if (monthBuys > 8000) warnings.add('Este mes tus compras pasaron S/ 8,000: el tope del Nuevo RUS también cuenta las compras. Habla con tu contador.');
       if (yearSalesBase > 96000) {
         warnings.add('En el año pasaste S/ 96,000: superaste el tope del Nuevo RUS.');
       } else if (yearSalesBase > 96000 * 0.8) {
         warnings.add('Vas por ${(yearSalesBase / 96000 * 100).round()} % del tope anual del Nuevo RUS (S/ 96,000).');
+      }
+      if (yearBuys > 96000) {
+        warnings.add('En el año tus compras pasaron S/ 96,000: superaste el tope del Nuevo RUS.');
+      } else if (yearBuys > 96000 * 0.8) {
+        warnings.add('Tus compras del año van por ${(yearBuys / 96000 * 100).round()} % del tope del Nuevo RUS (S/ 96,000).');
+      }
+      if (monthTotal > 8000 || monthBuys > 8000 || yearSalesBase > 96000 || yearBuys > 96000) {
+        notes.add('Si sales del Nuevo RUS, desde el mes siguiente debes emitir comprobantes electrónicos (RS 000075-2026).');
       }
       notes.add('En el Nuevo RUS la cuota mensual ya incluye IGV y renta. Solo puedes emitir boletas.');
       return TaxEstimate(regime: 'nrus', igv: 0, renta: cuota, rentaRate: null, notes: notes, warnings: warnings);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { addCashMove, closeCashDay, type FormResult } from "@/app/erp/actions";
 import type { DaySummary } from "@/lib/dayclose";
-import { cashBreakdown, cashDifference, methodLabel, methodShares, parseAmount, type CashMove, type DayClosing } from "@/lib/erp/cash";
+import { cashBreakdown, cashDifference, methodLabel, methodShares, parseAmount, type CashierRow, type CashMove, type DayClosing } from "@/lib/erp/cash";
 
 const fmt = (value: number, currency: string) => new Intl.NumberFormat("es-PE", { style: "currency", currency }).format(value);
 const longDay = (d: string) => new Intl.DateTimeFormat("es-PE", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
@@ -13,8 +13,8 @@ const shift = (d: string, days: number) => { const x = new Date(`${d}T12:00:00Z`
 const kindLabel = { apertura: "Apertura", ingreso: "Ingreso", egreso: "Retiro" } as const;
 
 /** The day's till: what was sold, how it was paid, cash movements and the blind count, shared with the mobile app. */
-export default function CashBoard({ org, day, today, summary, moves, closing, showExpected }: {
-  org: string; day: string; today: string; summary: DaySummary; moves: CashMove[]; closing: DayClosing | null; showExpected: boolean;
+export default function CashBoard({ org, day, today, summary, moves, closing, showExpected, cashiers = [] }: {
+  org: string; day: string; today: string; summary: DaySummary; moves: CashMove[]; closing: DayClosing | null; showExpected: boolean; cashiers?: CashierRow[];
 }) {
   const cur = summary.currency || "PEN";
   const shares = methodShares(summary);
@@ -63,6 +63,15 @@ export default function CashBoard({ org, day, today, summary, moves, closing, sh
         {isToday && !closing && <MoveForm org={org} opened={opened} />}
       </section>
     </div>
+
+    {showExpected && cashiers.length > 1 && <section className="fv-create fv-cash-card">
+      <h3>Por cajero</h3>
+      <p className="fv-muted">Cuenta el cajón de cada persona contra lo que cobró en efectivo y lo que registró en caja. Lo digital ya está en tu cuenta.</p>
+      <ul className="fv-lines fv-ledger">{cashiers.map(r => <li key={r.user_id}>
+        <span><b>{r.name}</b> {r.count} {r.count === 1 ? "cobro" : "cobros"} · efectivo {fmt(r.cashSales, cur)} · digital {fmt(r.digital, cur)}{r.cashOut ? ` · retiros ${fmt(r.cashOut, cur)}` : ""}</span>
+        <span>debe tener {fmt(r.expected, cur)}</span>
+      </li>)}</ul>
+    </section>}
 
     {closing ? <ClosingCard closing={closing} currency={cur} />
       : isToday || day < today ? <CloseForm org={org} day={day} expected={showExpected ? Number(summary.expected_cash ?? 0) : null} currency={cur} /> : null}

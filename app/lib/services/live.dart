@@ -24,6 +24,8 @@ class LiveHub {
     'payments',
     'clients',
     'products',
+    'product_lots',
+    'stock_losses',
     'expenses',
     'quotes',
     'jobs',

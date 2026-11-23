@@ -5,7 +5,7 @@ export const methodLabel: Record<string, string> = {
   efectivo: "Efectivo", yape: "Yape", plin: "Plin", transferencia: "Transferencia", tarjeta: "Tarjeta", mercadopago: "Mercado Pago", otro: "Otro",
 };
 
-export type CashMove = { id: string; kind: "apertura" | "ingreso" | "egreso"; amount: number; method: string; note: string | null; created_at: string };
+export type CashMove = { id: string; kind: "apertura" | "ingreso" | "egreso"; amount: number; method: string; note: string | null; created_at: string; user_id?: string | null };
 export type DayClosing = { counted_cash: number; expected_cash: number; difference: number | null; note: string | null; created_at: string };
 
 const n = (v: unknown) => Number(v ?? 0) || 0;
@@ -45,4 +45,35 @@ export function parseAmount(raw: string): number | null {
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
   const v = Number(t);
   return Number.isFinite(v) && v < 1e8 ? Math.round(v * 100) / 100 : null;
+}
+
+export type CashierRow = { user_id: string; name: string; cashSales: number; digital: number; opening: number; cashIn: number; cashOut: number; expected: number; count: number };
+
+/**
+ * Who handled what today (docs/INVESTIGACION_RETAIL.md, row 5: internal theft and collusion): sales collected by each
+ * person, split cash / digital, plus the cash movements they recorded. Expected cash = opening + cash sales + cash in −
+ * cash out, per person, so the owner can count each drawer when there is more than one cashier.
+ */
+export function cashierBreakdown(payments: { user_id: string; method: string; amount: number | string }[], moves: CashMove[], names: Map<string, string | null>): CashierRow[] {
+  const rows = new Map<string, CashierRow>();
+  const row = (id: string) => {
+    let r = rows.get(id);
+    if (!r) { r = { user_id: id, name: names.get(id) || "Sin nombre", cashSales: 0, digital: 0, opening: 0, cashIn: 0, cashOut: 0, expected: 0, count: 0 }; rows.set(id, r); }
+    return r;
+  };
+  for (const p of payments) {
+    const r = row(p.user_id);
+    if (p.method === "efectivo") r.cashSales += n(p.amount); else r.digital += n(p.amount);
+    r.count++;
+  }
+  for (const m of moves) {
+    if (!m.user_id || m.method !== "efectivo") continue;
+    const r = row(m.user_id);
+    if (m.kind === "apertura") r.opening += n(m.amount);
+    else if (m.kind === "ingreso") r.cashIn += n(m.amount);
+    else r.cashOut += n(m.amount);
+  }
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  return [...rows.values()].map(r => ({ ...r, cashSales: r2(r.cashSales), digital: r2(r.digital), opening: r2(r.opening), cashIn: r2(r.cashIn), cashOut: r2(r.cashOut),
+    expected: r2(r.opening + r.cashSales + r.cashIn - r.cashOut) })).sort((a, b) => b.cashSales + b.digital - (a.cashSales + a.digital) || a.name.localeCompare(b.name, "es"));
 }

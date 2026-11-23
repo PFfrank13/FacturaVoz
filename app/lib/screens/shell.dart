@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/payment_listener.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -148,6 +149,7 @@ class _MainShellState extends State<MainShell> {
   OrgSettings? _settings;
   RealtimeChannel? _licChan;
   String? _orgSeen;
+  AppLifecycleListener? _life;
 
   @override
   void initState() {
@@ -158,6 +160,12 @@ class _MainShellState extends State<MainShell> {
     _reloadSettings();
     _watchLicense();
     QuickLaunch.instance.bind(_onShortcut);
+    // Avisos de Yape/Plin automáticos (Android, si el dueño dio el permiso): lee la cola al abrir y al volver.
+    PaymentListener.instance.start();
+    _life = AppLifecycleListener(onResume: () {
+      PaymentListener.instance.refreshEnabled();
+      PaymentListener.instance.drain();
+    });
   }
 
   @override
@@ -167,12 +175,14 @@ class _MainShellState extends State<MainShell> {
     _licChan?.unsubscribe();
     _auroraScroll.dispose();
     QuickLaunch.instance.unbind();
+    _life?.dispose();
     super.dispose();
   }
 
   void _onApp() {
     if (_orgSeen == Repo.activeOrgId) return;
     _orgSeen = Repo.activeOrgId;
+    PaymentListener.instance.drain();
     _reloadSettings();
     _watchLicense();
   }

@@ -1,7 +1,7 @@
 // Avisos de pago de Yape / Plin / banco (Fase 8 · módulo 18). Pegas (o compartes) el texto de la notificación,
 // la app lee monto, quién pagó y el código de operación, te sugiere la factura que coincide y registra el cobro.
-// Nota honesta: leer las notificaciones del teléfono AUTOMÁTICAMENTE exige un permiso especial de Android con código
-// nativo; está en la HOJA_DE_RUTA. Hoy funciona copiando/pegando (2 toques) y no se registra nada sin tu confirmación.
+// En Android también se leen solos (PaymentNoticeListener.kt) si el dueño da «Acceso a notificaciones»; en iPhone
+// no se puede y se sigue pegando el texto. Nunca se registra un cobro sin tu confirmación.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -14,6 +14,7 @@ import '../models_v2.dart';
 import '../services/pro_repo.dart';
 import '../services/repo.dart';
 import '../services/live.dart';
+import '../services/payment_listener.dart';
 import '../services/v2_repo.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -143,7 +144,11 @@ class _PaymentNoticesScreenState extends State<PaymentNoticesScreen> with LiveRe
           : AbsorbPointer(
               absorbing: _busy,
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
-                Text('Copia la notificación de Yape/Plin (mantén presionado → Copiar) y pégala aquí.', style: t.textTheme.bodySmall),
+                if (PaymentListener.instance.supported) const _AutoReadCard(),
+                Text(PaymentListener.instance.supported
+                    ? 'También puedes copiar una notificación (mantén presionado → Copiar) y pegarla aquí.'
+                    : 'Copia la notificación de Yape/Plin (mantén presionado → Copiar) y pégala aquí. En iPhone no se pueden leer solas.',
+                  style: t.textTheme.bodySmall),
                 const SizedBox(height: 10),
                 Shake(
                   trigger: _shake,
@@ -224,6 +229,63 @@ class _PaymentNoticesScreenState extends State<PaymentNoticesScreen> with LiveRe
                     ),
               ]),
             ),
+    );
+  }
+}
+
+/// Lectura automática de los avisos (Android): estado del permiso y cómo activarlo.
+class _AutoReadCard extends StatefulWidget {
+  const _AutoReadCard();
+
+  @override
+  State<_AutoReadCard> createState() => _AutoReadCardState();
+}
+
+class _AutoReadCardState extends State<_AutoReadCard> {
+  late final AppLifecycleListener _life;
+
+  @override
+  void initState() {
+    super.initState();
+    PaymentListener.instance.refreshEnabled();
+    _life = AppLifecycleListener(onResume: () => PaymentListener.instance.refreshEnabled().then((on) { if (on) PaymentListener.instance.drain(); }));
+  }
+
+  @override
+  void dispose() {
+    _life.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return ValueListenableBuilder<bool?>(
+      valueListenable: PaymentListener.instance.enabled,
+      builder: (context, on, _) => Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(on == true ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+                color: on == true ? const Color(0xFF2FBF8F) : t.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(child: Text(on == true ? 'Leyendo tus Yape y Plin automáticamente' : 'Que los Yape y Plin se anoten solos',
+                style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+            ]),
+            const SizedBox(height: 6),
+            Text(on == true
+                ? 'Cada pago que llega a este teléfono aparece aquí y en el cobro del punto de venta. Igual confirmas tú cada cobro.'
+                : 'Da a FacturaVoz «Acceso a notificaciones». Solo lee Yape y las apps de tu banco con Plin, solo pagos recibidos, y todo se procesa en este teléfono. Puedes quitarlo cuando quieras.',
+              style: t.textTheme.bodySmall),
+            if (on != true) ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(onPressed: PaymentListener.instance.openSettings, icon: const Icon(Icons.settings_rounded), label: const Text('Activar en Ajustes')),
+            ],
+          ]),
+        ),
+      ),
     );
   }
 }

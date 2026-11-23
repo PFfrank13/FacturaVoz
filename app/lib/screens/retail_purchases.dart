@@ -15,6 +15,7 @@ import '../ui/theme.dart';
 import 'pos_payment_logic.dart';
 import 'products.dart';
 import 'retail_settlements.dart';
+import 'stock_lots.dart' show dayMonthYear, isoDay;
 
 /// Centra el flujo de compras en pantallas anchas sin estrecharlo en móviles.
 /// Usa el espacio REAL disponible, no el tamaño físico de la pantalla.
@@ -162,6 +163,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     if (_saving || _recovering || _pending != null || _recoveryError != null) return;
     final existing = _lines[product.id];
     final qty = TextEditingController(text: existing?.quantity.toStringAsFixed(2) ?? '1');
+    DateTime? expires = existing?.expiresOn == null ? null : DateTime.tryParse(existing!.expiresOn!);
     final cost = TextEditingController(
       text: existing != null
           ? (existing.unitCostCents / 100).toStringAsFixed(2)
@@ -169,7 +171,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
     );
     final item = await showDialog<RetailPurchaseLine>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) => AlertDialog(
         title: Text('Recibir: ${product.name}'),
         content: SizedBox(
           width: 350,
@@ -189,6 +191,27 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
                 helperText: 'Costo de compra, no precio de venta',
               ),
             ),
+            const SizedBox(height: 8),
+            // Vencimiento opcional: activa el aviso «por vencer» y la merma por lote (web y móvil).
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event_rounded),
+              title: Text(expires == null ? 'Fecha de vencimiento (opcional)' : 'Vence el ${dayMonthYear(expires!)}'),
+              subtitle: const Text('Te avisamos antes de que venza'),
+              trailing: expires == null ? null : IconButton(
+                tooltip: 'Quitar fecha', icon: const Icon(Icons.close_rounded),
+                onPressed: () => setD(() => expires = null),
+              ),
+              onTap: () async {
+                final now = DateTime.now();
+                final picked = await showDatePicker(
+                  context: ctx, initialDate: expires ?? now.add(const Duration(days: 30)),
+                  firstDate: now.subtract(const Duration(days: 365)), lastDate: DateTime(now.year + 10),
+                  helpText: 'Fecha de vencimiento',
+                );
+                if (picked != null) setD(() => expires = picked);
+              },
+            ),
           ]),
         ),
         actions: [
@@ -207,12 +230,13 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
               }
               Navigator.pop(ctx, RetailPurchaseLine(
                 productId: product.id, quantity: quantity, unitCostCents: costCents,
+                expiresOn: expires == null ? null : isoDay(expires!),
               ));
             },
             child: const Text('Agregar'),
           ),
         ],
-      ),
+      )),
     );
     disposeAfterClose([qty, cost]);
     if (item != null && mounted && Repo.activeOrgId == org && _allowed) {
@@ -272,6 +296,13 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       }
       setState(() => _pending = purchase);
       final receiptId = await RetailPurchaseRepo.receive(purchase);
+      var lotNote = '';
+      try {
+        final n = await RetailPurchaseRepo.saveLots(purchase, receiptId);
+        if (n > 0) lotNote = n == 1 ? ' Se guardó la fecha de vencimiento.' : ' Se guardaron $n fechas de vencimiento.';
+      } catch (_) {
+        lotNote = ' No se guardaron las fechas de vencimiento: añádelas en Vencimientos.';
+      }
       await RetailPurchaseStore.clear(purchase);
       if (!mounted || Repo.activeOrgId != org ||
           Supabase.instance.client.auth.currentUser?.id != user) {
@@ -287,7 +318,7 @@ class _RetailPurchasesScreenState extends State<RetailPurchasesScreen> {
       LiveCache.clear();
       AppState.instance.bump();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Compra recibida, inventario actualizado. Ref: ${receiptId.substring(0, 8)}')),
+        SnackBar(content: Text('Compra recibida, inventario actualizado.$lotNote Ref: ${receiptId.substring(0, 8)}')),
       );
       await _load();
     } catch (e) {

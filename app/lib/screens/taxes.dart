@@ -26,7 +26,7 @@ class TaxesScreen extends StatefulWidget {
 
 class _TaxesScreenState extends State<TaxesScreen> with LiveReload<TaxesScreen> {
   String? _regime;
-  double _base = 0, _tax = 0, _expBase = 0, _expTax = 0, _yearBase = 0;
+  double _base = 0, _tax = 0, _expBase = 0, _expTax = 0, _yearBase = 0, _monthBuys = 0, _yearBuys = 0;
   bool _loading = true;
   String? _error;
 
@@ -72,8 +72,10 @@ class _TaxesScreenState extends State<TaxesScreen> with LiveReload<TaxesScreen> 
       final month = await V2Repo.salesSummary(from, to, 'PEN');
       final year = await V2Repo.salesSummary(yearFrom, to, 'PEN');
       var expenses = const <Expense>[];
+      var yearExpenses = const <Expense>[];
       try {
         expenses = await ProRepo.listExpenses(from, to);
+        if (s.taxRegime == 'nrus') yearExpenses = await ProRepo.listExpenses(yearFrom, to);
       } catch (_) {}
       if (!mounted) return;
       setState(() {
@@ -84,6 +86,8 @@ class _TaxesScreenState extends State<TaxesScreen> with LiveReload<TaxesScreen> 
         final pen = expenses.where((e) => e.currency == 'PEN');
         _expBase = pen.fold(0.0, (a, e) => a + e.base);
         _expTax = pen.fold(0.0, (a, e) => a + e.tax);
+        _yearBuys = yearExpenses.where((e) => e.currency == 'PEN' && e.category == 'mercaderia').fold(0.0, (a, e) => a + e.base + e.tax);
+        _monthBuys = pen.where((e) => e.category == 'mercaderia').fold(0.0, (a, e) => a + e.base + e.tax);
         _loading = false;
         _error = month == null ? 'Ejecuta las migraciones v2.0 en Supabase para ver tus cifras reales.' : null;
       });
@@ -112,7 +116,8 @@ class _TaxesScreenState extends State<TaxesScreen> with LiveReload<TaxesScreen> 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final est = estimateTaxes(regime: _regime, monthSalesBase: _base, monthSalesTax: _tax, monthPurchasesTax: _expTax, yearSalesBase: _yearBase);
+    final est = estimateTaxes(regime: _regime, monthSalesBase: _base, monthSalesTax: _tax, monthPurchasesTax: _expTax, yearSalesBase: _yearBase,
+        monthPurchasesTotal: _monthBuys, yearPurchasesTotal: _yearBuys);
     final real = RealProfit(sales: _base, costOfSales: 0, expenses: _expBase, taxes: est.renta);
     final now = DateTime.now();
     final daysLeft = math.max(1, DateTime(now.year, now.month + 1, 0).day - now.day + 1);

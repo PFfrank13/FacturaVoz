@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/payment_listener.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
@@ -153,6 +154,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
   bool _loading = true;
   bool _verified = false;
   String? _method;
+  IncomingPayment? _matched;
   final _tender = TextEditingController();
 
   @override
@@ -160,6 +162,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
     super.initState();
     _method = widget.initialMethod;
     _tender.text = widget.total.toStringAsFixed(2);
+    PaymentListener.instance.drain(); // por si el aviso llegó mientras se armaba el carrito
     _loadSettings();
   }
 
@@ -211,7 +214,9 @@ class _PaymentFlowState extends State<_PaymentFlow> {
     final note = _method == 'efectivo'
         ? 'Efectivo recibido: ${money(_tendered! / 100, widget.currency)} · '
             'Vuelto: ${money(posChangeDue(chargeCents: _chargeCents, tenderedCents: _tendered!) / 100, widget.currency)}'
-        : '${posMethodLabel(_method!)}: abono confirmado manualmente por el cajero';
+        : _matched != null
+            ? '${posMethodLabel(_method!)}: aviso recibido de ${_matched!.notice.payer.isEmpty ? 'cliente' : _matched!.notice.payer}${_matched!.notice.operation.isEmpty ? '' : ' · op. ${_matched!.notice.operation}'}, confirmado por el cajero'
+            : '${posMethodLabel(_method!)}: abono confirmado manualmente por el cajero';
     Navigator.of(context).pop(PosPaymentApproval(_method!, note));
   }
 
@@ -387,7 +392,37 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                       style: TextStyle(fontWeight: FontWeight.w900,
                         color: _sufficient ? c.ok : c.bad)),
                   ]))
-                else _card(child: Material(type: MaterialType.transparency, child: CheckboxListTile(
+                else ...[
+                if ((method == 'yape' || method == 'plin') && PaymentListener.instance.supported)
+                  ValueListenableBuilder<List<IncomingPayment>>(
+                    valueListenable: PaymentListener.instance.recent,
+                    builder: (context, list, _) {
+                      final hit = list.where((p) => matchesCharge(p, widget.total)).firstOrNull;
+                      if (hit == null) {
+                        return PaymentListener.instance.enabled.value == true
+                            ? Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(
+                                'Esperando el aviso de ${posMethodLabel(method)} por ${money(widget.total, widget.currency)}…',
+                                textAlign: TextAlign.center, style: t.textTheme.bodySmall?.copyWith(color: c.muted)))
+                            : const SizedBox.shrink();
+                      }
+                      final who = hit.notice.payer.isEmpty ? 'un cliente' : hit.notice.payer;
+                      final mins = DateTime.now().difference(hit.at).inMinutes;
+                      return Padding(padding: const EdgeInsets.only(bottom: 12), child: _card(child: Row(children: [
+                        Icon(Icons.verified_rounded, color: c.ok, size: 30),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('${hit.notice.app == 'plin' ? 'Plin' : 'Yape'} recibido: ${money(hit.notice.amount, widget.currency)}',
+                            style: TextStyle(fontWeight: FontWeight.w900, color: c.ok)),
+                          Text('De $who · ${mins <= 0 ? 'ahora' : 'hace $mins min'}', style: t.textTheme.bodySmall),
+                        ])),
+                        if (_matched != hit) TextButton(
+                          onPressed: () => setState(() { _matched = hit; _verified = true; }),
+                          child: const Text('Es este pago'),
+                        ),
+                      ])));
+                    },
+                  ),
+                _card(child: Material(type: MaterialType.transparency, child: CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _verified,
                   onChanged: (_requiresAccount && _account.isEmpty && _qrPath.isEmpty) || _loading
@@ -395,8 +430,11 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                   title: Text(method == 'tarjeta'
                     ? 'El terminal POS autorizó el pago'
                     : 'He verificado el abono en mi cuenta'),
-                  subtitle: const Text('No se conecta automáticamente al banco. Confirma únicamente después de recibir el pago.'),
+                  subtitle: Text(PaymentListener.instance.enabled.value == true && method != 'tarjeta'
+                      ? 'Si el aviso llega a este teléfono aparece arriba. Confirma únicamente después de recibir el pago.'
+                      : 'No se conecta automáticamente al banco. Confirma únicamente después de recibir el pago.'),
                 ))),
+                ],
               ],
             ],
           )),

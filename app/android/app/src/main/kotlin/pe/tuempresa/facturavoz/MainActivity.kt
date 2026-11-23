@@ -7,7 +7,9 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import androidx.core.app.NotificationManagerCompat
 import java.io.File
 
 class MainActivity : FlutterFragmentActivity() {
@@ -54,5 +56,27 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+        // Avisos de Yape/Plin: estado del permiso, ir a ajustes y leer la cola local.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "facturavoz/payments")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isEnabled" -> result.success(NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName))
+                    "openSettings" -> {
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        result.success(null)
+                    }
+                    "drain" -> result.success(PaymentNoticeStore.drain(applicationContext))
+                    else -> result.notImplemented()
+                }
+            }
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "facturavoz/payments/events")
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    PaymentNoticeStore.onNotice = { events.success(it) }
+                }
+                override fun onCancel(arguments: Any?) {
+                    PaymentNoticeStore.onNotice = null
+                }
+            })
     }
 }

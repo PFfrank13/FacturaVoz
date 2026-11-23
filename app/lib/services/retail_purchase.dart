@@ -13,10 +13,14 @@ class RetailPurchaseLine {
     required this.productId,
     required this.quantity,
     required this.unitCostCents,
+    this.expiresOn,
   });
   final String productId;
   final double quantity;
   final int unitCostCents;
+  /// Fecha de vencimiento 'AAAA-MM-DD' (opcional). Va aparte de retail_receive (retail_set_lots) para no
+  /// cambiar la huella de la solicitud: un reintento de una compra guardada antes sigue siendo la misma.
+  final String? expiresOn;
 
   int get lineTotalCents {
     // Currency arithmetic never multiplies binary floating-point values.
@@ -31,11 +35,22 @@ class RetailPurchaseLine {
         'unit_cost_cents': unitCostCents,
       };
 
+  /// Lo que se guarda en el teléfono para reintentar: lo mismo que se envía, más la fecha de vencimiento.
+  Map<String, dynamic> toStoreJson() => {...toJson(), if (expiresOn != null) 'expires_on': expiresOn};
+
   factory RetailPurchaseLine.fromJson(Map<String, dynamic> j) => RetailPurchaseLine(
         productId: j['product_id'] as String,
         quantity: (j['quantity'] as num).toDouble(),
         unitCostCents: (j['unit_cost_cents'] as num).toInt(),
+        expiresOn: isIsoDate(j['expires_on']) ? j['expires_on'] as String : null,
       );
+}
+
+/// 'AAAA-MM-DD' de una fecha real.
+bool isIsoDate(Object? v) {
+  if (v is! String || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(v)) return false;
+  final d = DateTime.tryParse(v);
+  return d != null && d.toIso8601String().substring(0, 10) == v;
 }
 
 class PendingRetailPurchase {
@@ -61,7 +76,7 @@ class PendingRetailPurchase {
   Map<String, dynamic> toJson() => {
         'v': 1, 'org_id': orgId, 'user_id': userId, 'request_id': requestId,
         'supplier': supplier, 'reference': reference, 'payment_method': paymentMethod,
-        'items': [for (final line in lines) line.toJson()],
+        'items': [for (final line in lines) line.toStoreJson()],
       };
 
   factory PendingRetailPurchase.fromJson(Map<String, dynamic> json) {
@@ -159,6 +174,18 @@ class RetailPurchaseRepo {
       throw AppException('La recepción no devolvió su identificador.');
     }
     return id;
+  }
+
+  /// Guarda las fechas de vencimiento de una compra ya recibida. Reemplaza las de esa compra (seguro de reintentar).
+  /// Devuelve cuántas fechas se guardaron (0 si la compra no traía ninguna).
+  static Future<int> saveLots(PendingRetailPurchase purchase, String receiptId) async {
+    final lots = [
+      for (final l in purchase.lines)
+        if (l.expiresOn != null) {'product_id': l.productId, 'expires_on': l.expiresOn, 'quantity': double.parse(l.quantity.toStringAsFixed(2))},
+    ];
+    if (lots.isEmpty) return 0;
+    await Supabase.instance.client.rpc('retail_set_lots', params: {'p_org': purchase.orgId, 'p_receipt': receiptId, 'p_lots': lots});
+    return lots.length;
   }
 }
 
