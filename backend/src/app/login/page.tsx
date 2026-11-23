@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/safe-next";
+import "../erp/erp.css";
 
 export default function Login() {
   const router = useRouter();
@@ -32,15 +33,30 @@ export default function Login() {
     } catch { setMsg("No pudimos verificar el código. Inténtalo de nuevo."); }
     finally { setPending(false); }
   }
-  return <main className="fv-welcome fv-login">
-    <section><p className="fv-eyebrow">FACTURAVOZ / TU ESPACIO DE TRABAJO</p><h1>Menos pasos.<br /><span>Más negocio.</span></h1><p>Las personas, los productos y el trabajo de cada día. Con la misma empresa y los mismos permisos que en tu móvil.</p><p className="fv-caption">FacturaVoz · Solvex Software Labs</p>
-      <a className="fv-button secondary" href="/app">Abrir punto de venta</a>
+  const step = sent ? 2 : 1;
+  return <main className="fv-workspace fv-door">
+    <section className="fv-door-copy">
+      <p className="fv-door-brand">Factura <span>Voz</span></p>
+      <h1>Tu tienda, también desde la computadora.</h1>
+      <p>Comprobantes, caja, compras, clientes e inventario: lo mismo que llevas en el móvil, con la misma cuenta y los mismos permisos.</p>
+      <a className="fv-button secondary" href="/app">Abrir el punto de venta</a>
     </section>
-    <section className="fv-login-panel" aria-labelledby="login-title"><p className="fv-eyebrow">BIENVENIDO DE NUEVO</p><h2 id="login-title">Entra a tu empresa</h2><p>Usa el correo de tu cuenta de FacturaVoz.</p>
-      <form className="fv-form" onSubmit={e => { e.preventDefault(); void send(); }}><label>Correo electrónico<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={e => { setEmail(e.target.value); setSent(false); setCode(""); }} placeholder="tu@empresa.com" /></label><button className="fv-button" disabled={pending}>{pending ? "Un momento…" : sent ? "Reenviar acceso" : "Recibir acceso seguro"}</button></form>
-      {sent && <form className="fv-form" onSubmit={e => { e.preventDefault(); void verify(); }}><label>Código de acceso<input inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={12} pattern="[0-9]+" value={code} onChange={e => setCode(e.target.value)} /></label><button className="fv-button secondary" disabled={pending}>Verificar código</button></form>}
-      {msg && <p role="status" aria-live="polite">{msg}</p>}
-      <p className="fv-caption">Tu administrador gestiona el acceso a la empresa. Nunca compartas tu código de acceso.</p>
+    <section className="fv-door-panel" aria-labelledby="login-title">
+      <h2 id="login-title">Entra a tu empresa</h2>
+      <ol className="fv-door-steps" aria-label="Pasos para entrar">
+        <li aria-current={step === 1 ? "step" : undefined} className={step > 1 ? "is-done" : ""}>Recibe un código en tu correo</li>
+        <li aria-current={step === 2 ? "step" : undefined}>Escríbelo aquí</li>
+      </ol>
+      <form className="fv-form" onSubmit={e => { e.preventDefault(); void send(); }}>
+        <label>Correo de tu cuenta<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={e => { setEmail(e.target.value); setSent(false); setCode(""); }} placeholder="tu@empresa.com" /></label>
+        <button className={sent ? "fv-button secondary" : "fv-button"} disabled={pending}>{pending && !sent ? "Enviando…" : sent ? "Reenviar código" : "Recibir código"}</button>
+      </form>
+      {sent && <form className="fv-form fv-door-code" onSubmit={e => { e.preventDefault(); void verify(); }}>
+        <label>Código de acceso<input inputMode="numeric" autoComplete="one-time-code" autoFocus required minLength={6} maxLength={12} pattern="[0-9]+" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" /></label>
+        <button className="fv-button" disabled={pending}>{pending ? "Verificando…" : "Entrar"}</button>
+      </form>}
+      {msg && <p className="fv-door-msg" role="status">{msg}</p>}
+      <p className="fv-caption">El dueño de la empresa decide quién entra. Nunca compartas tu código.</p>
     </section>
   </main>;
 }

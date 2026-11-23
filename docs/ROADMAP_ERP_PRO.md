@@ -74,7 +74,9 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       mes pasado, ticket promedio, ritmo de ventas por hora, productos estrella y
       «Para resolver hoy» (SUNAT, stock bajo, fiados vencidos, deuda a
       proveedores, caja), todo con datos reales y según plan y rol.
-- [ ] Diseño premium coherente con el móvil (skill frontend-design).
+- [ ] Diseño premium coherente con el móvil (skill frontend-design). Hecho:
+      inicio, acceso, comprobantes, clientes, caja y compras. Falta: cobros,
+      cotizaciones, equipo, reportes, plan y configuración (aún con tabla genérica).
 
 ### 6. Móvil — pulido
 - [ ] Inicio de sesión y asistente de primera vez con el nuevo diseño.
@@ -105,3 +107,5 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 - 23/11/2026: Inicio rediseñado (skill frontend-design): una frase con la venta
   del día y el ritmo por hora como elemento principal; verificado en escritorio
   y a 375 px con ventas locales de prueba.
+- 23/11/2026: Acceso web con el mismo tema del ERP (aurora y cristal, claro y
+  oscuro) y pasos «recibe el código» → «escríbelo».

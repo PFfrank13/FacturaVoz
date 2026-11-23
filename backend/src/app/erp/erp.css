@@ -392,3 +392,23 @@
 .fv-shortcuts a:hover, .fv-shortcuts a:focus-visible { border-color: var(--erp-accent); }
 @media (max-width: 900px) { .fv-home-grid { grid-template-columns: 1fr; } .fv-rhythm-bars { gap: 3px; height: 100px; } .fv-rhythm-axis span:nth-child(even) { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .fv-rhythm-bars span { animation: none; } }
+
+/* Sign-in door: same aurora and glass as the workspace, one calm step at a time. */
+.fv-door { min-height: 100vh; display: grid; grid-template-columns: 1.1fr minmax(320px, 440px); gap: clamp(32px, 6vw, 96px); align-items: center; padding: clamp(28px, 6vw, 80px) max(20px, calc((100vw - 1160px) / 2)); }
+.fv-door-brand { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+.fv-door-brand span { color: var(--erp-accent); }
+.fv-door-copy h1 { font-size: clamp(38px, 5.4vw, 70px); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; margin: 28px 0 18px; max-width: 13ch; text-wrap: balance; }
+.fv-door-copy > p:not(.fv-door-brand) { color: var(--erp-muted); font-size: 17px; line-height: 1.65; max-width: 46ch; margin-bottom: 28px; }
+.fv-door-panel { padding: 32px; border-radius: 28px; display: grid; gap: 18px; background: var(--erp-pane); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); }
+.fv-door-panel h2 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; }
+.fv-door-panel .fv-form { margin: 0; max-width: none; }
+.fv-door-steps { display: grid; gap: 8px; counter-reset: step; }
+.fv-door-steps li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--erp-muted); counter-increment: step; }
+.fv-door-steps li::before { content: counter(step); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; border: 1px solid var(--erp-rim); }
+.fv-door-steps li[aria-current="step"] { color: var(--erp-ink); font-weight: 650; }
+.fv-door-steps li[aria-current="step"]::before { background: var(--erp-accent); color: var(--erp-accent-ink); border-color: transparent; }
+.fv-door-steps li.is-done::before { content: "✓"; color: var(--erp-accent); }
+.fv-door-code input { font-size: 26px; letter-spacing: .35em; font-variant-numeric: tabular-nums; text-align: center; font-weight: 700; }
+.fv-door-msg { font-size: 14px; line-height: 1.55; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--erp-accent) 12%, transparent); }
+.fv-door :focus-visible { outline: 3px solid var(--erp-accent); outline-offset: 3px; }
+@media (max-width: 860px) { .fv-door { grid-template-columns: 1fr; align-items: start; } .fv-door-copy h1 { margin: 18px 0 12px; } }
