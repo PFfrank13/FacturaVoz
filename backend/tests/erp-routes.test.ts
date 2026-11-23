@@ -7,6 +7,7 @@ const mock = vi.hoisted(() => ({ context: vi.fn(), notFound: vi.fn(() => { throw
 vi.mock("@/lib/erp/context", () => ({ workspaceContext: mock.context }));
 vi.mock("next/navigation", () => ({ notFound: mock.notFound, useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/lookup", () => ({ lookupDocument: vi.fn() }));
+vi.mock("@/lib/dayclose-core", () => ({ closeDay: vi.fn() }));
 import ModulePage from "../src/app/erp/[org]/[module]/page";
 
 describe("ERP routes", () => {

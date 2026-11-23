@@ -14,7 +14,7 @@ export function featureLimit(l: License, key: string): number {
 export function can(a: Access, permission: string): boolean { return a.can?.[permission] ?? a.is_admin === true; }
 
 export const sectors = {
-  bodega: { name: "Bodega / minimarket", title: "El ritmo de tu tienda", detail: "Ventas, productos y clientes para tu jornada.", priority: ["comprobantes", "inventario", "clientes", "cobros"] },
+  bodega: { name: "Bodega / minimarket", title: "El ritmo de tu tienda", detail: "Ventas, productos y clientes para tu jornada.", priority: ["comprobantes", "caja", "inventario", "compras", "clientes", "cobros"] },
   restaurante: { name: "Restaurante", title: "Tu servicio, en orden", detail: "Consulta la operación comercial y los productos de tu carta.", priority: ["comprobantes", "productos", "cobros", "clientes"] },
   servicios_tecnicos: { name: "Servicios técnicos", title: "Cada trabajo tiene su siguiente paso", detail: "Órdenes, visitas y clientes con seguimiento.", priority: ["trabajos", "agenda", "clientes", "cotizaciones"] },
   salon: { name: "Salón / barbería", title: "Haz espacio para la próxima cita", detail: "Agenda, clientes y servicios de tu negocio.", priority: ["agenda", "clientes", "productos", "cobros"] },
@@ -37,6 +37,8 @@ export const modules: readonly Module[] = [
   { id: "trabajos", title: "Trabajos", feature: "trabajos", permission: "jobs", sectors: jobSectors, table: "jobs", columns: "id,title,status,scheduled_at,kind", fields: [["title", "Trabajo"], ["status", "Estado"], ["scheduled_at", "Programado"], ["kind", "Tipo"]], order: "created_at" },
   { id: "agenda", title: "Agenda", feature: "agenda", permission: "jobs", sectors: appointmentSectors, table: "jobs", columns: "id,title,status,scheduled_at,duration_min", fields: [["title", "Cita"], ["scheduled_at", "Programada"], ["duration_min", "Minutos"], ["status", "Estado"]], order: "scheduled_at" },
   { id: "cotizaciones", title: "Cotizaciones", feature: "cotizaciones", permission: "sell", table: "quotes", columns: "id,number,issue_date,status,currency", fields: [["number", "Número"], ["issue_date", "Fecha"], ["status", "Estado"], ["currency", "Moneda"]], order: "created_at" },
+  { id: "caja", title: "Caja y cierre", feature: "caja", permission: "collect", sectors: ["bodega", "restaurante", "mayorista", "salon", "taller"] },
+  { id: "compras", title: "Compras", feature: "stock", permission: "products_edit", sectors: ["bodega", "restaurante", "taller", "mayorista", "construccion"] },
   { id: "cobros", title: "Cobros", feature: "cobros", permission: "collect", table: "payments", columns: "id,amount,paid_on,method,note", fields: [["amount", "Importe registrado"], ["paid_on", "Fecha"], ["method", "Medio"], ["note", "Nota"]], order: "paid_on" },
   { id: "equipo", title: "Equipo", permission: "team" },
   { id: "reportes", title: "Reportes", feature: "reportes", permission: "finance" },

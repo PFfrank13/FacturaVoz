@@ -5,6 +5,8 @@ import { workspaceContext } from "@/lib/erp/context";
 import { modules, moduleAllowed, can, hasFeature } from "@/lib/erp/access";
 import { lookupDocument, type LookupReply } from "@/lib/lookup";
 import { docTypeOf } from "@/lib/erp/clients";
+import { closeDay } from "@/lib/dayclose-core";
+import { parseAmount } from "@/lib/erp/cash";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
@@ -243,4 +245,50 @@ export async function addCreditMove(org: string, clientId: string, _previous: Fo
   if (result.error) return { ok: false, message: "No se pudo registrar. Revisa tus permisos." };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: d.kind === "abono" ? "Abono registrado. El saldo ya bajó también en el móvil." : "Fiado anotado en la libreta." };
+}
+
+/** Caja module context: module rights re-read on the server for every call. */
+async function cashContext(org: string) {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "caja")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  return { c, error: "" } as const;
+}
+
+const cashMoveSchema = z.object({
+  kind: z.enum(["apertura", "ingreso", "egreso"]),
+  amount: z.string().max(20),
+  method: z.enum(["efectivo", "yape", "plin", "transferencia", "tarjeta", "otro"]),
+  note: optional(200),
+});
+
+/** Opening, extra income or cash withdrawal for today, in the same table the mobile till uses. */
+export async function addCashMove(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await cashContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = cashMoveSchema.safeParse(Object.fromEntries(form));
+  const amount = parsed.success ? parseAmount(parsed.data.amount) : null;
+  if (!parsed.success || amount === null || (amount <= 0 && parsed.data.kind !== "apertura")) return { ok: false, message: "Indica un importe válido, por ejemplo 150.50." };
+  const d = parsed.data;
+  if (d.kind === "egreso" && !d.note) return { ok: false, message: "Escribe para qué fue el retiro: queda en el reporte del dueño." };
+  const { c } = ctx;
+  const result = await c.db.from("cash_movements").insert({ org_id: org, user_id: c.user.id, kind: d.kind, amount, method: d.kind === "apertura" ? "efectivo" : d.method, note: d.note || null });
+  if (result.error) return { ok: false, message: "No se pudo registrar. Revisa tus permisos." };
+  revalidatePath(`/erp/${org}/caja`);
+  return { ok: true, message: d.kind === "apertura" ? "Caja abierta. El móvil ya ve la apertura." : d.kind === "ingreso" ? "Ingreso registrado." : "Retiro registrado." };
+}
+
+const closeSchema = z.object({ day: z.iso.date(), counted: z.string().max(20), note: optional(300) });
+
+/** Blind cash count: same rules as the mobile close (reason required for a difference, no overwrite). */
+export async function closeCashDay(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await cashContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = closeSchema.safeParse(Object.fromEntries(form));
+  const counted = parsed.success ? parseAmount(parsed.data.counted) : null;
+  if (!parsed.success || counted === null) return { ok: false, message: "Escribe el efectivo que contaste en caja, por ejemplo 320.00." };
+  const r = await closeDay(ctx.c.db, ctx.c.user.id, org, parsed.data.day, counted, parsed.data.note || null);
+  if (r.status >= 400 || !r.body.ok) return { ok: false, message: r.body.error ?? "No se pudo cerrar la caja." };
+  revalidatePath(`/erp/${org}/caja`);
+  return { ok: true, message: r.body.emailed ? "Caja cerrada. Enviamos el reporte al dueño por correo." : "Caja cerrada y arqueo guardado." };
 }

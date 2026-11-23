@@ -57,7 +57,9 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 - [x] Filtros: con fiado, vencidos o sobre límite, «no están volviendo».
 
 ### 4. ERP web — Operación
-- [ ] Caja: apertura, movimientos, arqueo ciego, historial.
+- [x] Caja: apertura, ingresos, retiros con motivo, cobros por medio de pago,
+      arqueo ciego (el esperado solo lo ve finanzas) e historial por día. El cierre
+      usa `lib/dayclose-core.ts`, la misma lógica de `/api/day-close` del móvil.
 - [x] Fiados: saldos, abonos, límite por cliente (dentro de Clientes).
 - [ ] Compras y proveedores: registrar compra, actualizar stock y costo.
 - [ ] Inventario: vencimientos, mermas, kardex.
@@ -86,3 +88,6 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   depende del propietario (secretos en GitHub).
 - 23/11/2026: Clientes web con DNI/RUC, ficha, libreta de fiado y WhatsApp,
   verificado contra Supabase local (RUC en caché, alta, abono de S/ 12.40).
+- 23/11/2026: Caja web verificada en local: apertura S/ 50, esperado S/ 62.40
+  (incluye abono de fiado en efectivo), cierre ciego con faltante de S/ 2.40
+  bloqueado sin motivo y guardado con motivo.

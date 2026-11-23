@@ -9,16 +9,20 @@ import LiveRefresh from "@/components/erp/LiveRefresh";
 import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
 import type { ReceiptRow } from "@/lib/erp/receipts";
 import ClientsBoard from "@/components/erp/ClientsBoard";
+import CashBoard from "@/components/erp/CashBoard";
+import type { CashMove, DayClosing } from "@/lib/erp/cash";
+import type { DaySummary } from "@/lib/dayclose";
 import { limaDate } from "@/lib/erp/receipts";
 import { mergeClients, type ClientActivity, type ClientBalance, type ClientRow } from "@/lib/erp/clients";
 
 const liveProducts = ["products"] as const;
 const liveReceipts = ["invoices"] as const;
 const liveClients = ["clients", "credit_ledger", "invoices"] as const;
+const liveCash = ["cash_movements", "payments", "invoices", "credit_ledger"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
-export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string }> }) {
+export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string }> }) {
   const { org, module: id } = await params;
   const c = await workspaceContext(org);
   const m = modules.find(m => m.id === id);
@@ -57,6 +61,23 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los comprobantes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} />}
+    </>;
+  }
+  if (id === "caja") {
+    // The mobile «Caja y cierre del día»: the database computes the summary with the viewer's rights.
+    const today = limaDate(new Date());
+    const asked = (await searchParams).dia ?? "";
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= today && Number.isFinite(Date.parse(asked)) ? asked : today;
+    const [summary, moves, closing] = await Promise.all([
+      c.db.rpc("day_summary", { p_org: org, p_day: day }),
+      c.db.from("cash_movements").select("id,kind,amount,method,note,created_at").eq("org_id", org).eq("day", day).order("created_at"),
+      c.db.from("day_closings").select("counted_cash,expected_cash,difference,note,created_at").eq("org_id", org).eq("day", day).maybeSingle(),
+    ]);
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">CAJA / {c.organization.name}</p><LiveRefresh org={org} tables={liveCash} /></div><h1>Caja y cierre del día</h1><p>Apertura, retiros, cobros por medio de pago y arqueo ciego. Es la misma caja que lleva el móvil.</p></section>
+      {summary.error || !summary.data ? <div className="fv-empty" role="alert"><h2>No pudimos cargar la caja</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <CashBoard org={org} day={day} today={today} summary={summary.data as DaySummary}
+            moves={((moves.data ?? []) as CashMove[]).map(m => ({ ...m, amount: Number(m.amount) }))}
+            closing={(closing.data ?? null) as DayClosing | null} showExpected={can(c.access, "finance")} />}
     </>;
   }
   if (id === "clientes") {

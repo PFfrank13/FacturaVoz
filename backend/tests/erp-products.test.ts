@@ -3,6 +3,7 @@ const mock = vi.hoisted(() => ({ context: vi.fn(), update: vi.fn(), eq: vi.fn(),
 vi.mock("@/lib/erp/context", () => ({ workspaceContext: mock.context }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/lookup", () => ({ lookupDocument: vi.fn() }));
+vi.mock("@/lib/dayclose-core", () => ({ closeDay: vi.fn() }));
 import { updateProduct, uploadProductPhoto } from "../src/app/erp/actions";
 
 const previous = { ok: false, message: "" };
