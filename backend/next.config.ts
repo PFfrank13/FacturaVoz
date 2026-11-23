@@ -2,15 +2,27 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/** The configured Supabase origin (custom domain or local stack), when it is not *.supabase.co. */
+function supabaseOrigins(): { http: string; socket: string } {
+  try {
+    const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+    if (url.hostname.endsWith(".supabase.co")) return { http: "", socket: "" };
+    return { http: ` ${url.origin}`, socket: ` ${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}` };
+  } catch {
+    return { http: "", socket: "" };
+  }
+}
+
 function contentSecurityPolicy(flutter: boolean) {
+  const supabase = supabaseOrigins();
   return [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${flutter ? " 'wasm-unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.supabase.co",
+    `img-src 'self' data: blob: https://*.supabase.co${supabase.http}`,
     "font-src 'self' data:",
     "media-src 'self' blob:",
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co${flutter ? " blob: https://fonts.gstatic.com" : ""}`,
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co${supabase.http}${supabase.socket}${flutter ? " blob: https://fonts.gstatic.com" : ""}`,
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",
