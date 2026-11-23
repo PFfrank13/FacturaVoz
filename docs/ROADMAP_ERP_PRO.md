@@ -61,7 +61,9 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       arqueo ciego (el esperado solo lo ve finanzas) e historial por día. El cierre
       usa `lib/dayclose-core.ts`, la misma lógica de `/api/day-close` del móvil.
 - [x] Fiados: saldos, abonos, límite por cliente (dentro de Clientes).
-- [ ] Compras y proveedores: registrar compra, actualizar stock y costo.
+- [x] Compras y proveedores: registrar compra (stock, costo, kardex, gasto y
+      salida de caja en una transacción `retail_receive`, idempotente), cuentas
+      por pagar a proveedores y su pago (`retail_settle`).
 - [ ] Inventario: vencimientos, mermas, kardex.
 
 ### 5. ERP web — Panel y diseño
@@ -91,3 +93,5 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 - 23/11/2026: Caja web verificada en local: apertura S/ 50, esperado S/ 62.40
   (incluye abono de fiado en efectivo), cierre ciego con faltante de S/ 2.40
   bloqueado sin motivo y guardado con motivo.
+- 23/11/2026: Compras web verificadas en local: 12 × Arroz a S/ 3.80 «por
+  pagar» (stock 20 → 32, costo actualizado) y pago en efectivo posterior.

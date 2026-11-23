@@ -7,6 +7,7 @@ import { lookupDocument, type LookupReply } from "@/lib/lookup";
 import { docTypeOf } from "@/lib/erp/clients";
 import { closeDay } from "@/lib/dayclose-core";
 import { parseAmount } from "@/lib/erp/cash";
+import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
@@ -291,4 +292,61 @@ export async function closeCashDay(org: string, _previous: FormResult, form: For
   if (r.status >= 400 || !r.body.ok) return { ok: false, message: r.body.error ?? "No se pudo cerrar la caja." };
   revalidatePath(`/erp/${org}/caja`);
   return { ok: true, message: r.body.emailed ? "Caja cerrada. Enviamos el reporte al dueño por correo." : "Caja cerrada y arqueo guardado." };
+}
+
+/** Compras context: only the owner or an administrator receives and pays purchases (the database enforces it too). */
+async function purchasesContext(org: string) {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "compras")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  if (!c.access.is_admin) return { c: null, error: "Solo el dueño o un administrador registra compras." } as const;
+  return { c, error: "" } as const;
+}
+
+const purchaseSchema = z.object({
+  request_id: uuid,
+  supplier: z.string().max(120),
+  reference: z.string().max(40),
+  payment_method: z.enum(["pendiente", "efectivo", "yape", "plin", "transferencia", "tarjeta"]),
+  lines: z.array(z.object({ product_id: uuid, quantity: z.number(), unit_cost: z.number() })).min(1).max(50),
+});
+
+const dbMessage = (message: string | undefined, fallback: string) =>
+  message && /^[A-ZÁÉÍÓÚÑ][^\n]{5,160}$/.test(message) && !/violates|syntax|relation|column/i.test(message) ? message : fallback;
+
+/**
+ * Receive goods: stock, unit cost, kardex, expense and (if paid in cash) the till withdrawal happen in one
+ * database transaction (retail_receive). The request id makes a retried submit safe: it never doubles stock.
+ */
+export async function receivePurchase(org: string, input: { request_id: string; supplier: string; reference: string; payment_method: string; lines: PurchaseLine[] }): Promise<FormResult & { id?: string }> {
+  const ctx = await purchasesContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = purchaseSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Revisa el proveedor, el medio de pago y los productos." };
+  const d = parsed.data;
+  const problem = purchaseProblem(d.supplier, d.reference, d.lines);
+  if (problem) return { ok: false, message: problem };
+  const { data, error } = await ctx.c.db.rpc("retail_receive", {
+    p_org: org, p_request_id: d.request_id, p_supplier: d.supplier.trim(), p_reference: d.reference.trim(), p_payment_method: d.payment_method,
+    p_items: d.lines.map(l => ({ product_id: l.product_id, quantity: Math.round(l.quantity * 100) / 100, unit_cost_cents: toCents(l.unit_cost) })),
+  });
+  const row = Array.isArray(data) ? data[0] as { receipt_id?: string; reused?: boolean } | undefined : undefined;
+  if (error || !row?.receipt_id) return { ok: false, message: dbMessage(error?.message, "No se pudo registrar la compra. Inténtalo de nuevo: no se duplicará.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, id: row.receipt_id, message: row.reused ? "Esta compra ya estaba registrada; no se duplicó el stock." : "Compra recibida: el stock y el costo ya se actualizaron en el móvil." };
+}
+
+const settleSchema = z.object({ receipt: uuid, request_id: uuid, method: z.enum(["efectivo", "yape", "plin", "transferencia", "tarjeta"]), evidence: z.string().trim().max(200) });
+
+/** Pay a purchase that was received as «por pagar» (one payment per purchase, idempotent). */
+export async function settlePurchase(org: string, input: { receipt: string; request_id: string; method: string; evidence: string }): Promise<FormResult> {
+  const ctx = await purchasesContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = settleSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Elige el medio de pago." };
+  const d = parsed.data;
+  const { error } = await ctx.c.db.rpc("retail_settle", { p_org: org, p_receipt: d.receipt, p_request_id: d.request_id, p_method: d.method, p_evidence: d.evidence });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo registrar el pago.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: d.method === "efectivo" ? "Pago registrado y descontado de la caja de hoy." : "Pago registrado." };
 }

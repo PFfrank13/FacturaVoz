@@ -25,7 +25,7 @@ export default function ReceiptsBoard({ org, rows, currency }: { org: string; ro
   const open = rows.find(r => r.id === openId) ?? null;
   return <section className="fv-board">
     <div className="fv-kpis">
-      <div style={{ "--tone": "#3ee6b0" } as React.CSSProperties}><span>Vendido en la lista</span><strong>{fmt(totals.total, currency)}</strong><small>{totals.count} comprobantes</small></div>
+      <div style={{ "--tone": "#3ee6b0" } as React.CSSProperties}><span>Vendido en la lista</span><strong>{fmt(totals.total, currency)}</strong><small>{totals.count} {totals.count === 1 ? "comprobante" : "comprobantes"}</small></div>
       <div style={{ "--tone": "#6fb7ff" } as React.CSSProperties}><span>Aceptados por SUNAT</span><strong>{totals.accepted}</strong><small>con CDR disponible</small></div>
       <div style={{ "--tone": totals.attention ? "#ff7a6e" : "#a98bff" } as React.CSSProperties}><span>Requieren atención</span><strong>{totals.attention}</strong><small>pendientes, rechazados o con error</small></div>
     </div>
@@ -41,7 +41,7 @@ export default function ReceiptsBoard({ org, rows, currency }: { org: string; ro
         </select>
       </label>
     </div>
-    <p className="fv-caption" aria-live="polite">{visible.length} comprobantes</p>
+    <p className="fv-caption" aria-live="polite">{visible.length} {visible.length === 1 ? "comprobante" : "comprobantes"}</p>
     <ul className="fv-receipts">
       {visible.map((r, i) => {
         const s = sunatState(r);

@@ -345,3 +345,11 @@
 .fv-close .fv-pill { align-self: center; }
 .fv-closed { margin-top: 4px; }
 @media (max-width: 900px) { .fv-cash-grid { grid-template-columns: 1fr; } }
+
+/* Compras: product lines with stock preview. */
+.fv-buy-head, .fv-buy-line { grid-template-columns: minmax(0, 3fr) 80px 110px 100px 40px; }
+.fv-buy-line select { border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); color: var(--erp-ink); border-radius: 12px; padding: 10px 12px; font: inherit; min-width: 0; width: 100%; }
+.fv-buy-line select:focus { outline: none; border-color: var(--erp-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--erp-accent) 22%, transparent); }
+.fv-buy-hint { grid-column: 1 / -1; color: var(--erp-muted); font-size: 12px; font-weight: 500; }
+.fv-client-form select { border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); color: var(--erp-ink); border-radius: 14px; padding: 12px 14px; font: inherit; }
+@media (max-width: 720px) { .fv-buy-line select { grid-column: 1 / -1; } }

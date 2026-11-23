@@ -10,6 +10,8 @@ import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
 import type { ReceiptRow } from "@/lib/erp/receipts";
 import ClientsBoard from "@/components/erp/ClientsBoard";
 import CashBoard from "@/components/erp/CashBoard";
+import PurchasesBoard, { type PurchaseProduct } from "@/components/erp/PurchasesBoard";
+import type { PurchaseRow } from "@/lib/erp/purchases";
 import type { CashMove, DayClosing } from "@/lib/erp/cash";
 import type { DaySummary } from "@/lib/dayclose";
 import { limaDate } from "@/lib/erp/receipts";
@@ -19,6 +21,7 @@ const liveProducts = ["products"] as const;
 const liveReceipts = ["invoices"] as const;
 const liveClients = ["clients", "credit_ledger", "invoices"] as const;
 const liveCash = ["cash_movements", "payments", "invoices", "credit_ledger"] as const;
+const livePurchases = ["products"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
@@ -61,6 +64,25 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los comprobantes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} />}
+    </>;
+  }
+  if (id === "compras") {
+    // The mobile «Compras y recepción»: retail_receive moves stock, cost, kardex, expense and till together.
+    if (!c.access.is_admin) return <><section className="fv-heading"><p className="fv-eyebrow">COMPRAS / {c.organization.name}</p><h1>Compras</h1></section><div className="fv-empty"><h2>Solo el dueño o un administrador</h2><p>Las compras mueven el stock, el costo y la caja; pídele acceso al dueño.</p></div></>;
+    const [receipts, products] = await Promise.all([
+      c.db.from("retail_receipts").select("id,supplier_name,document_ref,payment_method,total_cents,created_at,items:retail_receipt_items(product_id,quantity,unit_cost_cents,line_total_cents,stock_before,stock_after,product:products(name)),paid:retail_purchase_settlements(method,paid_cents,created_at)")
+        .eq("org_id", org).gt("total_cents", 0).order("created_at", { ascending: false }).limit(200),
+      c.db.from("products").select("id,name,unit_cost,stock").eq("org_id", org).eq("active", true).eq("unit", "NIU").order("name").limit(1000),
+    ]);
+    type Raw = Omit<PurchaseRow, "items" | "paid" | "total_cents"> & { total_cents: number | string; items: (Omit<PurchaseRow["items"][number], "name"> & { product: { name: string } | { name: string }[] | null })[]; paid: PurchaseRow["paid"] | NonNullable<PurchaseRow["paid"]>[] };
+    const rows: PurchaseRow[] = ((receipts.data ?? []) as unknown as Raw[]).map(r => ({
+      ...r, total_cents: Number(r.total_cents),
+      items: (r.items ?? []).map(({ product, ...i }) => ({ ...i, name: (Array.isArray(product) ? product[0]?.name : product?.name) ?? "Producto", quantity: Number(i.quantity), unit_cost_cents: Number(i.unit_cost_cents), line_total_cents: Number(i.line_total_cents), stock_before: Number(i.stock_before), stock_after: Number(i.stock_after) })),
+      paid: (Array.isArray(r.paid) ? r.paid[0] : r.paid) ?? null,
+    }));
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">COMPRAS / {c.organization.name}</p><LiveRefresh org={org} tables={livePurchases} /></div><h1>Compras a proveedores</h1><p>Registra lo que te llega: el stock, el costo y la caja se actualizan juntos, igual que en el móvil. Lleva lo que debes a cada proveedor.</p></section>
+      {receipts.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar las compras</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <PurchasesBoard org={org} rows={rows} products={((products.data ?? []) as PurchaseProduct[]).map(p => ({ ...p, unit_cost: p.unit_cost === null ? null : Number(p.unit_cost), stock: p.stock === null ? null : Number(p.stock) }))} currency={c.organization.currency || "PEN"} month={limaDate(new Date()).slice(0, 7)} />}
     </>;
   }
   if (id === "caja") {

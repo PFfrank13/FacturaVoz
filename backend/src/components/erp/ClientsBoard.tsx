@@ -36,7 +36,7 @@ export default function ClientsBoard({ org, clients, currency, canFiado }: { org
       </div>
       <button className="fv-button" onClick={() => setOpenId("new")}>Nuevo cliente</button>
     </div>
-    <p className="fv-caption" aria-live="polite">{visible.length} clientes</p>
+    <p className="fv-caption" aria-live="polite">{visible.length} {visible.length === 1 ? "cliente" : "clientes"}</p>
     <ul className="fv-receipts fv-clients">
       {visible.map((c, i) => <li key={c.id} style={{ "--i": Math.min(i, 14) } as React.CSSProperties}>
         <button onClick={() => setOpenId(c.id)} aria-label={`${c.name}${c.balance > 0 ? `, debe ${fmt(c.balance, currency)}` : ""}`}>
