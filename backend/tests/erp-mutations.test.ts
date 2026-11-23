@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ context: vi.fn(), insert: vi.fn(), from: vi.fn() }));
 vi.mock("@/lib/erp/context", () => ({ workspaceContext: mock.context }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/lookup", () => ({ lookupDocument: vi.fn() }));
 import { createRecord } from "../src/app/erp/actions";
 const previous = { ok: false, message: "" };
 beforeEach(() => {
