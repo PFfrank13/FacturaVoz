@@ -5,6 +5,8 @@ import { modules, moduleAllowed, featureLimit, can, hasFeature } from "@/lib/erp
 import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
 import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
+import { ExpiryOverview } from "@/components/erp/LotsAndLosses";
+import type { LossRow, LotStatus } from "@/lib/erp/lots";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
 import type { ReceiptRow } from "@/lib/erp/receipts";
@@ -13,7 +15,7 @@ import CashBoard from "@/components/erp/CashBoard";
 import PurchasesBoard, { type PurchaseProduct } from "@/components/erp/PurchasesBoard";
 import PaymentsBoard from "@/components/erp/PaymentsBoard";
 import { monthBounds, parseMonth, type PaymentRow } from "@/lib/erp/payments";
-import type { PurchaseRow } from "@/lib/erp/purchases";
+import { lastSupplierByProduct, suggestOrder, type PurchaseRow, type Velocity } from "@/lib/erp/purchases";
 import type { CashMove, DayClosing } from "@/lib/erp/cash";
 import type { DaySummary } from "@/lib/dayclose";
 import { limaDate, parseRange } from "@/lib/erp/receipts";
@@ -25,6 +27,7 @@ const liveClients = ["clients", "credit_ledger", "invoices"] as const;
 const liveCash = ["cash_movements", "payments", "invoices", "credit_ledger"] as const;
 const livePurchases = ["products"] as const;
 const livePayments = ["payments"] as const;
+const liveInventory = ["products", "product_lots", "stock_losses"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
@@ -76,10 +79,11 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   if (id === "compras") {
     // The mobile «Compras y recepción»: retail_receive moves stock, cost, kardex, expense and till together.
     if (!c.access.is_admin) return <><section className="fv-heading"><p className="fv-eyebrow">COMPRAS / {c.organization.name}</p><h1>Compras</h1></section><div className="fv-empty"><h2>Solo el dueño o un administrador</h2><p>Las compras mueven el stock, el costo y la caja; pídele acceso al dueño.</p></div></>;
-    const [receipts, products] = await Promise.all([
+    const [receipts, products, velocity] = await Promise.all([
       c.db.from("retail_receipts").select("id,supplier_name,document_ref,payment_method,total_cents,created_at,items:retail_receipt_items(product_id,quantity,unit_cost_cents,line_total_cents,stock_before,stock_after,product:products(name)),paid:retail_purchase_settlements(method,paid_cents,created_at)")
         .eq("org_id", org).gt("total_cents", 0).order("created_at", { ascending: false }).limit(200),
-      c.db.from("products").select("id,name,unit_cost,stock").eq("org_id", org).eq("active", true).eq("unit", "NIU").order("name").limit(1000),
+      c.db.from("products").select("id,name,unit,unit_cost,stock").eq("org_id", org).eq("active", true).in("unit", ["NIU", "KGM"]).order("name").limit(1000),
+      c.db.rpc("product_velocity", { p_org: org, p_days: 30 }),
     ]);
     type Raw = Omit<PurchaseRow, "items" | "paid" | "total_cents"> & { total_cents: number | string; items: (Omit<PurchaseRow["items"][number], "name"> & { product: { name: string } | { name: string }[] | null })[]; paid: PurchaseRow["paid"] | NonNullable<PurchaseRow["paid"]>[] };
     const rows: PurchaseRow[] = ((receipts.data ?? []) as unknown as Raw[]).map(r => ({
@@ -89,7 +93,8 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     }));
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">COMPRAS / {c.organization.name}</p><LiveRefresh org={org} tables={livePurchases} /></div><h1>Compras a proveedores</h1><p>Registra lo que te llega: el stock, el costo y la caja se actualizan juntos, igual que en el móvil. Lleva lo que debes a cada proveedor.</p></section>
       {receipts.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar las compras</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
-        : <PurchasesBoard org={org} rows={rows} products={((products.data ?? []) as PurchaseProduct[]).map(p => ({ ...p, unit_cost: p.unit_cost === null ? null : Number(p.unit_cost), stock: p.stock === null ? null : Number(p.stock) }))} currency={c.organization.currency || "PEN"} month={limaDate(new Date()).slice(0, 7)} />}
+        : <PurchasesBoard org={org} rows={rows} products={((products.data ?? []) as PurchaseProduct[]).map(p => ({ ...p, unit_cost: p.unit_cost === null ? null : Number(p.unit_cost), stock: p.stock === null ? null : Number(p.stock) }))} currency={c.organization.currency || "PEN"} month={limaDate(new Date()).slice(0, 7)}
+            suggestions={suggestOrder(((velocity.data ?? []) as Velocity[]).filter(v => ((products.data ?? []) as PurchaseProduct[]).some(p => p.id === v.product_id)), lastSupplierByProduct(rows))} />}
     </>;
   }
   if (id === "cobros") {
@@ -152,10 +157,32 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     const signed = paths.length ? await c.db.storage.from("org-media").createSignedUrls(paths, 3600) : { data: [] };
     const urls = new Map((signed.data ?? []).map(s => [s.path, s.signedUrl] as const));
     const products: ProductRow[] = rows.map(r => ({ ...r, photo_url: r.image_path ? urls.get(r.image_path) ?? null : null }));
-    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{id === "inventario" ? "EXISTENCIAS" : "CATÁLOGO"} / {c.organization.name}</p><LiveRefresh org={org} tables={liveProducts} /></div><h1>{title}</h1><p>El mismo catálogo que vende el móvil. Lo que cambies aquí aparece allá al instante, y al revés.</p></section>
+    // Expiry dates and shrinkage live in Inventario (stock feature); the catalog view stays as it was.
+    const inventory = id === "inventario";
+    const today = limaDate(new Date());
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const [lotRes, lossRes, members, sales] = inventory ? await Promise.all([
+      c.db.rpc("lot_status", { p_org: org }),
+      c.db.from("stock_losses").select("id,product_id,quantity,reason,note,unit_cost,created_at,user_id,product:products(name),lot:product_lots(lot_code,expires_on)")
+        .eq("org_id", org).gte("created_at", `${monthStart}T05:00:00Z`).order("created_at", { ascending: false }).limit(300),
+      c.db.from("organization_members").select("user_id,display_name").eq("org_id", org),
+      can(c.access, "finance") ? c.db.rpc("sales_summary", { p_org: org, p_from: monthStart, p_to: today, p_currency: c.organization.currency || "PEN" }) : Promise.resolve({ data: null }),
+    ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: null }];
+    const lots = ((lotRes.data ?? []) as LotStatus[]).map(l => ({ ...l, quantity: Number(l.quantity), remaining: Number(l.remaining), days_left: Number(l.days_left), unit_cost: l.unit_cost == null ? null : Number(l.unit_cost), unit_price: l.unit_price == null ? null : Number(l.unit_price) }));
+    const names = new Map(((members.data ?? []) as { user_id: string; display_name: string | null }[]).map(m => [m.user_id, m.display_name] as const));
+    const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] : v) ?? null;
+    type RawLoss = Omit<LossRow, "product_name" | "lot_code" | "expires_on" | "user_name" | "quantity" | "unit_cost"> & { quantity: number | string; unit_cost: number | string | null; user_id: string; product: unknown; lot: unknown };
+    const losses: LossRow[] = ((lossRes.data ?? []) as unknown as RawLoss[]).map(r => {
+      const lot = first(r.lot as { lot_code: string | null; expires_on: string } | null);
+      return { id: r.id, product_id: r.product_id, quantity: Number(r.quantity), reason: r.reason, note: r.note, unit_cost: r.unit_cost == null ? null : Number(r.unit_cost), created_at: r.created_at,
+        product_name: first(r.product as { name: string } | null)?.name ?? "Producto", lot_code: lot?.lot_code ?? null, expires_on: lot?.expires_on ?? null, user_name: names.get(r.user_id) ?? null };
+    });
+    const salesTotal = sales.data ? Number((sales.data as { sales_total?: number | string }).sales_total ?? 0) : null;
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{inventory ? "EXISTENCIAS" : "CATÁLOGO"} / {c.organization.name}</p><LiveRefresh org={org} tables={inventory ? liveInventory : liveProducts} /></div><h1>{title}</h1><p>{inventory ? "Stock, fechas de vencimiento y mermas con su motivo. Es el mismo inventario que vende el móvil." : "El mismo catálogo que vende el móvil. Lo que cambies aquí aparece allá al instante, y al revés."}</p></section>
       {can(c.access, "products_edit") && id === "productos" && <CreateRecord org={org} moduleId={id} />}
+      {inventory && !lotRes.error && <ExpiryOverview org={org} lots={lots} losses={losses} currency={c.organization.currency || "PEN"} salesTotal={salesTotal} canEdit={can(c.access, "products_edit")} />}
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los productos</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
-        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} canKardex={c.access.is_admin === true} />}
+        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} canKardex={c.access.is_admin === true} canLots={inventory} />}
     </>;
   }
   const rawPage = Number((await searchParams).page ?? 1);

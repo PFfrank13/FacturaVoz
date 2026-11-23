@@ -53,13 +53,16 @@ export function attentionList(o: {
   payables?: { count: number; amount: string } | null;
   till?: "sin_apertura" | "abierta" | "cerrada" | null;
   afterHours?: boolean;
+  expiry?: { expired: number; week: number; weekValue: string } | null;
 }): Attention[] {
   const out: Attention[] = [];
+  if (o.expiry?.expired) out.push({ id: "vencidos", tone: "bad", text: o.expiry.expired === 1 ? "Un lote vencido sigue en el anaquel." : `${o.expiry.expired} lotes vencidos siguen en el anaquel.`, action: "Retirar como merma", href: `${o.base}/inventario` });
   if (o.sunatProblems) out.push({ id: "sunat", tone: "bad", text: o.sunatProblems === 1 ? "Un comprobante no llegó bien a SUNAT." : `${o.sunatProblems} comprobantes no llegaron bien a SUNAT.`, action: "Revisar comprobantes", href: `${o.base}/comprobantes` });
   if (o.lowStock?.length) {
     const names = o.lowStock.slice(0, 3).map(p => p.name).join(", ");
     out.push({ id: "stock", tone: "bad", text: o.lowStock.length === 1 ? `Se está acabando ${names}.` : `${o.lowStock.length} productos bajo su mínimo: ${names}${o.lowStock.length > 3 ? " y más" : ""}.`, action: "Registrar compra", href: `${o.base}/compras` });
   }
+  if (o.expiry?.week) out.push({ id: "por-vencer", tone: "wait", text: `${o.expiry.week === 1 ? "Un lote vence" : `${o.expiry.week} lotes vencen`} esta semana (${o.expiry.weekValue}): ponlos adelante o rebájalos.`, action: "Ver vencimientos", href: `${o.base}/inventario` });
   if (o.overdueFiado?.count) out.push({ id: "fiado", tone: "wait", text: `${o.overdueFiado.count === 1 ? "Un cliente tiene" : `${o.overdueFiado.count} clientes tienen`} fiado vencido o sobre su límite (${o.overdueFiado.amount}).`, action: "Ver clientes", href: `${o.base}/clientes` });
   if (o.payables?.count) out.push({ id: "pagar", tone: "wait", text: `Debes ${o.payables.amount} a proveedores en ${o.payables.count === 1 ? "una compra" : `${o.payables.count} compras`}.`, action: "Ver compras", href: `${o.base}/compras` });
   if (o.till === "sin_apertura") out.push({ id: "caja", tone: "wait", text: "La caja de hoy aún no se abre.", action: "Abrir caja", href: `${o.base}/caja` });

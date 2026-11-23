@@ -9,6 +9,7 @@ import { closeDay } from "@/lib/dayclose-core";
 import { parseAmount } from "@/lib/erp/cash";
 import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
 import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
+import { lossProblem, type LotStatus } from "@/lib/erp/lots";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
@@ -332,7 +333,7 @@ const purchaseSchema = z.object({
   supplier: z.string().max(120),
   reference: z.string().max(40),
   payment_method: z.enum(["pendiente", "efectivo", "yape", "plin", "transferencia", "tarjeta"]),
-  lines: z.array(z.object({ product_id: uuid, quantity: z.number(), unit_cost: z.number() })).min(1).max(50),
+  lines: z.array(z.object({ product_id: uuid, quantity: z.number(), unit_cost: z.number(), expires_on: z.union([z.literal(""), z.iso.date()]).optional() })).min(1).max(50),
 });
 
 const dbMessage = (message: string | undefined, fallback: string) =>
@@ -356,8 +357,15 @@ export async function receivePurchase(org: string, input: { request_id: string; 
   });
   const row = Array.isArray(data) ? data[0] as { receipt_id?: string; reused?: boolean } | undefined : undefined;
   if (error || !row?.receipt_id) return { ok: false, message: dbMessage(error?.message, "No se pudo registrar la compra. Inténtalo de nuevo: no se duplicará.") };
+  // Expiry dates go right after the receipt (retail_set_lots replaces the lots of that receipt, so a retry is safe).
+  const lots = d.lines.filter(l => l.expires_on).map(l => ({ product_id: l.product_id, expires_on: l.expires_on, quantity: Math.round(l.quantity * 100) / 100 }));
+  let lotNote = "";
+  if (lots.length) {
+    const set = await ctx.c.db.rpc("retail_set_lots", { p_org: org, p_receipt: row.receipt_id, p_lots: lots });
+    lotNote = set.error ? " No se guardaron las fechas de vencimiento: añádelas desde la ficha del producto." : ` Se ${lots.length === 1 ? "guardó una fecha" : `guardaron ${lots.length} fechas`} de vencimiento.`;
+  }
   revalidatePath(`/erp/${org}`, "layout");
-  return { ok: true, id: row.receipt_id, message: row.reused ? "Esta compra ya estaba registrada; no se duplicó el stock." : "Compra recibida: el stock y el costo ya se actualizaron en el móvil." };
+  return { ok: true, id: row.receipt_id, message: (row.reused ? "Esta compra ya estaba registrada; no se duplicó el stock." : "Compra recibida: el stock y el costo ya se actualizaron en el móvil.") + lotNote };
 }
 
 const settleSchema = z.object({ receipt: uuid, request_id: uuid, method: z.enum(["efectivo", "yape", "plin", "transferencia", "tarjeta"]), evidence: z.string().trim().max(200) });
@@ -383,10 +391,85 @@ export async function getKardex(org: string, productId: string): Promise<{ ok: t
   const catalog = modules.find(m => m.id === "productos")!;
   if (!moduleAllowed(entry, c.license, c.access, c.sector) && !moduleAllowed(catalog, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
   if (!c.access.is_admin) return { ok: false, message: "El kardex lo ve el dueño o un administrador." };
-  const [buys, sales] = await Promise.all([
+  const [buys, sales, losses] = await Promise.all([
     c.db.from("retail_inventory_events").select("created_at,quantity_delta,stock_before,stock_after,receipt:retail_receipts(supplier_name,document_ref)").eq("org_id", org).eq("product_id", productId).order("created_at", { ascending: false }).limit(30),
     c.db.from("retail_sale_stock_events").select("created_at,quantity_delta,stock_before,stock_after,invoice:invoices(number)").eq("org_id", org).eq("product_id", productId).order("created_at", { ascending: false }).limit(30),
+    c.db.from("stock_losses").select("created_at,quantity,stock_before,stock_after,reason,note").eq("org_id", org).eq("product_id", productId).order("created_at", { ascending: false }).limit(30),
   ]);
   if (buys.error || sales.error) return { ok: false, message: "No se pudo cargar el kardex." };
-  return { ok: true, rows: mergeKardex(buys.data ?? [], sales.data ?? []) };
+  return { ok: true, rows: mergeKardex(buys.data ?? [], sales.data ?? [], 30, losses.data ?? []) };
+}
+
+/** Inventory context: lots and shrinkage move stock, so only roles with products_edit (owner, admin, finance). */
+async function inventoryContext(org: string) {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "inventario")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  if (!can(c.access, "products_edit")) return { c: null, error: "Las mermas y los lotes los registra el dueño, un administrador o finanzas." } as const;
+  return { c, error: "" } as const;
+}
+
+const lossSchema = z.object({
+  request_id: uuid, product_id: uuid, quantity: z.string().max(20), reason: z.string().max(20),
+  lot_id: z.union([z.literal(""), uuid]).default(""), note: optional(200).default(""),
+});
+
+/** Shrinkage with a reason: lowers stock and records who, how much, why and at what cost (record_loss, idempotent). */
+export async function recordLoss(org: string, stock: number | null, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await inventoryContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = lossSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Revisa la cantidad y el motivo." };
+  const d = parsed.data;
+  const quantity = parseAmount(d.quantity);
+  const problem = lossProblem(quantity, d.reason, d.note, stock);
+  if (problem) return { ok: false, message: problem };
+  const { error } = await ctx.c.db.rpc("record_loss", {
+    p_org: org, p_request_id: d.request_id, p_product: d.product_id, p_quantity: Math.round(quantity! * 100) / 100,
+    p_reason: d.reason, p_lot: d.lot_id || null, p_note: d.note || null,
+  });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo registrar la merma. Inténtalo de nuevo: no se duplicará.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Merma registrada: el stock ya bajó también en el móvil." };
+}
+
+const lotSchema = z.object({ expires_on: z.iso.date(), quantity: z.string().max(20), lot_code: optional(40).default("") });
+
+/** Expiry date for stock already on the shelf (no purchase recorded). */
+export async function addLot(org: string, productId: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(productId).success) return { ok: false, message: "Producto no válido." };
+  const ctx = await inventoryContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = lotSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Elige la fecha de vencimiento." };
+  const quantity = parseAmount(parsed.data.quantity);
+  if (quantity == null || !(quantity > 0)) return { ok: false, message: "Escribe cuántas unidades vencen en esa fecha." };
+  const { error } = await ctx.c.db.rpc("product_lot_add", { p_org: org, p_product: productId, p_expires: parsed.data.expires_on, p_quantity: Math.round(quantity * 100) / 100, p_code: parsed.data.lot_code || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar el lote.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Fecha de vencimiento guardada." };
+}
+
+export async function removeLot(org: string, lotId: string): Promise<FormResult> {
+  if (!uuid.safeParse(lotId).success) return { ok: false, message: "Lote no válido." };
+  const ctx = await inventoryContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.rpc("product_lot_remove", { p_org: org, p_lot: lotId });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo quitar el lote.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Lote quitado." };
+}
+
+/** Lots of one product with what is left of each (FEFO), for its sheet. */
+export async function getProductLots(org: string, productId: string): Promise<{ ok: true; lots: LotStatus[] } | { ok: false; message: string }> {
+  if (!uuid.safeParse(productId).success) return { ok: false, message: "Producto no válido." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "inventario")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  const { data, error } = await c.db.rpc("lot_status", { p_org: org });
+  if (error) return { ok: false, message: "No se pudieron cargar los vencimientos." };
+  const lots = ((data ?? []) as LotStatus[]).filter(l => l.product_id === productId)
+    .map(l => ({ ...l, quantity: Number(l.quantity), remaining: Number(l.remaining), days_left: Number(l.days_left) }))
+    .sort((a, b) => a.expires_on.localeCompare(b.expires_on));
+  return { ok: true, lots };
 }

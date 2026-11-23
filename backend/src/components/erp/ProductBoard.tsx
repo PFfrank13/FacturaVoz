@@ -3,6 +3,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getKardex, updateProduct, uploadProductPhoto, type FormResult } from "@/app/erp/actions";
 import { kardexTotals, type KardexEntry } from "@/lib/erp/kardex";
+import { ProductLots } from "@/components/erp/LotsAndLosses";
 
 export type ProductRow = {
   id: string; name: string; unit_price: number | string; unit: string; active: boolean;
@@ -15,7 +16,7 @@ const fmt = (value: number, currency: string) => new Intl.NumberFormat("es-PE", 
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
 
 /** Catalog administration: the same rows the mobile POS sells from. */
-export default function ProductBoard({ org, rows, currency, canEdit, canKardex = false }: { org: string; rows: ProductRow[]; currency: string; canEdit: boolean; canKardex?: boolean }) {
+export default function ProductBoard({ org, rows, currency, canEdit, canKardex = false, canLots = false }: { org: string; rows: ProductRow[]; currency: string; canEdit: boolean; canKardex?: boolean; canLots?: boolean }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"todos" | "bajo" | "inactivos">("todos");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -49,11 +50,11 @@ export default function ProductBoard({ org, rows, currency, canEdit, canKardex =
       </button>)}
     </div>
     {!visible.length && <div className="fv-empty"><h2>{query || filter !== "todos" ? "Sin coincidencias" : "Todavía no hay productos"}</h2><p>Los productos creados en el móvil o aquí aparecen al instante.</p></div>}
-    {open && <ProductPanel key={open.id} org={org} product={open} currency={currency} canEdit={canEdit} canKardex={canKardex} onClose={() => setOpenId(null)} />}
+    {open && <ProductPanel key={open.id} org={org} product={open} currency={currency} canEdit={canEdit} canKardex={canKardex} canLots={canLots} onClose={() => setOpenId(null)} />}
   </section>;
 }
 
-function ProductPanel({ org, product, currency, canEdit, canKardex, onClose }: { org: string; product: ProductRow; currency: string; canEdit: boolean; canKardex: boolean; onClose: () => void }) {
+function ProductPanel({ org, product, currency, canEdit, canKardex, canLots, onClose }: { org: string; product: ProductRow; currency: string; canEdit: boolean; canKardex: boolean; canLots: boolean; onClose: () => void }) {
   const [state, save, saving] = useActionState(updateProduct.bind(null, org, product.id), empty);
   const [photoState, upload, uploading] = useActionState(uploadProductPhoto.bind(null, org, product.id), empty);
   const [preview, setPreview] = useState<string | null>(null);
@@ -101,6 +102,7 @@ function ProductPanel({ org, product, currency, canEdit, canKardex, onClose }: {
         <dt>Existencias</dt><dd>{product.stock == null ? "No controla stock" : Number(product.stock)}</dd>
         <p className="fv-caption">Tu rol puede consultar el catálogo, pero no editarlo.</p>
       </dl>}
+      {canLots && product.stock != null && <ProductLots org={org} productId={product.id} unit={product.unit} stock={Number(product.stock)} canEdit={canEdit} />}
       {canKardex && product.stock != null && <Kardex org={org} productId={product.id} />}
     </div>
   </div>;
@@ -130,11 +132,11 @@ function Kardex({ org, productId }: { org: string; productId: string }) {
     <h3>Kardex</h3>
     {!data ? <div className="fv-skeleton" aria-label="Cargando kardex"><i /><i /></div>
       : !data.ok ? <p role="alert" className="fv-error">{data.message}</p>
-      : !data.rows.length ? <p className="fv-muted">Aún no hay compras ni ventas que hayan movido su stock.</p>
+      : !data.rows.length ? <p className="fv-muted">Aún no hay compras, ventas ni mermas que hayan movido su stock.</p>
       : <>
         <p className="fv-muted">Últimos movimientos: entraron {units(totals!.entered)} y salieron {units(totals!.left)} unidades.</p>
         <ul className="fv-lines fv-ledger">{data.rows.map((r: KardexEntry, i: number) => <li key={i}>
-          <span><b className={r.delta > 0 ? "is-in" : "is-out"}>{r.kind === "compra" ? "Compra" : "Venta"}</b> {when(r.at)} · {r.ref}</span>
+          <span><b className={r.delta > 0 ? "is-in" : "is-out"}>{r.kind === "compra" ? "Compra" : r.kind === "merma" ? "Merma" : "Venta"}</b> {when(r.at)} · {r.ref}</span>
           <span>{r.delta > 0 ? "+" : ""}{units(r.delta)} → {units(r.after)}</span>
         </li>)}</ul>
       </>}

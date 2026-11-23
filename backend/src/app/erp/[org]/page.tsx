@@ -4,8 +4,9 @@ import { can, licenseReady, moduleAllowed, modules, sectors, visibleModules } fr
 import { limaDate } from "@/lib/erp/receipts";
 import { attentionList, hourLabel, hourlyRhythm, monthChange, topProducts, OPEN_HOURS } from "@/lib/erp/dashboard";
 import LiveRefresh from "@/components/erp/LiveRefresh";
+import { summarizeLots, type LotStatus } from "@/lib/erp/lots";
 
-const liveHome = ["invoices", "products", "cash_movements", "credit_ledger"] as const;
+const liveHome = ["invoices", "products", "cash_movements", "credit_ledger", "product_lots", "stock_losses"] as const;
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 type Summary = { sales_total?: number | string; sales_count?: number } | null;
 
@@ -34,7 +35,7 @@ export default async function Dashboard({ params }: { params: Promise<{ org: str
   const rpc = (from: string, to: string) => c.db.rpc("sales_summary", { p_org: org, p_from: from, p_to: to, p_currency: cur });
   const none = Promise.resolve({ data: null, error: null });
 
-  const [dayS, monthS, prevS, daySales, monthItems, stock, balances, sunat, payables, opening, closing] = await Promise.all([
+  const [dayS, monthS, prevS, daySales, monthItems, stock, balances, sunat, payables, opening, closing, lotRes] = await Promise.all([
     finance ? rpc(today, tomorrow) : none,
     finance ? rpc(monthStart, tomorrow) : none,
     finance ? rpc(prevStart, prevSameDay) : none,
@@ -46,6 +47,7 @@ export default async function Dashboard({ params }: { params: Promise<{ org: str
     allowed("compras") && c.access.is_admin ? c.db.from("retail_receipts").select("total_cents,paid:retail_purchase_settlements(id)").eq("org_id", org).eq("payment_method", "pendiente").gt("total_cents", 0).limit(500) : none,
     allowed("caja") ? c.db.from("cash_movements").select("id", { count: "exact", head: true }).eq("org_id", org).eq("day", today).eq("kind", "apertura") : none,
     allowed("caja") ? c.db.from("day_closings").select("id").eq("org_id", org).eq("day", today).maybeSingle() : none,
+    allowed("inventario") ? c.db.rpc("lot_status", { p_org: org }) : none,
   ]);
 
   const day = (dayS.data ?? null) as Summary;
@@ -62,12 +64,14 @@ export default async function Dashboard({ params }: { params: Promise<{ org: str
     .filter(b => Number(b.balance) > 0 && ((b.oldest_due && b.oldest_due < today) || (b.credit_limit && Number(b.balance) > Number(b.credit_limit))));
   const pend = ((payables.data ?? []) as { total_cents: number; paid: unknown[] | null }[]).filter(p => !(p.paid ?? []).length);
   const till = !allowed("caja") ? null : closing.data ? "cerrada" : (opening as { count?: number | null }).count ? "abierta" : "sin_apertura";
+  const lotSum = lotRes.data ? summarizeLots(((lotRes.data ?? []) as LotStatus[]).map(l => ({ ...l, remaining: Number(l.remaining), days_left: Number(l.days_left) }))) : null;
   const todo = attentionList({
     base, lowStock: allowed("inventario") ? low : null,
     overdueFiado: owed.length ? { count: owed.length, amount: money(owed.reduce((a, b) => a + Number(b.balance), 0)) } : null,
     sunatProblems: (sunat as { count?: number | null }).count ?? null,
     payables: pend.length ? { count: pend.length, amount: money(pend.reduce((a, p) => a + Number(p.total_cents), 0) / 100) } : null,
     till, afterHours: nowHour >= 21,
+    expiry: lotSum && (lotSum.vencido.count || lotSum.semana.count) ? { expired: lotSum.vencido.count, week: lotSum.semana.count, weekValue: money(lotSum.semana.value) } : null,
   });
   const dateLine = new Intl.DateTimeFormat("es-PE", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Lima" }).format(new Date());
   const monthName = new Intl.DateTimeFormat("es-PE", { month: "long", timeZone: "UTC" }).format(new Date(`${monthStart}T12:00:00Z`)).toLocaleLowerCase("es");
@@ -99,7 +103,7 @@ export default async function Dashboard({ params }: { params: Promise<{ org: str
       <section className="fv-home-card">
         <h2>Para resolver hoy</h2>
         {todo.length ? <ul className="fv-todo">{todo.map(t => <li key={t.id} className={`is-${t.tone}`}><p>{t.text}</p><Link href={t.href}>{t.action}</Link></li>)}</ul>
-          : <p className="fv-muted">Todo en orden: sin stock bajo, fiados vencidos ni comprobantes con problemas.</p>}
+          : <p className="fv-muted">Todo en orden: sin vencidos, stock bajo, fiados vencidos ni comprobantes con problemas.</p>}
       </section>
       {finance ? <section className="fv-home-card">
         <h2>Lo que más se vende en {monthName}</h2>
