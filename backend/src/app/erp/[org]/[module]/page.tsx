@@ -127,7 +127,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{id === "inventario" ? "EXISTENCIAS" : "CATÁLOGO"} / {c.organization.name}</p><LiveRefresh org={org} tables={liveProducts} /></div><h1>{title}</h1><p>El mismo catálogo que vende el móvil. Lo que cambies aquí aparece allá al instante, y al revés.</p></section>
       {can(c.access, "products_edit") && id === "productos" && <CreateRecord org={org} moduleId={id} />}
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los productos</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
-        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} />}
+        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} canKardex={c.access.is_admin === true} />}
     </>;
   }
   const rawPage = Number((await searchParams).page ?? 1);

@@ -64,7 +64,10 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 - [x] Compras y proveedores: registrar compra (stock, costo, kardex, gasto y
       salida de caja en una transacción `retail_receive`, idempotente), cuentas
       por pagar a proveedores y su pago (`retail_settle`).
-- [ ] Inventario: vencimientos, mermas, kardex.
+- [x] Inventario: kardex por producto (compras y ventas con stock resultante).
+- [ ] Inventario: vencimientos por lote y mermas con motivo. **Requiere decisión
+      del propietario:** una migración nueva (tablas de lotes y mermas) que debe
+      aplicarse en producción con el procedimiento de seguridad.
 
 ### 5. ERP web — Panel y diseño
 - [ ] Inicio con ventas del día/mes, ticket promedio, top productos, stock bajo,
@@ -95,3 +98,5 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   bloqueado sin motivo y guardado con motivo.
 - 23/11/2026: Compras web verificadas en local: 12 × Arroz a S/ 3.80 «por
   pagar» (stock 20 → 32, costo actualizado) y pago en efectivo posterior.
+- 23/11/2026: Kardex en la ficha del producto (solo dueño/administrador, como
+  exige RLS), verificado con la compra local (+12 → 32).

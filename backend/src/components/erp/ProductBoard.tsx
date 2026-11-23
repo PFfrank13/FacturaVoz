@@ -1,7 +1,8 @@
 "use client";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { updateProduct, uploadProductPhoto, type FormResult } from "@/app/erp/actions";
+import { getKardex, updateProduct, uploadProductPhoto, type FormResult } from "@/app/erp/actions";
+import { kardexTotals, type KardexEntry } from "@/lib/erp/kardex";
 
 export type ProductRow = {
   id: string; name: string; unit_price: number | string; unit: string; active: boolean;
@@ -14,7 +15,7 @@ const fmt = (value: number, currency: string) => new Intl.NumberFormat("es-PE", 
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
 
 /** Catalog administration: the same rows the mobile POS sells from. */
-export default function ProductBoard({ org, rows, currency, canEdit }: { org: string; rows: ProductRow[]; currency: string; canEdit: boolean }) {
+export default function ProductBoard({ org, rows, currency, canEdit, canKardex = false }: { org: string; rows: ProductRow[]; currency: string; canEdit: boolean; canKardex?: boolean }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"todos" | "bajo" | "inactivos">("todos");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -48,11 +49,11 @@ export default function ProductBoard({ org, rows, currency, canEdit }: { org: st
       </button>)}
     </div>
     {!visible.length && <div className="fv-empty"><h2>{query || filter !== "todos" ? "Sin coincidencias" : "Todavía no hay productos"}</h2><p>Los productos creados en el móvil o aquí aparecen al instante.</p></div>}
-    {open && <ProductPanel key={open.id} org={org} product={open} currency={currency} canEdit={canEdit} onClose={() => setOpenId(null)} />}
+    {open && <ProductPanel key={open.id} org={org} product={open} currency={currency} canEdit={canEdit} canKardex={canKardex} onClose={() => setOpenId(null)} />}
   </section>;
 }
 
-function ProductPanel({ org, product, currency, canEdit, onClose }: { org: string; product: ProductRow; currency: string; canEdit: boolean; onClose: () => void }) {
+function ProductPanel({ org, product, currency, canEdit, canKardex, onClose }: { org: string; product: ProductRow; currency: string; canEdit: boolean; canKardex: boolean; onClose: () => void }) {
   const [state, save, saving] = useActionState(updateProduct.bind(null, org, product.id), empty);
   const [photoState, upload, uploading] = useActionState(uploadProductPhoto.bind(null, org, product.id), empty);
   const [preview, setPreview] = useState<string | null>(null);
@@ -100,6 +101,7 @@ function ProductPanel({ org, product, currency, canEdit, onClose }: { org: strin
         <dt>Existencias</dt><dd>{product.stock == null ? "No controla stock" : Number(product.stock)}</dd>
         <p className="fv-caption">Tu rol puede consultar el catálogo, pero no editarlo.</p>
       </dl>}
+      {canKardex && product.stock != null && <Kardex org={org} productId={product.id} />}
     </div>
   </div>;
   return root ? createPortal(sheet, root) : sheet;
@@ -110,4 +112,31 @@ function MarginHint({ price, cost }: { price: number; cost: number | null }) {
   if (cost == null || price <= 0) return <p className="fv-margin">Margen: añade el costo</p>;
   const margin = Math.round(((price - cost) / price) * 100);
   return <p className={`fv-margin${margin < 0 ? " is-bad" : ""}`}>Margen guardado: {margin} %</p>;
+}
+
+const when = (iso: string) => new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }).format(new Date(iso));
+const units = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(2));
+
+/** Purchases and sales that moved this product's stock, newest first. */
+function Kardex({ org, productId }: { org: string; productId: string }) {
+  const [data, setData] = useState<Awaited<ReturnType<typeof getKardex>> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getKardex(org, productId).then(d => { if (alive) setData(d); });
+    return () => { alive = false; };
+  }, [org, productId]);
+  const totals = data?.ok ? kardexTotals(data.rows) : null;
+  return <section className="fv-client-block">
+    <h3>Kardex</h3>
+    {!data ? <div className="fv-skeleton" aria-label="Cargando kardex"><i /><i /></div>
+      : !data.ok ? <p role="alert" className="fv-error">{data.message}</p>
+      : !data.rows.length ? <p className="fv-muted">Aún no hay compras ni ventas que hayan movido su stock.</p>
+      : <>
+        <p className="fv-muted">Últimos movimientos: entraron {units(totals!.entered)} y salieron {units(totals!.left)} unidades.</p>
+        <ul className="fv-lines fv-ledger">{data.rows.map((r: KardexEntry, i: number) => <li key={i}>
+          <span><b className={r.delta > 0 ? "is-in" : "is-out"}>{r.kind === "compra" ? "Compra" : "Venta"}</b> {when(r.at)} · {r.ref}</span>
+          <span>{r.delta > 0 ? "+" : ""}{units(r.delta)} → {units(r.after)}</span>
+        </li>)}</ul>
+      </>}
+  </section>;
 }

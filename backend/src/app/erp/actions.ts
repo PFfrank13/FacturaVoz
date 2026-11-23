@@ -8,6 +8,7 @@ import { docTypeOf } from "@/lib/erp/clients";
 import { closeDay } from "@/lib/dayclose-core";
 import { parseAmount } from "@/lib/erp/cash";
 import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
+import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
@@ -349,4 +350,20 @@ export async function settlePurchase(org: string, input: { receipt: string; requ
   if (error) return { ok: false, message: dbMessage(error.message, "No se pudo registrar el pago.") };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: d.method === "efectivo" ? "Pago registrado y descontado de la caja de hoy." : "Pago registrado." };
+}
+
+/** Stock movements of one product (purchases and sales), for the owner or an administrator. */
+export async function getKardex(org: string, productId: string): Promise<{ ok: true; rows: KardexEntry[] } | { ok: false; message: string }> {
+  if (!uuid.safeParse(productId).success) return { ok: false, message: "Producto no válido." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "inventario")!;
+  const catalog = modules.find(m => m.id === "productos")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector) && !moduleAllowed(catalog, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  if (!c.access.is_admin) return { ok: false, message: "El kardex lo ve el dueño o un administrador." };
+  const [buys, sales] = await Promise.all([
+    c.db.from("retail_inventory_events").select("created_at,quantity_delta,stock_before,stock_after,receipt:retail_receipts(supplier_name,document_ref)").eq("org_id", org).eq("product_id", productId).order("created_at", { ascending: false }).limit(30),
+    c.db.from("retail_sale_stock_events").select("created_at,quantity_delta,stock_before,stock_after,invoice:invoices(number)").eq("org_id", org).eq("product_id", productId).order("created_at", { ascending: false }).limit(30),
+  ]);
+  if (buys.error || sales.error) return { ok: false, message: "No se pudo cargar el kardex." };
+  return { ok: true, rows: mergeKardex(buys.data ?? [], sales.data ?? []) };
 }
