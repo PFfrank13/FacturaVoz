@@ -6,6 +6,8 @@ import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
 import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
 import { ExpiryOverview } from "@/components/erp/LotsAndLosses";
+import InventoryCount from "@/components/erp/InventoryCount";
+import BulkPrices from "@/components/erp/BulkPrices";
 import type { LossRow, LotStatus } from "@/lib/erp/lots";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
@@ -75,7 +77,10 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     const fmt = (v: number) => money(v, cur);
     const short = (d: string) => new Intl.DateTimeFormat("es-PE", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
     return <><section className="fv-heading"><p className="fv-eyebrow">CONTROL COMERCIAL / {c.organization.name}</p><h1>Reportes</h1><p>Ventas emitidas (sin anuladas ni borradores, menos notas de crédito), cobros, compras y merma del periodo.</p></section>
-      <form className="fv-create fv-fiado-form"><label><span>Desde</span><input type="date" name="from" defaultValue={from} required /></label><label><span>Hasta (incluido)</span><input type="date" name="to" defaultValue={to} required /></label><button className="fv-button">Ver periodo</button></form>
+      <form className="fv-create fv-fiado-form"><label><span>Desde</span><input type="date" name="from" defaultValue={from} required /></label><label><span>Hasta (incluido)</span><input type="date" name="to" defaultValue={to} required /></label><button className="fv-button">Ver periodo</button>
+        {valid && can(c.access, "finance") && <><a className="fv-button secondary" href={`/erp/${org}/reportes/registro?tipo=ventas&from=${from}&to=${to}`}>Registro de ventas (CSV)</a>
+          <a className="fv-button secondary" href={`/erp/${org}/reportes/registro?tipo=compras&from=${from}&to=${to}`}>Registro de compras (CSV)</a></>}</form>
+      {valid && can(c.access, "finance") && <p className="fv-muted">Para tu contador: con estos registros compara la propuesta del SIRE de SUNAT antes de aceptarla.</p>}
       {!valid ? <div className="fv-empty" role="alert"><h2>Revisa las fechas</h2><p>Elige un intervalo válido de hasta 366 días.</p></div>
         : summary?.error || !sum ? <div className="fv-empty" role="alert"><h2>No pudimos cargar el reporte</h2><p>Pulsa Actualizar para reintentar.</p></div>
         : <section className="fv-board">
@@ -349,6 +354,10 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     const salesTotal = sales.data ? Number((sales.data as { sales_total?: number | string }).sales_total ?? 0) : null;
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{inventory ? "EXISTENCIAS" : "CATÁLOGO"} / {c.organization.name}</p><LiveRefresh org={org} tables={inventory ? liveInventory : liveProducts} /></div><h1>{title}</h1><p>{inventory ? "Stock, fechas de vencimiento y mermas con su motivo. Es el mismo inventario que vende el móvil." : "El mismo catálogo que vende el móvil. Lo que cambies aquí aparece allá al instante, y al revés."}</p></section>
       {can(c.access, "products_edit") && id === "productos" && <CreateRecord org={org} moduleId={id} />}
+      {can(c.access, "products_edit") && id === "productos" && <div className="fv-actions-row"><BulkPrices org={org} currency={c.organization.currency || "PEN"} taxRate={Number(c.organization.default_tax_rate ?? 18)}
+        products={products.filter(p => p.active && p.unit !== "ZZ").map(p => ({ id: p.id, name: p.name, category: p.category, unit_price: Number(p.unit_price), unit_cost: p.unit_cost == null ? null : Number(p.unit_cost) }))} /></div>}
+      {inventory && can(c.access, "products_edit") && <div className="fv-actions-row"><InventoryCount org={org} currency={c.organization.currency || "PEN"}
+        products={products.filter(p => p.active && p.stock != null).map(p => ({ id: p.id, name: p.name, category: p.category, stock: Number(p.stock), unit: p.unit, unit_cost: p.unit_cost == null ? null : Number(p.unit_cost) }))} /></div>}
       {inventory && !lotRes.error && <ExpiryOverview org={org} lots={lots} losses={losses} currency={c.organization.currency || "PEN"} salesTotal={salesTotal} canEdit={can(c.access, "products_edit")} />}
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los productos</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} canKardex={c.access.is_admin === true} canLots={inventory} />}

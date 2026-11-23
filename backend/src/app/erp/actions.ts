@@ -11,6 +11,7 @@ import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases
 import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
 import { lossProblem, type LotStatus } from "@/lib/erp/lots";
 import { couponProblem, promoProblem } from "@/lib/erp/loyalty";
+import { newShelfPrice, pricingProblem, withTax, withoutTax, type PriceMode } from "@/lib/erp/pricing";
 
 export type FormResult = { ok: boolean; message: string };
 const name = z.string().trim().min(1).max(120);
@@ -627,4 +628,67 @@ export async function transferStock(org: string, input: { request_id: string; to
   const row = Array.isArray(data) ? data[0] as { from_stock?: number; to_stock?: number; reused?: boolean } | undefined : undefined;
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: row?.reused ? "Ese traslado ya estaba registrado." : `Trasladado. Aquí quedan ${Number(row?.from_stock ?? 0)}; en el destino hay ${Number(row?.to_stock ?? 0)}.` };
+}
+
+const countSchema = z.object({ request_id: uuid, lines: z.array(z.object({ product_id: uuid, expected: z.number(), counted: z.number().min(0).max(10_000_000) })).min(1).max(300) });
+
+/**
+ * Applies an inventory count. A shortage is shrinkage («Diferencia de conteo», record_loss: idempotent per line);
+ * a surplus sets the stock to what was counted only if it still has the value that was on screen (no double add).
+ */
+export async function applyCount(org: string, input: { request_id: string; lines: { product_id: string; expected: number; counted: number }[] }): Promise<FormResult> {
+  const ctx = await inventoryContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = countSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Revisa las cantidades contadas." };
+  const { request_id, lines } = parsed.data;
+  let shortages = 0, surpluses = 0, changed = 0;
+  for (const [i, l] of lines.entries()) {
+    const counted = Math.round(l.counted * 100) / 100;
+    const diff = Math.round((counted - l.expected) * 100) / 100;
+    if (diff === 0) continue;
+    if (diff < 0) {
+      // Deterministic id per count and line: a retried click never records the same shortage twice.
+      const lineId = `${request_id.slice(0, 24)}${(i + 1).toString(16).padStart(12, "0")}`;
+      const { error } = await ctx.c.db.rpc("record_loss", { p_org: org, p_request_id: lineId, p_product: l.product_id, p_quantity: -diff, p_reason: "otro", p_lot: null, p_note: "Diferencia de conteo" });
+      if (error) { changed++; continue; }
+      shortages++;
+    } else {
+      const { data, error } = await ctx.c.db.from("products").update({ stock: counted }).eq("org_id", org).eq("id", l.product_id).eq("stock", l.expected).select("id");
+      if (error || !data?.length) { changed++; continue; }
+      surpluses++;
+    }
+  }
+  revalidatePath(`/erp/${org}`, "layout");
+  const done = shortages + surpluses;
+  if (!done) return { ok: false, message: changed ? "El stock cambió mientras contabas (hubo ventas). Vuelve a abrir el conteo." : "No había diferencias que aplicar." };
+  return { ok: true, message: `Conteo aplicado: ${shortages} ${shortages === 1 ? "faltante registrado" : "faltantes registrados"} como merma y ${surpluses} ${surpluses === 1 ? "sobrante sumado" : "sobrantes sumados"}.${changed ? ` ${changed} no se aplicaron porque su stock cambió mientras contabas.` : ""}` };
+}
+
+const bulkSchema = z.object({ ids: z.array(uuid).min(1).max(500), mode: z.string().max(20), value: z.number() });
+
+/** Changes shelf prices (with IGV) of many products at once, rounded to 0.10; stored back without IGV. */
+export async function applyBulkPrices(org: string, input: { ids: string[]; mode: string; value: number }): Promise<FormResult> {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "productos")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector) || !can(c.access, "products_edit")) return { ok: false, message: "Los precios los cambia el dueño, un administrador o finanzas." };
+  const parsed = bulkSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Elige los productos y el cambio." };
+  const { ids, mode, value } = parsed.data;
+  const problem = pricingProblem(mode, value);
+  if (problem) return { ok: false, message: problem };
+  const rate = Number(c.organization.default_tax_rate ?? 18);
+  const { data, error } = await c.db.from("products").select("id,unit_price").eq("org_id", org).in("id", ids);
+  if (error) return { ok: false, message: "No se pudieron leer los productos." };
+  let changed = 0, failed = 0;
+  for (const p of (data ?? []) as { id: string; unit_price: number | string }[]) {
+    const shelf = withTax(Number(p.unit_price), rate);
+    const base = withoutTax(newShelfPrice(shelf, mode as PriceMode, value), rate);
+    if (base === Number(p.unit_price)) continue;
+    const r = await c.db.from("products").update({ unit_price: base }).eq("org_id", org).eq("id", p.id);
+    if (r.error) failed++; else changed++;
+  }
+  revalidatePath(`/erp/${org}`, "layout");
+  if (!changed) return { ok: failed === 0, message: failed ? "No se pudieron cambiar los precios." : "Los precios ya estaban así." };
+  return { ok: true, message: `Precios cambiados en ${changed} ${changed === 1 ? "producto" : "productos"}${failed ? ` (${failed} sin cambiar)` : ""}. Imprime las etiquetas nuevas.` };
 }

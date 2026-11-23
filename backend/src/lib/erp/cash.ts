@@ -77,3 +77,22 @@ export function cashierBreakdown(payments: { user_id: string; method: string; am
   return [...rows.values()].map(r => ({ ...r, cashSales: r2(r.cashSales), digital: r2(r.digital), opening: r2(r.opening), cashIn: r2(r.cashIn), cashOut: r2(r.cashOut),
     expected: r2(r.opening + r.cashSales + r.cashIn - r.cashOut) })).sort((a, b) => b.cashSales + b.digital - (a.cashSales + a.digital) || a.name.localeCompare(b.name, "es"));
 }
+
+/** Quick entries for money that is not a sale (docs/INVESTIGACION_RETAIL.md, row 24): banking agent and top-ups. */
+export const serviceMoves = [
+  { id: "agente_deposito", label: "Depósito de agente", kind: "ingreso", note: "Agente: depósito de cliente" },
+  { id: "agente_retiro", label: "Retiro de agente", kind: "egreso", note: "Agente: retiro de cliente" },
+  { id: "recarga", label: "Recarga o pago de servicio", kind: "ingreso", note: "Recarga / servicio" },
+] as const;
+
+/** Agent and top-up money of the day, apart from sales: what came in, what went out, and the net in the drawer. */
+export function serviceSummary(moves: CashMove[]) {
+  let inflow = 0, outflow = 0, count = 0;
+  for (const m of moves) {
+    if (!m.note || !/^(Agente:|Recarga)/.test(m.note)) continue;
+    count++;
+    if (m.kind === "egreso") outflow += Number(m.amount); else if (m.kind === "ingreso") inflow += Number(m.amount);
+  }
+  const r = (v: number) => Math.round(v * 100) / 100;
+  return { count, inflow: r(inflow), outflow: r(outflow), net: r(inflow - outflow) };
+}

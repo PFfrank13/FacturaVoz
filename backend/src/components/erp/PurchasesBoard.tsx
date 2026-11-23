@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { receivePurchase, settlePurchase } from "@/app/erp/actions";
+import { matchProduct, parseUblInvoice } from "@/lib/erp/ubl";
 import { isPending, lineCents, paymentLabel, purchaseCents, purchaseProblem, summarizePurchases, supplierSuggestions, type OrderSuggestion, type PurchaseLine, type PurchaseRow } from "@/lib/erp/purchases";
 
 export type PurchaseProduct = { id: string; name: string; unit: string; unit_cost: number | null; stock: number | null };
@@ -12,12 +13,33 @@ const day = (iso: string) => new Intl.DateTimeFormat("es-PE", { day: "2-digit", 
 const qty = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(2));
 const newId = () => crypto.randomUUID();
 
+/** What a new purchase starts with: a suggested order or a supplier's XML invoice. */
+type Preset = { supplier: string; reference?: string; note?: string; lines: { product_id: string; quantity: number; unit_cost: number | null; hint?: string }[] };
+
 /** Supplier purchases shared with the mobile «Compras y recepción»: receiving updates stock, cost and the till. */
 export default function PurchasesBoard({ org, rows, products, currency, month, suggestions = [] }: { org: string; rows: PurchaseRow[]; products: PurchaseProduct[]; currency: string; month: string; suggestions?: OrderSuggestion[] }) {
   const [q, setQ] = useState("");
   const [onlyPending, setOnlyPending] = useState(false);
   const [openId, setOpenId] = useState<string | "new" | null>(null);
-  const [preset, setPreset] = useState<{ supplier: string; lines: OrderSuggestion[] } | null>(null);
+  const [preset, setPreset] = useState<Preset | null>(null);
+  const [xmlError, setXmlError] = useState("");
+  async function fromXml(file: File | undefined) {
+    setXmlError("");
+    if (!file) return;
+    if (file.size > 2_000_000) return setXmlError("El archivo es muy grande para ser una factura XML.");
+    const inv = parseUblInvoice(await file.text());
+    if (!inv || !inv.lines.length) return setXmlError("No reconocimos el archivo: sube el XML de la factura electrónica del proveedor.");
+    const lines = inv.lines.slice(0, 50).map(l => ({ product_id: matchProduct(l.description, products) ?? "", quantity: l.quantity, unit_cost: l.unit_cost, hint: l.description }));
+    const missing = lines.filter(l => !l.product_id).length;
+    setPreset({
+      supplier: inv.supplier.slice(0, 120), reference: inv.reference.slice(0, 40),
+      note: [`Factura ${inv.reference} del ${inv.issueDate} por ${fmt(inv.total, currency)}.`,
+        inv.perception ? `Incluye percepción de IGV por ${fmt(inv.perception, currency)}: guárdala, la descuentas en tu declaración.` : "",
+        missing ? `${missing} ${missing === 1 ? "producto no se encontró" : "productos no se encontraron"} en tu catálogo: elígelos en su línea.` : "Todos los productos se encontraron en tu catálogo."].filter(Boolean).join(" "),
+      lines,
+    });
+    setOpenId("new");
+  }
   const s = summarizePurchases(rows, month);
   const visible = useMemo(() => rows.filter(r => (!onlyPending || isPending(r)) && (!q.trim() || `${r.supplier_name} ${r.document_ref ?? ""} ${r.items.map(i => i.name).join(" ")}`.toLocaleLowerCase("es").includes(q.trim().toLocaleLowerCase("es")))), [rows, q, onlyPending]);
   const open = openId && openId !== "new" ? rows.find(r => r.id === openId) ?? null : null;
@@ -34,8 +56,10 @@ export default function PurchasesBoard({ org, rows, products, currency, month, s
         <button aria-pressed={!onlyPending} onClick={() => setOnlyPending(false)}>Todas</button>
         <button aria-pressed={onlyPending} onClick={() => setOnlyPending(true)}>Por pagar</button>
       </div>
+      <label className={`fv-button secondary fv-file${products.length ? "" : " is-disabled"}`}>Subir XML de factura<input type="file" accept=".xml,text/xml,application/xml" className="fv-visually-hidden" disabled={!products.length} onChange={e => { void fromXml(e.target.files?.[0]); e.target.value = ""; }} /></label>
       <button className="fv-button" disabled={!products.length} onClick={() => { setPreset(null); setOpenId("new"); }}>Registrar compra</button>
     </div>
+    {xmlError && <p className="fv-error" role="alert">{xmlError}</p>}
     <p className="fv-caption" aria-live="polite">{visible.length} {visible.length === 1 ? "compra" : "compras"}</p>
     <ul className="fv-receipts">
       {visible.map((r, i) => <li key={r.id} style={{ "--i": Math.min(i, 14) } as React.CSSProperties}>
@@ -95,16 +119,16 @@ function Sheet({ title, kicker, onClose, children }: { title: string; kicker: st
   return root ? createPortal(sheet, root) : sheet;
 }
 
-type Draft = { key: string; product_id: string; quantity: string; unit_cost: string; expires_on: string };
+type Draft = { key: string; product_id: string; quantity: string; unit_cost: string; expires_on: string; hint?: string };
 
-function NewPurchase({ org, products, suppliers, currency, preset, onClose, onDone }: { org: string; products: PurchaseProduct[]; suppliers: string[]; currency: string; preset: { supplier: string; lines: OrderSuggestion[] } | null; onClose: () => void; onDone: (id: string) => void }) {
+function NewPurchase({ org, products, suppliers, currency, preset, onClose, onDone }: { org: string; products: PurchaseProduct[]; suppliers: string[]; currency: string; preset: Preset | null; onClose: () => void; onDone: (id: string) => void }) {
   const router = useRouter();
   const requestId = useRef(newId()); // same id on retries: the database never receives it twice
   const [supplier, setSupplier] = useState(preset?.supplier ?? "");
-  const [reference, setReference] = useState("");
+  const [reference, setReference] = useState(preset?.reference ?? "");
   const [method, setMethod] = useState("pendiente");
   const [drafts, setDrafts] = useState<Draft[]>(() => preset?.lines.length
-    ? preset.lines.map(l => ({ key: newId(), product_id: l.product_id, quantity: String(l.quantity), unit_cost: l.unit_cost == null ? "" : String(l.unit_cost), expires_on: "" }))
+    ? preset.lines.map(l => ({ key: newId(), product_id: l.product_id, quantity: String(l.quantity), unit_cost: l.unit_cost == null ? "" : String(Math.round(l.unit_cost * 100) / 100), expires_on: "", hint: l.hint }))
     : [{ key: newId(), product_id: "", quantity: "1", unit_cost: "", expires_on: "" }]);
   const [state, setState] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
   const byId = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
@@ -135,6 +159,7 @@ function NewPurchase({ org, products, suppliers, currency, preset, onClose, onDo
         <label><span>Comprobante del proveedor</span><input maxLength={40} value={reference} onChange={e => setReference(e.target.value)} placeholder="F001-123 (opcional)" /></label>
       </div>
       <datalist id="fv-suppliers">{suppliers.map(s => <option key={s} value={s} />)}</datalist>
+      {preset?.note && <p className="fv-hint" role="status">{preset.note}</p>}
       <div className="fv-draft-lines" role="group" aria-label="Productos recibidos">
         <div className="fv-draft-head fv-buy-head" aria-hidden="true"><span>Producto</span><span>Cant.</span><span>Costo unit.</span><span>Importe</span><span /></div>
         {drafts.map((d, i) => {
@@ -149,6 +174,7 @@ function NewPurchase({ org, products, suppliers, currency, preset, onClose, onDo
             <input aria-label={`Costo unitario de la línea ${i + 1}`} inputMode="decimal" value={d.unit_cost} placeholder="0.00" onChange={e => set(d.key, { unit_cost: e.target.value })} />
             <span className="fv-draft-amount">{l.quantity > 0 && l.unit_cost >= 0 ? fmt(lineCents(l) / 100, currency) : "—"}</span>
             <button type="button" className="fv-icon-button" disabled={drafts.length === 1} aria-label={`Quitar línea ${i + 1}`} onClick={() => setDrafts(ds => ds.filter(x => x.key !== d.key))}>−</button>
+            {d.hint && <small className="fv-buy-hint">En la factura: {d.hint}</small>}
             {p && <small className="fv-buy-hint">Stock {qty(Number(p.stock ?? 0))} → {qty(Number(p.stock ?? 0) + (l.quantity > 0 ? l.quantity : 0))} {p.unit === "KGM" ? "kg" : "u."}{p.unit_cost ? ` · último costo ${fmt(Number(p.unit_cost), currency)}` : ""}</small>}
             {p && <label className="fv-buy-expiry"><span>Vence</span><input type="date" value={d.expires_on} aria-label={`Fecha de vencimiento de la línea ${i + 1} (opcional)`} onChange={e => set(d.key, { expires_on: e.target.value })} /><small>opcional: activa la alerta antes de que venza</small></label>}
           </div>;

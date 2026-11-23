@@ -21,6 +21,7 @@ import '../services/pending_checkout.dart';
 import '../services/pos_cart_draft.dart';
 import '../services/v2_repo.dart';
 import '../ui/barcode_scanner.dart';
+import '../logic/scale_barcode.dart';
 import '../ui/motion.dart';
 import '../ui/ds.dart';
 import '../ui/theme.dart';
@@ -420,6 +421,28 @@ class _PosScreenState extends State<PosScreen> {
   Future<void> _submit(String v) async {
     final code = v.trim();
     if (code.isEmpty) return;
+    // Etiqueta de balanza (EAN-13 que empieza con 2): producto por su PLU y el peso impreso.
+    final scale = parseScaleLabel(code);
+    if (scale != null && !_extra.values.any((e) => (e['barcode'] ?? '') == code)) {
+      final id = _extra.entries.where((e) => matchesScaleProduct((e.value['barcode'] ?? '').toString(), scale)).map((e) => e.key).firstOrNull;
+      final sp = id == null ? null : _products?.where((x) => x.id == id).firstOrNull;
+      if (sp != null) {
+        _add(sp, scale.kilos);
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(duration: const Duration(milliseconds: 1800),
+              content: Text('${sp.name} · ${qtyText(scale.kilos)} kg · ${money(scale.kilos * _price(sp, scale.kilos).unitPrice, _cur)}', maxLines: 2, overflow: TextOverflow.ellipsis)));
+        }
+        _q.clear();
+        setState(() {});
+        _focus.requestFocus();
+        return;
+      }
+      setState(() => _shake++);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Etiqueta de balanza con PLU ${scale.plu}: pon ese número como código de barras del producto (por kilo).')));
+      return;
+    }
     final byExtra = _extra.entries.where((e) => (e.value['barcode'] ?? '') == code).map((e) => e.key).firstOrNull;
     final p = byExtra == null ? null : _products?.where((x) => x.id == byExtra).firstOrNull;
     if (p != null) {

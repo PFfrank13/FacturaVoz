@@ -45,3 +45,16 @@ describe("cuadre por cajero", () => {
     expect(rows[1]).toMatchObject({ name: "Sin nombre", cashSales: 8.4, cashIn: 0, expected: 8.4 });
   });
 });
+
+import { serviceSummary } from "@/lib/erp/cash";
+describe("agente y recargas", () => {
+  it("se suma aparte de las ventas", () => {
+    const base = { id: "x", method: "efectivo", created_at: "" };
+    expect(serviceSummary([
+      { ...base, kind: "ingreso", amount: 200, note: "Agente: depósito de cliente" },
+      { ...base, kind: "egreso", amount: 50, note: "Agente: retiro de cliente" },
+      { ...base, kind: "ingreso", amount: 10, note: "Recarga / servicio" },
+      { ...base, kind: "egreso", amount: 30, note: "Pasajes" },
+    ])).toEqual({ count: 3, inflow: 210, outflow: 50, net: 160 });
+  });
+});

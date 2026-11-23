@@ -477,3 +477,80 @@
 .fv-kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .fv-kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .fv-kpis-4 { grid-template-columns: 1fr; } }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tema profesional (24/11/2026): fondo neutro, paneles sólidos, UN acento de marca y
+   color solo para estados (rojo = problema, ámbar = atención, verde = bien). Va al final para
+   imponerse sobre los estilos anteriores sin quitar ninguna función.
+   ───────────────────────────────────────────────────────────────────────────── */
+.fv-workspace {
+  --erp-bg: #f5f6f8; --erp-ink: #111827; --erp-muted: #5b6472; --erp-line: #e4e7ec;
+  --erp-pane: #ffffff; --erp-pane-strong: #ffffff; --erp-rim: #e4e7ec;
+  --erp-accent: #0b7a64; --erp-accent-ink: #ffffff; --erp-glow: rgba(11, 122, 100, .18);
+  --erp-a1: transparent; --erp-a2: transparent; --erp-a3: transparent; --erp-a4: transparent;
+  --erp-shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+  --erp-ok: #0b7a64; --erp-warn: #b45309; --erp-bad: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  .fv-workspace {
+    --erp-bg: #0d1117; --erp-ink: #e6edf3; --erp-muted: #9aa4b2; --erp-line: #262c36;
+    --erp-pane: #161b22; --erp-pane-strong: #161b22; --erp-rim: #262c36;
+    --erp-accent: #34d399; --erp-accent-ink: #052e22; --erp-glow: rgba(52, 211, 153, .18);
+    --erp-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --erp-ok: #34d399; --erp-warn: #f59e0b; --erp-bad: #f87171;
+  }
+}
+.fv-workspace::before { display: none; }
+.fv-rail, .fv-topbar, .fv-pulse > a, .fv-next, .fv-table-scroll, .fv-details, .fv-empty, .fv-product, .fv-sheet, .fv-create,
+.fv-board-tools, .fv-home-card, .fv-expiry, .fv-reorder-card, .fv-branches li {
+  background: var(--erp-pane) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  border: 1px solid var(--erp-rim) !important; box-shadow: var(--erp-shadow) !important;
+}
+/* KPIs: tarjetas blancas con una línea de acento, sin halos de colores. */
+.fv-kpis > div { --tone: var(--erp-accent) !important; background: var(--erp-pane) !important; border: 1px solid var(--erp-rim) !important; box-shadow: var(--erp-shadow) !important; }
+.fv-kpis > div::before { background: none !important; border-top: 3px solid var(--erp-accent); opacity: .9; }
+.fv-pulse > a { --tone: var(--erp-accent) !important; }
+.fv-pulse > a::before { background: none !important; }
+.fv-pulse > a:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16, 24, 40, .1) !important; }
+.fv-studio b { background: none !important; color: var(--erp-accent) !important; -webkit-background-clip: initial; background-clip: initial; }
+.fv-doc-badge, .fv-doc-badge.is-boleta, .fv-doc-badge.is-nota_credito { background: var(--erp-accent) !important; box-shadow: none !important; }
+.fv-doc-badge.is-nota_credito { background: var(--erp-warn) !important; }
+.fv-avatar { background: color-mix(in srgb, var(--erp-accent) 12%, var(--erp-pane)) !important; color: var(--erp-accent) !important; border-color: var(--erp-rim) !important; }
+.fv-shares i::after { background: var(--erp-accent) !important; }
+.fv-rhythm-bars span { background: color-mix(in srgb, var(--erp-accent) 22%, var(--erp-line)) !important; box-shadow: none !important; }
+.fv-rhythm-bars span.is-peak, .fv-rhythm-bars span.is-now { background: var(--erp-accent) !important; }
+.fv-ledger .is-in, .fv-top li:first-child::before, .fv-pay-day header span { color: var(--erp-ok) !important; }
+.fv-ledger .is-out, .fv-ledger .is-warn, .fv-branches .is-out { color: var(--erp-warn) !important; }
+.fv-todo li::before, .fv-lots li.is-semana::before { background: var(--erp-warn) !important; }
+.fv-todo li.is-bad::before, .fv-lots li.is-vencido::before { background: var(--erp-bad) !important; box-shadow: none !important; }
+.fv-lots li::before { background: color-mix(in srgb, var(--erp-accent) 60%, var(--erp-line)); }
+.fv-link:hover, .fv-mic .fv-button span { color: var(--erp-bad) !important; }
+.fv-rail nav a[aria-current="page"] { background: color-mix(in srgb, var(--erp-accent) 10%, var(--erp-pane)) !important; box-shadow: inset 3px 0 0 var(--erp-accent) !important; }
+.fv-rail nav a[aria-current="page"]::before { display: none; }
+.fv-rail nav a:hover { background: color-mix(in srgb, var(--erp-ink) 5%, transparent) !important; transform: none !important; }
+.fv-button { box-shadow: none !important; }
+.fv-button:hover { filter: brightness(1.06); transform: none !important; }
+.fv-pill.is-ok { color: var(--erp-ok) !important; background: color-mix(in srgb, var(--erp-ok) 10%, var(--erp-pane)) !important; }
+.fv-pill.is-wait { color: var(--erp-warn) !important; background: color-mix(in srgb, var(--erp-warn) 10%, var(--erp-pane)) !important; }
+.fv-pill.is-bad { color: var(--erp-bad) !important; background: color-mix(in srgb, var(--erp-bad) 10%, var(--erp-pane)) !important; }
+.fv-pill.is-off { color: var(--erp-muted) !important; background: color-mix(in srgb, var(--erp-ink) 5%, var(--erp-pane)) !important; }
+.fv-ok { color: var(--erp-ok) !important; } .fv-error { color: var(--erp-bad) !important; }
+.fv-heading h1 { letter-spacing: -.02em; }
+.fv-eyebrow { color: var(--erp-muted) !important; letter-spacing: .08em; }
+
+/* Conteo de inventario */
+.fv-actions-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-bottom: 14px; }
+.fv-count { max-width: 720px; }
+.fv-count-list { display: grid; gap: 2px; max-height: 52vh; overflow: auto; margin: 10px 0; }
+.fv-count-list li { display: grid; grid-template-columns: minmax(0, 1fr) 96px 72px; gap: 10px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--erp-line); }
+.fv-count-list li span { display: grid; gap: 2px; min-width: 0; }
+.fv-count-list li small { color: var(--erp-muted); }
+.fv-count-list input { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--erp-rim); background: var(--erp-pane); color: var(--erp-ink); font: inherit; text-align: right; font-variant-numeric: tabular-nums; }
+.fv-count-list input:focus { outline: none; border-color: var(--erp-accent); box-shadow: 0 0 0 3px var(--erp-glow); }
+.fv-count-list input.is-invalid { border-color: var(--erp-bad, #b42318); }
+.fv-count-list em { font-style: normal; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.fv-count-list em.is-out { color: var(--erp-bad, #b42318); } .fv-count-list em.is-in { color: var(--erp-ok, #0b7a64); }
+.fv-count-foot { display: grid; gap: 8px; }
+.fv-chips { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.fv-chip { border: 1px solid var(--erp-rim); background: var(--erp-pane); color: var(--erp-ink); border-radius: 99px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.fv-chip[aria-pressed="true"] { border-color: var(--erp-accent); color: var(--erp-accent); background: color-mix(in srgb, var(--erp-accent) 8%, var(--erp-pane)); }

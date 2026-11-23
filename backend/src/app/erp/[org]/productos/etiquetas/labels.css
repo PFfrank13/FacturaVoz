@@ -1,0 +1,16 @@
+/* Shelf labels: 3 columns on A4, black on white, readable from a meter away. */
+.fv-labels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fv-label { border: 1.5px solid #111827; border-radius: 10px; padding: 10px 12px; background: #fff; color: #111827; display: grid; gap: 4px; break-inside: avoid; min-height: 34mm; }
+.fv-label small { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #4b5563; }
+.fv-label strong { font-size: 14px; line-height: 1.2; }
+.fv-label b { font-size: 26px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.fv-label b i { font-size: 12px; font-style: normal; font-weight: 700; }
+.fv-label code { font-size: 11px; letter-spacing: .12em; color: #374151; }
+@media (max-width: 720px) { .fv-labels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media print {
+  @page { size: A4; margin: 8mm; }
+  .fv-workspace { display: block !important; background: #fff !important; }
+  .fv-workspace::before, .fv-rail, .fv-topbar, .fv-skip, .no-print { display: none !important; }
+  .fv-workarea, .fv-content { padding: 0 !important; margin: 0 !important; max-width: none !important; animation: none !important; }
+  .fv-labels { grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+}

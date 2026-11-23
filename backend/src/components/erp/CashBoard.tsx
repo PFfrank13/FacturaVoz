@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { addCashMove, closeCashDay, type FormResult } from "@/app/erp/actions";
 import type { DaySummary } from "@/lib/dayclose";
-import { cashBreakdown, cashDifference, methodLabel, methodShares, parseAmount, type CashierRow, type CashMove, type DayClosing } from "@/lib/erp/cash";
+import { cashBreakdown, cashDifference, methodLabel, methodShares, parseAmount, serviceMoves, serviceSummary, type CashierRow, type CashMove, type DayClosing } from "@/lib/erp/cash";
 
 const fmt = (value: number, currency: string) => new Intl.NumberFormat("es-PE", { style: "currency", currency }).format(value);
 const longDay = (d: string) => new Intl.DateTimeFormat("es-PE", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
@@ -60,6 +60,7 @@ export default function CashBoard({ org, day, today, summary, moves, closing, sh
           <span><b className={m.kind === "egreso" ? "is-out" : "is-in"}>{kindLabel[m.kind]}</b> {hour(m.created_at)} · {methodLabel[m.method] ?? m.method}{m.note ? ` · ${m.note}` : ""}</span>
           <span>{m.kind === "egreso" ? "−" : "+"}{fmt(m.amount, cur)}</span>
         </li>)}</ul> : <p className="fv-muted">Sin movimientos. Empieza registrando la apertura con el sencillo del día.</p>}
+        {(() => { const sv = serviceSummary(moves); return sv.count > 0 && <p className="fv-muted">Agente y recargas (no son ventas): entraron {fmt(sv.inflow, cur)}, salieron {fmt(sv.outflow, cur)} · neto en caja {fmt(sv.net, cur)}.</p>; })()}
         {isToday && !closing && <MoveForm org={org} opened={opened} />}
       </section>
     </div>
@@ -93,10 +94,14 @@ function useDone(state: FormResult, then: () => void) {
 
 function MoveForm({ org, opened }: { org: string; opened: boolean }) {
   const [kind, setKind] = useState<"apertura" | "ingreso" | "egreso">(opened ? "egreso" : "apertura");
+  const [note, setNote] = useState("");
   const [state, action, pending] = useActionState<FormResult, FormData>(addCashMove.bind(null, org), { ok: false, message: "" });
   const form = useRef<HTMLFormElement>(null);
-  useDone(state, () => form.current?.reset());
+  useDone(state, () => { form.current?.reset(); setNote(""); });
   return <form ref={form} action={action} className="fv-fiado-form">
+    {opened && <div className="fv-chips" role="group" aria-label="Agente y recargas">
+      {serviceMoves.map(m => <button key={m.id} type="button" className="fv-chip" aria-pressed={note === m.note} onClick={() => { setKind(m.kind); setNote(m.note); }}>{m.label}</button>)}
+    </div>}
     <div className="fv-segment" role="group" aria-label="Tipo de movimiento">
       {(opened ? ["egreso", "ingreso"] as const : ["apertura", "ingreso", "egreso"] as const).map(k => <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>{k === "apertura" ? "Abrir caja" : k === "ingreso" ? "Ingreso" : "Retiro o pago"}</button>)}
     </div>
@@ -104,7 +109,7 @@ function MoveForm({ org, opened }: { org: string; opened: boolean }) {
     <label><span>{kind === "apertura" ? "Sencillo inicial" : "Importe"}</span><input name="amount" inputMode="decimal" required autoComplete="off" placeholder="0.00" /></label>
     {kind === "apertura" ? <input type="hidden" name="method" value="efectivo" />
       : <label><span>Medio</span><select name="method" defaultValue="efectivo">{Object.entries(methodLabel).filter(([k]) => k !== "mercadopago").map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
-    <label className="fv-grow"><span>{kind === "egreso" ? "Motivo (obligatorio)" : "Nota"}</span><input name="note" maxLength={200} required={kind === "egreso"} placeholder={kind === "egreso" ? "Pago a proveedor, pasajes…" : "Opcional"} /></label>
+    <label className="fv-grow"><span>{kind === "egreso" ? "Motivo (obligatorio)" : "Nota"}</span><input name="note" maxLength={200} required={kind === "egreso"} value={note} onChange={e => setNote(e.target.value)} placeholder={kind === "egreso" ? "Pago a proveedor, pasajes…" : "Opcional"} /></label>
     <button className="fv-button" disabled={pending}>{pending ? "Guardando…" : kind === "apertura" ? "Abrir caja" : "Registrar"}</button>
     {state.message && <p className={state.ok ? "fv-ok" : "fv-error"} role={state.ok ? "status" : "alert"}>{state.message}</p>}
   </form>;

@@ -47,7 +47,7 @@ class FvLiquidGlass extends StatelessWidget {
   final Brightness? tone;
 
   static double sigmaFor(double requested) =>
-      requested.clamp(0.0, kIsWeb ? 14.0 : 24.0);
+      requested.clamp(0.0, kIsWeb ? 14.0 : 16.0);
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +65,11 @@ class FvLiquidGlass extends StatelessWidget {
         child: Padding(padding: padding, child: child),
       );
     }
-    final a = strength.clamp(.4, 3.0);
+    // Rendimiento: dentro de una lista que se desplaza, el desenfoque en vivo (BackdropFilter) se recalcula
+    // en cada cuadro por cada tarjeta y hace sentir pesada la app. Ahí se usa vidrio esmerilado: el mismo
+    // panel, más denso y sin desenfoque. Las barras fijas (arriba, abajo, menú) mantienen el desenfoque real.
+    final inScroll = Scrollable.maybeOf(context) != null;
+    final a = (inScroll ? strength * 1.9 : strength).clamp(.4, 3.0);
     final pane = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: shape,
@@ -74,12 +78,12 @@ class FvLiquidGlass extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: dark
               ? [
-                  const Color(0xFF1B2B44).withValues(alpha: .42 * a),
-                  const Color(0xFF0B1424).withValues(alpha: .30 * a),
+                  const Color(0xFF1B2B44).withValues(alpha: (.42 * a).clamp(0.0, 1.0)),
+                  const Color(0xFF0B1424).withValues(alpha: (.30 * a).clamp(0.0, 1.0)),
                 ]
               : [
-                  Colors.white.withValues(alpha: .46 * a),
-                  Colors.white.withValues(alpha: .20 * a),
+                  Colors.white.withValues(alpha: (.46 * a).clamp(0.0, 1.0)),
+                  Colors.white.withValues(alpha: (.20 * a).clamp(0.0, 1.0)),
                 ],
         ),
       ),
@@ -89,7 +93,7 @@ class FvLiquidGlass extends StatelessWidget {
         child: Padding(padding: padding, child: child),
       ),
     );
-    final sigma = sigmaFor(blur);
+    final sigma = inScroll ? 0.0 : sigmaFor(blur);
     final glass = ClipRRect(
       borderRadius: shape,
       child: sigma == 0
