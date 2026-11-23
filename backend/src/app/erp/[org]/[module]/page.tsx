@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { workspaceContext } from "@/lib/erp/context";
-import { modules, moduleAllowed, featureLimit, can, hasFeature } from "@/lib/erp/access";
+import { modules, moduleAllowed, featureLimit, can, hasFeature, visibleModules } from "@/lib/erp/access";
 import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
 import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
@@ -20,10 +20,12 @@ import LoyaltyBoard from "@/components/erp/LoyaltyBoard";
 import type { Coupon, LoyaltyRow, Promotion } from "@/lib/erp/loyalty";
 import { monthBounds, parseMonth, type PaymentRow } from "@/lib/erp/payments";
 import { lastSupplierByProduct, suggestOrder, type PurchaseRow, type Velocity } from "@/lib/erp/purchases";
-import { cashierBreakdown, type CashMove, type DayClosing } from "@/lib/erp/cash";
+import { cashierBreakdown, methodLabel, type CashMove, type DayClosing } from "@/lib/erp/cash";
 import type { DaySummary } from "@/lib/dayclose";
 import { limaDate, parseRange } from "@/lib/erp/receipts";
 import { mergeClients, type ClientActivity, type ClientBalance, type ClientRow } from "@/lib/erp/clients";
+import { byMethod, dailySeries, grossMargin } from "@/lib/erp/reports";
+import { topProducts } from "@/lib/erp/dashboard";
 
 const liveProducts = ["products"] as const;
 /** Next calendar day (sales_summary takes an exclusive end date). */
@@ -45,22 +47,108 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const title = id === "clientes" && c.sector === "consultorio" ? "Pacientes" : id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title;
   if (id === "reportes") {
     const search = await searchParams;
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const today = limaDate(new Date());
     const from = search.from ?? `${today.slice(0, 7)}-01`;
     const to = search.to ?? today;
     const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
     const valid = validDate(from) && validDate(to) && from <= to && Date.parse(to) - Date.parse(from) <= 366 * 86400000;
-    const result = valid ? await c.db.rpc("sales_summary", { p_org: org, p_from: from, p_to: new Date(Date.parse(to) + 86400000).toISOString().slice(0, 10), p_currency: c.organization.currency || "PEN" }) : null;
-    return <><section className="fv-heading"><p className="fv-eyebrow">CONTROL COMERCIAL</p><h1>Reportes de ventas</h1><p>Ventas emitidas, sin anuladas ni rechazadas, menos notas de crédito. Una moneda por consulta.</p></section>
-      <form className="fv-form"><label>Desde<input type="date" name="from" defaultValue={from} required /></label><label>Hasta (incluido)<input type="date" name="to" defaultValue={to} required /></label><button className="fv-button">Consultar periodo</button></form>
-      {!valid ? <p role="alert">Elige un intervalo válido de hasta 366 días.</p> : result?.error || !result?.data ? <p role="alert">No pudimos cargar el reporte. Pulsa Actualizar para reintentar.</p> : <dl className="fv-details"><dt>Ventas netas · {c.organization.currency || "PEN"}</dt><dd>{money(Number(result.data.sales_total), c.organization.currency || "PEN")}</dd><dt>Operaciones emitidas</dt><dd>{result.data.sales_count}</dd><dt>Notas de crédito</dt><dd>{money(Number(result.data.credit_notes_total), c.organization.currency || "PEN")}</dd><dt>Borradores (no incluidos en ventas)</dt><dd>{result.data.drafts_count}</dd></dl>}
+    const cur = c.organization.currency || "PEN";
+    const end = valid ? addDay(to) : today;
+    const [summary, invs, items, pays, buys, losses] = valid ? await Promise.all([
+      c.db.rpc("sales_summary", { p_org: org, p_from: from, p_to: end, p_currency: cur }),
+      c.db.from("invoices").select("issue_date,amt_total").eq("org_id", org).gte("issue_date", from).lte("issue_date", to).neq("status", "draft").is("voided_at", null).eq("currency", cur).limit(5000),
+      c.db.from("invoice_items").select("description,quantity,unit_price,product:products(unit_cost),invoice:invoices!inner(org_id,issue_date,status,voided_at)").eq("invoice.org_id", org).gte("invoice.issue_date", from).lte("invoice.issue_date", to).neq("invoice.status", "draft").is("invoice.voided_at", null).limit(8000),
+      c.db.from("payments").select("method,amount").eq("org_id", org).gte("paid_on", from).lte("paid_on", to).limit(8000),
+      c.db.from("retail_receipts").select("total_cents").eq("org_id", org).gte("created_at", `${from}T05:00:00Z`).lt("created_at", `${end}T05:00:00Z`).limit(2000),
+      c.db.from("stock_losses").select("quantity,unit_cost").eq("org_id", org).gte("created_at", `${from}T05:00:00Z`).lt("created_at", `${end}T05:00:00Z`).limit(3000),
+    ]) : [null, null, null, null, null, null];
+    const sum = (summary?.data ?? null) as { sales_total?: number | string; sales_count?: number; credit_notes_total?: number | string; drafts_count?: number } | null;
+    const total = Number(sum?.sales_total ?? 0), count = Number(sum?.sales_count ?? 0);
+    const series = dailySeries((invs?.data ?? []) as { issue_date: string; amt_total: number }[], from, to);
+    type RawItem = { description: string; quantity: number; unit_price: number; product: { unit_cost: number | null } | { unit_cost: number | null }[] | null };
+    const itemRows = ((items?.data ?? []) as unknown as RawItem[]).map(i => ({ ...i, unit_cost: (Array.isArray(i.product) ? i.product[0]?.unit_cost : i.product?.unit_cost) ?? null }));
+    const top = topProducts(itemRows, 10);
+    const margin = grossMargin(itemRows);
+    const methods = byMethod((pays?.data ?? []) as { method: string; amount: number }[]);
+    const purchases = ((buys?.data ?? []) as { total_cents: number }[]).reduce((a, r) => a + Number(r.total_cents), 0) / 100;
+    const shrink = ((losses?.data ?? []) as { quantity: number; unit_cost: number | null }[]).reduce((a, r) => a + Number(r.quantity) * Number(r.unit_cost ?? 0), 0);
+    const fmt = (v: number) => money(v, cur);
+    const short = (d: string) => new Intl.DateTimeFormat("es-PE", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
+    return <><section className="fv-heading"><p className="fv-eyebrow">CONTROL COMERCIAL / {c.organization.name}</p><h1>Reportes</h1><p>Ventas emitidas (sin anuladas ni borradores, menos notas de crédito), cobros, compras y merma del periodo.</p></section>
+      <form className="fv-create fv-fiado-form"><label><span>Desde</span><input type="date" name="from" defaultValue={from} required /></label><label><span>Hasta (incluido)</span><input type="date" name="to" defaultValue={to} required /></label><button className="fv-button">Ver periodo</button></form>
+      {!valid ? <div className="fv-empty" role="alert"><h2>Revisa las fechas</h2><p>Elige un intervalo válido de hasta 366 días.</p></div>
+        : summary?.error || !sum ? <div className="fv-empty" role="alert"><h2>No pudimos cargar el reporte</h2><p>Pulsa Actualizar para reintentar.</p></div>
+        : <section className="fv-board">
+          <div className="fv-kpis fv-kpis-4">
+            <div style={{ "--tone": "#3ee6b0" } as React.CSSProperties}><span>Ventas netas</span><strong>{fmt(total)}</strong><small>{count} {count === 1 ? "venta" : "ventas"}{Number(sum.credit_notes_total ?? 0) ? ` · notas de crédito ${fmt(Number(sum.credit_notes_total))}` : ""}</small></div>
+            <div style={{ "--tone": "#6fb7ff" } as React.CSSProperties}><span>Ticket promedio</span><strong>{fmt(count ? total / count : 0)}</strong><small>{series.best ? `mejor día ${short(series.best.day)}: ${fmt(series.best.total)}` : "sin ventas en el periodo"}</small></div>
+            <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Margen bruto estimado</span><strong>{margin.margin === null ? "—" : `${margin.margin} %`}</strong><small>{margin.margin === null ? "añade el costo de tus productos" : `${fmt(margin.profit)} · ${margin.coverage} % de la venta tiene costo`}</small></div>
+            <div style={{ "--tone": "#a98bff" } as React.CSSProperties}><span>Compras y merma</span><strong>{fmt(purchases)}</strong><small>merma {fmt(shrink)}{total ? ` (${Math.round((shrink / total) * 1000) / 10} % de la venta)` : ""}</small></div>
+          </div>
+          <figure className="fv-rhythm fv-month-rhythm fv-create" aria-label="Ventas por día del periodo">
+            <div className="fv-rhythm-bars" style={{ "--cols": series.days.length } as React.CSSProperties}>
+              {series.days.map(d => <span key={d.day} className={series.best?.day === d.day ? "is-peak" : ""} style={{ "--h": d.height } as React.CSSProperties} title={`${short(d.day)}: ${fmt(d.total)} en ${d.count} ${d.count === 1 ? "venta" : "ventas"}`} />)}
+            </div>
+            <figcaption>{series.days.length} días · {short(from)} – {short(to)}</figcaption>
+          </figure>
+          <div className="fv-cash-grid">
+            <section className="fv-create fv-cash-card"><h3>Lo que más se vendió</h3>
+              {top.length ? <ol className="fv-top">{top.map(t => <li key={t.name}><span>{t.name}</span><small>{Number.isInteger(t.units) ? t.units : t.units.toFixed(2)} u.</small><strong>{fmt(t.revenue)}</strong></li>)}</ol> : <p className="fv-muted">Sin ventas en el periodo.</p>}
+            </section>
+            <section className="fv-create fv-cash-card"><h3>Cómo te pagaron</h3>
+              {methods.length ? <ul className="fv-shares">{methods.map(m => <li key={m.method} style={{ "--share": `${m.share}%` } as React.CSSProperties}><span>{methodLabel[m.method] ?? m.method}</span><span>{fmt(m.value)} · {m.share} %</span><i aria-hidden="true" /></li>)}</ul> : <p className="fv-muted">Sin cobros registrados en el periodo.</p>}
+            </section>
+          </div>
+        </section>}
     </>;
   }
-  if (id === "plan") return <><section className="fv-heading"><p className="fv-eyebrow">SOLVEX HUB</p><h1>Mi plan</h1><p>Una sola licencia para móvil y web.</p></section><dl className="fv-details"><dt>Plan</dt><dd>{c.license.plan || "Sin asignar"}</dd><dt>Estado</dt><dd>{c.license.status || "Sin verificar"}</dd><dt>Usuarios</dt><dd>{featureLimit(c.license, "max_users") === -1 ? "Sin límite" : featureLimit(c.license, "max_users")}</dd><dt>Sucursales</dt><dd>{featureLimit(c.license, "max_branches") === -1 ? "Sin límite" : featureLimit(c.license, "max_branches")}</dd></dl><p>{c.license.message}</p></>;
-  if (id === "configuracion") return <><section className="fv-heading"><p className="fv-eyebrow">EMPRESA</p><h1>Configuración</h1><p>Datos compartidos con FacturaVoz Mobile.</p></section><dl className="fv-details">{[["Razón social", c.organization.name], ["Documento", c.organization.tax_id], ["Dirección", c.organization.address], ["Moneda", c.organization.currency]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "Sin configurar"}</dd></div>)}</dl></>;
+  if (id === "plan") {
+    const team = await c.db.rpc("team_members", { p_org: org });
+    const used = Array.isArray(team.data) ? team.data.length : null;
+    const maxUsers = featureLimit(c.license, "max_users");
+    const maxBranches = featureLimit(c.license, "max_branches");
+    const planName = ({ BASICO: "Básico", PRO: "Pro", EMPRESA: "Empresa" } as Record<string, string>)[c.license.plan ?? ""] ?? (c.license.plan || "Sin asignar");
+    const statusText = c.license.status === "prueba" ? "En prueba gratis" : c.license.status === "activa" ? "Activo" : c.license.status || "Sin verificar";
+    const included = visibleModules(c.license, c.access, c.sector).filter(x => !["plan", "configuracion"].includes(x.id));
+    return <><section className="fv-heading"><p className="fv-eyebrow">SOLVEX HUB / {c.organization.name}</p><h1>Mi plan</h1><p>Una sola licencia para el móvil y la web. Los cambios de plan y los pagos se hacen en Solvex Hub.</p></section>
+      <section className="fv-board">
+        <div className="fv-kpis">
+          <div style={{ "--tone": "#3ee6b0" } as React.CSSProperties}><span>Plan</span><strong>{planName}</strong><small>{statusText}</small></div>
+          <div style={{ "--tone": "#6fb7ff" } as React.CSSProperties}><span>Usuarios</span><strong>{used ?? "—"}{maxUsers === -1 ? "" : ` de ${maxUsers}`}</strong><small>{maxUsers === -1 ? "sin límite" : "incluidos en tu plan"}</small></div>
+          <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Locales</span><strong>{maxBranches === -1 ? "Sin límite" : maxBranches}</strong><small>empresas o sucursales</small></div>
+        </div>
+        {c.license.message && <p className="fv-hint">{c.license.message}</p>}
+        <section className="fv-create fv-cash-card"><h3>Lo que tienes en la web con tu rol</h3>
+          <ul className="fv-shortcuts">{included.map(x => <li key={x.id}><Link href={`/erp/${org}/${x.id}`}>{x.title}</Link></li>)}</ul>
+        </section>
+      </section></>;
+  }
+  if (id === "configuracion") {
+    const extra = await c.db.from("organizations").select("trade_name,ubigeo,district,province,department,series_factura,series_boleta").eq("id", org).maybeSingle();
+    const e = (extra.data ?? {}) as Record<string, string | null>;
+    const rows: [string, string | null | undefined][] = [
+      ["Razón social", c.organization.name], ["Nombre comercial", e.trade_name], ["RUC", c.organization.tax_id], ["Dirección fiscal", c.organization.address],
+      ["Distrito / provincia", [e.district, e.province, e.department].filter(Boolean).join(" · ")], ["Ubigeo", e.ubigeo],
+      ["Moneda", c.organization.currency], ["IGV por defecto", c.organization.default_tax_rate != null ? `${c.organization.default_tax_rate} %` : null],
+      ["Serie de facturas", e.series_factura], ["Serie de boletas", e.series_boleta],
+    ];
+    const missing = rows.filter(([, v]) => !v).map(([k]) => k);
+    return <><section className="fv-heading"><p className="fv-eyebrow">EMPRESA / {c.organization.name}</p><h1>Configuración</h1><p>Los datos que salen en tus comprobantes. Se editan en el móvil (Ajustes → Negocio) y aquí se ven al instante.</p></section>
+      {missing.length > 0 && <p className="fv-hint" role="status">Te falta completar: {missing.join(", ")}. Sin ellos SUNAT puede rechazar tus comprobantes.</p>}
+      <dl className="fv-details">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "Sin configurar"}</dd></div>)}</dl></>;
+  }
   if (id === "equipo") {
     const result = await c.db.rpc("team_members", { p_org: org });
-    return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS</p><h1>Equipo</h1></section>{result.error ? <p role="alert">No se pudo cargar el equipo. Pulsa Actualizar para reintentar.</p> : <DataTable rows={result.data ?? []} fields={[["display_name", "Nombre"], ["email", "Correo"], ["role", "Rol"], ["staff_role", "Función"]]} />}</>;
+    const roleLabel: Record<string, string> = { owner: "Dueño", admin: "Administrador", cajero: "Cajero", finanzas: "Finanzas", tecnico: "Técnico", vendedor: "Vendedor" };
+    type Member = { display_name: string | null; email: string | null; role: string; staff_role: string | null };
+    const members = (result.data ?? []) as Member[];
+    return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS / {c.organization.name}</p><h1>Equipo</h1><p>Quién entra a tu empresa y qué puede hacer. Las invitaciones y los cambios de rol se hacen en el móvil (Ajustes → Equipo).</p></section>
+      {result.error ? <div className="fv-empty" role="alert"><h2>No se pudo cargar el equipo</h2><p>Pulsa Actualizar para reintentar.</p></div>
+        : <ul className="fv-branches">{members.map((mb, i) => {
+          const role = mb.role === "owner" || mb.role === "admin" ? mb.role : mb.staff_role ?? "cajero";
+          return <li key={i}><div><strong>{mb.display_name || mb.email || "Sin nombre"}</strong><small>{mb.email ?? ""}</small></div><span>{roleLabel[role] ?? role}</span><span /><span /></li>;
+        })}</ul>}
+    </>;
   }
   if (id === "comprobantes") {
     // Same receipts the mobile app issues, with their SUNAT documents (RLS: company members).
@@ -273,7 +361,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   if (id === "trabajos") query = query.neq("kind", "cita");
   const result = await query.order(m.order!, { ascending: ["name", "scheduled_at"].includes(m.order!) }).order("id").range((page - 1) * 50, page * 50);
   const rows = (result.data ?? []) as unknown as Record<string, unknown>[];
-  return <><section className="fv-heading"><p className="fv-eyebrow">OPERACIÓN / {c.organization.name}</p><h1>{title}</h1><p>{id === "agenda" ? "Citas registradas, ordenadas por fecha." : "Información de tu empresa, compartida con la aplicación móvil."}</p></section>
+  return <><section className="fv-heading"><p className="fv-eyebrow">OPERACIÓN / {c.organization.name}</p><h1>{title}</h1><p>{id === "agenda" ? "Citas registradas, ordenadas por fecha." : id === "cotizaciones" ? "Tus cotizaciones con su estado. Se crean y se convierten en venta desde el móvil." : "Trabajos de tu empresa con su estado, los mismos del móvil."}</p></section>
     {(["trabajos", "agenda"].includes(id) || (id === "productos" && can(c.access, "products_edit"))) && <CreateRecord org={org} moduleId={id} />}
     {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los registros</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div> : <><DataTable rows={rows.slice(0, 50)} fields={m.fields!} /><nav className="fv-pagination" aria-label="Paginación">{page > 1 && <Link className="fv-button secondary" href={`?page=${page - 1}`}>Anterior</Link>}<span>Página {page}</span>{rows.length > 50 && <Link className="fv-button secondary" href={`?page=${page + 1}`}>Siguiente</Link>}</nav></>}
   </>;

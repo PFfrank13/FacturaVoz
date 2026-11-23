@@ -96,12 +96,15 @@ Fuente: `docs/INVESTIGACION_RETAIL.md`, «Las cinco siguientes» y tabla de 24 f
 - [x] Lotes, vencimientos y mermas con motivo (filas 3–4): **una sola migración,
       requiere aprobación del propietario.** El plan Pro ya promete alertas de
       vencimiento: es la deuda comercial más urgente.
-- [ ] Turnos por cajero con fondo, sangrías, entrega de turno, cierre ciego por
+- [x] Turnos por cajero con fondo, sangrías, entrega de turno, cierre ciego por
       cajero, PIN de supervisor y bitácora (filas 5 y 7), sobre la caja actual.
+      Hecho en v3.8c (turno con fondo y cierre ciego, diferencia solo para finanzas, bitácora
+      en audit); el PIN de supervisor para anular ya existía en el móvil.
 - [x] Pedido sugerido multiproveedor (fila 6), en Compras web con la venta real; falta llevarlo al Copiloto del móvil.
-- [ ] Correcciones fiscales chicas: ICBPER (bolsa a S/ 0,50 fuera de la base del
+- [x] Correcciones fiscales chicas: ICBPER (bolsa a S/ 0,50 fuera de la base del
       IGV, fila 13) y tope del NRUS por ventas **y compras** (fila 14, `taxes.dart`).
-- [ ] Después: multisucursal real con stock por local (fila 22). Hasta entonces el
+- [x] Después: multisucursal real con stock por local (fila 22). Hecho en v3.8d: cada local es
+      una empresa con su stock; módulo «Sucursales» con panel consolidado y traslados atómicos. Hasta entonces el
       plan Empresa no debe venderse con «5 sucursales» como argumento central.
 
 ### 6. Móvil — pulido
@@ -169,3 +172,8 @@ Fuente: `docs/INVESTIGACION_RETAIL.md`, «Las cinco siguientes» y tabla de 24 f
   recibido» en el cobro. NRUS: el tope cuenta compras. Pendiente: ICBPER (toca el XML de SUNAT, probar en beta),
   turnos con fondo y entrega por cajero con PIN, multisucursal con stock por local, cupones en el plan Pro de bodega
   (hoy los cupones van con «precios»).
+- 23/11/2026: Pendientes cerrados. v3.8a (cupones también en el Pro de bodega), v3.8b (ICBPER dentro del precio
+  de la bolsa, sin cambiar el total; probado en pruebas unitarias del XML, no enviado aún a SUNAT beta),
+  v3.8c (turnos de caja por cajero) y v3.8d (sucursales y traslados), aplicadas en producción y verificadas.
+  Avisos de seguridad de Supabase previos y ajenos a estos cambios: protección de contraseñas filtradas apagada y
+  tres funciones SECURITY DEFINER en public (audit_verify, create_pos_kitchen_order, link_pos_kitchen_invoice).
