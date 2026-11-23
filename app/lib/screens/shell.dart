@@ -850,7 +850,7 @@ class _Dock extends StatelessWidget {
   Widget _item(BuildContext context, _Dest d) {
     final t = Theme.of(context);
     final on = d.id == current;
-    final c = on ? t.colorScheme.primary : t.colorScheme.onSurfaceVariant;
+    final c = on ? t.colorScheme.primary : t.colorScheme.onSurface; // contraste pleno: el gris se veía desteñido
     final dur = Motion.d(context, Motion.medium);
     return Expanded(
       child: Semantics(
@@ -880,7 +880,7 @@ class _Dock extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 child: AnimatedDefaultTextStyle(
                   duration: Motion.d(context, Motion.fast),
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: c),
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: on ? FontWeight.w800 : FontWeight.w600, color: c),
                   child: Text(d.label, maxLines: 1, softWrap: false),
                 ),
               ),

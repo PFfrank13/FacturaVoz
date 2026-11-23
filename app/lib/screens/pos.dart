@@ -1365,10 +1365,10 @@ class _PosScreenState extends State<PosScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('${qtyText(count)} productos · Ver carrito',
+                                      Text('${qtyText(count)} ${count == 1 ? 'producto' : 'productos'} · Ver carrito',
                                         maxLines: 1, overflow: TextOverflow.ellipsis,
                                         style: t.textTheme.labelSmall?.copyWith(
-                                          color: t.colorScheme.onSurfaceVariant)),
+                                          color: t.colorScheme.onSurface.withValues(alpha: .8), fontWeight: FontWeight.w600)),
                                       Text(money(totals.total, _cur),
                                         maxLines: 1, overflow: TextOverflow.ellipsis,
                                         style: t.textTheme.titleMedium?.copyWith(

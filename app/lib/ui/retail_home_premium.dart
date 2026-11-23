@@ -622,7 +622,7 @@ class _DockDestination extends StatelessWidget {
         ? (selected ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface)
         : selected
             ? (dark ? const Color(0xFFE4FFF1) : const Color(0xFF10483B))
-            : (dark ? const Color(0xFFF2F8F7) : const Color(0xFF15282A)); // más contraste: antes se veía desteñido
+            : (dark ? const Color(0xFFFFFFFF) : const Color(0xFF0A1517)); // casi negro: a 11 px el gris se veía desteñido
     void activate() {
       HapticFeedback.selectionClick();
       onTap();
@@ -645,7 +645,7 @@ class _DockDestination extends StatelessWidget {
                   : dark ? const Color(0xFF45969B) : const Color(0xFF84C8C1)),
             const SizedBox(height: 3),
             Text(item.$2, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: labelStyle.copyWith(color: ink, fontWeight: selected ? FontWeight.w800 : FontWeight.w700)),
+                style: labelStyle.copyWith(color: ink, fontWeight: FontWeight.w800)),
           ]),
         ),
       ),
