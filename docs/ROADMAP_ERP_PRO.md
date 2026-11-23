@@ -50,12 +50,15 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
 - [ ] Filtro por rango de fechas y envío por WhatsApp/correo desde el detalle.
 
 ### 3. ERP web — Clientes con DNI/RUC
-- [ ] Alta con consulta DNI/RUC (`/api/lookup`, la misma del móvil).
-- [ ] Ficha: compras, deuda de fiado, límite.
+- [x] Alta y edición con consulta DNI/RUC (misma lógica que `/api/lookup`, en
+      `lib/lookup.ts`: caché, cupos y avisos de RUC no activo / no habido).
+- [x] Ficha: compras, total, frecuencia, deuda de fiado con límite y vencimiento,
+      abonos y fiados en la misma libreta del móvil, recordatorio por WhatsApp.
+- [x] Filtros: con fiado, vencidos o sobre límite, «no están volviendo».
 
 ### 4. ERP web — Operación
 - [ ] Caja: apertura, movimientos, arqueo ciego, historial.
-- [ ] Fiados: saldos, abonos, límite por cliente.
+- [x] Fiados: saldos, abonos, límite por cliente (dentro de Clientes).
 - [ ] Compras y proveedores: registrar compra, actualizar stock y costo.
 - [ ] Inventario: vencimientos, mermas, kardex.
 
@@ -81,3 +84,5 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   manipulado, HTTP 404, aviso y «Más tarde»), `flutter build apk --debug` OK
   (Kotlin + FileProvider compilan). No probado en dispositivo. Bloque 1 ítem 3
   depende del propietario (secretos en GitHub).
+- 23/11/2026: Clientes web con DNI/RUC, ficha, libreta de fiado y WhatsApp,
+  verificado contra Supabase local (RUC en caché, alta, abono de S/ 12.40).

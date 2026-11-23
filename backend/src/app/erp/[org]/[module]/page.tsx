@@ -8,9 +8,13 @@ import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
 import type { ReceiptRow } from "@/lib/erp/receipts";
+import ClientsBoard from "@/components/erp/ClientsBoard";
+import { limaDate } from "@/lib/erp/receipts";
+import { mergeClients, type ClientActivity, type ClientBalance, type ClientRow } from "@/lib/erp/clients";
 
 const liveProducts = ["products"] as const;
 const liveReceipts = ["invoices"] as const;
+const liveClients = ["clients", "credit_ledger", "invoices"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
@@ -55,6 +59,19 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
         : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} />}
     </>;
   }
+  if (id === "clientes") {
+    // Same customers as the mobile app, joined with their fiado balance and purchase history.
+    const [list, balances, activity] = await Promise.all([
+      c.db.from("clients").select("id,name,tax_id,doc_type,email,phone,address,district,notes,credit_limit,created_at").eq("org_id", org).order("name").order("id").limit(1000),
+      c.db.rpc("credit_balances", { p_org: org }),
+      c.db.rpc("client_activity", { p_org: org }),
+    ]);
+    const clients = mergeClients((list.data ?? []) as ClientRow[], (balances.data ?? []) as ClientBalance[], (activity.data ?? []) as ClientActivity[], limaDate(new Date()));
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">CLIENTES / {c.organization.name}</p><LiveRefresh org={org} tables={liveClients} /></div><h1>{title}</h1><p>Con el DNI o RUC se completan solos. Ve lo que compran, cuánto deben de fiado y registra sus abonos: todo se ve igual en el móvil.</p></section>
+      {list.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los clientes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <ClientsBoard org={org} clients={clients} currency={c.organization.currency || "PEN"} canFiado={hasFeature(c.license, "fiados") && can(c.access, "collect")} />}
+    </>;
+  }
   if (id === "productos" || id === "inventario") {
     // One catalog, shared with the mobile POS: same rows, photos and permissions.
     const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path")
@@ -78,7 +95,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const result = await query.order(m.order!, { ascending: ["name", "scheduled_at"].includes(m.order!) }).order("id").range((page - 1) * 50, page * 50);
   const rows = (result.data ?? []) as unknown as Record<string, unknown>[];
   return <><section className="fv-heading"><p className="fv-eyebrow">OPERACIÓN / {c.organization.name}</p><h1>{title}</h1><p>{id === "agenda" ? "Citas registradas, ordenadas por fecha." : "Información de tu empresa, compartida con la aplicación móvil."}</p></section>
-    {(["clientes", "trabajos", "agenda"].includes(id) || (id === "productos" && can(c.access, "products_edit"))) && <CreateRecord org={org} moduleId={id} />}
+    {(["trabajos", "agenda"].includes(id) || (id === "productos" && can(c.access, "products_edit"))) && <CreateRecord org={org} moduleId={id} />}
     {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los registros</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div> : <><DataTable rows={rows.slice(0, 50)} fields={m.fields!} /><nav className="fv-pagination" aria-label="Paginación">{page > 1 && <Link className="fv-button secondary" href={`?page=${page - 1}`}>Anterior</Link>}<span>Página {page}</span>{rows.length > 50 && <Link className="fv-button secondary" href={`?page=${page + 1}`}>Siguiente</Link>}</nav></>}
   </>;
 }
