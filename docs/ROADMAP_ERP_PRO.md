@@ -7,8 +7,10 @@ base de Supabase que el móvil, con RLS del usuario.
 
 ## Por qué existe cada bloque (investigación del rubro, 22/11/2026)
 
-- Mermas y vencimientos son la mayor pérdida del retail peruano (≈ S/ 700 M/año;
-  ≈ 7 % de ventas en tiendas pequeñas). → Vencimientos, mermas, conteos.
+- Mermas y vencimientos: ≈ S/ 700 M/año y 1,2–1,5 % de las ventas en el retail
+  peruano (ISEG 2025, 19 empresas grandes); la mitad es vencimiento y daño, y
+  del resto la mayor parte es robo interno. (La cifra antigua de «7 % en tiendas
+  pequeñas» era de 2017 sin metodología: no usarla.) → Vencimientos, mermas, conteos.
 - Fiado por cliente con límite, Yape/Plin y boleta por WhatsApp son estándar en
   la competencia (Xelera, ERP Perú). → Igualarlos y superarlos.
 - SUNAT: boletas se anulan dentro del resumen diario (≤ 7 días); facturas con
@@ -16,6 +18,10 @@ base de Supabase que el móvil, con RLS del usuario.
   visibles en Comprobantes.
 - Operación diaria: arqueo de caja, compras a proveedores, reposición; el
   inventario valorizado es registro tributario. → Caja, Compras, Kardex.
+
+**Investigación completa (23/11/2026):** `docs/INVESTIGACION_RETAIL.md` y notas con
+fuentes en `docs/investigacion/`. Toda función nueva debe citar el hallazgo que la
+justifica (fila de la tabla «Lista priorizada de funciones»).
 
 ## Planes (confirmados en Solvex Hub: S/ 39 / 79 / 179, 2 / 5 / 20 usuarios, 7 días de prueba)
 
@@ -78,6 +84,26 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       inicio, acceso, comprobantes, clientes, caja, compras y cobros. Falta:
       cotizaciones, equipo, reportes, plan y configuración (aún con tabla genérica).
 
+### 7. Según la investigación del rubro (orden de prioridad)
+Fuente: `docs/INVESTIGACION_RETAIL.md`, «Las cinco siguientes» y tabla de 24 funciones.
+- [ ] Conciliación Yape/Plin (fila 1): en Android, leer solo las notificaciones de
+      Yape, Plin y bancos (permiso opcional y declarado, procesado en el teléfono),
+      avisar por voz, registrar el cobro y emparejarlo con la venta; cuadre por medio
+      al cierre. iOS no lo permite: decirlo en la venta. Revisar Ley 29733 y la
+      política de Google Play antes de publicar.
+- [ ] Venta suelta y por peso en Básico (fila 2): presentaciones unidad/paquete/
+      caja/kilo con conversión de stock (costal → kilos).
+- [ ] Lotes, vencimientos y mermas con motivo (filas 3–4): **una sola migración,
+      requiere aprobación del propietario.** El plan Pro ya promete alertas de
+      vencimiento: es la deuda comercial más urgente.
+- [ ] Turnos por cajero con fondo, sangrías, entrega de turno, cierre ciego por
+      cajero, PIN de supervisor y bitácora (filas 5 y 7), sobre la caja actual.
+- [ ] Pedido sugerido multiproveedor del Copiloto IA al cierre del día (fila 6).
+- [ ] Correcciones fiscales chicas: ICBPER (bolsa a S/ 0,50 fuera de la base del
+      IGV, fila 13) y tope del NRUS por ventas **y compras** (fila 14, `taxes.dart`).
+- [ ] Después: multisucursal real con stock por local (fila 22). Hasta entonces el
+      plan Empresa no debe venderse con «5 sucursales» como argumento central.
+
 ### 6. Móvil — pulido
 - [ ] Inicio de sesión y asistente de primera vez con el nuevo diseño.
 - [ ] Transición carrito → cobro sin mezcla de pantallas.
@@ -130,3 +156,7 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   `lib/erp/payments.ts`. Verificado: `tsc` OK, eslint sin errores (2 avisos
   previos de `<img>`), `vitest` 220 OK (nueva: `erp-payments.test.ts`, 6 casos).
   **No verificado en el navegador:** no se autorizó arrancar la vista previa local.
+- 23/11/2026: Investigación del rubro en cinco frentes (bodegas, minimarkets y
+  supermercados, SUNAT y mercado, competencia, proveedores y pagos) con fuentes;
+  informe en `docs/INVESTIGACION_RETAIL.md`. Se añade el bloque 7 y se corrige la
+  cifra de merma.
