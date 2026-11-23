@@ -129,6 +129,29 @@ export async function getReceipt(org: string, invoiceId: string): Promise<Receip
   };
 }
 
+export type ReceiptShare =
+  | { ok: true; path: string; phone: string; email: string; business: string }
+  | { ok: false; message: string };
+
+/**
+ * Private link of one receipt for its customer (the same `doc_links` token the
+ * mobile «Enlace» shares, created by `invoice_portal_link` under the user's RLS),
+ * plus the customer's phone and e-mail to send it by WhatsApp or mail.
+ */
+export async function shareReceipt(org: string, invoiceId: string): Promise<ReceiptShare> {
+  if (!uuid.safeParse(invoiceId).success) return { ok: false, message: "Comprobante no válido." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "comprobantes")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  const inv = await c.db.from("invoices").select("id,client:clients(phone,email)").eq("org_id", org).eq("id", invoiceId).maybeSingle();
+  if (inv.error || !inv.data) return { ok: false, message: "No encontramos ese comprobante." };
+  const link = await c.db.rpc("invoice_portal_link", { p_invoice: invoiceId });
+  if (link.error || typeof link.data !== "string" || !/^[A-Za-z0-9_-]{20,80}$/.test(link.data)) return { ok: false, message: "No se pudo crear el enlace. Inténtalo de nuevo." };
+  const raw = (inv.data as { client: unknown }).client;
+  const client = (Array.isArray(raw) ? raw[0] : raw) as { phone?: string | null; email?: string | null } | null;
+  return { ok: true, path: `/comprobante/${link.data}`, phone: client?.phone ?? "", email: client?.email ?? "", business: c.organization?.name ?? "" };
+}
+
 /** Clients module context: module rights re-read on the server for every call. */
 async function clientsContext(org: string) {
   const c = await workspaceContext(org);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesReceipt, receiptKind, receiptNumber, summarize, sunatState, voidHint, voidWindow, type ReceiptRow } from "../src/lib/erp/receipts";
+import { mailtoHref, matchesReceipt, parseRange, presetRange, shareMessage, receiptKind, receiptNumber, summarize, sunatState, voidHint, voidWindow, type ReceiptRow } from "../src/lib/erp/receipts";
 
 const base: ReceiptRow = {
   id: "1", number: "V-0001", issue_date: "2026-11-20", status: "sent", currency: "PEN", doc_kind: "boleta",
@@ -46,5 +46,32 @@ describe("draft receipts", () => {
     expect(draftProblem({ client_name: "x", tax_rate: 18, items: [{ ...line, description: " " }] })).toBe("Escribe la descripción.");
     expect(draftProblem({ client_name: "x", tax_rate: 18, items: [line, { ...line, quantity: 0 }] })).toBe("La cantidad del artículo 2 debe ser mayor que cero.");
     expect(draftProblem({ client_name: "x", tax_rate: 120, items: [line] })).toContain("IGV");
+  });
+});
+
+describe("receipt date range and sending", () => {
+  it("accepts only real, ordered ranges up to 366 days", () => {
+    expect(parseRange("2026-11-01", "2026-11-23")).toEqual({ from: "2026-11-01", to: "2026-11-23" });
+    expect(parseRange("2026-11-23", "2026-11-01")).toBeNull();
+    expect(parseRange("2026-02-30", "2026-03-01")).toBeNull();
+    expect(parseRange("2025-01-01", "2026-11-23")).toBeNull();
+    expect(parseRange(undefined, "2026-11-23")).toBeNull();
+    expect(parseRange("2026-11-01'; drop", "2026-11-23")).toBeNull();
+  });
+
+  it("builds quick ranges in Lima calendar days", () => {
+    expect(presetRange("hoy", "2026-11-23")).toEqual({ from: "2026-11-23", to: "2026-11-23" });
+    expect(presetRange("7dias", "2026-03-02")).toEqual({ from: "2026-02-24", to: "2026-03-02" });
+    expect(presetRange("mes", "2026-11-23")).toEqual({ from: "2026-11-01", to: "2026-11-23" });
+  });
+
+  it("writes the share text and a mailto with subject and body", () => {
+    const msg = shareMessage({ client: "Rosa Quispe", number: "B001-00000128", business: "Bodega Lucha", url: "https://x.pe/comprobante/abc" });
+    expect(msg).toBe("Hola Rosa Quispe, aquí tienes tu comprobante B001-00000128 de Bodega Lucha:\nhttps://x.pe/comprobante/abc");
+    expect(shareMessage({ client: null, number: "N-1", business: "", url: "u" })).toBe("Hola, aquí tienes tu comprobante N-1:\nu");
+    const href = mailtoHref({ to: "rosa@correo.pe", number: "B001-00000128", business: "Bodega Lucha", body: msg });
+    expect(href.startsWith("mailto:rosa@correo.pe?subject=")).toBe(true);
+    expect(decodeURIComponent(href.split("body=")[1])).toBe(msg);
+    expect(mailtoHref({ to: "no es correo", number: "N-1", business: "", body: "b" }).startsWith("mailto:?subject=")).toBe(true);
   });
 });

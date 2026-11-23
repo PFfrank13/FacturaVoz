@@ -256,6 +256,9 @@
 .fv-sums div { display: flex; justify-content: space-between; font-size: 14px; color: var(--erp-muted); font-variant-numeric: tabular-nums; }
 .fv-sums .is-total { color: var(--erp-ink); font-size: 20px; font-weight: 800; border-top: 1px solid var(--erp-line); padding-top: 8px; }
 .fv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fv-send { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--erp-rim); }
+.fv-send-row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.fv-send-row .fv-search { flex: 1 1 200px; }
 .fv-skeleton { display: grid; gap: 10px; margin: 12px 0; }
 .fv-skeleton i { height: 18px; border-radius: 8px; background: linear-gradient(90deg, var(--erp-pane), var(--erp-pane-strong), var(--erp-pane)); background-size: 200% 100%; animation: fv-shimmer 1.2s linear infinite; }
 @keyframes fv-shimmer { to { background-position: -200% 0; } }

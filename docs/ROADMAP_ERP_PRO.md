@@ -47,7 +47,7 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
       cliente (QR SUNAT nivel Q, valor resumen, aviso de beta o envío pendiente).
 - [x] Plazos: «puedes anular hasta …» / «corrígela con nota de crédito».
 - [x] Borradores por voz o escritos con el estilo del ERP y errores claros.
-- [ ] Filtro por rango de fechas y envío por WhatsApp/correo desde el detalle.
+- [x] Filtro por rango de fechas y envío por WhatsApp/correo desde el detalle.
 
 ### 3. ERP web — Clientes con DNI/RUC
 - [x] Alta y edición con consulta DNI/RUC (misma lógica que `/api/lookup`, en
@@ -109,3 +109,14 @@ Menús y rutas del servidor se filtran por empresa + rubro + plan + rol (ya exis
   y a 375 px con ventas locales de prueba.
 - 23/11/2026: Acceso web con el mismo tema del ERP (aurora y cristal, claro y
   oscuro) y pasos «recibe el código» → «escríbelo».
+- 23/11/2026 (sesión automática): Comprobantes con filtro por fechas (Todo / Hoy /
+  7 días / Este mes / desde–hasta, leído por el servidor con `?desde=&hasta=`,
+  hasta 366 días; aviso si se llega al tope de 300) y «Enviar al cliente» en el
+  detalle: enlace privado `/comprobante/<token>` (el mismo `invoice_portal_link`
+  del botón «Enlace» del móvil, con RLS del usuario), WhatsApp con el celular del
+  cliente o eligiendo chat, correo con `mailto:` desde el correo del propio
+  negocio (sin coste de Resend ni PDF adjunto) y «Copiar enlace». Verificado:
+  `tsc` OK, eslint sin errores (2 avisos previos de `<img>`), `vitest` 214 OK
+  (nuevas: `erp-receipt-share.test.ts` y rangos/mensajes en `erp-receipts.test.ts`).
+  **No verificado en el navegador:** no se pudo arrancar la vista previa local en
+  esta ejecución; conviene probar el envío con Supabase local.

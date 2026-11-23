@@ -104,3 +104,37 @@ export function summarize(rows: ReceiptRow[]) {
   }
   return { total, accepted, attention, count: rows.length };
 }
+
+const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+const realDate = (d: string) => isoDate.test(d) && new Date(`${d}T12:00:00Z`).toISOString().slice(0, 10) === d;
+
+/**
+ * Issue-date range from the URL (`desde`/`hasta`, both included). Invalid or
+ * reversed values, or ranges longer than 366 days, fall back to «sin rango»
+ * so the list never silently hides receipts.
+ */
+export function parseRange(from: unknown, to: unknown): { from: string; to: string } | null {
+  if (typeof from !== "string" || typeof to !== "string" || !realDate(from) || !realDate(to) || from > to) return null;
+  if (Date.parse(to) - Date.parse(from) > 366 * 86400000) return null;
+  return { from, to };
+}
+
+/** Quick ranges for the filter, in Lima calendar days. */
+export function presetRange(preset: "hoy" | "7dias" | "mes", today = limaDate(new Date())): { from: string; to: string } {
+  if (preset === "hoy") return { from: today, to: today };
+  if (preset === "7dias") return { from: addDays(today, -6), to: today };
+  return { from: `${today.slice(0, 7)}-01`, to: today };
+}
+
+/** Text sent with the receipt link, by WhatsApp or e-mail (same wording as the mobile app). */
+export function shareMessage(o: { client: string | null | undefined; number: string; business: string; url: string }): string {
+  const who = o.client && o.client.trim() && o.client !== "—" ? ` ${o.client.trim()}` : "";
+  return `Hola${who}, aquí tienes tu comprobante ${o.number}${o.business ? ` de ${o.business}` : ""}:\n${o.url}`;
+}
+
+/** mailto: link with subject and body; the user's own mail app sends it (no server cost, replies reach the business). */
+export function mailtoHref(o: { to: string | null | undefined; number: string; business: string; body: string }): string {
+  const to = o.to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.to.trim()) ? o.to.trim() : "";
+  const subject = `Comprobante ${o.number}${o.business ? ` · ${o.business}` : ""}`;
+  return `mailto:${encodeURIComponent(to).replace(/%40/g, "@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(o.body)}`;
+}

@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { getReceipt, type ReceiptDetail } from "@/app/erp/actions";
+import { getReceipt, shareReceipt, type ReceiptDetail, type ReceiptShare } from "@/app/erp/actions";
+import { waPhone } from "@/lib/erp/clients";
 import {
-  kindLabel, matchesReceipt, receiptKind, receiptNumber, summarize, sunatLabel, sunatState, voidHint, voidWindow,
+  kindLabel, mailtoHref, matchesReceipt, parseRange, presetRange, receiptKind, shareMessage, receiptNumber, summarize, sunatLabel, sunatState, voidHint, voidWindow,
   type ReceiptKind, type ReceiptRow, type SunatState,
 } from "@/lib/erp/receipts";
 
@@ -15,7 +17,7 @@ const stateTone: Record<SunatState, string> = {
 };
 
 /** Every receipt of the company, the same rows the mobile app issues. */
-export default function ReceiptsBoard({ org, rows, currency }: { org: string; rows: ReceiptRow[]; currency: string }) {
+export default function ReceiptsBoard({ org, rows, currency, range = null, capped = false }: { org: string; rows: ReceiptRow[]; currency: string; range?: { from: string; to: string } | null; capped?: boolean }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<ReceiptKind | "todos">("todos");
   const [sunat, setSunat] = useState<SunatState | "todos">("todos");
@@ -41,7 +43,8 @@ export default function ReceiptsBoard({ org, rows, currency }: { org: string; ro
         </select>
       </label>
     </div>
-    <p className="fv-caption" aria-live="polite">{visible.length} {visible.length === 1 ? "comprobante" : "comprobantes"}</p>
+    <DateRange range={range} />
+    <p className="fv-caption" aria-live="polite">{visible.length} {visible.length === 1 ? "comprobante" : "comprobantes"}{range ? ` del ${day(range.from)} al ${day(range.to)}` : ""}{capped ? " · se muestran los 300 más recientes; acota las fechas para ver el resto" : ""}</p>
     <ul className="fv-receipts">
       {visible.map((r, i) => {
         const s = sunatState(r);
@@ -59,7 +62,7 @@ export default function ReceiptsBoard({ org, rows, currency }: { org: string; ro
         </li>;
       })}
     </ul>
-    {!visible.length && <div className="fv-empty"><h2>{q || kind !== "todos" || sunat !== "todos" ? "Sin coincidencias" : "Todavía no hay comprobantes"}</h2><p>Las boletas y facturas emitidas en el móvil o aquí aparecen en esta lista.</p></div>}
+    {!visible.length && <div className="fv-empty"><h2>{q || kind !== "todos" || sunat !== "todos" || range ? "Sin coincidencias" : "Todavía no hay comprobantes"}</h2><p>Las boletas y facturas emitidas en el móvil o aquí aparecen en esta lista.</p></div>}
     {open && <ReceiptSheet key={open.id} org={org} row={open} currency={currency} onClose={() => setOpenId(null)} />}
   </section>;
 }
@@ -115,7 +118,79 @@ function ReceiptSheet({ org, row, currency, onClose }: { org: string; row: Recei
           <a className="fv-button secondary" href={`${base}/archivo?k=cdr`}>CDR de SUNAT</a>
         </>}
       </div>
+      <SendReceipt org={org} row={row} />
     </div>
   </div>;
   return root ? createPortal(sheet, root) : sheet;
+}
+
+/** Issue-date filter: read by the server from `?desde=&hasta=` so it covers every receipt, not just the loaded page. */
+function DateRange({ range }: { range: { from: string; to: string } | null }) {
+  const router = useRouter();
+  const path = usePathname();
+  const [pending, start] = useTransition();
+  const [from, setFrom] = useState(range?.from ?? "");
+  const [to, setTo] = useState(range?.to ?? "");
+  const [error, setError] = useState("");
+  const go = (r: { from: string; to: string } | null) => {
+    setError("");
+    setFrom(r?.from ?? ""); setTo(r?.to ?? "");
+    start(() => router.replace(r ? `${path}?desde=${r.from}&hasta=${r.to}` : path, { scroll: false }));
+  };
+  const apply = (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = parseRange(from, to || from);
+    if (!r) { setError("Elige un rango válido de hasta 366 días (la fecha inicial no puede ser posterior a la final)."); return; }
+    go(r);
+  };
+  const is = (p: "hoy" | "7dias" | "mes") => { const r = presetRange(p); return range?.from === r.from && range?.to === r.to; };
+  return <form className="fv-board-tools" onSubmit={apply} aria-busy={pending}>
+    <div className="fv-segment" role="group" aria-label="Rango rápido de fechas">
+      <button type="button" aria-pressed={!range} onClick={() => go(null)}>Todo</button>
+      <button type="button" aria-pressed={is("hoy")} onClick={() => go(presetRange("hoy"))}>Hoy</button>
+      <button type="button" aria-pressed={is("7dias")} onClick={() => go(presetRange("7dias"))}>7 días</button>
+      <button type="button" aria-pressed={is("mes")} onClick={() => go(presetRange("mes"))}>Este mes</button>
+    </div>
+    <label className="fv-search fv-narrow"><span>Desde</span><input type="date" value={from} onChange={e => setFrom(e.target.value)} required /></label>
+    <label className="fv-search fv-narrow"><span>Hasta (incluido)</span><input type="date" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} /></label>
+    <button className="fv-button secondary" disabled={pending}>{pending ? "Filtrando…" : "Filtrar fechas"}</button>
+    {error && <p role="alert" className="fv-error">{error}</p>}
+  </form>;
+}
+
+/** Send the receipt's private link by WhatsApp or e-mail (the customer sees, prints and downloads it, no account). */
+function SendReceipt({ org, row }: { org: string; row: ReceiptRow }) {
+  const [share, setShare] = useState<ReceiptShare | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [copied, setCopied] = useState(false);
+  const prepare = async () => {
+    setBusy(true);
+    const s = await shareReceipt(org, row.id).catch(() => ({ ok: false, message: "No se pudo crear el enlace. Inténtalo de nuevo." }) as const);
+    setShare(s);
+    if (s.ok) { setPhone(s.phone); setEmail(s.email); }
+    setBusy(false);
+  };
+  if (!share || !share.ok) return <div className="fv-send">
+    <button className="fv-button" onClick={prepare} disabled={busy}>{busy ? "Preparando enlace…" : "Enviar al cliente"}</button>
+    {share && !share.ok && <p role="alert" className="fv-error">{share.message}</p>}
+  </div>;
+  const url = `${window.location.origin}${share.path}`;
+  const message = shareMessage({ client: row.client?.name, number: receiptNumber(row), business: share.business, url });
+  const wa = waPhone(phone);
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); } catch { setCopied(false); } };
+  return <div className="fv-send" aria-label="Enviar al cliente">
+    <p className="fv-caption">Enlace privado: tu cliente ve, imprime o descarga el comprobante (PDF, XML y CDR) sin crear cuenta.</p>
+    <div className="fv-send-row">
+      <label className="fv-search"><span>WhatsApp</span><input type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XX XXX XXX" /></label>
+      {wa ? <a className="fv-button" href={`https://wa.me/${wa}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener">Enviar por WhatsApp</a>
+        : <a className="fv-button secondary" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener">Elegir chat en WhatsApp</a>}
+    </div>
+    <div className="fv-send-row">
+      <label className="fv-search"><span>Correo</span><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@correo.com" /></label>
+      <a className="fv-button secondary" href={mailtoHref({ to: email, number: receiptNumber(row), business: share.business, body: message })}>Enviar por correo</a>
+    </div>
+    <button className="fv-button secondary" onClick={copy}>{copied ? "Enlace copiado" : "Copiar enlace"}</button>
+  </div>;
 }

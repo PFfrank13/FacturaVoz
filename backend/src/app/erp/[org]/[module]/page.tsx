@@ -14,7 +14,7 @@ import PurchasesBoard, { type PurchaseProduct } from "@/components/erp/Purchases
 import type { PurchaseRow } from "@/lib/erp/purchases";
 import type { CashMove, DayClosing } from "@/lib/erp/cash";
 import type { DaySummary } from "@/lib/dayclose";
-import { limaDate } from "@/lib/erp/receipts";
+import { limaDate, parseRange } from "@/lib/erp/receipts";
 import { mergeClients, type ClientActivity, type ClientBalance, type ClientRow } from "@/lib/erp/clients";
 
 const liveProducts = ["products"] as const;
@@ -25,7 +25,7 @@ const livePurchases = ["products"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
-export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string }> }) {
+export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string }> }) {
   const { org, module: id } = await params;
   const c = await workspaceContext(org);
   const m = modules.find(m => m.id === id);
@@ -52,9 +52,13 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   }
   if (id === "comprobantes") {
     // Same receipts the mobile app issues, with their SUNAT documents (RLS: company members).
-    const result = await c.db.from("invoices")
+    const search = await searchParams;
+    const range = parseRange(search.desde, search.hasta);
+    let query = c.db.from("invoices")
       .select("id,number,issue_date,status,currency,doc_kind,amt_total,voided_at,client:clients(name,tax_id),fiscal:fiscal_documents(doc_type,series,correlative,status,sunat_code,sunat_message,issued_at)")
-      .eq("org_id", org).order("issue_date", { ascending: false }).order("created_at", { ascending: false }).limit(300);
+      .eq("org_id", org);
+    if (range) query = query.gte("issue_date", range.from).lte("issue_date", range.to);
+    const result = await query.order("issue_date", { ascending: false }).order("created_at", { ascending: false }).limit(300);
     const receipts: ReceiptRow[] = ((result.data ?? []) as unknown as (Omit<ReceiptRow, "client" | "fiscal"> & { client: unknown; fiscal: unknown })[]).map(r => ({
       ...r,
       client: (Array.isArray(r.client) ? r.client[0] : r.client) as ReceiptRow["client"] ?? null,
@@ -63,7 +67,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">FACTURACIÓN / {c.organization.name}</p><LiveRefresh org={org} tables={liveReceipts} /></div><h1>Comprobantes</h1><p>Boletas, facturas y notas emitidas en el móvil o aquí, con su estado en SUNAT, XML, CDR y versión imprimible.</p></section>
       <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los comprobantes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
-        : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} />}
+        : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} range={range} capped={receipts.length >= 300} />}
     </>;
   }
   if (id === "compras") {
