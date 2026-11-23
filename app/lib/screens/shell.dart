@@ -372,9 +372,19 @@ class _MainShellState extends State<MainShell> {
     final cs = t.colorScheme;
     final selected = destinations.indexWhere((d) => d.id == _tab);
     final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
+    // Textos del menú con contraste pleno: sobre el vidrio, el gris de onSurfaceVariant se veía desteñido.
+    final ink = cs.onSurface;
     return FvGlassSurface(
       radius: 24,
       blur: 18,
+      child: Theme(
+      data: t.copyWith(navigationDrawerTheme: t.navigationDrawerTheme.copyWith(
+        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+          fontSize: 16,
+          color: ink,
+          fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
+        )),
+      )),
       child: NavigationDrawer(
       key: const ValueKey('bodega-navigation-drawer'),
       backgroundColor: Colors.transparent,
@@ -408,7 +418,7 @@ class _MainShellState extends State<MainShell> {
                   fontWeight: FontWeight.w800, letterSpacing: -0.5)),
               const SizedBox(height: 5),
               Text('Bodega / Tienda  ·  ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
-                style: t.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                style: t.textTheme.bodySmall?.copyWith(color: ink.withValues(alpha: .78), fontWeight: FontWeight.w600)),
             ]),
           ),
         ),
@@ -420,7 +430,7 @@ class _MainShellState extends State<MainShell> {
         ),
         for (final d in destinations)
           NavigationDrawerDestination(
-            icon: Icon(d.icon, color: cs.onSurfaceVariant, size: 21),
+            icon: Icon(d.icon, color: ink.withValues(alpha: .82), size: 21),
             selectedIcon: Icon(d.icon, color: cs.primary, size: 21),
             label: Text(d.label),
           ),
@@ -428,9 +438,10 @@ class _MainShellState extends State<MainShell> {
         Padding(
           padding: const EdgeInsets.fromLTRB(26, 12, 18, 24),
           child: Text('Funciones habilitadas para tu plan y rol.',
-            style: t.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            style: t.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .72))),
         ),
       ],
+      ),
       ),
     );
   }
