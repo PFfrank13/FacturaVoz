@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { amountLegend } from "@/lib/fiscal/words";
 import { totalsOf } from "@/lib/publicbase";
@@ -70,20 +71,21 @@ export type PrintDoc = {
 const DOC_LABEL: Record<string, string> = { "6": "RUC", "1": "DNI", "4": "C. EXTRANJERÍA", "7": "PASAPORTE" };
 const n = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
-/** Representación impresa: si hay comprobante SUNAT se arma SOLO con lo enviado a SUNAT (como la app). */
-export async function getPrintDoc(portal: Portal, invoiceId: string): Promise<PrintDoc | null> {
-  if (!portal.history.some((h) => h.id === invoiceId)) return null;
-  const admin = createAdminClient();
-  const { data: inv } = await admin
+/**
+ * Representación impresa: si hay comprobante SUNAT se arma SOLO con lo enviado a SUNAT (como la app).
+ * `db` decide quién lee: el portal usa service_role tras validar el token; el ERP, la sesión del usuario con RLS.
+ */
+export async function buildPrintDoc(db: SupabaseClient, invoiceId: string, signLogo: (path: string | null | undefined) => Promise<string | null>): Promise<PrintDoc | null> {
+  const { data: inv } = await db
     .from("invoices")
     .select("id, number, issue_date, due_date, currency, tax_rate, status, clients(name, tax_id, address), invoice_items(description, quantity, unit_price, position), organizations(name, trade_name, tax_id, address, logo_path)")
     .eq("id", invoiceId)
     .order("position", { referencedTable: "invoice_items", ascending: true })
     .maybeSingle();
   if (!inv) return null;
-  const { data: fd } = await admin.from("fiscal_documents").select("doc_type, series, correlative, env, status, payload, totals, legend, hash, xml, cdr").eq("invoice_id", invoiceId).maybeSingle();
+  const { data: fd } = await db.from("fiscal_documents").select("doc_type, series, correlative, env, status, payload, totals, legend, hash, xml, cdr").eq("invoice_id", invoiceId).maybeSingle();
   const org = (Array.isArray(inv.organizations) ? inv.organizations[0] : inv.organizations) as { name: string; trade_name: string | null; tax_id: string | null; address: string | null; logo_path: string | null } | null;
-  const logoUrl = await signedLogo(org?.logo_path);
+  const logoUrl = await signLogo(org?.logo_path);
   if (fd) {
     const p = fd.payload as Record<string, unknown>;
     const company = (p.company ?? {}) as Record<string, unknown>;
@@ -165,4 +167,10 @@ export async function getPrintDoc(portal: Portal, invoiceId: string): Promise<Pr
     hasXml: false,
     hasCdr: false,
   };
+}
+
+/** Representación impresa para el portal público: solo comprobantes del historial de ese enlace. */
+export async function getPrintDoc(portal: Portal, invoiceId: string): Promise<PrintDoc | null> {
+  if (!portal.history.some((h) => h.id === invoiceId)) return null;
+  return buildPrintDoc(createAdminClient(), invoiceId, signedLogo);
 }

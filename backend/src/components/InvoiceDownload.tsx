@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 
 const PDFButton = dynamic(() => import("./PDFButton"), {
   ssr: false,
-  loading: () => <div className="animate-pulse">Estructurando documento...</div>,
+  loading: () => <span className="fv-button secondary" aria-busy="true">Preparando PDF…</span>,
 });
 
 export default PDFButton;

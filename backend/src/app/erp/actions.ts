@@ -97,3 +97,28 @@ export async function uploadProductPhoto(org: string, productId: string, _previo
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: "Foto actualizada. Ya aparece en el móvil." };
 }
+
+export type ReceiptDetail = {
+  ok: true;
+  items: { description: string; quantity: number; unit_price: number }[];
+  base: number; tax: number; discount: number; total: number; currency: string; notes: string | null;
+} | { ok: false; message: string };
+
+/** Line items and totals of one receipt, re-checking module rights on the server. */
+export async function getReceipt(org: string, invoiceId: string): Promise<ReceiptDetail> {
+  if (!uuid.safeParse(invoiceId).success) return { ok: false, message: "Comprobante no válido." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "comprobantes")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  const [inv, items] = await Promise.all([
+    c.db.from("invoices").select("id,currency,amt_base,amt_tax,amt_discount,amt_total,notes").eq("org_id", org).eq("id", invoiceId).maybeSingle(),
+    c.db.from("invoice_items").select("description,quantity,unit_price").eq("invoice_id", invoiceId).order("id"),
+  ]);
+  if (inv.error || !inv.data || items.error) return { ok: false, message: "No se pudo cargar el comprobante." };
+  return {
+    ok: true,
+    items: (items.data ?? []).map(i => ({ description: i.description, quantity: Number(i.quantity), unit_price: Number(i.unit_price) })),
+    base: Number(inv.data.amt_base), tax: Number(inv.data.amt_tax), discount: Number(inv.data.amt_discount),
+    total: Number(inv.data.amt_total), currency: inv.data.currency || "PEN", notes: inv.data.notes,
+  };
+}

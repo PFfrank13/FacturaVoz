@@ -1,0 +1,9 @@
+/* The printable receipt lives inside the ERP shell: frame it on screen and print only the paper. */
+.fv-print-frame { border-radius: 18px; overflow: hidden; }
+.fv-print-frame .fv-receipt-print { min-height: 0; }
+@media print {
+  .fv-workspace { display: block !important; background: #fff !important; }
+  .fv-workspace::before, .fv-rail, .fv-topbar, .fv-skip, .no-print { display: none !important; }
+  .fv-workarea, .fv-content { padding: 0 !important; margin: 0 !important; max-width: none !important; animation: none !important; }
+  .fv-print-frame { border-radius: 0; }
+}

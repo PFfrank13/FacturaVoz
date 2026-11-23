@@ -211,3 +211,87 @@
 @media (prefers-reduced-motion: reduce) {
   .fv-workspace *, .fv-workspace *::before { animation: none !important; transition: none !important; }
 }
+
+/* Comprobantes. */
+.fv-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+.fv-kpis > div { position: relative; overflow: hidden; border-radius: 22px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); animation: fv-rise .5s var(--erp-ease) both; }
+.fv-kpis > div::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--tone) 30%, transparent), transparent 60%); }
+.fv-kpis span, .fv-kpis small { position: relative; font-size: 12px; font-weight: 700; color: var(--erp-muted); }
+.fv-kpis strong { position: relative; font-size: clamp(24px, 2.4vw, 34px); font-weight: 800; letter-spacing: -1.2px; font-variant-numeric: tabular-nums; }
+.fv-narrow { min-width: 180px; flex: 0 1 220px; }
+.fv-search select { border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); color: var(--erp-ink); border-radius: 14px; padding: 12px 14px; font: inherit; font-weight: 600; }
+.fv-receipts { list-style: none; display: grid; gap: 8px; padding: 0; margin: 0; }
+.fv-receipts li { animation: fv-rise .45s var(--erp-ease) both; animation-delay: calc(var(--i, 0) * 25ms); }
+.fv-receipts button { width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) 70px auto 120px; align-items: center; gap: 14px; text-align: left;
+  padding: 12px 16px; border-radius: 18px; cursor: pointer; color: inherit; font: inherit;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim);
+  transition: transform .25s var(--erp-ease), box-shadow .25s var(--erp-ease); }
+.fv-receipts button:hover { transform: translateY(-2px); box-shadow: var(--erp-shadow), 0 14px 30px -18px var(--erp-glow); }
+.fv-doc-badge { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; font-weight: 900; color: #fff;
+  background: linear-gradient(135deg, #6fb7ff, #3b5bdb); box-shadow: 0 8px 18px -8px #3b5bdb; }
+.fv-doc-badge.is-boleta { background: linear-gradient(135deg, #3ee6b0, #0e8c74); box-shadow: 0 8px 18px -8px #0e8c74; }
+.fv-doc-badge.is-nota_credito { background: linear-gradient(135deg, #ffb35c, #e07b24); }
+.fv-doc-badge.is-borrador, .fv-doc-badge.is-nota_venta { background: linear-gradient(135deg, #a3b1c6, #5b6b82); }
+.fv-receipt-main { display: flex; flex-direction: column; min-width: 0; }
+.fv-receipt-main strong { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fv-receipt-main small { color: var(--erp-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fv-receipt-date { color: var(--erp-muted); font-size: 13px; font-weight: 600; }
+.fv-receipt-total { text-align: right; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.fv-pill { font-size: 11px; font-weight: 800; padding: 6px 10px; border-radius: 99px; white-space: nowrap; }
+.fv-pill.is-ok, .fv-sunat.is-ok { color: #0e8c74; background: rgba(62, 230, 176, .16); }
+.fv-pill.is-wait, .fv-sunat.is-wait { color: #b4690e; background: rgba(255, 179, 92, .18); }
+.fv-pill.is-bad, .fv-sunat.is-bad { color: #e0457b; background: rgba(224, 69, 123, .14); }
+.fv-pill.is-off, .fv-sunat.is-off { color: var(--erp-muted); background: color-mix(in srgb, var(--erp-ink) 7%, transparent); }
+@media (prefers-color-scheme: dark) { .fv-pill.is-ok, .fv-sunat.is-ok { color: #5bebbe; } .fv-pill.is-wait, .fv-sunat.is-wait { color: #ffc069; } .fv-pill.is-bad, .fv-sunat.is-bad { color: #ff8aa8; } }
+.fv-sunat { border-radius: 16px; padding: 12px 14px; margin: 14px 0; display: grid; gap: 4px; font-size: 13px; }
+.fv-sunat strong { font-size: 14px; }
+.fv-mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.fv-mini dt { font-size: 11px; font-weight: 700; color: var(--erp-muted); text-transform: uppercase; letter-spacing: .6px; }
+.fv-mini dd { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
+.fv-lines { list-style: none; padding: 0; margin: 0 0 12px; border-top: 1px solid var(--erp-line); }
+.fv-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 2px; border-bottom: 1px dashed var(--erp-line); font-size: 14px; font-variant-numeric: tabular-nums; }
+.fv-sums { display: grid; gap: 6px; margin-bottom: 16px; }
+.fv-sums div { display: flex; justify-content: space-between; font-size: 14px; color: var(--erp-muted); font-variant-numeric: tabular-nums; }
+.fv-sums .is-total { color: var(--erp-ink); font-size: 20px; font-weight: 800; border-top: 1px solid var(--erp-line); padding-top: 8px; }
+.fv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fv-skeleton { display: grid; gap: 10px; margin: 12px 0; }
+.fv-skeleton i { height: 18px; border-radius: 8px; background: linear-gradient(90deg, var(--erp-pane), var(--erp-pane-strong), var(--erp-pane)); background-size: 200% 100%; animation: fv-shimmer 1.2s linear infinite; }
+@keyframes fv-shimmer { to { background-position: -200% 0; } }
+@media (max-width: 900px) { .fv-kpis { grid-template-columns: 1fr; } .fv-receipts button { grid-template-columns: 40px minmax(0, 1fr) auto; } .fv-receipt-date, .fv-pill { display: none; } }
+
+/* Draft receipts (voice or typed): a quiet bar until it is needed, then a glass editor. */
+.fv-draft-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; padding: 16px 20px; }
+.fv-draft-bar > div:first-child { display: grid; gap: 4px; min-width: 220px; flex: 1; }
+.fv-draft-bar strong, .fv-draft header strong { font-size: 15px; font-weight: 800; }
+.fv-draft-bar small, .fv-draft header small { color: var(--erp-muted); font-size: 13px; line-height: 1.5; }
+.fv-draft-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fv-draft-note { flex-basis: 100%; font-size: 13px; color: var(--erp-muted); margin: 0; }
+.fv-mic { display: inline-flex; align-items: center; gap: 10px; }
+.fv-mic canvas { width: 96px; height: 28px; opacity: 0; transition: opacity .25s; }
+.fv-mic.is-recording canvas { opacity: 1; }
+.fv-mic .fv-button span { color: #ff6b6b; font-size: 12px; }
+.fv-mic.is-recording .fv-button { background: #e5484d; color: #fff; animation: fv-breathe 1.4s ease-in-out infinite; }
+.fv-mic.is-recording .fv-button span { color: #fff; }
+@keyframes fv-breathe { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, #e5484d 22%, transparent); } }
+.fv-draft { display: grid; gap: 16px; padding: 20px 22px; }
+.fv-draft header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.fv-draft header > div { display: grid; gap: 4px; }
+.fv-draft-client { max-width: 480px; }
+.fv-draft-lines { display: grid; gap: 8px; }
+.fv-draft-head, .fv-draft-line { display: grid; grid-template-columns: minmax(0, 3fr) 90px 120px 110px 40px; gap: 8px; align-items: center; }
+.fv-draft-head span { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--erp-muted); }
+.fv-draft-line input { border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); color: var(--erp-ink); border-radius: 12px; padding: 10px 12px; font: inherit; min-width: 0; width: 100%; }
+.fv-draft-line input:focus { outline: none; border-color: var(--erp-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--erp-accent) 22%, transparent); }
+.fv-draft-amount { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fv-draft-line .fv-icon-button:hover { transform: none; }
+.fv-draft-line .fv-icon-button:disabled { opacity: .35; cursor: not-allowed; }
+.fv-draft-foot { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.fv-draft-foot .fv-sums { margin-left: auto; min-width: 240px; }
+@media (max-width: 720px) {
+  .fv-draft-head { display: none; }
+  .fv-draft-line { grid-template-columns: 1fr 1fr 40px; }
+  .fv-draft-line input:first-child { grid-column: 1 / -1; }
+  .fv-draft-amount { grid-column: 1 / 3; text-align: left; }
+}

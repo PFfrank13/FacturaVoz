@@ -4,9 +4,12 @@ import { useRef, useState } from "react";
 export default function VoiceRecorder({
   onAudio,
   disabled,
+  compact = false,
 }: {
   onAudio: (blob: Blob, filename: string) => void;
   disabled?: boolean;
+  /** Inline mic button for toolbars (ERP); the large one is for the dictation screen. */
+  compact?: boolean;
 }) {
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
@@ -63,6 +66,17 @@ export default function VoiceRecorder({
     recRef.current?.stop();
     setRecording(false);
   }
+
+  if (compact)
+    return (
+      <div className={`fv-mic${recording ? " is-recording" : ""}`}>
+        <canvas ref={canvasRef} width={96} height={28} aria-hidden="true" />
+        <button type="button" className="fv-button" disabled={disabled} onClick={recording ? stop : start} aria-label={recording ? "Terminar dictado" : "Dictar borrador"}>
+          <span aria-hidden="true">{recording ? "■" : "●"}</span>{recording ? "Terminar" : "Dictar"}
+        </button>
+        {error && <span className="fv-error" role="alert">{error}</span>}
+      </div>
+    );
 
   return (
     <div className="flex flex-col items-center gap-4">

@@ -55,7 +55,7 @@ export default function PDFButton({ data }: { data: PdfData }) {
     <PDFDownloadLink
       document={<InvoiceDoc d={data} />}
       fileName={`${data.number}.pdf`}
-      className="inline-block rounded-lg bg-green-600 px-5 py-3 font-medium text-white"
+      className="fv-button"
     >
       {({ loading }) => (loading ? "Preparando PDF…" : "Descargar PDF")}
     </PDFDownloadLink>

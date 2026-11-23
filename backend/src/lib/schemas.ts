@@ -15,6 +15,18 @@ export const invoiceInputSchema = z.object({
 });
 
 export type InvoiceInput = z.infer<typeof invoiceInputSchema>;
+
+/** The first thing a person must fix before saving, in their words (mirrors invoiceInputSchema). */
+export function draftProblem(inv: InvoiceInput): string | null {
+  for (const [k, it] of inv.items.entries()) {
+    const n = inv.items.length > 1 ? ` del artículo ${k + 1}` : "";
+    if (!it.description.trim()) return `Escribe la descripción${n}.`;
+    if (!(Number(it.quantity) > 0)) return `La cantidad${n} debe ser mayor que cero.`;
+    if (!(Number(it.unit_price) >= 0)) return `El precio${n} no puede ser negativo.`;
+  }
+  if (!(inv.tax_rate >= 0 && inv.tax_rate <= 100)) return "El IGV debe estar entre 0 y 100 %.";
+  return null;
+}
 export type ActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };

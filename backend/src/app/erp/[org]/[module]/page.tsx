@@ -6,8 +6,11 @@ import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
 import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
 import LiveRefresh from "@/components/erp/LiveRefresh";
+import ReceiptsBoard from "@/components/erp/ReceiptsBoard";
+import type { ReceiptRow } from "@/lib/erp/receipts";
 
 const liveProducts = ["products"] as const;
+const liveReceipts = ["invoices"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { money } from "@/lib/schemas";
 
@@ -36,6 +39,22 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     const result = await c.db.rpc("team_members", { p_org: org });
     return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS</p><h1>Equipo</h1></section>{result.error ? <p role="alert">No se pudo cargar el equipo. Pulsa Actualizar para reintentar.</p> : <DataTable rows={result.data ?? []} fields={[["display_name", "Nombre"], ["email", "Correo"], ["role", "Rol"], ["staff_role", "Función"]]} />}</>;
   }
+  if (id === "comprobantes") {
+    // Same receipts the mobile app issues, with their SUNAT documents (RLS: company members).
+    const result = await c.db.from("invoices")
+      .select("id,number,issue_date,status,currency,doc_kind,amt_total,voided_at,client:clients(name,tax_id),fiscal:fiscal_documents(doc_type,series,correlative,status,sunat_code,sunat_message,issued_at)")
+      .eq("org_id", org).order("issue_date", { ascending: false }).order("created_at", { ascending: false }).limit(300);
+    const receipts: ReceiptRow[] = ((result.data ?? []) as unknown as (Omit<ReceiptRow, "client" | "fiscal"> & { client: unknown; fiscal: unknown })[]).map(r => ({
+      ...r,
+      client: (Array.isArray(r.client) ? r.client[0] : r.client) as ReceiptRow["client"] ?? null,
+      fiscal: (Array.isArray(r.fiscal) ? r.fiscal[0] : r.fiscal) as ReceiptRow["fiscal"] ?? null,
+    }));
+    return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">FACTURACIÓN / {c.organization.name}</p><LiveRefresh org={org} tables={liveReceipts} /></div><h1>Comprobantes</h1><p>Boletas, facturas y notas emitidas en el móvil o aquí, con su estado en SUNAT, XML, CDR y versión imprimible.</p></section>
+      <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />
+      {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los comprobantes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
+        : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} />}
+    </>;
+  }
   if (id === "productos" || id === "inventario") {
     // One catalog, shared with the mobile POS: same rows, photos and permissions.
     const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path")
@@ -60,7 +79,6 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const rows = (result.data ?? []) as unknown as Record<string, unknown>[];
   return <><section className="fv-heading"><p className="fv-eyebrow">OPERACIÓN / {c.organization.name}</p><h1>{title}</h1><p>{id === "agenda" ? "Citas registradas, ordenadas por fecha." : "Información de tu empresa, compartida con la aplicación móvil."}</p></section>
     {(["clientes", "trabajos", "agenda"].includes(id) || (id === "productos" && can(c.access, "products_edit"))) && <CreateRecord org={org} moduleId={id} />}
-    {id === "comprobantes" && <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />}
     {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los registros</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div> : <><DataTable rows={rows.slice(0, 50)} fields={m.fields!} /><nav className="fv-pagination" aria-label="Paginación">{page > 1 && <Link className="fv-button secondary" href={`?page=${page - 1}`}>Anterior</Link>}<span>Página {page}</span>{rows.length > 50 && <Link className="fv-button secondary" href={`?page=${page + 1}`}>Siguiente</Link>}</nav></>}
   </>;
 }
