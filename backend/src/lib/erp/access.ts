@@ -69,6 +69,7 @@ export const modules: readonly Module[] = [
   { id: "reportes", title: "Reportes", feature: "reportes", permission: "finance" },
   { id: "plan", title: "Mi plan", permission: "license" },
   { id: "configuracion", title: "Configuración", permission: "settings" },
+  { id: "api", title: "API y webhooks", feature: "api_publica", permission: "team" },
 ];
 export function moduleAllowed(m: Module, l: License, a: Access, sector: Sector | null): boolean {
   if (m.permission && !can(a, m.permission)) return false;

@@ -43,6 +43,7 @@ import { renderExtra } from "./extra";
 import { renderExtra2 } from "./extra2";
 import { renderExtra3 } from "./extra3";
 import { money } from "@/lib/schemas";
+import { BrandingForm, BusinessForm, CancelInvite, InviteForm, MemberEditor, PaySettingsForm, SunatForm } from "@/components/erp/SettingsBoards";
 
 export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string; seg?: string }> }) {
   const { org, module: id } = await params;
@@ -139,30 +140,49 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       </section></>;
   }
   if (id === "configuracion") {
-    const extra = await c.db.from("organizations").select("trade_name,ubigeo,district,province,department,series_factura,series_boleta").eq("id", org).maybeSingle();
-    const e = (extra.data ?? {}) as Record<string, string | null>;
-    const rows: [string, string | null | undefined][] = [
-      ["Razón social", c.organization.name], ["Nombre comercial", e.trade_name], ["RUC", c.organization.tax_id], ["Dirección fiscal", c.organization.address],
-      ["Distrito / provincia", [e.district, e.province, e.department].filter(Boolean).join(" · ")], ["Ubigeo", e.ubigeo],
-      ["Moneda", c.organization.currency], ["IGV por defecto", c.organization.default_tax_rate != null ? `${c.organization.default_tax_rate} %` : null],
-      ["Serie de facturas", e.series_factura], ["Serie de boletas", e.series_boleta],
-    ];
-    const missing = rows.filter(([, v]) => !v).map(([k]) => k);
-    return <><section className="fv-heading"><p className="fv-eyebrow">EMPRESA / {c.organization.name}</p><h1>Configuración</h1><p>Los datos que salen en tus comprobantes. Se editan en el móvil (Ajustes → Negocio) y aquí se ven al instante.</p></section>
+    const [extra, pay, fiscal] = await Promise.all([
+      c.db.from("organizations").select("trade_name,ubigeo,district,province,department,series_factura,series_boleta,logo_path,pdf_template,ticket_width,brand_color").eq("id", org).maybeSingle(),
+      c.db.from("org_pay_settings").select("yape_phone,plin_phone,yape_qr_path,plin_qr_path,bank_name,bank_account,bank_cci,account_holder,pay_note,reminders_enabled,reminder_offsets").eq("org_id", org).maybeSingle(),
+      c.db.from("fiscal_companies").select("env").eq("org_id", org).maybeSingle(),
+    ]);
+    const e = (extra.data ?? {}) as Record<string, string | number | null>;
+    const s = (v: unknown) => (v == null ? "" : String(v));
+    const missing = [["RUC", c.organization.tax_id], ["Dirección fiscal", c.organization.address], ["Ubigeo", e.ubigeo], ["Serie de facturas", e.series_factura], ["Serie de boletas", e.series_boleta]].filter(([, v]) => !v).map(([k]) => k);
+    const logo = e.logo_path ? (await c.db.storage.from("org-media").createSignedUrl(String(e.logo_path), 3600)).data?.signedUrl ?? null : null;
+    const pr = (pay.data ?? {}) as Record<string, unknown>;
+    const admin = c.access.is_admin === true;
+    return <><section className="fv-heading"><p className="fv-eyebrow">EMPRESA / {c.organization.name}</p><h1>Configuración</h1><p>Los datos de tus comprobantes, SUNAT, tu logo y cómo te pagan. Lo que cambies aquí se ve igual en el móvil.</p></section>
       {missing.length > 0 && <p className="fv-hint" role="status">Te falta completar: {missing.join(", ")}. Sin ellos SUNAT puede rechazar tus comprobantes.</p>}
-      <dl className="fv-details">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "Sin configurar"}</dd></div>)}</dl></>;
+      {!admin ? <div className="fv-empty"><h2>Solo el dueño o un administrador</h2><p>Pídele acceso al dueño para cambiar la configuración.</p></div> : <div className="fv-settings-grid">
+        <BusinessForm org={org} b={{ name: c.organization.name ?? "", trade_name: s(e.trade_name), tax_id: s(c.organization.tax_id), address: s(c.organization.address), ubigeo: s(e.ubigeo), department: s(e.department), province: s(e.province), district: s(e.district),
+          series_factura: s(e.series_factura), series_boleta: s(e.series_boleta), currency: c.organization.currency || "PEN", default_tax_rate: Number(c.organization.default_tax_rate ?? 18) }} />
+        <SunatForm org={org} connected={!!fiscal.data} env={(fiscal.data as { env?: string } | null)?.env ?? null} />
+        <PaySettingsForm org={org} s={{ yape: s(pr.yape_phone), plin: s(pr.plin_phone), bank_name: s(pr.bank_name), bank_account: s(pr.bank_account), bank_cci: s(pr.bank_cci), holder: s(pr.account_holder), note: s(pr.pay_note),
+          reminders: pr.reminders_enabled === true, offsets: Array.isArray(pr.reminder_offsets) ? (pr.reminder_offsets as number[]) : [-3, 0, 3, 7, 15], yape_qr: !!pr.yape_qr_path, plin_qr: !!pr.plin_qr_path }} />
+        <BrandingForm org={org} logoUrl={logo} template={s(e.pdf_template) || "clasico"} color={s(e.brand_color) || "#1E3A8A"} width={Number(e.ticket_width ?? 80)} />
+      </div>}</>;
   }
   if (id === "equipo") {
-    const result = await c.db.rpc("team_members", { p_org: org });
+    const [result, invites] = await Promise.all([c.db.rpc("team_members", { p_org: org }), c.db.from("org_invites").select("id,email,role,staff_role,display_name").eq("org_id", org).is("accepted_at", null).order("created_at")]);
     const roleLabel: Record<string, string> = { owner: "Dueño", admin: "Administrador", cajero: "Cajero", finanzas: "Finanzas", tecnico: "Técnico", vendedor: "Vendedor" };
-    type Member = { display_name: string | null; email: string | null; role: string; staff_role: string | null };
+    type Member = { user_id: string; display_name: string | null; email: string | null; role: string; staff_role: string | null; commission_pct: number | string | null; sales_goal: number | string | null };
     const members = (result.data ?? []) as Member[];
-    return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS / {c.organization.name}</p><h1>Equipo</h1><p>Quién entra a tu empresa y qué puede hacer. Las invitaciones y los cambios de rol se hacen en el móvil (Ajustes → Equipo).</p></section>
-      {result.error ? <div className="fv-empty" role="alert"><h2>No se pudo cargar el equipo</h2><p>Pulsa Actualizar para reintentar.</p></div>
-        : <ul className="fv-branches">{members.map((mb, i) => {
+    const inv = (invites.data ?? []) as { id: string; email: string; role: string; staff_role: string | null; display_name: string | null }[];
+    const maxUsers = featureLimit(c.license, "max_users");
+    const left = maxUsers === -1 || maxUsers == null ? null : Math.max(0, Number(maxUsers) - members.length - inv.length);
+    const admin = c.access.is_admin === true;
+    return <><section className="fv-heading"><p className="fv-eyebrow">PERSONAS / {c.organization.name}</p><h1>Equipo</h1><p>Quién entra a tu empresa y qué puede hacer. Invita por correo y elige su rol: cada uno ve solo lo que le toca.</p></section>
+      {result.error ? <div className="fv-empty" role="alert"><h2>No se pudo cargar el equipo</h2><p>Pulsa Actualizar para reintentar.</p></div> : <>
+        {admin && <InviteForm org={org} left={left} />}
+        <ul className="fv-team">{members.map(mb => {
           const role = mb.role === "owner" || mb.role === "admin" ? mb.role : mb.staff_role ?? "cajero";
-          return <li key={i}><div><strong>{mb.display_name || mb.email || "Sin nombre"}</strong><small>{mb.email ?? ""}</small></div><span>{roleLabel[role] ?? role}</span><span /><span /></li>;
-        })}</ul>}
+          const nm = mb.display_name || (mb.email ?? "").split("@")[0] || "Sin nombre";
+          return <li key={mb.user_id}><div><strong>{nm}</strong><small>{mb.email ?? ""}{mb.commission_pct != null ? ` · comisión ${Number(mb.commission_pct)} %` : ""}{mb.sales_goal != null ? ` · meta ${money(Number(mb.sales_goal), c.organization.currency || "PEN")}` : ""}</small></div>
+            <span className={`fv-role r-${role}`}>{roleLabel[role] ?? role}</span>
+            {admin && <MemberEditor org={org} userId={mb.user_id} role={role} name={nm} commission={mb.commission_pct == null ? null : Number(mb.commission_pct)} goal={mb.sales_goal == null ? null : Number(mb.sales_goal)} isOwner={mb.role === "owner"} isMe={mb.user_id === c.user.id} />}</li>;
+        })}</ul>
+        {inv.length > 0 && <section className="fv-create" style={{ padding: 18 }}><h3>Invitaciones pendientes</h3><ul className="fv-lines">{inv.map(i => <li key={i.id}><span>{i.display_name ? `${i.display_name} · ` : ""}{i.email} · {roleLabel[i.role === "admin" ? "admin" : i.staff_role ?? "cajero"]}<small> Debe entrar con este correo.</small></span>{admin && <CancelInvite org={org} id={i.id} />}</li>)}</ul></section>}
+      </>}
     </>;
   }
   if (id === "comprobantes") {

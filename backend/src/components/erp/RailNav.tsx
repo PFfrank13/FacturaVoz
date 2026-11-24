@@ -25,6 +25,7 @@ const icons: Record<string, string> = {
   credito: "M3.5 6h17v12h-17zM3.5 10h17M7 14.5h4M15 14.5h2",
   clientes360: "M12 21a9 9 0 1 1 9-9M12 12V3M12 12l6.4 6.4M15 21h6v-6",
   negocio: "M3 17l6-6 4 4 8-8M15 7h6v6",
+  api: "M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16",
   escanear: "M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3M7 12h10",
   pin: "M6 10V8a6 6 0 0 1 12 0v2M5 10h14v10H5zM9 15h.01M12 15h.01M15 15h.01",
   agente: "M12 3v3M7 8h10a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3zM9.5 13v1M14.5 13v1M2 13h2M20 13h2",
@@ -56,7 +57,7 @@ const groups: { title: string; color: string; ids: string[] }[] = [
   { title: "Servicios", color: "#0b8aa8", ids: ["trabajos", "agenda"] },
   { title: "Mi negocio", color: "#6a5ae0", ids: ["negocio", "reportes", "impuestos", "comisiones", "agente", "importar"] },
   { title: "Control del dueño", color: "#8a4b2f", ids: ["alertas", "bitacora", "pin", "papelera"] },
-  { title: "Configuración", color: "#4f6480", ids: ["equipo", "plan", "configuracion"] },
+  { title: "Configuración", color: "#4f6480", ids: ["equipo", "plan", "configuracion", "api"] },
 ];
 
 export const RailIcon = ({ id }: { id: string }) => <svg className="fv-rail-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">

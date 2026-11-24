@@ -36,7 +36,7 @@ export default function QuotesBoard({ org, rows, today, canSell }: { org: string
       <div style={{ "--tone": "#6fb7ff" } as React.CSSProperties}><span>Aceptadas</span><strong>{decided ? `${Math.round((won / decided) * 100)} %` : "—"}</strong><small>{decided ? `${won} de ${decided} respondidas` : "aún sin respuestas"}</small></div>
       <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Listas para facturar</span><strong>{rows.filter(q => q.status === "accepted").length}</strong><small>aceptadas por el cliente</small></div>
     </div>
-    <div className="fv-chips" role="tablist">{tabs.map(([id, t]) => <button key={id} role="tab" className="fv-chip" aria-pressed={tab === id} onClick={() => setTab(id)}>{t} ({rows.filter(q => match(id, q)).length})</button>)}</div>
+    <div className="fv-chips" role="group" aria-label="Filtrar cotizaciones">{tabs.map(([id, t]) => <button key={id} className="fv-chip" aria-pressed={tab === id} onClick={() => setTab(id)}>{t} ({rows.filter(q => match(id, q)).length})</button>)}</div>
     {!list.length ? <div className="fv-empty"><h2>Nada por aquí</h2><p>{tab === "open" ? "Crea una cotización arriba y envíale el enlace a tu cliente." : "Cuando haya cotizaciones en este estado aparecerán aquí."}</p></div>
       : <ul className="fv-quotes">{list.map(q => <QuoteCard key={q.id} org={org} q={q} expired={expired(q)} canSell={canSell} fmt={fmt} />)}</ul>}
   </section>;

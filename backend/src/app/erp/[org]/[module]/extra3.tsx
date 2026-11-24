@@ -8,6 +8,7 @@ import LiveRefresh from "@/components/erp/LiveRefresh";
 import { ClaimActions, CreditLimit, PayForm, RemindButton } from "@/components/erp/MoneyBoards";
 import { ScanExpense } from "@/components/erp/OwnerBoards";
 import { AgentBoard, OwnerPinForm, type AgentTask } from "@/components/erp/OwnerTools";
+import { ApiBoard, type ApiKey, type Hook } from "@/components/erp/ApiBoard";
 import {
   addDaysIso, aging, clientKey, clientMessage, creditLevel, daysBetween, deltaText, forecastCash, isReceivable, profitOf, scoreClient, segmentClients, segmentLabel,
   type Activity, type PayStats, type Receivable, type Segment,
@@ -272,6 +273,17 @@ export async function renderExtra3(id: string, c: Ctx, org: string, title: strin
       summary: t.status === "done" ? (n(t.result?.reminders_created) ? `Listo: se programaron ${n(t.result?.reminders_created)} recordatorios de cobro.` : "Listo.") : null }));
     return <>{heading(`COPILOTO / ${name}`, title, "Encárgale una tarea al Copiloto: la prepara con tus datos y tú decides si se hace.", org, ["agent_tasks"] as const)}
       {res.error ? failed("tus tareas") : <AgentBoard org={org} tasks={tasks} />}
+    </>;
+  }
+
+  if (id === "api") {
+    const [keys, hooks] = await Promise.all([
+      c.db.from("org_api_keys").select("id,name,prefix,scopes,created_at,last_used_at,revoked_at").eq("org_id", org).order("created_at", { ascending: false }),
+      c.db.from("org_webhooks").select("id,url,events,active,last_status,secret").eq("org_id", org).order("created_at"),
+    ]);
+    const base = `${(process.env.NEXT_PUBLIC_SITE_URL ?? process.env.APP_URL ?? "https://factura-voz-two.vercel.app").replace(/\/$/, "")}/api/v1`;
+    return <>{heading(`CONEXIONES / ${name}`, title, "Conecta tu página web o tu sistema: lee comprobantes y clientes, crea pedidos y recibe avisos al instante.", org)}
+      {keys.error ? failed("tus llaves") : <ApiBoard org={org} keys={(keys.data ?? []) as ApiKey[]} hooks={((hooks.data ?? []) as Hook[]).map(h => ({ ...h, secret: h.secret ?? null }))} base={base} />}
     </>;
   }
 

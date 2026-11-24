@@ -1210,3 +1210,204 @@ export async function setOwnerPin(org: string, pin: string | null, current: stri
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: pin ? "PIN del dueño guardado." : "PIN del dueño desactivado." };
 }
+
+// ── Configuración y equipo (same organizations / org_pay_settings / team RPCs as the mobile Ajustes) ──
+async function settingsContext(org: string) {
+  const ctx = await moduleContext(org, "configuracion");
+  if (ctx.c && !ctx.c.access.is_admin) return { c: null, error: "Solo el dueño o un administrador cambia la configuración." } as const;
+  return ctx;
+}
+
+const businessSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  trade_name: optional(160),
+  tax_id: z.string().trim().regex(/^(\d{8}|\d{11})?$/),
+  address: optional(250),
+  ubigeo: z.string().trim().regex(/^(\d{6})?$/),
+  department: optional(60), province: optional(60), district: optional(60),
+  series_factura: z.string().trim().toUpperCase().regex(/^(F[A-Z0-9]{3})?$/),
+  series_boleta: z.string().trim().toUpperCase().regex(/^(B[A-Z0-9]{3})?$/),
+  currency: z.enum(["PEN", "USD"]),
+  default_tax_rate: z.coerce.number().min(0).max(100),
+});
+
+/** «Datos del negocio»: what goes on every receipt. */
+export async function saveBusiness(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await settingsContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = businessSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) {
+    const f = parsed.error.issues[0]?.path[0];
+    const why: Record<string, string> = { tax_id: "El RUC tiene 11 dígitos (o DNI de 8).", ubigeo: "El ubigeo tiene 6 dígitos.", series_factura: "La serie de facturas es F y 3 caracteres (ej. F001).",
+      series_boleta: "La serie de boletas es B y 3 caracteres (ej. B001).", name: "Escribe la razón social.", default_tax_rate: "El IGV debe estar entre 0 y 100 %." };
+    return { ok: false, message: why[String(f)] ?? "Revisa los datos." };
+  }
+  const d = parsed.data;
+  const blank = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
+  const { data, error } = await ctx.c.db.from("organizations").update({
+    name: d.name, trade_name: blank(d.trade_name), tax_id: blank(d.tax_id), address: blank(d.address), ubigeo: blank(d.ubigeo), department: blank(d.department), province: blank(d.province),
+    district: blank(d.district), series_factura: blank(d.series_factura), series_boleta: blank(d.series_boleta), currency: d.currency, default_tax_rate: d.default_tax_rate,
+  }).eq("id", org).select("id");
+  if (error || !(data ?? []).length) return { ok: false, message: dbMessage(error?.message, "No se pudo guardar. Solo el dueño o un administrador puede cambiarlo.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Datos guardados. Ya salen así en tus comprobantes (también en el móvil)." };
+}
+
+const imageTypes: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+async function uploadImage(db: Awaited<ReturnType<typeof workspaceContext>>["db"], org: string, folder: string, file: FormDataEntryValue | null): Promise<string | null | "bad"> {
+  if (!(file instanceof File) || file.size === 0) return null;
+  const ext = imageTypes[file.type];
+  if (!ext || file.size > 2_000_000) return "bad";
+  const path = `${org}/${folder}/${Date.now()}_${file.size}.${ext}`;
+  const { error } = await db.storage.from("org-media").upload(path, new Uint8Array(await file.arrayBuffer()), { contentType: file.type, upsert: true });
+  return error ? "bad" : path;
+}
+
+/** «Logo y comprobantes»: logo, PDF design, color and ticket width. */
+export async function saveBranding(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await settingsContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const template = String(form.get("pdf_template") ?? "clasico"), color = String(form.get("brand_color") ?? "#1E3A8A").toUpperCase(), width = Number(form.get("ticket_width") ?? 80);
+  if (!["clasico", "moderno", "minimal"].includes(template) || !/^#[0-9A-F]{6}$/.test(color) || ![58, 80].includes(width)) return { ok: false, message: "Opción no válida." };
+  const logo = await uploadImage(ctx.c.db, org, "logo", form.get("logo"));
+  if (logo === "bad") return { ok: false, message: "El logo debe ser PNG, JPG o WEBP de hasta 2 MB." };
+  const { data, error } = await ctx.c.db.from("organizations").update({ pdf_template: template, brand_color: color, ticket_width: width, ...(logo ? { logo_path: logo } : {}) }).eq("id", org).select("id");
+  if (error || !(data ?? []).length) return { ok: false, message: "Solo el dueño o un administrador puede cambiar la marca." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: logo ? "Logo y diseño guardados." : "Diseño guardado." };
+}
+
+const paySettingsSchema = z.object({
+  yape: z.string().trim().max(15), plin: z.string().trim().max(15), bank_name: optional(60), bank_account: optional(40), bank_cci: z.string().trim().max(30),
+  holder: optional(120), note: optional(300), reminders: z.string().optional(), offsets: z.string().max(60).optional(),
+});
+
+/** «Medios de cobro»: Yape, Plin and bank shown on the pay page and reminders. */
+export async function savePaySettings(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await settingsContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = paySettingsSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Revisa los datos." };
+  const d = parsed.data;
+  const digits = (v: string) => v.replace(/\D/g, "");
+  if (d.yape && !/^9\d{8}$/.test(digits(d.yape))) return { ok: false, message: "El celular de Yape tiene 9 dígitos y empieza con 9." };
+  if (d.plin && !/^9\d{8}$/.test(digits(d.plin))) return { ok: false, message: "El celular de Plin tiene 9 dígitos y empieza con 9." };
+  if (d.bank_cci && digits(d.bank_cci).length !== 20) return { ok: false, message: "El CCI tiene 20 dígitos." };
+  const offsets = [...new Set((d.offsets ?? "").split(/[,\s]+/).filter(Boolean).map(Number).filter(v => Number.isInteger(v) && v >= -30 && v <= 90))].sort((a, b) => a - b);
+  const [yq, pq] = await Promise.all([uploadImage(ctx.c.db, org, "qr-medios", form.get("yape_qr")), uploadImage(ctx.c.db, org, "qr-medios", form.get("plin_qr"))]);
+  if (yq === "bad" || pq === "bad") return { ok: false, message: "El QR debe ser una imagen PNG o JPG de hasta 2 MB." };
+  const n = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
+  const { error } = await ctx.c.db.from("org_pay_settings").upsert({
+    org_id: org, yape_phone: n(digits(d.yape)), plin_phone: n(digits(d.plin)), bank_name: n(d.bank_name), bank_account: n(d.bank_account), bank_cci: n(digits(d.bank_cci)),
+    account_holder: n(d.holder), pay_note: n(d.note), reminders_enabled: d.reminders === "on", reminder_offsets: offsets.length ? offsets : [0], updated_at: new Date().toISOString(),
+    ...(yq ? { yape_qr_path: yq } : {}), ...(pq ? { plin_qr_path: pq } : {}),
+  }, { onConflict: "org_id" });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudieron guardar los medios de cobro.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Medios de cobro guardados. Tus clientes los ven al pagar con tu enlace." };
+}
+
+async function teamContext(org: string) {
+  const ctx = await moduleContext(org, "equipo");
+  if (ctx.c && !ctx.c.access.is_admin) return { c: null, error: "Solo el dueño o un administrador gestiona el equipo." } as const;
+  return ctx;
+}
+const staffRole = z.enum(["admin", "cajero", "vendedor", "tecnico", "finanzas"]);
+
+export async function inviteMember(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await teamContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = z.object({ email: z.email().max(200), name: optional(80), role: staffRole }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Escribe un correo válido y elige su rol." };
+  const d = parsed.data;
+  const { data, error } = await ctx.c.db.rpc("invite_member", { p_org: org, p_email: d.email.trim().toLowerCase(), p_staff_role: d.role === "admin" ? "cajero" : d.role, p_admin: d.role === "admin", p_name: d.name || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo invitar. Revisa si tu plan tiene usuarios libres.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: data === "added" ? "Listo: ya tenía cuenta y lo agregamos a tu empresa." : "Invitación creada: que entre a la app o a la web con ese correo." };
+}
+
+export async function cancelInvite(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await teamContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("org_invites").delete().eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: "No se pudo cancelar la invitación." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Invitación cancelada." };
+}
+
+export async function setMemberRole(org: string, userId: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(userId).success) return { ok: false, message: "No válido." };
+  const ctx = await teamContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = z.object({ role: staffRole, name: optional(80), commission: z.string().max(10).optional(), goal: z.string().max(20).optional() }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Revisa el rol." };
+  const d = parsed.data;
+  const commission = d.commission ? parseAmount(d.commission) : null, goal = d.goal ? parseAmount(d.goal) : null;
+  if (commission != null && commission > 100) return { ok: false, message: "La comisión es un porcentaje entre 0 y 100." };
+  const { error } = await ctx.c.db.rpc("set_member_role", { p_org: org, p_user: userId, p_staff_role: d.role === "admin" ? null : d.role, p_admin: d.role === "admin", p_commission: commission, p_goal: goal, p_name: d.name || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo cambiar el rol.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Cambios guardados." };
+}
+
+export async function removeMember(org: string, userId: string): Promise<FormResult> {
+  if (!uuid.safeParse(userId).success) return { ok: false, message: "No válido." };
+  const ctx = await teamContext(org);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (userId === ctx.c.user.id) return { ok: false, message: "No puedes quitarte a ti mismo." };
+  const { error } = await ctx.c.db.rpc("remove_org_member", { p_org: org, p_user: userId });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo quitar a esa persona.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Ya no tiene acceso a tu empresa." };
+}
+
+// ── API y webhooks (plan Empresa; same org_api_keys / org_webhooks as the mobile app) ──
+const apiScopes = ["invoices:read", "clients:read", "products:read", "orders:write"] as const;
+const hookEvents = ["invoice.created", "invoice.updated", "invoice.paid", "payment.created", "order.created"] as const;
+
+export async function createApiKey(org: string, name: string, scopes: string[]): Promise<{ ok: true; key: string } | { ok: false; message: string }> {
+  const ctx = await moduleContext(org, "api");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const n = String(name ?? "").trim();
+  const sc = [...new Set(scopes)].filter((s): s is (typeof apiScopes)[number] => (apiScopes as readonly string[]).includes(s));
+  if (!n || n.length > 60 || !sc.length) return { ok: false, message: "Ponle un nombre y elige al menos un permiso." };
+  const { data, error } = await ctx.c.db.rpc("create_api_key", { p_org: org, p_name: n, p_scopes: sc });
+  if (error || typeof data !== "string") return { ok: false, message: dbMessage(error?.message, "No se pudo crear la llave.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, key: data };
+}
+
+export async function revokeApiKey(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "api");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.rpc("revoke_api_key", { p_id: id });
+  if (error) return { ok: false, message: "No se pudo revocar." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Llave revocada: deja de funcionar al instante." };
+}
+
+export async function addWebhook(org: string, url: string, events: string[]): Promise<FormResult> {
+  const ctx = await moduleContext(org, "api");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const u = String(url ?? "").trim();
+  const ev = [...new Set(events)].filter(e => (hookEvents as readonly string[]).includes(e));
+  if (!/^https:\/\/\S+$/.test(u) || u.length < 12 || u.length > 400) return { ok: false, message: "La dirección debe empezar con https://" };
+  if (!ev.length) return { ok: false, message: "Elige al menos un evento." };
+  const { error } = await ctx.c.db.from("org_webhooks").insert({ org_id: org, url: u, events: ev });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar el webhook.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Webhook guardado." };
+}
+
+export async function setWebhook(org: string, id: string, action: "on" | "off" | "delete"): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "api");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const q = action === "delete" ? ctx.c.db.from("org_webhooks").delete().eq("org_id", org).eq("id", id) : ctx.c.db.from("org_webhooks").update({ active: action === "on" }).eq("org_id", org).eq("id", id);
+  const { error } = await q;
+  if (error) return { ok: false, message: "No se pudo cambiar." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: action === "delete" ? "Webhook eliminado." : action === "on" ? "Activado." : "Pausado." };
+}

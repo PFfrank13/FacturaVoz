@@ -811,3 +811,34 @@
 .fv-agent-step .fv-lines { padding-left: 0; }
 .fv-agent-step .fv-lines li > span { display: grid; gap: 2px; min-width: 0; }
 .fv-agent-step .fv-lines small { color: var(--erp-muted); }
+
+/* ── v3.10 · Configuración y equipo editables ── */
+.fv-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+.fv-settings-card { padding: 20px; display: grid; gap: 12px; }
+.fv-settings-card h3 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0; }
+.fv-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fv-logo-row { display: flex; gap: 14px; align-items: center; }
+.fv-logo-box { width: 84px; height: 84px; border-radius: 18px; display: grid; place-items: center; overflow: hidden; border: 1px dashed var(--erp-rim); background: var(--erp-pane-strong); color: var(--erp-muted); font-size: 12px; }
+.fv-logo-box img { width: 100%; height: 100%; object-fit: contain; }
+.fv-radio-cards, .fv-swatches, .fv-segment-field { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.fv-radio-cards legend, .fv-swatches legend, .fv-segment-field legend { font-size: 13px; font-weight: 700; color: var(--erp-muted); margin-bottom: 6px; width: 100%; }
+.fv-radio-cards label { flex: 1 1 140px; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); cursor: pointer; }
+.fv-radio-cards label:has(input:checked) { border-color: var(--erp-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--erp-accent) 30%, transparent); }
+.fv-radio-cards span { display: grid; gap: 2px; } .fv-radio-cards small { color: var(--erp-muted); }
+.fv-swatches label { cursor: pointer; }
+.fv-swatches input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.fv-swatches i { display: block; width: 34px; height: 34px; border-radius: 12px; border: 3px solid transparent; }
+.fv-swatches label:has(input:checked) i { border-color: var(--erp-ink); }
+.fv-swatches label:has(input:focus-visible) i { outline: 2px solid var(--erp-accent); outline-offset: 2px; }
+.fv-segment-field label { display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); cursor: pointer; }
+.fv-segment-field label:has(input:checked) { border-color: var(--erp-accent); }
+.fv-team { list-style: none; display: grid; gap: 10px; padding: 0; margin: 16px 0; }
+.fv-team > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 14px 16px; border-radius: 18px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); }
+.fv-team > li > div { display: grid; gap: 2px; min-width: 0; } .fv-team small { color: var(--erp-muted); }
+.fv-team > li > .fv-actions, .fv-team > li > form { grid-column: 1 / -1; }
+.fv-role { padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff; background: #4f6480; }
+.fv-role.r-owner { background: linear-gradient(135deg, #ffd36e, #d99a1c); } .fv-role.r-admin { background: #6a5ae0; } .fv-role.r-cajero { background: #0e8c74; }
+.fv-role.r-vendedor { background: #2f6fdc; } .fv-role.r-finanzas { background: #c2407e; } .fv-role.r-tecnico { background: #c77417; }
+.fv-member-form { padding: 10px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px dashed var(--erp-rim); }
+@media (max-width: 640px) { .fv-three { grid-template-columns: 1fr; } }
