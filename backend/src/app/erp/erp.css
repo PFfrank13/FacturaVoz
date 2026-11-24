@@ -592,3 +592,19 @@
   .fv-button:not(.secondary)::after, .fv-wordmark i, .fv-rail nav a[aria-current="page"]::before, .fv-skeleton i { animation: none; transition: none; }
 }
 @media (max-width: 720px) { .fv-sheet header { top: -20px; } .fv-heading h1 { letter-spacing: -1px; } }
+
+/* ── v3.7 · Menú por categorías con color propio (igual que el menú del móvil) ── */
+.fv-rail-group { --gi: color-mix(in srgb, var(--g, var(--erp-accent)) 82%, var(--erp-ink)); }
+@media (prefers-color-scheme: dark) { .fv-rail-group { --gi: color-mix(in srgb, var(--g, var(--erp-accent)) 55%, #fff); } }
+.fv-rail-title { display: flex; align-items: center; gap: 8px; color: var(--gi); opacity: 1; font-size: 11px; letter-spacing: .9px; }
+.fv-rail-title i { width: 4px; height: 14px; border-radius: 4px; background: var(--g, var(--erp-accent)); box-shadow: 0 0 10px color-mix(in srgb, var(--g, var(--erp-accent)) 60%, transparent); }
+.fv-rail-group .fv-rail-icon { color: var(--gi); opacity: .95; }
+.fv-rail-group a:hover { background: color-mix(in srgb, var(--g, var(--erp-accent)) 12%, transparent); }
+.fv-rail-group a[aria-current="page"] {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--g, var(--erp-accent)) 24%, transparent), color-mix(in srgb, var(--g, var(--erp-accent)) 10%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g, var(--erp-accent)) 45%, transparent), 0 8px 20px -12px var(--g, var(--erp-glow));
+}
+.fv-rail-group a[aria-current="page"]::before { background: var(--g, var(--erp-accent)); box-shadow: 0 0 12px var(--g, var(--erp-accent)); }
+.fv-rail-group a[aria-current="page"] .fv-rail-icon { color: var(--gi); filter: none; }
+@media (max-width: 720px) { .fv-rail-group { border-left: 2px solid color-mix(in srgb, var(--g, var(--erp-accent)) 55%, transparent); padding-left: 4px; } }
+.fv-shortcuts span { display: block; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--erp-rim); background: var(--erp-pane); font-weight: 650; font-size: 14px; }

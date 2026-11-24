@@ -123,8 +123,9 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
           <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Locales</span><strong>{maxBranches === -1 ? "Sin límite" : maxBranches}</strong><small>empresas o sucursales</small></div>
         </div>
         {c.license.message && <p className="fv-hint">{c.license.message}</p>}
-        <section className="fv-create fv-cash-card"><h3>Lo que tienes en la web con tu rol</h3>
-          <ul className="fv-shortcuts">{included.map(x => <li key={x.id}><Link href={`/erp/${org}/${x.id}`}>{x.title}</Link></li>)}</ul>
+        <section className="fv-create fv-cash-card"><h3>Lo que incluye tu plan con tu rol</h3>
+          <p className="fv-caption">Todo esto está en el menú de la izquierda, ordenado por categorías.</p>
+          <ul className="fv-shortcuts">{included.map(x => <li key={x.id}><span>{x.title}</span></li>)}</ul>
         </section>
       </section></>;
   }

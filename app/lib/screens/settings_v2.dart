@@ -246,7 +246,10 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
           trailing: const SizedBox.shrink(),
         ),
       _row(Icons.support_agent_rounded, 'Ayuda por WhatsApp', 'Escríbenos: el mensaje ya lleva tu versión, rubro y plan', () => openSupport(context)),
-      _row(Icons.security_rounded, 'Seguridad', 'Alertas, bitácora, PIN, papelera y huella', () => showSecuritySheet(context)),
+      // Bodega: alertas, bitácora, PIN y papelera están en «Control del dueño» del menú; la huella y el PIN de
+      // entrada, en Seguridad de la lista de abajo.
+      if (a.rubro != 'bodega')
+        _row(Icons.security_rounded, 'Seguridad', 'Alertas, bitácora, PIN, papelera y huella', () => showSecuritySheet(context)),
       if (admin && s != null && rubroFor(s.businessType) != null)
         _row(Icons.science_rounded, 'Datos de práctica', 'Productos y clientes de ejemplo de tu rubro (se borran con un toque)', () => showPracticeSheet(context, rubroFor(s.businessType)!)),
       if (a.rubro != 'bodega' && a.has('stock') && a.can('products_edit'))
@@ -267,11 +270,13 @@ class _BusinessSettingsCardState extends State<BusinessSettingsCard> {
                 ].join(' · '), () => go(const PlanScreen())),
       if (admin) _row(Icons.palette_rounded, 'Logo y comprobantes', 'Logo, diseño del PDF y ancho del ticket', () => go(const BrandingScreen())),
       _row(Icons.print_rounded, 'Impresora de tickets', 'Bluetooth o red · 58 u 80 mm', () => go(const PrinterSettingsScreen())),
-      if (a.can('team') && a.has('antifraude')) _row(Icons.shield_rounded, 'Dueño a distancia', 'PIN, alertas y bitácora', () => go(const AlertsScreen())),
+      if (a.rubro != 'bodega' && a.can('team') && a.has('antifraude')) _row(Icons.shield_rounded, 'Dueño a distancia', 'PIN, alertas y bitácora', () => go(const AlertsScreen())),
       if (admin && s != null)
         _row(Icons.mark_email_read_rounded, 'Reporte del día por correo', s.dailyReport ? 'Activado${s.dailyReportTo.isNotEmpty ? ' · ${s.dailyReportTo}' : ''}' : 'Apagado', () => _dailyReport(s)),
-      if (a.can('finance')) _row(Icons.restore_from_trash_rounded, 'Papelera', 'Recupera lo borrado (30 días)', () => go(const TrashScreen())),
-      _row(Icons.apps_rounded, 'Todas las funciones', 'Busca y abre cualquier función', () => go(const AllFunctionsScreen())),
+      if (a.rubro != 'bodega' && a.can('finance')) _row(Icons.restore_from_trash_rounded, 'Papelera', 'Recupera lo borrado (30 días)', () => go(const TrashScreen())),
+      // En Bodega todo lo del plan ya está en el menú lateral por categorías: no se repite aquí.
+      if (a.rubro != 'bodega')
+        _row(Icons.apps_rounded, 'Todas las funciones', 'Busca y abre cualquier función', () => go(const AllFunctionsScreen())),
     ];
     return SoftCard(
       padding: EdgeInsets.zero,

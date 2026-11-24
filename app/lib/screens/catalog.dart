@@ -470,7 +470,8 @@ Future<void> showAccountSheet(BuildContext context) {
           tile('equipo'),
           tile('plan'),
           tile('empresas'),
-          ListTile(
+          // Bodega: todo lo del plan está en el menú lateral por categorías.
+          if (a.rubro != 'bodega') ListTile(
             leading: const Icon(Icons.menu_rounded),
             title: const Text('Menú (todas las funciones)'),
             onTap: () {
@@ -724,7 +725,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
                       ),
                   ]),
                   const SizedBox(height: 20),
-                  OutlinedButton.icon(
+                  if (Access.instance.rubro != 'bodega') OutlinedButton.icon(
                     onPressed: () => pushPremium(context, const AllFunctionsScreen()),
                     icon: const Icon(Icons.apps_rounded),
                     label: const Text('Ver todas las funciones'),

@@ -279,6 +279,7 @@ class _OwnerPinScreenState extends State<OwnerPinScreen> {
   bool? _enabled;
   final _a = TextEditingController();
   final _b = TextEditingController();
+  final _cur = TextEditingController();
   String _msg = '';
   bool _busy = false;
 
@@ -294,6 +295,7 @@ class _OwnerPinScreenState extends State<OwnerPinScreen> {
   void dispose() {
     _a.dispose();
     _b.dispose();
+    _cur.dispose();
     super.dispose();
   }
 
@@ -309,10 +311,22 @@ class _OwnerPinScreenState extends State<OwnerPinScreen> {
         return;
       }
     }
+    if (_enabled == true && _cur.text.trim().isEmpty) {
+      setState(() => _msg = 'Escribe el PIN actual del dueño.');
+      return;
+    }
     setState(() => _busy = true);
     try {
-      await V2Repo.setPin(remove ? null : pin);
+      final err = await V2Repo.setPinChecked(remove ? null : pin, _enabled == true ? _cur.text.trim() : null);
       if (!mounted) return;
+      if (err != null) {
+        setState(() {
+          _msg = err;
+          _busy = false;
+        });
+        return;
+      }
+      _cur.clear();
       showSuccess(context, remove ? 'PIN quitado' : 'PIN guardado', icon: Icons.pin_rounded);
       _a.clear();
       _b.clear();
@@ -340,6 +354,9 @@ class _OwnerPinScreenState extends State<OwnerPinScreen> {
         else ...[
           TagChip(_enabled! ? 'PIN activo' : 'Sin PIN', color: _enabled! ? Brand.ok : Brand.warn, icon: _enabled! ? Icons.lock_rounded : Icons.lock_open_rounded),
           const SizedBox(height: 16),
+          if (_enabled!)
+            TextField(controller: _cur, obscureText: true, keyboardType: TextInputType.number, maxLength: 8,
+              decoration: const InputDecoration(labelText: 'PIN actual del dueño', helperText: 'Para cambiarlo o quitarlo necesitas el actual.')),
           TextField(controller: _a, obscureText: true, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: _enabled! ? 'Nuevo PIN' : 'PIN (4 a 8 números)')),
           TextField(controller: _b, obscureText: true, keyboardType: TextInputType.number, maxLength: 8, decoration: const InputDecoration(labelText: 'Repite el PIN')),
           if (_msg.isNotEmpty) Text(_msg, style: const TextStyle(color: Brand.bad)),

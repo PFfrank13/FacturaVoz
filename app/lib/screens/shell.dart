@@ -19,6 +19,7 @@ import '../ui/design_tokens.dart';
 import '../ui/glass_widgets.dart';
 import '../ui/retail_home_premium.dart';
 import '../ui/retail_icon.dart';
+import '../ui/widgets.dart' show sectorShortName;
 import 'assistant.dart';
 import 'catalog.dart';
 import 'clients_hub.dart';
@@ -37,6 +38,7 @@ import 'pos.dart';
 import 'products.dart';
 import 'reports.dart';
 import 'retail_purchases.dart';
+import '../nav/drawer_menu.dart';
 import 'retail_notifications.dart';
 import 'retail_receipts.dart';
 import 'profit.dart';
@@ -366,82 +368,153 @@ class _MainShellState extends State<MainShell> {
         _ => const SettingsScreen(embedded: true),
       };
 
-  /// Drawer móvil único; sin otra barra de navegación duplicada.
+  /// Menú lateral por categorías con color: todo lo que el plan y el rol permiten, sin repetir nada.
   Widget _bodegaNavigation(List<_Dest> destinations) {
     final t = Theme.of(context);
     final cs = t.colorScheme;
-    final selected = destinations.indexWhere((d) => d.id == _tab);
-    final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
-    // Textos del menú con contraste pleno: sobre el vidrio, el gris de onSurfaceVariant se veía desteñido.
+    final dark = t.brightness == Brightness.dark;
     final ink = cs.onSurface;
+    final a = Access.instance;
+    final orgName = AppState.instance.activeOrg?.name ?? 'Tu negocio';
+    final tabs = {for (final d in destinations) d.id};
+    final sections = buildMenu(bodegaMenu, tabs: tabs, allowed: (id) => featureById(id)?.allowed ?? false);
+    final plan = a.license.dev ? 'Desarrollo' : planName(a.license.plan);
+
+    void open(MenuEntry e) {
+      Navigator.of(context).pop();
+      if (e.isTab) {
+        _go(e.tab!);
+        return;
+      }
+      final f = featureById(e.featureId);
+      if (f != null && f.allowed) openFeature(context, f);
+    }
+
+    Widget tile({required IconData icon, required String label, required Color color, required bool selected, required VoidCallback onTap, Key? key}) {
+      return Padding(
+        key: key,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1.5),
+        child: Material(
+          color: selected ? color.withValues(alpha: dark ? .30 : .14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
+              child: Row(children: [
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: selected ? (dark ? .55 : .9) : (dark ? .22 : .12)),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, size: 19, color: selected ? Colors.white : (dark ? Color.lerp(color, Colors.white, .35) : color)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 15, color: ink, fontWeight: selected ? FontWeight.w800 : FontWeight.w600))),
+                if (selected) Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    String labelOf(MenuEntry e) {
+      for (final d in destinations) {
+        if (e.isTab && d.id == e.tab) return d.label;
+      }
+      return featureById(e.featureId)?.title ?? e.featureId;
+    }
+
+    IconData iconOf(MenuEntry e) {
+      for (final d in destinations) {
+        if (e.isTab && d.id == e.tab) return d.icon;
+      }
+      return featureById(e.featureId)?.icon ?? Icons.circle_outlined;
+    }
+
+    const homeColor = Color(0xFF0E8C74);
+    const settingsColor = Color(0xFF4F6480);
     return FvGlassSurface(
       radius: 24,
       blur: 18,
-      child: Theme(
-      data: t.copyWith(navigationDrawerTheme: t.navigationDrawerTheme.copyWith(
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
-          fontSize: 16,
-          color: ink,
-          fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
-        )),
-      )),
-      child: NavigationDrawer(
-      key: const ValueKey('bodega-navigation-drawer'),
-      backgroundColor: Colors.transparent,
-      selectedIndex: selected < 0 ? 0 : selected,
-      onDestinationSelected: (index) {
-        Navigator.of(context).pop();
-        if (index >= 0 && index < destinations.length) _go(destinations[index].id);
-      },
-      children: [
-        SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 22, 22),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(
-                  height: 42, width: 42,
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    borderRadius: BorderRadius.circular(14),
+      child: Drawer(
+        key: const ValueKey('bodega-navigation-drawer'),
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        child: ListView(padding: EdgeInsets.zero, children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 22, 20, 16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    height: 42, width: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFF19B98F), Color(0xFF0E8C74)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [BoxShadow(color: const Color(0xFF0E8C74).withValues(alpha: .35), blurRadius: 14, offset: const Offset(0, 6))],
+                    ),
+                    child: const Icon(Icons.storefront_rounded, color: Colors.white),
                   ),
-                  child: Icon(Icons.storefront_rounded, color: cs.onPrimary),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(orgName, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.4))),
+                ]),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: homeColor.withValues(alpha: dark ? .28 : .12),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text('Plan $plan · ${sectorShortName(a.rubro)}', style: TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w800,
+                    color: dark ? const Color(0xFF8EF0D0) : const Color(0xFF0B6B59))),
                 ),
-                const SizedBox(width: 12),
-                const Text('FACTURAVOZ', style: TextStyle(
-                  fontSize: 11, letterSpacing: 1.6, fontWeight: FontWeight.w800)),
               ]),
-              const SizedBox(height: 20),
-              Text(orgName, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: t.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-              const SizedBox(height: 5),
-              Text('Bodega / Tienda  ·  ${Access.instance.license.plan == 'BASICO' ? 'Básico' : Access.instance.license.plan}',
-                style: t.textTheme.bodySmall?.copyWith(color: ink.withValues(alpha: .78), fontWeight: FontWeight.w600)),
-            ]),
+            ),
           ),
-        ),
-        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(26, 20, 18, 8),
-          child: Text('ESPACIO DE TRABAJO', style: TextStyle(
-            fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.w700)),
-        ),
-        for (final d in destinations)
-          NavigationDrawerDestination(
-            icon: Icon(d.icon, color: ink.withValues(alpha: .82), size: 21),
-            selectedIcon: Icon(d.icon, color: cs.primary, size: 21),
-            label: Text(d.label),
+          if (tabs.contains('home'))
+            tile(icon: Icons.home_rounded, label: 'Inicio', color: homeColor, selected: _tab == 'home',
+              onTap: () => open(const MenuEntry('inicio', tab: 'home'))),
+          for (final (s, items) in sections) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 18, 6),
+              child: Row(children: [
+                Container(width: 4, height: 16, decoration: BoxDecoration(color: s.color, borderRadius: BorderRadius.circular(4))),
+                const SizedBox(width: 9),
+                Expanded(child: Text(s.title, style: TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w800, letterSpacing: .1,
+                  color: dark ? Color.lerp(s.color, Colors.white, .45) : Color.lerp(s.color, Colors.black, .15)))),
+                Text('${items.length}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink.withValues(alpha: .55))),
+              ]),
+            ),
+            for (final e in items)
+              tile(
+                key: ValueKey('menu-${e.featureId}'),
+                icon: iconOf(e), label: labelOf(e), color: s.color,
+                selected: e.isTab && e.tab == _tab,
+                onTap: () => open(e)),
+          ],
+          if (tabs.contains('settings')) ...[
+            const SizedBox(height: 14),
+            Divider(height: 1, indent: 22, endIndent: 22, color: cs.outlineVariant.withValues(alpha: .6)),
+            const SizedBox(height: 8),
+            tile(icon: Icons.settings_rounded, label: 'Configuración', color: settingsColor, selected: _tab == 'settings',
+              onTap: () => open(const MenuEntry('ajustes', tab: 'settings'))),
+          ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 20, 28),
+            child: Text('Solo ves lo que incluye tu plan $plan y lo que tu rol permite.',
+              style: t.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .7))),
           ),
-        const SizedBox(height: 18),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(26, 12, 18, 24),
-          child: Text('Funciones habilitadas para tu plan y rol.',
-            style: t.textTheme.labelSmall?.copyWith(color: ink.withValues(alpha: .72))),
-        ),
-      ],
-      ),
+        ]),
       ),
     );
   }

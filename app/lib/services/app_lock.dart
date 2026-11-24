@@ -1,6 +1,11 @@
 // Bloqueo de la app: PIN (siempre) + huella/rostro (si el equipo lo tiene). Se pide en cada inicio
 // y al volver tras un rato en segundo plano. El PIN nunca se guarda en claro: PBKDF2-HMAC-SHA256 con sal
 // aleatoria dentro del almacén seguro del sistema (Keystore / Keychain).
+// v4.0: el PIN es de la CUENTA. El servidor guarda su bcrypt (app_pin_*): en un celular nuevo hay que escribir el PIN
+// de siempre (no se puede crear otro), cambiarlo exige el actual y, si se olvidó, solo se crea otro tras entrar con
+// el código del correo. Cada celular guarda una copia cifrada para abrir sin internet.
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -8,6 +13,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_state.dart';
+import '../errors.dart';
 import '../pin_logic.dart';
 
 /// Llave del Navigator: permite volver a la raíz al cerrar sesión desde la pantalla de bloqueo.
@@ -16,11 +22,14 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 enum LockStatus { off, checking, noPin, locked, unlocked }
 
 class PinCheck {
-  const PinCheck({required this.ok, this.failsLeft = 0, this.waitSeconds = 0, this.signedOut = false});
+  const PinCheck({required this.ok, this.failsLeft = 0, this.waitSeconds = 0, this.signedOut = false, this.offline = false});
   final bool ok;
   final int failsLeft;
   final int waitSeconds;
   final bool signedOut;
+
+  /// No se pudo consultar el PIN de la cuenta (celular nuevo sin internet).
+  final bool offline;
 }
 
 class AppLock extends ChangeNotifier with WidgetsBindingObserver {
@@ -37,13 +46,37 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
   bool biometricOn = false;
   bool biometricAvailable = false;
   bool setupAllowed = false;
+
+  /// La cuenta ya tiene PIN en el servidor (un celular nuevo debe escribirlo, no crear otro).
+  bool serverHasPin = false;
+
+  /// Entró con el código del correo hace poco: puede crear un PIN nuevo si olvidó el suyo.
+  bool canReset = false;
+
+  /// Creando un PIN nuevo tras «Olvidé mi PIN» (con el código del correo).
+  bool resetMode = false;
+
+  bool _needsUpload = false;
+  DateTime? _serverUntil;
   String? _uid;
   DateTime? _leftAt;
   bool _askingBiometric = false;
   bool _bound = false;
 
   /// La pantalla de bloqueo solo se dibuja cuando corresponde.
-  bool get showOverlay => status == LockStatus.checking || status == LockStatus.locked || (status == LockStatus.noPin && setupAllowed);
+  bool get showOverlay => status == LockStatus.checking || status == LockStatus.locked ||
+      (status == LockStatus.noPin && (setupAllowed || resetMode));
+
+  SupabaseClient get _db => Supabase.instance.client;
+
+  Future<Map<String, dynamic>?> _rpc(String fn, [Map<String, dynamic>? params]) async {
+    try {
+      final r = await _db.rpc(fn, params: params).timeout(const Duration(seconds: 10));
+      return r is Map ? Map<String, dynamic>.from(r) : null;
+    } catch (_) {
+      return null; // sin internet o migración pendiente: se usa la copia del celular
+    }
+  }
 
   String _k(String name) => '${name}_$_uid';
 
@@ -86,12 +119,46 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _activate(String uid, {required bool fresh}) async {
     _uid = uid;
     status = LockStatus.checking;
+    resetMode = false;
     notifyListeners();
-    final enc = await _read(_k('pin'));
-    biometricAvailable = await _canBio();
-    biometricOn = biometricAvailable && (await _read(_k('bio'))) != '0';
+    var enc = await _read(_k('pin'));
+    final st = await _rpc('app_pin_status');
     if (_uid != uid) return;
-    status = enc == null ? LockStatus.noPin : (fresh ? LockStatus.unlocked : LockStatus.locked);
+    serverHasPin = st?['has_pin'] == true;
+    canReset = st?['can_reset'] == true;
+    _needsUpload = false;
+    if (st != null) {
+      if (serverHasPin) {
+        // El PIN de la cuenta cambió en otro celular (o este nunca lo confirmó): manda el del servidor.
+        if (enc != null && await _read(_k('pinv')) != st['version']) {
+          await _write(_k('pin'), null);
+          enc = null;
+        }
+        final wait = (st['wait'] as num?)?.toInt() ?? 0;
+        _serverUntil = wait > 0 ? DateTime.now().add(Duration(seconds: wait)) : null;
+      } else if (enc != null) {
+        _needsUpload = true; // PIN creado antes de v4.0: se sube a la cuenta al próximo desbloqueo
+      }
+    }
+    biometricAvailable = await _canBio();
+    // Sin copia local del PIN (celular nuevo) la huella NO abre: primero el PIN de la cuenta.
+    biometricOn = enc != null && biometricAvailable && (await _read(_k('bio'))) != '0';
+    if (_uid != uid) return;
+    if (enc != null) {
+      status = fresh ? LockStatus.unlocked : LockStatus.locked;
+    } else if (serverHasPin) {
+      status = LockStatus.locked; // celular nuevo: escribe el PIN de tu cuenta
+    } else {
+      status = LockStatus.noPin;
+    }
+    notifyListeners();
+  }
+
+  /// «Olvidé mi PIN» tras entrar con el código del correo: pasa a crear uno nuevo.
+  void startReset() {
+    if (!canReset) return;
+    resetMode = true;
+    status = LockStatus.noPin;
     notifyListeners();
   }
 
@@ -99,13 +166,18 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> deactivate() async {
     final uid = _uid;
     if (uid != null) {
-      for (final k in ['pin', 'bio', 'fails', 'until']) {
+      for (final k in ['pin', 'pinv', 'bio', 'fails', 'until']) {
         await _write('${k}_$uid', null);
       }
     }
     _uid = null;
     status = LockStatus.off;
     setupAllowed = false;
+    serverHasPin = false;
+    canReset = false;
+    resetMode = false;
+    _needsUpload = false;
+    _serverUntil = null;
     notifyListeners();
   }
 
@@ -128,12 +200,52 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<bool> hasPin() async => _uid != null && await _read(_k('pin')) != null;
 
-  /// Guarda el PIN (no cambia el estado: lo hace [completeSetup] cuando termina la animación).
-  Future<void> setPin(String pin) async {
-    if (_uid == null) return;
+  Future<void> _storeLocal(String pin, String? version) async {
     await _write(_k('pin'), encodePin(pin));
+    await _write(_k('pinv'), version);
     await _write(_k('fails'), '0');
     await _write(_k('until'), null);
+  }
+
+  /// Crea el PIN de la cuenta (primera vez, o uno nuevo tras entrar con el código del correo).
+  /// No cambia el estado: lo hace [completeSetup] cuando termina la animación.
+  Future<void> setPin(String pin) async {
+    if (_uid == null) return;
+    final r = await _rpc('app_pin_set', {'p_new': pin, 'p_current': null});
+    if (r == null) {
+      // Sin internet: solo se permite la primera vez (la cuenta aún no tiene PIN). Se sube al volver la señal.
+      if (resetMode || serverHasPin) throw AppException('Necesitas internet para crear tu PIN nuevo.');
+      await _storeLocal(pin, null);
+      _needsUpload = true;
+      return;
+    }
+    if (r['ok'] != true) throw AppException((r['error'] ?? 'No se pudo guardar el PIN.') as String);
+    await _storeLocal(pin, r['version'] as String?);
+    serverHasPin = true;
+    _needsUpload = false;
+    resetMode = false;
+  }
+
+  /// Cambia el PIN de la cuenta: exige el actual (lo comprueba el servidor). Necesita internet.
+  Future<void> changePin(String current, String next) async {
+    if (_uid == null) return;
+    final r = await _rpc('app_pin_set', {'p_new': next, 'p_current': current});
+    if (r == null) throw AppException('Necesitas internet para cambiar tu PIN (así el cambio vale en todos tus celulares).');
+    if (r['ok'] != true) throw AppException((r['error'] ?? 'No se pudo cambiar el PIN.') as String);
+    await _storeLocal(next, r['version'] as String?);
+    serverHasPin = true;
+    _needsUpload = false;
+  }
+
+  void _upload(String pin) {
+    if (!_needsUpload) return;
+    _rpc('app_pin_set', {'p_new': pin, 'p_current': null}).then((r) async {
+      if (r != null && r['ok'] == true) {
+        _needsUpload = false;
+        serverHasPin = true;
+        await _write(_k('pinv'), r['version'] as String?);
+      }
+    });
   }
 
   /// Termina la configuración inicial: activa la huella (si el equipo la tiene) y desbloquea.
@@ -155,7 +267,29 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
   Future<int> waitSeconds() async {
     final until = int.tryParse(await _read(_k('until')) ?? '') ?? 0;
     final left = ((until - DateTime.now().millisecondsSinceEpoch) / 1000).ceil();
-    return left > 0 ? left : 0;
+    final server = _serverUntil == null ? 0 : _serverUntil!.difference(DateTime.now()).inSeconds;
+    final w = left > server ? left : server;
+    return w > 0 ? w : 0;
+  }
+
+  /// Celular sin copia del PIN: lo comprueba el servidor (con su propio límite de intentos).
+  Future<PinCheck> _verifyServer(String pin, bool unlock) async {
+    final r = await _rpc('app_pin_verify', {'p_pin': pin});
+    if (r == null) return const PinCheck(ok: false, offline: true);
+    if (r['ok'] == true) {
+      await _storeLocal(pin, r['version'] as String?);
+      _serverUntil = null;
+      biometricOn = biometricAvailable && (await _read(_k('bio'))) != '0';
+      if (unlock) unlockNow();
+      return const PinCheck(ok: true);
+    }
+    if (r['signed_out'] == true) {
+      await _forceSignOut();
+      return const PinCheck(ok: false, signedOut: true);
+    }
+    final wait = (r['wait'] as num?)?.toInt() ?? 0;
+    _serverUntil = wait > 0 ? DateTime.now().add(Duration(seconds: wait)) : null;
+    return PinCheck(ok: false, failsLeft: (r['fails_left'] as num?)?.toInt() ?? 0, waitSeconds: wait);
   }
 
   /// Comprueba el PIN con límite de intentos y espera creciente. `unlock` desbloquea la app si es correcto.
@@ -163,9 +297,11 @@ class AppLock extends ChangeNotifier with WidgetsBindingObserver {
     final wait = await waitSeconds();
     if (wait > 0) return PinCheck(ok: false, waitSeconds: wait);
     final enc = await _read(_k('pin'));
-    if (enc != null && verifyEncodedPin(pin, enc)) {
+    if (enc == null) return _verifyServer(pin, unlock);
+    if (verifyEncodedPin(pin, enc)) {
       await _write(_k('fails'), '0');
       await _write(_k('until'), null);
+      _upload(pin);
       if (unlock) unlockNow();
       return const PinCheck(ok: true);
     }

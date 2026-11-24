@@ -1,4 +1,5 @@
 "use client";
+import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -24,12 +25,15 @@ const icons: Record<string, string> = {
   configuracion: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-1.8 3.1-1.9-.6a7 7 0 0 1-2 1.1L15 20.5h-3.6l-.4-2.2a7 7 0 0 1-2-1.1l-1.9.6-1.8-3.1 1.6-1.2a7 7 0 0 1 0-2.3L5.3 10l1.8-3.1 1.9.6a7 7 0 0 1 2-1.1l.4-2.2H15l.4 2.2a7 7 0 0 1 2 1.1l1.9-.6 1.8 3.1-1.6 1.2a7 7 0 0 1 0 2.3z",
 };
 
-/** Sections grouped the way a shopkeeper thinks about the day. */
-const groups: { title: string; ids: string[] }[] = [
-  { title: "Vender y cobrar", ids: ["comprobantes", "caja", "cobros", "clientes", "puntos", "promociones", "cotizaciones"] },
-  { title: "Mercadería", ids: ["inventario", "productos", "compras", "sucursales"] },
-  { title: "Servicios", ids: ["trabajos", "agenda"] },
-  { title: "Tu negocio", ids: ["reportes", "equipo", "plan", "configuracion"] },
+/** Sections grouped the way a shopkeeper thinks about the day, each with its own color (same as the mobile menu). */
+const groups: { title: string; color: string; ids: string[] }[] = [
+  { title: "Vender", color: "#0e8c74", ids: ["comprobantes", "cotizaciones"] },
+  { title: "Mercadería", color: "#2f6fdc", ids: ["productos", "inventario", "compras", "sucursales"] },
+  { title: "Caja y cobros", color: "#c77417", ids: ["caja", "cobros"] },
+  { title: "Clientes y promociones", color: "#c2407e", ids: ["clientes", "promociones", "puntos"] },
+  { title: "Servicios", color: "#0b8aa8", ids: ["trabajos", "agenda"] },
+  { title: "Mi negocio", color: "#6a5ae0", ids: ["reportes"] },
+  { title: "Configuración", color: "#4f6480", ids: ["equipo", "plan", "configuracion"] },
 ];
 
 export const RailIcon = ({ id }: { id: string }) => <svg className="fv-rail-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -50,7 +54,8 @@ export default function RailNav({ links }: { links: readonly { id: string; href:
     {home && item(home)}
     {groups.map(g => {
       const ls = g.ids.map(id => rest.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
-      return ls.length ? <div key={g.title} className="fv-rail-group" role="group" aria-label={g.title}><p className="fv-rail-title">{g.title}</p>{ls.map(item)}</div> : null;
+      return ls.length ? <div key={g.title} className="fv-rail-group" role="group" aria-label={g.title} style={{ "--g": g.color } as React.CSSProperties}>
+        <p className="fv-rail-title"><i aria-hidden="true" />{g.title}</p>{ls.map(item)}</div> : null;
     })}
     {rest.filter(l => !known.has(l.id)).map(item)}
   </nav>;

@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../errors.dart';
 import '../pin_logic.dart';
 import '../services/app_lock.dart';
 import '../ui/theme.dart';
@@ -410,7 +411,13 @@ class _PinSetupFlowState extends State<PinSetupFlow> {
                 });
                 return 'No coinciden. Empecemos de nuevo.';
               }
-              await widget.onSave(pin);
+              try {
+                await widget.onSave(pin);
+              } on AppException catch (e) {
+                return e.message;
+              } catch (_) {
+                return 'No se pudo guardar el PIN. Revisa tu conexión e intenta otra vez.';
+              }
               return null;
             },
             onDone: widget.onFinished,
@@ -486,6 +493,7 @@ class _LockScreenState extends State<LockScreen> {
     final r = await AppLock.instance.verifyPin(pin, unlock: false);
     if (r.ok) return null;
     if (r.signedOut) return 'Demasiados intentos. Cerramos tu sesión por seguridad.';
+    if (r.offline) return 'Sin conexión. En un celular nuevo tu PIN se confirma con internet.';
     if (r.waitSeconds > 0) {
       _setWait(r.waitSeconds);
       return 'PIN incorrecto.';
@@ -503,15 +511,18 @@ class _LockScreenState extends State<LockScreen> {
           : PinEntry(
               key: const ValueKey('pin'),
               title: 'Bienvenido de nuevo',
-              subtitle: 'Ingresa tu PIN para continuar.',
+              subtitle: lock.serverHasPin && !lock.biometricOn
+                  ? 'Escribe el PIN de tu cuenta (el mismo de tu otro celular).'
+                  : 'Ingresa tu PIN para continuar.',
               lockedSeconds: _wait,
               onSubmit: _verify,
               onDone: lock.unlockNow,
               onBiometric: lock.biometricOn ? () async => lock.unlockWithBiometric() : null,
               footer: TextButton(
-                onPressed: () => setState(() => _forgot = true),
+                // Recién entró con el código del correo: puede crear uno nuevo. Si no, primero se valida el correo.
+                onPressed: lock.canReset ? lock.startReset : () => setState(() => _forgot = true),
                 style: TextButton.styleFrom(foregroundColor: Colors.white70),
-                child: const Text('¿Olvidaste tu PIN?'),
+                child: Text(lock.canReset ? 'Olvidé mi PIN: crear uno nuevo' : '¿Olvidaste tu PIN?'),
               ),
             ),
     );
@@ -534,7 +545,7 @@ class _ForgotPanel extends StatelessWidget {
           const Text('¿Olvidaste tu PIN?', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
           Text(
-            'Cerraremos tu sesión y volverás a entrar con tu correo. Tus facturas siguen guardadas en tu cuenta y podrás crear un PIN nuevo.',
+            'Cerraremos tu sesión. Vuelve a entrar con el CÓDIGO que llega a tu correo y podrás crear un PIN nuevo. Tus ventas siguen guardadas. Sin acceso a tu correo, nadie puede cambiar tu PIN.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white.withValues(alpha: 0.75), height: 1.4),
           ),
@@ -560,7 +571,7 @@ class SetupGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PinSetupFlow(
-        title: 'Protege tu cuenta',
+        title: AppLock.instance.resetMode ? 'Crea tu PIN nuevo' : 'Protege tu cuenta',
         onSave: AppLock.instance.setPin,
         onFinished: () => AppLock.instance.completeSetup(),
       );
@@ -582,7 +593,7 @@ class LockOverlay extends StatelessWidget {
           content = const SizedBox.expand(key: ValueKey('chk'));
         } else if (l.status == LockStatus.locked) {
           content = const SafeArea(key: ValueKey('lock'), child: LockScreen());
-        } else if (l.status == LockStatus.noPin && l.setupAllowed) {
+        } else if (l.status == LockStatus.noPin && (l.setupAllowed || l.resetMode)) {
           content = const SafeArea(key: ValueKey('setup'), child: SetupGate());
         }
         if (content != null) {

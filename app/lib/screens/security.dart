@@ -73,7 +73,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
             ),
             const SizedBox(height: 14),
             Text(
-              'Tu PIN se guarda cifrado en este teléfono y nunca sale de él. Tras $maxPinFails intentos fallidos se cierra tu sesión.',
+              'Tu PIN es de tu cuenta: en otro celular te pedirán este mismo PIN y solo se cambia aquí, escribiendo el actual. Se guarda cifrado (nadie puede leerlo). Tras $maxPinFails intentos fallidos se cierra tu sesión.',
               style: TextStyle(color: t.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13, height: 1.4),
             ),
           ]);
@@ -93,6 +93,7 @@ class ChangePinScreen extends StatefulWidget {
 
 class _ChangePinScreenState extends State<ChangePinScreen> {
   bool _verified = false;
+  String? _current;
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +109,7 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
                   ? PinSetupFlow(
                       key: const ValueKey('new'),
                       title: 'Nuevo PIN',
-                      onSave: AppLock.instance.setPin,
+                      onSave: (next) => AppLock.instance.changePin(_current!, next),
                       onFinished: () => Navigator.of(context).pop(true),
                     )
                   : PinEntry(
@@ -117,7 +118,11 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
                       subtitle: 'Confirma que eres tú.',
                       onSubmit: (pin) async {
                         final r = await AppLock.instance.verifyPin(pin, unlock: false);
-                        if (r.ok) return null;
+                        if (r.ok) {
+                          _current = pin;
+                          return null;
+                        }
+                        if (r.offline) return 'Sin conexión. Conéctate a internet para cambiar tu PIN.';
                         if (r.signedOut) return 'Demasiados intentos. Cerramos tu sesión.';
                         if (r.waitSeconds > 0) return 'Espera ${formatCountdown(r.waitSeconds)} para volver a intentar.';
                         return 'PIN incorrecto.';

@@ -236,25 +236,25 @@ class SettingsScreen extends StatelessWidget {
                       title: 'Cobros y recordatorios',
                       subtitle: 'Yape, Plin, banco, tarjeta y cobranza automática',
                       onTap: () => pushPremium(context, const PaySettingsScreen())),
-                if (a.can('settings') && a.has('tienda'))
+                if (a.rubro != 'bodega' && a.can('settings') && a.has('tienda'))
                   _tile(context,
                       icon: Icons.storefront_rounded,
                       title: 'Tienda en línea',
                       subtitle: 'Tu catálogo como página web: recibe pedidos por WhatsApp',
                       onTap: () => pushPremium(context, const StoreScreen())),
-                if (a.can('finance') && a.has('recurrentes'))
+                if (a.rubro != 'bodega' && a.can('finance') && a.has('recurrentes'))
                   _tile(context,
                       icon: Icons.event_repeat_rounded,
                       title: 'Facturación recurrente',
                       subtitle: 'Alquileres y mensualidades que se facturan solos',
                       onTap: () => pushPremium(context, const RecurringScreen())),
-                if (a.can('finance'))
+                if (a.rubro != 'bodega' && a.can('finance'))
                   _tile(context,
                       icon: Icons.groups_rounded,
                       title: 'Clientes 360',
                       subtitle: 'Mejores clientes y los que se están yendo',
                       onTap: () => pushPremium(context, const Clients360Screen())),
-                if (a.can('finance'))
+                if (a.rubro != 'bodega' && a.can('finance'))
                   _tile(context,
                       icon: Icons.shopping_bag_rounded,
                       title: 'Gastos',
@@ -281,7 +281,7 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Clientes (lista simple)',
                     subtitle: 'Contactos, documentos y correos',
                     onTap: () => go(const ClientsScreen())),
-                if (a.can('import'))
+                if (a.rubro != 'bodega' && a.can('import'))
                   _tile(context,
                       icon: Icons.cloud_upload_rounded,
                       title: 'Importar facturas antiguas',

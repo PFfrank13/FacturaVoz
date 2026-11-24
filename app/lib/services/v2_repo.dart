@@ -406,6 +406,22 @@ class V2Repo {
   }
 
   static Future<void> setPin(String? pin) => _db.rpc('set_admin_pin', params: {'p_org': org, 'p_pin': pin});
+
+  /// Cambia o quita el PIN del dueño escribiendo el actual (v4.0). Devuelve null si salió bien o el mensaje de error.
+  static Future<String?> setPinChecked(String? pin, String? current) async {
+    try {
+      final r = await _db.rpc('set_admin_pin', params: {'p_org': org, 'p_pin': pin, 'p_current': current});
+      if (r is Map && r['ok'] == true) return null;
+      return r is Map ? (r['error'] ?? 'No se pudo guardar el PIN.') as String : 'No se pudo guardar el PIN.';
+    } on PostgrestException catch (e) {
+      // Migración v4.0 pendiente: se usa la versión anterior.
+      if (e.code == 'PGRST202') {
+        await setPin(pin);
+        return null;
+      }
+      rethrow;
+    }
+  }
   static Future<bool> verifyPin(String pin) async => (await _db.rpc('verify_admin_pin', params: {'p_org': org, 'p_pin': pin})) == true;
 
   // ═══════════ Papelera ═══════════
