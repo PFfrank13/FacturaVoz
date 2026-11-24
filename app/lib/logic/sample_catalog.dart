@@ -5,7 +5,7 @@
 class SampleItem {
   const SampleItem(this.name, this.price, this.category, this.emoji);
   final String name;
-  final double price; // precio unitario sin impuesto
+  final double price; // precio de venta referencial CON IGV (al cargarlo se guarda sin IGV)
   final String category;
   final String emoji;
 }

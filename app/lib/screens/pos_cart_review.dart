@@ -180,7 +180,7 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                     overflow: TextOverflow.ellipsis,
                                     style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: 15)),
                                   const SizedBox(height: 3),
-                                  Text('${money(item.unitPrice, widget.currency)} c/u',
+                                  Text('${money(round2(item.unitPrice * (1 + widget.taxRate / 100)), widget.currency)} c/u',
                                     style: t.textTheme.bodySmall?.copyWith(
                                       color: t.colorScheme.onSurfaceVariant)),
                                   const SizedBox(height: 8),
@@ -207,7 +207,8 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                                   Expanded(child: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     alignment: AlignmentDirectional.centerEnd,
-                                    child: Text(money(item.amount, widget.currency),
+                                    // Lo que se cobra por esta línea: valor + su IGV (mismo redondeo que el total).
+                                    child: Text(money(round2(item.amount + round2(item.amount * widget.taxRate / 100)), widget.currency),
                                       maxLines: 1,
                                       style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800,
                                         fontFamily: 'Inter', letterSpacing: -.4,
@@ -239,9 +240,9 @@ class _PosCartReviewScreenState extends State<PosCartReviewScreen> {
                     child: DefaultTextStyle.merge(
                       style: const TextStyle(color: Colors.white),
                       child: Column(children: [
-                    _totalLine('Subtotal (${qtyText(count)})', total.subtotal, widget.currency),
+                    _totalLine('Valor de venta (${qtyText(count)})', total.subtotal, widget.currency),
                     const SizedBox(height: 7),
-                    _totalLine('IGV (${qtyText(widget.taxRate)}%)', total.tax, widget.currency),
+                    _totalLine('IGV ${qtyText(widget.taxRate)}% (ya incluido)', total.tax, widget.currency),
                     const Divider(height: 26, color: Color(0x2EFFFFFF)),
                     _totalLine('Total a cobrar', total.total, widget.currency, bold: true),
                     const SizedBox(height: 16),

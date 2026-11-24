@@ -77,12 +77,13 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
         final typed = parseDecimal(ctrl.text);
-        final kg = weightFor(kilos: bySoles ? null : typed, amount: bySoles ? typed : null, pricePerKilo: p.unitPrice);
+        final perKilo = _gross(p.unitPrice); // el cliente paga por kilo el precio con IGV
+        final kg = weightFor(kilos: bySoles ? null : typed, amount: bySoles ? typed : null, pricePerKilo: perKilo);
         final cur = AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
         return AlertDialog(
           title: Text(p.name),
           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('${money(p.unitPrice, cur)} el kilo', style: Theme.of(ctx).textTheme.bodySmall),
+            Text('${money(perKilo, cur)} el kilo', style: Theme.of(ctx).textTheme.bodySmall),
             const SizedBox(height: 12),
             SegmentedButton<bool>(
               segments: const [
@@ -100,7 +101,7 @@ class _PosScreenState extends State<PosScreen> {
               onChanged: (_) => setD(() {}),
             ),
             const SizedBox(height: 8),
-            Text(kg == null ? 'Escribe cuánto quiere el cliente.' : bySoles ? 'Son ${qtyText(kg)} kg' : 'Son ${money(kg * p.unitPrice, cur)}',
+            Text(kg == null ? 'Escribe cuánto quiere el cliente.' : bySoles ? 'Son ${qtyText(kg)} kg' : 'Son ${money(kg * perKilo, cur)}',
               style: Theme.of(ctx).textTheme.titleMedium),
           ]),
           actions: [
@@ -291,6 +292,10 @@ class _PosScreenState extends State<PosScreen> {
   String get _cur => AppState.instance.profile?.currency.isNotEmpty == true ? AppState.instance.profile!.currency : 'PEN';
   double get _rate => AppState.instance.profile?.taxRate ?? 18;
 
+  /// v3.8: lo que se ve en la caja es el precio FINAL (con IGV), igual que la web. En la base el precio va sin IGV.
+  double _gross(double net) => round2(net * (1 + _rate / 100));
+  double _net(double gross) => round2(gross / (1 + _rate / 100));
+
   @override
   void initState() {
     super.initState();
@@ -436,7 +441,7 @@ class _PosScreenState extends State<PosScreen> {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(SnackBar(duration: const Duration(milliseconds: 1800),
-              content: Text('${sp.name} · ${qtyText(scale.kilos)} kg · ${money(scale.kilos * _price(sp, scale.kilos).unitPrice, _cur)}', maxLines: 2, overflow: TextOverflow.ellipsis)));
+              content: Text('${sp.name} · ${qtyText(scale.kilos)} kg · ${money(scale.kilos * _gross(_price(sp, scale.kilos).unitPrice), _cur)}', maxLines: 2, overflow: TextOverflow.ellipsis)));
         }
         _q.clear();
         setState(() {});
@@ -459,7 +464,7 @@ class _PosScreenState extends State<PosScreen> {
         messenger.hideCurrentSnackBar();
         messenger.showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 1600),
-          content: Text('${p.name} · ${money(effectivePrice, _cur)}',
+          content: Text('${p.name} · ${money(_gross(effectivePrice), _cur)}',
             maxLines: 2, overflow: TextOverflow.ellipsis),
         ));
       }
@@ -494,7 +499,7 @@ class _PosScreenState extends State<PosScreen> {
         // Puede ser de un producto archivado (no sale en la venta): nunca se crea un duplicado.
         final taken = await ProductCodes.owner(code);
         if (taken != null) throw AppException('${codeTakenMessage(code, taken.name)} Reactívalo en Productos.');
-        final id = await Repo.saveProduct(name: picked.$1, unitPrice: picked.$2, unit: 'NIU');
+        final id = await Repo.saveProduct(name: picked.$1, unitPrice: _net(picked.$2), unit: 'NIU');
         await V2Repo.saveProductExtra(id, {'barcode': code});
         await _load();
         product = _products?.where((x) => x.id == id).firstOrNull;
@@ -574,7 +579,7 @@ class _PosScreenState extends State<PosScreen> {
     setState(() => _seeding = true);
     try {
       for (final it in items) {
-        final id = await Repo.saveProduct(name: it.name, unitPrice: it.price, unit: 'NIU');
+        final id = await Repo.saveProduct(name: it.name, unitPrice: _net(it.price), unit: 'NIU');
         await V2Repo.saveProductExtra(id, {'category': it.category}).catchError((_) {});
       }
       AppState.instance.bump();
@@ -1309,7 +1314,7 @@ class _PosScreenState extends State<PosScreen> {
                                   return FvPosProductCard(
                                     key: ValueKey('retail-product-${p.id}'),
                                     name: p.name,
-                                    price: money(pr.unitPrice, _cur),
+                                    price: money(_gross(pr.unitPrice), _cur),
                                     icon: placeholderIcon,
                                     category: categoryLabel,
                                     // Las fotos procesadas como PNG transparente
@@ -1377,7 +1382,7 @@ class _PosScreenState extends State<PosScreen> {
                                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                           Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.15)),
                                           Row(children: [
-                                            Money(money(pr.unitPrice, _cur), size: 13, weight: FontWeight.w800),
+                                            Money(money(_gross(pr.unitPrice), _cur), size: 13, weight: FontWeight.w800),
                                             if (pr.reason.isNotEmpty) ...[const SizedBox(width: 4), const Icon(Icons.local_offer_rounded, size: 14, color: Brand.ok)],
                                           ]),
                                         ]),
@@ -1514,7 +1519,7 @@ class _PosScreenState extends State<PosScreen> {
 }
 
 /// «Código nuevo»: elegir el producto al que pertenece (búsqueda, sin escribir el nombre completo) o crearlo.
-/// Devuelve el Product elegido o (nombre, precio sin IGV) para crear uno.
+/// Devuelve el Product elegido o (nombre, precio de venta CON IGV) para crear uno.
 class _UnknownCodeSheet extends StatefulWidget {
   const _UnknownCodeSheet({required this.code, required this.products, required this.currency});
   final String code;
@@ -1564,7 +1569,7 @@ class _UnknownCodeSheetState extends State<_UnknownCodeSheet> {
               itemBuilder: (_, i) => ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(list[i].name),
-                subtitle: Text(money(list[i].unitPrice, widget.currency)),
+                subtitle: Text(money(round2(list[i].unitPrice * (1 + (AppState.instance.profile?.taxRate ?? 18) / 100)), widget.currency)),
                 trailing: const Icon(Icons.add_link_rounded),
                 onTap: () => Navigator.pop(context, list[i]),
               ),
@@ -1574,7 +1579,7 @@ class _UnknownCodeSheetState extends State<_UnknownCodeSheet> {
           ] else ...[
             TextField(controller: _name, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Nombre del producto')),
             const SizedBox(height: 10),
-            TextField(controller: _price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Precio (sin IGV)')),
+            TextField(controller: _price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Precio de venta (con IGV)')),
             if (_err != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_err!, style: TextStyle(color: t.colorScheme.error))),
             const Spacer(),
             FilledButton.icon(

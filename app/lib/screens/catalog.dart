@@ -654,7 +654,7 @@ class _UniversalSearchScreenState extends State<UniversalSearchScreen> {
     }
     for (final p in _products) {
       final s = matchScore(q, p.name);
-      if (s > 0) out.add(_Hit(s * 0.85, 'Producto', p.name, money(p.unitPrice, AppState.instance.profile?.currency ?? 'PEN'), Icons.inventory_2_rounded, () => pushPremium(context, const ProductsScreen())));
+      if (s > 0) out.add(_Hit(s * 0.85, 'Producto', p.name, money(round2(p.unitPrice * (1 + (AppState.instance.profile?.taxRate ?? 18) / 100)), AppState.instance.profile?.currency ?? 'PEN'), Icons.inventory_2_rounded, () => pushPremium(context, const ProductsScreen())));
     }
     out.sort((a, b) => b.score.compareTo(a.score));
     return out.take(60).toList();

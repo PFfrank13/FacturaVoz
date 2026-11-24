@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/payment_listener.dart';
 import 'package:flutter/services.dart';
 
+import '../app_state.dart';
 import '../models.dart';
 import '../ui/retail_visual.dart';
 import '../ui/theme.dart';
@@ -312,7 +313,7 @@ class _PaymentFlowState extends State<_PaymentFlow> {
                         Expanded(child: Text(item.description, maxLines: 1, overflow: TextOverflow.ellipsis)),
                         Text('×${qtyText(item.quantity)}'),
                         const SizedBox(width: 12),
-                        Text(money(item.quantity * item.unitPrice, widget.currency)),
+                        Text(money(round2(item.amount + round2(item.amount * (AppState.instance.profile?.taxRate ?? 18) / 100)), widget.currency)),
                       ]),
                     ),
                 ],

@@ -106,7 +106,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                                   child: Icon(p.isService ? Icons.handyman_rounded : Icons.inventory_2_rounded, size: 20, color: t.colorScheme.primary),
                                 ),
                                 title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                trailing: Money(money(p.unitPrice, widget.currency), size: 14),
+                                trailing: Money(money(round2(p.unitPrice * (1 + (AppState.instance.profile?.taxRate ?? 18) / 100)), widget.currency), size: 14),
                                 onTap: () => Navigator.pop(context, p),
                               );
                             },
@@ -212,7 +212,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
   Future<void> _edit([Product? p]) async {
     if (!_canManageProducts) return;
     final name = TextEditingController(text: p?.name ?? '');
-    final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(p.unitPrice));
+    // v3.8: se escribe el precio de venta CON IGV (lo que paga el cliente); en la base se guarda sin IGV para SUNAT.
+    final taxRate = AppState.instance.profile?.taxRate ?? 18;
+    double gross(double net) => round2(net * (1 + taxRate / 100));
+    double net(double g) => round2(g / (1 + taxRate / 100));
+    final price = TextEditingController(text: p == null || p.unitPrice == 0 ? '' : qtyText(gross(p.unitPrice)));
     final guided = p == null && Access.instance.rubro == 'bodega';
     var wizardStep = 0;
     const steps = ['Datos del producto', 'Código y foto', 'Presentaciones',
@@ -231,7 +235,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
     final barcode = TextEditingController(text: (extra?['barcode'] ?? '') as String);
     final category = TextEditingController(text: (extra?['category'] ?? '') as String);
     final description = TextEditingController(text: (extra?['description'] ?? '') as String);
-    final wholesale = TextEditingController(text: extra?['wholesale_price'] == null ? '' : qtyText((extra!['wholesale_price'] as num).toDouble()));
+    final wholesale = TextEditingController(text: extra?['wholesale_price'] == null ? '' : qtyText(gross((extra!['wholesale_price'] as num).toDouble())));
     final wholesaleMin = TextEditingController(text: extra?['wholesale_min_qty'] == null ? '' : qtyText((extra!['wholesale_min_qty'] as num).toDouble()));
     final oldImage = extra?['image_path'] as String?;
     Uint8List? newImage;
@@ -303,7 +307,11 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 controller: price,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                decoration: const InputDecoration(labelText: 'Precio unitario (sin impuesto)', prefixIcon: Icon(Icons.payments_outlined)),
+                decoration: InputDecoration(
+                  labelText: taxRate > 0 ? 'Precio de venta (con IGV)' : 'Precio de venta',
+                  helperText: taxRate > 0 ? 'Lo que paga tu cliente. Para SUNAT guardamos ${net(parseDecimal(price.text) ?? 0).toStringAsFixed(2)} sin IGV.' : 'Lo que paga tu cliente.',
+                  prefixIcon: const Icon(Icons.payments_outlined),
+                ),
                 onChanged: (_) => setS(() {}),
               ),
               const SizedBox(height: 10),
@@ -316,7 +324,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
               ),
               Builder(builder: (_) {
                 final c = parseDecimal(cost.text);
-                final pr = parseDecimal(price.text) ?? 0;
+                final pr = net(parseDecimal(price.text) ?? 0);
                 final m = marginOf(price: pr, cost: c);
                 if (c == null || c <= 0) return const SizedBox.shrink();
                 final color = m == null ? Colors.grey : (m < 0.15 ? const Color(0xFFD94A5E) : (m < 0.3 ? const Color(0xFFC57A12) : const Color(0xFF23956F)));
@@ -332,8 +340,8 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                     Wrap(spacing: 6, runSpacing: 6, children: [
                       for (final target in const [0.3, 0.4, 0.5])
                         ActionChip(
-                          label: Text('Precio para ${(target * 100).round()} %: ${priceForMargin(cost: c, margin: target).toStringAsFixed(2)}'),
-                          onPressed: () => setS(() => price.text = qtyText(priceForMargin(cost: c, margin: target))),
+                          label: Text('Precio para ${(target * 100).round()} %: ${gross(priceForMargin(cost: c, margin: target)).toStringAsFixed(2)}'),
+                          onPressed: () => setS(() => price.text = qtyText(gross(priceForMargin(cost: c, margin: target)))),
                         ),
                     ]),
                   ]),
@@ -480,7 +488,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                   child: TextField(
                     controller: wholesale,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Precio por mayor (opcional)'),
+                    decoration: const InputDecoration(labelText: 'Precio por mayor con IGV (opcional)'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -537,7 +545,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                 Text('Producto: ${name.text.trim()}'),
                 Text('Código: ${barcode.text.trim().isEmpty ? 'Sin código' : barcode.text.trim()}'),
                 Text('Categoría: ${category.text.trim().isEmpty ? 'Sin categoría' : category.text.trim()}'),
-                Text('Precio: S/ ${price.text.trim().isEmpty ? '0.00' : price.text.trim()}'),
+                Text('Precio de venta: S/ ${price.text.trim().isEmpty ? '0.00' : price.text.trim()}${taxRate > 0 ? ' (con IGV)' : ''}'),
                 Text('Stock inicial: ${track ? stock.text : 'Sin control'}'),
                 const Text('La ficha se guardará en Supabase al pulsar «Guardar producto».'),
               ],
@@ -600,7 +608,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
         ),
       ),
     );
-    final values = (name.text, price.text.trim().isEmpty ? 0.0 : (parseDecimal(price.text) ?? 0.0), unit);
+    final values = (name.text, price.text.trim().isEmpty ? 0.0 : net(parseDecimal(price.text) ?? 0.0), unit);
     final stockValue = track && unit != 'ZZ' ? (parseDecimal(stock.text) ?? 0.0) : null;
     final reorderValue = track && unit != 'ZZ' ? parseDecimal(reorder.text) : null;
     final stockChanged = stockValue != p?.stock || reorderValue != p?.reorderPoint;
@@ -611,7 +619,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
       'barcode': barcode.text.trim().isEmpty ? null : barcode.text.trim(),
       'category': category.text.trim().isEmpty ? null : category.text.trim(),
       'description': description.text.trim().isEmpty ? null : description.text.trim(),
-      'wholesale_price': parseDecimal(wholesale.text),
+      'wholesale_price': parseDecimal(wholesale.text) == null ? null : net(parseDecimal(wholesale.text)!),
       'wholesale_min_qty': parseDecimal(wholesale.text) == null ? null : parseDecimal(wholesaleMin.text),
     };
     final imageToUpload = newImage;
@@ -952,7 +960,7 @@ class _ProductsScreenState extends State<ProductsScreen> with LiveReload<Product
                       index: i < 8 ? i : 8,
                       child: FvInventoryProductCard(
                         name: p.name,
-                        price: p.unitPrice.toStringAsFixed(2),
+                        price: round2(p.unitPrice * (1 + (AppState.instance.profile?.taxRate ?? 18) / 100)).toStringAsFixed(2),
                         isService: p.isService,
                         active: p.active,
                         category: (_catalogExtras[p.id]?['category'] ?? '').toString(),
