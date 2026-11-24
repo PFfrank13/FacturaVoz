@@ -13,6 +13,14 @@ const icons: Record<string, string> = {
   alertas: "M12 3l9 16H3zM12 10v4M12 17v.01",
   bitacora: "M12 8v4l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4",
   papelera: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6",
+  cuaderno: "M4 7h3l2-3h6l2 3h3v12H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  recurrentes: "M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5",
+  tienda: "M4 9l1.5-5h13L20 9M4 9h16v11H4zM4 9a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M10 20v-5h4v5",
+  encuestas: "M12 3.5l2.6 5.3 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8L3.5 9.6l5.9-.8z",
+  conciliacion: "M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18",
+  impuestos: "M6 3h12v18H6zM9 7h6M9 11h6M9 15h2M14 15h1",
+  comisiones: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4",
+  importar: "M12 3v12M7 10l5 5 5-5M4 17v3h16v-3",
   comprobantes: "M7 3h7l4 4v14H7zM14 3v4h4M9.5 12h6M9.5 15.5h6M9.5 8.5h2.5",
   caja: "M3.5 9h17v10.5h-17zM6 9V6.5h12V9M8 13.5h3M15.5 14.5a1 1 0 1 0 0-.01",
   cobros: "M4 7h16v11H4zM4 10.5h16M7.5 14.5h3",
@@ -34,12 +42,12 @@ const icons: Record<string, string> = {
 
 /** Sections grouped the way a shopkeeper thinks about the day, each with its own color (same as the mobile menu). */
 const groups: { title: string; color: string; ids: string[] }[] = [
-  { title: "Vender", color: "#0e8c74", ids: ["vender", "comprobantes", "cotizaciones"] },
+  { title: "Vender", color: "#0e8c74", ids: ["vender", "comprobantes", "cotizaciones", "cuaderno", "recurrentes", "tienda"] },
   { title: "Mercadería", color: "#2f6fdc", ids: ["productos", "inventario", "compras", "sucursales"] },
-  { title: "Caja y cobros", color: "#c77417", ids: ["caja", "fiados", "cobros", "avisos", "gastos"] },
-  { title: "Clientes y promociones", color: "#c2407e", ids: ["clientes", "promociones", "puntos"] },
+  { title: "Caja y cobros", color: "#c77417", ids: ["caja", "fiados", "cobros", "avisos", "conciliacion", "gastos"] },
+  { title: "Clientes y promociones", color: "#c2407e", ids: ["clientes", "promociones", "puntos", "encuestas"] },
   { title: "Servicios", color: "#0b8aa8", ids: ["trabajos", "agenda"] },
-  { title: "Mi negocio", color: "#6a5ae0", ids: ["reportes"] },
+  { title: "Mi negocio", color: "#6a5ae0", ids: ["reportes", "impuestos", "comisiones", "importar"] },
   { title: "Control del dueño", color: "#8a4b2f", ids: ["alertas", "bitacora", "papelera"] },
   { title: "Configuración", color: "#4f6480", ids: ["equipo", "plan", "configuracion"] },
 ];

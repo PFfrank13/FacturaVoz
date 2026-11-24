@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import VoiceRecorder from "./VoiceRecorder";
 import InvoiceDownload from "./InvoiceDownload";
 import { createInvoice } from "@/app/actions/invoices";
+import { createClient } from "@/lib/supabase/client";
 import { draftProblem, money, totals, type InvoiceInput } from "@/lib/schemas";
 
 type Stage =
@@ -18,7 +19,7 @@ const blankLine = () => ({ description: "", quantity: 1, unit_price: 0 });
  * Draft receipts from the web: dictated (voice plan) or typed. Saving creates a draft only; it is issued to SUNAT
  * from the POS or the mobile app, like any other sale.
  */
-export default function NewInvoice({ org, currency, voiceAllowed, defaultTaxRate = 18 }: { org: string; currency: string; voiceAllowed: boolean; defaultTaxRate?: number }) {
+export default function NewInvoice({ org, currency, voiceAllowed, notebookAllowed = false, defaultTaxRate = 18 }: { org: string; currency: string; voiceAllowed: boolean; notebookAllowed?: boolean; defaultTaxRate?: number }) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ name: "idle" });
   const [saving, setSaving] = useState(false);
@@ -41,6 +42,28 @@ export default function NewInvoice({ org, currency, voiceAllowed, defaultTaxRate
       setStage({ name: "review", inv: json.invoice });
     } catch {
       setError("No pudimos procesar el audio. Comprueba tu conexión.");
+      setStage({ name: "idle" });
+    }
+  }
+
+  /** «Del cuaderno a la factura»: a photo of the notebook, a note or a WhatsApp screenshot becomes a draft. */
+  async function onPhoto(file: File) {
+    setError("");
+    setStage({ name: "working" });
+    try {
+      const fd = new FormData();
+      fd.append("org_id", org);
+      fd.append("image", file, file.name);
+      const { data } = await createClient().auth.getSession();
+      const res = await fetch("/api/notebook", { method: "POST", body: fd, headers: data.session ? { authorization: `Bearer ${data.session.access_token}` } : {} });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.sale) { setError(json.error ?? "No pude leer la foto. Intenta con más luz y la hoja completa."); setStage({ name: "idle" }); return; }
+      const sale = json.sale as { client_name: string; items: { description: string; quantity: number; unit_price: number }[]; prices_include_tax: boolean; notes: string };
+      if (!sale.items.length) { setError("No encontré productos en la foto. Prueba con otra más clara."); setStage({ name: "idle" }); return; }
+      const net = (p: number) => sale.prices_include_tax && defaultTaxRate > 0 ? Math.round(p / (1 + defaultTaxRate / 100) * 100) / 100 : p;
+      setStage({ name: "review", inv: { client_name: sale.client_name, tax_rate: defaultTaxRate, notes: sale.notes || undefined, items: sale.items.map(i => ({ ...i, unit_price: net(i.unit_price) })) } });
+    } catch {
+      setError("No pudimos procesar la foto. Comprueba tu conexión.");
       setStage({ name: "idle" });
     }
   }
@@ -68,9 +91,10 @@ export default function NewInvoice({ org, currency, voiceAllowed, defaultTaxRate
         </div>
         <div className="fv-draft-actions">
           {voiceAllowed && <VoiceRecorder compact onAudio={onAudio} disabled={stage.name === "working"} />}
+          {notebookAllowed && <label className="fv-button secondary fv-file">Foto del cuaderno<input type="file" accept="image/jpeg,image/png,image/webp" className="fv-visually-hidden" disabled={stage.name === "working"} onChange={e => { const f = e.target.files?.[0]; if (f) void onPhoto(f); e.target.value = ""; }} /></label>}
           <button className="fv-button secondary" disabled={stage.name === "working"} onClick={() => setStage({ name: "review", inv: { client_name: "", tax_rate: defaultTaxRate, items: [blankLine()] } })}>Escribir borrador</button>
         </div>
-        {stage.name === "working" && <p className="fv-draft-note" aria-live="polite">Entendiendo el dictado…</p>}
+        {stage.name === "working" && <p className="fv-draft-note" aria-live="polite">Leyendo…</p>}
         {error && <p className="fv-draft-note fv-error" role="alert">{error}</p>}
       </div>
     );

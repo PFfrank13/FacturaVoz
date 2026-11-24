@@ -40,6 +40,7 @@ const livePayments = ["payments"] as const;
 const liveInventory = ["products", "product_lots", "stock_losses"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { renderExtra } from "./extra";
+import { renderExtra2 } from "./extra2";
 import { money } from "@/lib/schemas";
 
 export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string }> }) {
@@ -50,6 +51,8 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const title = id === "clientes" && c.sector === "consultorio" ? "Pacientes" : id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title;
   const extra = await renderExtra(id, c, org, title);
   if (extra) return extra;
+  const extra2 = await renderExtra2(id, c, org, title, (await searchParams).mes);
+  if (extra2) return extra2;
   if (id === "reportes") {
     const search = await searchParams;
     const today = limaDate(new Date());
@@ -174,7 +177,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       fiscal: (Array.isArray(r.fiscal) ? r.fiscal[0] : r.fiscal) as ReceiptRow["fiscal"] ?? null,
     }));
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">FACTURACIÓN / {c.organization.name}</p><LiveRefresh org={org} tables={liveReceipts} /></div><h1>Comprobantes</h1><p>Boletas, facturas y notas emitidas en el móvil o aquí, con su estado en SUNAT, XML, CDR y versión imprimible.</p></section>
-      <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} />
+      <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} notebookAllowed={hasFeature(c.license, "cuaderno_ia") && can(c.access, "sell")} />
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los comprobantes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} range={range} capped={receipts.length >= 300} />}
     </>;

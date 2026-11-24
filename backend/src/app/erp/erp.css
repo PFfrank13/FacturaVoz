@@ -695,3 +695,26 @@
 .fv-alerts small { color: var(--erp-muted); font-size: 12px; }
 @media (max-width: 1100px) { .fv-pos { grid-template-columns: 1fr; } .fv-pos-cart { position: static; max-height: none; } }
 @media (max-width: 720px) { .fv-pos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fv-pos-scan { top: 8px; } }
+
+/* ── v3.9 · Ranking de vendedores, tienda y conciliación ── */
+.fv-ranking { list-style: none; display: grid; gap: 10px; padding: 0; }
+.fv-ranking li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 20px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); }
+.fv-ranking li > div { display: grid; gap: 4px; min-width: 0; }
+.fv-ranking small { color: var(--erp-muted); font-size: 12.5px; }
+.fv-rank { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-weight: 900; color: #fff; background: linear-gradient(135deg, #a3b1c6, #5b6b82); }
+.fv-ranking li:nth-child(1) .fv-rank { background: linear-gradient(135deg, #ffd36e, #d99a1c); box-shadow: 0 8px 18px -8px #d99a1c; }
+.fv-ranking li:nth-child(2) .fv-rank { background: linear-gradient(135deg, #e3e8ef, #9aa6b6); }
+.fv-ranking li:nth-child(3) .fv-rank { background: linear-gradient(135deg, #f0b48a, #b8693a); }
+.fv-bar { display: block; height: 6px; border-radius: 6px; background: color-mix(in srgb, var(--erp-ink) 8%, transparent); overflow: hidden; }
+.fv-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--erp-accent), #6fb7ff); }
+.fv-rank-amounts { text-align: right; display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+.fv-rank-amounts strong { font-size: 18px; }
+.fv-store-url { display: flex; align-items: center; gap: 4px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); border-radius: 14px; padding-left: 12px; }
+.fv-store-url small { color: var(--erp-muted); white-space: nowrap; font-weight: 600; }
+.fv-store-url input { border: 0 !important; background: transparent !important; padding-left: 0 !important; }
+.fv-inline-action { display: inline-flex; flex-direction: column; gap: 4px; }
+.fv-inline-action .fv-ok, .fv-inline-action .fv-error { font-size: 12px; padding: 4px 8px; }
+.fv-neg { color: #e0457b; }
+.fv-note-box { font-size: 13.5px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, #6fb7ff 12%, transparent); margin: 8px 0; }
+.fv-file { cursor: pointer; }
