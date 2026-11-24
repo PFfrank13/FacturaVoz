@@ -192,6 +192,8 @@ ThemeData buildTheme(Brightness b) {
       backgroundColor: card,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
+      dragHandleColor: muted.withValues(alpha: .45),
+      dragHandleSize: const Size(44, 5),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(FvTokens.sheetRadius))),
     ),
     brightness: b,
@@ -214,7 +216,9 @@ ThemeData buildTheme(Brightness b) {
     cardTheme: CardThemeData(
       color: card,
       surfaceTintColor: Colors.transparent,
-      elevation: 0,
+      // Lift apenas visible y teñido de azul noche: separa tarjetas sin sombras duras.
+      elevation: dark ? 0 : 1.5,
+      shadowColor: const Color(0x331B3550),
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.lg),
@@ -254,9 +258,13 @@ ThemeData buildTheme(Brightness b) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
-        elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: radius),
-        textStyle: const TextStyle(fontFamily: _font, fontSize: 15.5, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: _font, fontSize: 15.5, fontWeight: FontWeight.w700, letterSpacing: -.1),
+      ).copyWith(
+        // Resplandor jade bajo la acción principal; desaparece al presionar o si está desactivada.
+        elevation: WidgetStateProperty.resolveWith((st) =>
+            st.contains(WidgetState.disabled) || st.contains(WidgetState.pressed) ? 0 : (dark ? 0 : 4)),
+        shadowColor: WidgetStateProperty.all(primary.withValues(alpha: .55)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -278,15 +286,31 @@ ThemeData buildTheme(Brightness b) {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: dark ? ds.elevated : ds.ink,
-      contentTextStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentTextStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+      actionTextColor: dark ? ds.primary : FvLuxe.mintInk,
+      elevation: 6,
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: dark ? const Color(0x24FFFFFF) : Colors.white, width: 1)),
       titleTextStyle: TextStyle(fontFamily: _font, fontSize: 19, fontWeight: FontWeight.w600, color: ink),
     ),
-    listTileTheme: ListTileThemeData(iconColor: muted, textColor: ink),
+    listTileTheme: ListTileThemeData(iconColor: muted, textColor: ink,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.md))),
+    checkboxTheme: CheckboxThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      side: BorderSide(color: muted, width: 1.6),
+    ),
+    badgeTheme: BadgeThemeData(backgroundColor: ds.bad, textColor: Colors.white),
+    scrollbarTheme: ScrollbarThemeData(
+      radius: const Radius.circular(8),
+      thickness: WidgetStateProperty.all(5),
+      thumbColor: WidgetStateProperty.all(ink.withValues(alpha: .22)),
+    ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? Colors.white : muted),
       trackColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? primary : line),
@@ -322,11 +346,18 @@ ThemeData buildTheme(Brightness b) {
       decoration: BoxDecoration(color: dark ? ds.elevated : ds.ink, borderRadius: BorderRadius.circular(10)),
       textStyle: const TextStyle(fontFamily: _font, color: Colors.white, fontSize: 12.5),
     ),
-    progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: primary,
+      linearTrackColor: primary.withValues(alpha: .14),
+      circularTrackColor: Colors.transparent,
+      linearMinHeight: 5,
+      borderRadius: BorderRadius.circular(8),
+    ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: primary,
       foregroundColor: ds.onPrimary,
-      elevation: 2,
+      elevation: dark ? 0 : 6,
+      highlightElevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
   );

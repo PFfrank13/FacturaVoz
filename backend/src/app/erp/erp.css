@@ -534,3 +534,61 @@
   .fv-rail nav a span { white-space: nowrap; }
   .fv-user small { display: none; }
 }
+
+/* ── v3.6.3 · Acabado premium (misma paleta aurora y vidrio jade) ── */
+.fv-workspace ::selection { background: color-mix(in srgb, var(--erp-accent) 30%, transparent); color: var(--erp-ink); }
+.fv-workspace * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--erp-ink) 22%, transparent) transparent; }
+/* Botón principal: jade con brillo interior y un destello al pasar el cursor. */
+.fv-button:not(.secondary) {
+  position: relative; overflow: hidden; isolation: isolate;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--erp-accent) 88%, #fff) 0%, var(--erp-accent) 45%, color-mix(in srgb, var(--erp-accent) 72%, #2f6fdc) 100%);
+  box-shadow: 0 10px 24px -10px var(--erp-glow), inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -1px 0 rgba(0, 0, 0, .12);
+}
+.fv-button:not(.secondary)::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .38) 50%, transparent 65%);
+  transform: translateX(-120%); transition: transform .7s var(--erp-ease);
+}
+.fv-button:not(.secondary):hover:not(:disabled)::after { transform: translateX(120%); }
+.fv-button.secondary { -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: transform .2s var(--erp-ease), border-color .2s, background .2s; }
+.fv-button.secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--erp-accent) 45%, var(--erp-rim)); background: var(--erp-pane-strong); }
+/* Títulos: tinta con un reflejo jade en todo el titular. */
+.fv-heading h1 { background: linear-gradient(120deg, var(--erp-ink) 0%, var(--erp-ink) 55%, color-mix(in srgb, var(--erp-accent) 70%, var(--erp-ink)) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: .06em; }
+/* Logotipo: barras de voz que respiran una vez al entrar. */
+.fv-wordmark i { display: inline-block; transform-origin: bottom; animation: fv-voice 1.4s var(--erp-ease) .2s both; }
+@keyframes fv-voice { 0% { transform: scaleY(.3); opacity: .4; } 45% { transform: scaleY(1.25); } 100% { transform: none; opacity: 1; } }
+/* Riel: el ítem activo con indicador que crece y el riel con borde de luz. */
+.fv-rail { box-shadow: var(--erp-shadow), inset 0 1px 0 rgba(255, 255, 255, .4), inset 1px 0 0 rgba(255, 255, 255, .18); }
+.fv-rail nav a[aria-current="page"]::before { animation: fv-grow .45s var(--erp-ease) both; }
+@keyframes fv-grow { from { height: 0; opacity: 0; } }
+.fv-rail nav a[aria-current="page"] { font-weight: 750; }
+/* Mosaicos del inicio: una línea de color arriba, como luz que entra por el canto del vidrio. */
+.fv-pulse > a::after, .fv-kpis > div::after { content: ""; position: absolute; left: 18px; right: 18px; top: 0; height: 2px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--tone, var(--erp-accent)), transparent); opacity: .85; }
+.fv-kpis > div:nth-child(1) { --tone: #3ee6b0; } .fv-kpis > div:nth-child(2) { --tone: #6fb7ff; }
+.fv-kpis > div:nth-child(3) { --tone: #ffb35c; } .fv-kpis > div:nth-child(4) { --tone: #a98bff; }
+.fv-pulse strong, .fv-kpis strong { color: var(--erp-ink); }
+/* Tablas: cabecera fija de vidrio y filas con marca jade al pasar. */
+.fv-data th { position: sticky; top: 0; z-index: 1; background: var(--erp-pane-strong); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.fv-data tbody tr { position: relative; }
+.fv-data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--erp-accent); }
+.fv-data tbody tr:last-child td { border-bottom: 0; }
+/* Campos: respuesta suave al cursor. */
+.fv-search input:hover, .fv-form input:hover, .fv-form select:hover, .fv-form textarea:hover, .fv-search select:hover { border-color: color-mix(in srgb, var(--erp-accent) 35%, var(--erp-rim)); }
+.fv-form textarea:focus, .fv-search select:focus { outline: none; border-color: var(--erp-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--erp-accent) 22%, transparent); }
+/* Hojas laterales: cabecera que se queda arriba al desplazar. */
+.fv-sheet header { position: sticky; top: -20px; z-index: 2; margin: -20px -22px 0; padding: 20px 22px 14px; background: linear-gradient(var(--erp-pane-strong) 75%, transparent); border-radius: 28px 28px 0 0; }
+/* Estados vacíos y avisos más amables. */
+.fv-empty { text-align: center; padding: 42px 26px; }
+.fv-empty p { margin-left: auto; margin-right: auto; max-width: 520px; }
+.fv-empty::before { content: ""; display: block; width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 18px;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, .9), transparent 45%), linear-gradient(135deg, var(--erp-accent), color-mix(in srgb, var(--erp-accent) 50%, #3d8bff));
+  box-shadow: 0 14px 28px -12px var(--erp-glow); }
+.fv-ok::before { content: "✓ "; } .fv-error::before { content: "! "; font-weight: 900; }
+/* Esqueletos de carga con brillo. */
+.fv-skeleton i:nth-child(2) { width: 82%; } .fv-skeleton i:nth-child(3) { width: 64%; }
+@media (prefers-reduced-motion: reduce) {
+  .fv-button:not(.secondary)::after, .fv-wordmark i, .fv-rail nav a[aria-current="page"]::before, .fv-skeleton i { animation: none; transition: none; }
+}
+@media (max-width: 720px) { .fv-sheet header { top: -20px; } .fv-heading h1 { letter-spacing: -1px; } }

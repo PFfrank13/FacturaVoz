@@ -59,8 +59,8 @@ abstract final class FvTokens {
   static const Color fieldDark = Color(0xFF17253B);
   static const Color ink = Color(0xFF0D1B2E);
   static const Color inkDark = Color(0xFFF3F8FF);
-  static const Color muted = Color(0xFF55657A);
-  static const Color mutedDark = Color(0xFFAEBDD1);
+  static const Color muted = Color(0xFF4A5A6F);
+  static const Color mutedDark = Color(0xFFB9C7DA);
   static const Color emerald = Color(0xFF087F68);
   static const Color emeraldDark = Color(0xFF5BEBBE);
   static const Color stroke = Color(0xFFDAE4EF);
