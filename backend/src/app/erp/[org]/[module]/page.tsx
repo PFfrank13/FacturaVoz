@@ -39,6 +39,7 @@ const livePurchases = ["products"] as const;
 const livePayments = ["payments"] as const;
 const liveInventory = ["products", "product_lots", "stock_losses"] as const;
 import NewInvoice from "@/components/NewInvoice";
+import { renderExtra } from "./extra";
 import { money } from "@/lib/schemas";
 
 export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string }> }) {
@@ -47,6 +48,8 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   const m = modules.find(m => m.id === id);
   if (!m || !moduleAllowed(m, c.license, c.access, c.sector)) notFound();
   const title = id === "clientes" && c.sector === "consultorio" ? "Pacientes" : id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title;
+  const extra = await renderExtra(id, c, org, title);
+  if (extra) return extra;
   if (id === "reportes") {
     const search = await searchParams;
     const today = limaDate(new Date());

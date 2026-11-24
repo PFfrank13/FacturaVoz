@@ -7,6 +7,7 @@ import { lookupDocument, type LookupReply } from "@/lib/lookup";
 import { docTypeOf } from "@/lib/erp/clients";
 import { closeDay } from "@/lib/dayclose-core";
 import { parseAmount } from "@/lib/erp/cash";
+import { expenseCategories } from "@/lib/erp/expenses";
 import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
 import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
 import { lossProblem, type LotStatus } from "@/lib/erp/lots";
@@ -738,4 +739,116 @@ export async function removeProductCode(org: string, codeId: string): Promise<Fo
   if (error) return { ok: false, message: "No se pudo quitar el código." };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: "Código quitado." };
+}
+
+const posSchema = z.object({
+  request_id: uuid,
+  method: z.enum(["efectivo", "yape", "plin", "tarjeta", "transferencia"]),
+  items: z.array(z.object({ product_id: uuid, quantity: z.number().positive().max(100_000) })).min(1).max(50),
+  note: z.string().trim().max(120).optional(),
+});
+export type PosCheckoutResult = { ok: true; invoice_id: string; charged: number; reused: boolean } | { ok: false; message: string };
+
+/**
+ * Quick sale from the web: the same atomic checkout the mobile POS uses (invoice + payment + stock, idempotent by
+ * request_id). Prices are read from the database, never trusted from the browser.
+ */
+export async function posCheckout(org: string, input: z.input<typeof posSchema>): Promise<PosCheckoutResult> {
+  const parsed = posSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "La venta no es válida. Revisa las cantidades." };
+  const d = parsed.data;
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "vender")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tu plan o tu rol no permiten vender. Actualiza la página." };
+  const ids = [...new Set(d.items.map(i => i.product_id))];
+  const { data: prods, error: pErr } = await c.db.from("products").select("id,name,unit_price,active").eq("org_id", org).in("id", ids);
+  if (pErr) return { ok: false, message: "No se pudieron leer los precios. Inténtalo otra vez." };
+  const byId = new Map(((prods ?? []) as { id: string; name: string; unit_price: number | string; active: boolean }[]).map(p => [p.id, p] as const));
+  const lines = [];
+  for (const i of d.items) {
+    const p = byId.get(i.product_id);
+    if (!p || !p.active) return { ok: false, message: "Un producto del carrito ya no está disponible. Quítalo y vuelve a cobrar." };
+    lines.push({ description: p.name, quantity: Math.round(i.quantity * 1000) / 1000, unit_price: Number(p.unit_price), product_id: p.id });
+  }
+  const { data, error } = await c.db.rpc("fast_checkout_atomic", {
+    p_org_id: org, p_request_id: d.request_id, p_items: lines,
+    p_tax_rate: Number(c.organization.default_tax_rate ?? 18), p_currency: c.organization.currency || "PEN",
+    p_method: d.method, p_notes: d.note || null,
+  });
+  const row = Array.isArray(data) ? data[0] as { invoice_id: string; charged: number | string; reused: boolean } | undefined : undefined;
+  if (error || !row?.invoice_id) return { ok: false, message: dbMessage(error?.message, "No se pudo cobrar. Inténtalo de nuevo: no se duplicará.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, invoice_id: row.invoice_id, charged: Number(row.charged), reused: row.reused };
+}
+
+/** RUC / DNI lookup for the receipt of a quick sale (same limits as everywhere). */
+export async function posLookup(org: string, number: string): Promise<LookupReply> {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "vender")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, reason: "forbidden", message: "Sin permiso." };
+  const digits = String(number ?? "").replace(/\D/g, "").slice(0, 11);
+  return (await lookupDocument(c.db, c.user.id, digits, org)).body;
+}
+
+/** Module rights re-read on the server for the owner and money modules added in v3.8. */
+async function moduleContext(org: string, id: string) {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === id);
+  if (!entry || !moduleAllowed(entry, c.license, c.access, c.sector)) return { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+  return { c, error: "" } as const;
+}
+
+const expenseSchema = z.object({
+  spent_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  category: z.string().max(20),
+  description: optional(200),
+  total: z.string().max(20),
+  supplier_name: optional(160),
+  doc_number: optional(40),
+});
+
+/** A business expense, in the same table the mobile app uses. */
+export async function addExpense(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "gastos");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = expenseSchema.safeParse(Object.fromEntries(form));
+  const total = parsed.success ? parseAmount(parsed.data.total) : null;
+  if (!parsed.success || total == null || total <= 0) return { ok: false, message: "Indica la fecha y un importe mayor que cero." };
+  const d = parsed.data;
+  const { error } = await ctx.c.db.from("expenses").insert({
+    org_id: org, user_id: ctx.c.user.id, spent_on: d.spent_on, category: d.category in expenseCategories ? d.category : "otros",
+    description: d.description || "Gasto", total: Math.round(total * 100) / 100, tax: 0, currency: ctx.c.organization.currency || "PEN", source: "manual",
+    supplier_name: d.supplier_name || null, doc_number: d.doc_number || null,
+  });
+  if (error) return { ok: false, message: "No se pudo guardar el gasto. Revisa tus permisos." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Gasto registrado. También lo ves en el móvil." };
+}
+
+export async function markAlertsRead(org: string): Promise<FormResult> {
+  const ctx = await moduleContext(org, "alertas");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("owner_alerts").update({ read_at: new Date().toISOString() }).eq("org_id", org).is("read_at", null);
+  if (error) return { ok: false, message: "No se pudo marcar." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Alertas marcadas como vistas." };
+}
+
+export async function restoreTrash(org: string, trashId: string): Promise<FormResult> {
+  if (!uuid.safeParse(trashId).success) return { ok: false, message: "Elemento no válido." };
+  const ctx = await moduleContext(org, "papelera");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { data, error } = await ctx.c.db.rpc("restore_trash", { p_id: trashId });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo recuperar.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: typeof data === "string" && data ? data : "Recuperado." };
+}
+
+/** Checks the chained audit log: null = intact, otherwise the first altered row. */
+export async function verifyAudit(org: string): Promise<FormResult> {
+  const ctx = await moduleContext(org, "bitacora");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { data, error } = await ctx.c.db.rpc("audit_verify", { p_org: org });
+  if (error) return { ok: false, message: "No se pudo verificar ahora." };
+  return data == null ? { ok: true, message: "Bitácora íntegra: nadie alteró ningún registro." } : { ok: false, message: `¡Atención! El registro ${data} fue alterado.` };
 }

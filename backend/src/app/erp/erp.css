@@ -622,3 +622,76 @@
 .fv-user-security { font-size: 12.5px; font-weight: 700; color: var(--erp-accent); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--erp-rim); background: var(--erp-pane); white-space: nowrap; }
 .fv-user-security:hover { border-color: var(--erp-accent); }
 .fv-topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+/* ── v3.8 · Venta rápida en la web ── */
+.fv-pos { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+.fv-pos-catalog { display: grid; gap: 14px; min-width: 0; }
+.fv-pos-scan { position: sticky; top: 84px; z-index: 3; display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 18px; border-radius: 20px;
+  background: var(--erp-pane-strong); border: 1.5px solid color-mix(in srgb, var(--erp-accent) 45%, var(--erp-rim)); box-shadow: var(--erp-shadow), 0 0 0 5px color-mix(in srgb, var(--erp-accent) 10%, transparent);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.fv-pos-scan span { font-size: 18px; letter-spacing: -3px; color: var(--erp-accent); font-weight: 900; }
+.fv-pos-scan input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--erp-ink); font: inherit; font-size: 18px; font-weight: 600; padding: 12px 6px; outline: none; }
+.fv-pos-cats { flex-basis: auto; }
+.fv-pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.fv-pos-item { position: relative; display: grid; gap: 6px; text-align: left; padding: 8px 8px 12px; border-radius: 20px; cursor: pointer; color: inherit; font: inherit;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow);
+  transition: transform .2s var(--erp-ease), box-shadow .2s var(--erp-ease), border-color .2s; }
+.fv-pos-item:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--erp-accent) 45%, var(--erp-rim)); }
+.fv-pos-item:active { transform: scale(.97); }
+.fv-pos-item.is-added { animation: fv-pos-pop .45s var(--erp-ease); border-color: var(--erp-accent); }
+@keyframes fv-pos-pop { 40% { transform: scale(1.04); box-shadow: 0 0 0 4px color-mix(in srgb, var(--erp-accent) 30%, transparent); } }
+.fv-pos-item.is-out { opacity: .6; }
+.fv-pos-thumb { aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: radial-gradient(90% 70% at 50% -10%, rgba(255, 255, 255, .9), transparent 70%), linear-gradient(#fff, #e5eef7); }
+@media (prefers-color-scheme: dark) { .fv-pos-thumb { background: radial-gradient(90% 70% at 50% -10%, rgba(255, 255, 255, .18), transparent 70%), linear-gradient(#203552, #111d31); } }
+.fv-pos-thumb img { width: 88%; height: 88%; object-fit: contain; }
+.fv-pos-thumb b { font-size: 30px; font-weight: 800; background: linear-gradient(135deg, #3ee6b0, #3b5bdb); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.fv-pos-item strong { font-size: 14px; line-height: 1.25; font-weight: 700; padding: 0 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fv-pos-price { font-size: 17px; font-weight: 800; padding: 0 4px; font-variant-numeric: tabular-nums; }
+.fv-pos-item small { padding: 0 4px; font-size: 11.5px; color: var(--erp-muted); font-weight: 600; }
+.fv-pos-item small.is-bad { color: #e0457b; }
+.fv-pos-cart { position: sticky; top: 84px; display: grid; gap: 12px; padding: 18px; border-radius: 26px; max-height: calc(100vh - 100px); overflow: auto;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); }
+.fv-pos-cart header { display: flex; justify-content: space-between; align-items: center; }
+.fv-pos-cart h2 { font-size: 20px; font-weight: 800; }
+.fv-pos-empty { padding: 26px 6px; text-align: center; }
+.fv-pos-lines { list-style: none; display: grid; gap: 2px; margin: 0; padding: 0; }
+.fv-pos-lines li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px dashed var(--erp-line); animation: fv-fade .25s ease both; }
+.fv-pos-lines li > div:first-child { display: grid; min-width: 0; }
+.fv-pos-lines strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fv-pos-lines small { font-size: 12px; color: var(--erp-muted); }
+.fv-pos-lines b { font-variant-numeric: tabular-nums; font-size: 14px; }
+.fv-pos-qty { display: flex; align-items: center; border-radius: 12px; border: 1px solid var(--erp-rim); background: var(--erp-pane); overflow: hidden; }
+.fv-pos-qty button { width: 30px; height: 32px; border: 0; background: transparent; color: var(--erp-ink); font-size: 17px; font-weight: 700; cursor: pointer; }
+.fv-pos-qty button:hover { background: color-mix(in srgb, var(--erp-accent) 14%, transparent); }
+.fv-pos-qty input { width: 52px; border: 0; background: transparent; color: var(--erp-ink); text-align: center; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fv-pos-sums { display: grid; gap: 5px; font-variant-numeric: tabular-nums; }
+.fv-pos-sums div { display: flex; justify-content: space-between; color: var(--erp-muted); font-size: 14px; }
+.fv-pos-sums .is-total { color: var(--erp-ink); font-size: 26px; font-weight: 800; letter-spacing: -.6px; border-top: 1px solid var(--erp-line); padding-top: 8px; }
+.fv-pos-methods { display: flex; flex-wrap: wrap; }
+.fv-pos-methods button { flex: 1 1 auto; }
+.fv-pos-cash { display: grid; gap: 8px; }
+.fv-pos-cash .fv-search { max-width: none; }
+.fv-pos-change { font-size: 18px; color: var(--erp-accent); font-weight: 700; }
+.fv-pos-pay { min-height: 60px; font-size: 19px; border-radius: 18px; }
+.fv-pos-done { max-width: 560px; margin: 20px auto; text-align: center; display: grid; gap: 12px; padding: 34px 28px; border-radius: 30px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); animation: fv-rise .5s var(--erp-ease) both; }
+.fv-pos-check { width: 76px; height: 76px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; font-size: 38px; font-weight: 900; color: #fff;
+  background: linear-gradient(135deg, #3ee6b0, #0e8c74); box-shadow: 0 16px 34px -12px #0e8c74; animation: fv-pos-pop .6s var(--erp-ease); }
+.fv-pos-done h2 { font-size: 26px; font-weight: 800; }
+.fv-pos-done-total { font-size: 44px; font-weight: 800; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+.fv-pos-emit { display: grid; gap: 10px; text-align: left; padding: 16px; border-radius: 18px; border: 1px solid var(--erp-rim); background: var(--erp-pane); }
+.fv-pos-emit h3 { font-size: 16px; font-weight: 800; }
+.fv-pos-next { min-height: 54px; font-size: 17px; }
+.fv-muted { color: var(--erp-muted); }
+/* Alertas del dueño */
+.fv-alerts { list-style: none; display: grid; gap: 8px; padding: 0; }
+.fv-alerts li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 14px; padding: 14px 16px; border-radius: 18px; background: var(--erp-pane); border: 1px solid var(--erp-rim); }
+.fv-alerts li i { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #6fb7ff; }
+.fv-alerts li.is-bad i { background: #e0457b; box-shadow: 0 0 10px #e0457b; }
+.fv-alerts li.is-warn i { background: #ffb35c; }
+.fv-alerts li.is-new { border-color: color-mix(in srgb, var(--erp-accent) 45%, var(--erp-rim)); }
+.fv-alerts strong { font-size: 15px; }
+.fv-alerts p { color: var(--erp-muted); font-size: 14px; margin: 2px 0; }
+.fv-alerts small { color: var(--erp-muted); font-size: 12px; }
+@media (max-width: 1100px) { .fv-pos { grid-template-columns: 1fr; } .fv-pos-cart { position: static; max-height: none; } }
+@media (max-width: 720px) { .fv-pos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fv-pos-scan { top: 8px; } }

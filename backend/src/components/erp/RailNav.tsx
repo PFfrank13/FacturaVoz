@@ -6,6 +6,13 @@ import { usePathname } from "next/navigation";
 /** Stroke icons (24 px grid) for each workspace section: recognizable at a glance, same weight everywhere. */
 const icons: Record<string, string> = {
   inicio: "M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10M10 19.5v-5h4v5",
+  vender: "M4 5v14M7 5v14M10 5v14M13.5 5v14M16 5v14M20 5v14",
+  fiados: "M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM5 18a2 2 0 0 1 2-2h11M9 8h5M9 11h5",
+  avisos: "M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9M10 20a2 2 0 0 0 4 0",
+  gastos: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3",
+  alertas: "M12 3l9 16H3zM12 10v4M12 17v.01",
+  bitacora: "M12 8v4l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4",
+  papelera: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6",
   comprobantes: "M7 3h7l4 4v14H7zM14 3v4h4M9.5 12h6M9.5 15.5h6M9.5 8.5h2.5",
   caja: "M3.5 9h17v10.5h-17zM6 9V6.5h12V9M8 13.5h3M15.5 14.5a1 1 0 1 0 0-.01",
   cobros: "M4 7h16v11H4zM4 10.5h16M7.5 14.5h3",
@@ -27,12 +34,13 @@ const icons: Record<string, string> = {
 
 /** Sections grouped the way a shopkeeper thinks about the day, each with its own color (same as the mobile menu). */
 const groups: { title: string; color: string; ids: string[] }[] = [
-  { title: "Vender", color: "#0e8c74", ids: ["comprobantes", "cotizaciones"] },
+  { title: "Vender", color: "#0e8c74", ids: ["vender", "comprobantes", "cotizaciones"] },
   { title: "Mercadería", color: "#2f6fdc", ids: ["productos", "inventario", "compras", "sucursales"] },
-  { title: "Caja y cobros", color: "#c77417", ids: ["caja", "cobros"] },
+  { title: "Caja y cobros", color: "#c77417", ids: ["caja", "fiados", "cobros", "avisos", "gastos"] },
   { title: "Clientes y promociones", color: "#c2407e", ids: ["clientes", "promociones", "puntos"] },
   { title: "Servicios", color: "#0b8aa8", ids: ["trabajos", "agenda"] },
   { title: "Mi negocio", color: "#6a5ae0", ids: ["reportes"] },
+  { title: "Control del dueño", color: "#8a4b2f", ids: ["alertas", "bitacora", "papelera"] },
   { title: "Configuración", color: "#4f6480", ids: ["equipo", "plan", "configuracion"] },
 ];
 

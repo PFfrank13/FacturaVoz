@@ -14,8 +14,8 @@ export function featureLimit(l: License, key: string): number {
 export function can(a: Access, permission: string): boolean { return a.can?.[permission] ?? a.is_admin === true; }
 
 export const sectors = {
-  bodega: { name: "Bodega / minimarket", title: "El ritmo de tu tienda", detail: "Ventas, productos y clientes para tu jornada.", priority: ["comprobantes", "caja", "inventario", "compras", "clientes", "puntos", "promociones", "cobros"] },
-  restaurante: { name: "Restaurante", title: "Tu servicio, en orden", detail: "Consulta la operación comercial y los productos de tu carta.", priority: ["comprobantes", "productos", "cobros", "clientes"] },
+  bodega: { name: "Bodega / minimarket", title: "El ritmo de tu tienda", detail: "Ventas, productos y clientes para tu jornada.", priority: ["vender", "comprobantes", "caja", "fiados", "inventario", "compras", "clientes", "puntos", "promociones", "cobros"] },
+  restaurante: { name: "Restaurante", title: "Tu servicio, en orden", detail: "Consulta la operación comercial y los productos de tu carta.", priority: ["vender", "comprobantes", "productos", "cobros", "clientes"] },
   servicios_tecnicos: { name: "Servicios técnicos", title: "Cada trabajo tiene su siguiente paso", detail: "Órdenes, visitas y clientes con seguimiento.", priority: ["trabajos", "agenda", "clientes", "cotizaciones"] },
   salon: { name: "Salón / barbería", title: "Haz espacio para la próxima cita", detail: "Agenda, clientes y servicios de tu negocio.", priority: ["agenda", "clientes", "productos", "cobros"] },
   consultorio: { name: "Consultorio", title: "Una atención bien organizada", detail: "Agenda y gestión administrativa de pacientes, sin información clínica.", priority: ["agenda", "clientes", "cobros", "comprobantes"] },
@@ -30,6 +30,7 @@ export type Module = { id: string; title: string; feature?: string; permission?:
 const jobSectors: Sector[] = ["servicios_tecnicos", "taller", "construccion"];
 const appointmentSectors: Sector[] = ["servicios_tecnicos", "salon", "consultorio", "taller", "educacion"];
 export const modules: readonly Module[] = [
+  { id: "vender", title: "Venta rápida", feature: "facturar", permission: "sell" },
   { id: "comprobantes", title: "Comprobantes", feature: "facturar", permission: "sell", table: "invoices", columns: "id,number,issue_date,status,currency", fields: [["number", "Número"], ["issue_date", "Fecha"], ["status", "Estado"], ["currency", "Moneda"]], order: "created_at" },
   { id: "clientes", title: "Clientes", feature: "clientes", permission: "clients", table: "clients", columns: "id,name,tax_id,email,phone", fields: [["name", "Nombre"], ["tax_id", "Documento"], ["email", "Correo"], ["phone", "Teléfono"]], order: "name" },
   { id: "productos", title: "Productos y servicios", feature: "facturar", permission: "sell", table: "products", columns: "id,name,unit_price,unit,active", fields: [["name", "Nombre"], ["unit_price", "Precio unitario"], ["unit", "Unidad"], ["active", "Activo"]], order: "name" },
@@ -43,6 +44,12 @@ export const modules: readonly Module[] = [
   { id: "puntos", title: "Puntos de clientes", feature: "fidelizacion", permission: "sell" },
   { id: "cobros", title: "Cobros", feature: "cobros", permission: "collect", table: "payments", columns: "id,amount,paid_on,method,note", fields: [["amount", "Importe registrado"], ["paid_on", "Fecha"], ["method", "Medio"], ["note", "Nota"]], order: "paid_on" },
   { id: "sucursales", title: "Sucursales", feature: "multisucursal", permission: "team" },
+  { id: "fiados", title: "Fiados", feature: "fiados", permission: "collect" },
+  { id: "avisos", title: "Avisos de Yape y Plin", feature: "avisos_pago", permission: "collect" },
+  { id: "gastos", title: "Gastos", permission: "finance" },
+  { id: "alertas", title: "Alertas del dueño", feature: "antifraude", permission: "team" },
+  { id: "bitacora", title: "Bitácora", feature: "antifraude", permission: "team" },
+  { id: "papelera", title: "Papelera", permission: "finance" },
   { id: "equipo", title: "Equipo", permission: "team" },
   { id: "reportes", title: "Reportes", feature: "reportes", permission: "finance" },
   { id: "plan", title: "Mi plan", permission: "license" },
