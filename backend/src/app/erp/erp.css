@@ -608,3 +608,11 @@
 .fv-rail-group a[aria-current="page"] .fv-rail-icon { color: var(--gi); filter: none; }
 @media (max-width: 720px) { .fv-rail-group { border-left: 2px solid color-mix(in srgb, var(--g, var(--erp-accent)) 55%, transparent); padding-left: 4px; } }
 .fv-shortcuts span { display: block; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--erp-rim); background: var(--erp-pane); font-weight: 650; font-size: 14px; }
+/* Acceso con correo y contraseña */
+.fv-door-pass { position: relative; display: block; }
+.fv-door-pass input { padding-right: 76px; }
+.fv-door-pass button { position: absolute; right: 12px; top: 50%; translate: 0 -50%; font-size: 13px; }
+.fv-door-forgot { justify-self: start; font-size: 14px; font-weight: 650; color: var(--erp-accent); background: none; border: 0; cursor: pointer; padding: 0; }
+.fv-door-msg.is-bad { color: #c2304f; background: rgba(224, 69, 123, .12); }
+@media (prefers-color-scheme: dark) { .fv-door-msg.is-bad { color: #ff8aa8; } }
+.fv-door-forgot:hover { color: var(--erp-ink); }
