@@ -22,7 +22,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       <header className="fv-topbar">
         <span className="fv-user"><b aria-hidden="true">{(c.access.display_name || c.user.email || "?").trim().slice(0, 1).toUpperCase()}</b>
           <span><strong>{c.access.display_name || c.user.email}</strong><small>{c.access.role === "owner" ? "Dueño" : c.access.role === "admin" ? "Administrador" : c.access.role === "finanzas" ? "Finanzas" : c.access.role === "tecnico" ? "Técnico" : "Cajero"} · {c.organization.name}</small></span></span>
-        <RefreshAccess org={org} />
+        <span className="fv-topbar-actions"><Link className="fv-user-security" href="/cuenta/seguridad" title="Verificación en dos pasos">🔒 Seguridad</Link><RefreshAccess org={org} /></span>
       </header>
       <main id="workspace-content" className="fv-content">{children}</main>
     </div>

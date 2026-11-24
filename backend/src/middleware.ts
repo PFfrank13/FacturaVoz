@@ -33,6 +33,18 @@ export async function middleware(request: NextRequest) {
     if (next) url.searchParams.set("next", next);
     return NextResponse.redirect(url);
   }
+  // Verificación en dos pasos: si la cuenta la activó, una sesión solo con contraseña no entra al ERP.
+  if (user && !p.startsWith("/login") && !p.startsWith("/auth") && (user.factors ?? []).some(f => f.status === "verified")) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      const next = safeNext(p);
+      if (next) url.searchParams.set("next", next);
+      return NextResponse.redirect(url);
+    }
+  }
   return response;
 }
 
