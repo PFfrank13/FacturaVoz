@@ -29,6 +29,13 @@ export async function POST(req: Request) {
   try {
     const t0 = Date.now();
     const sheets = readXlsx(buf);
+    // A single-sheet Excel (SUNAT's sales register, another system's list) goes to the old-receipts import, like the app.
+    const mode = new URL(req.url).searchParams.get("mode");
+    if (mode === "table" || (mode === "auto" && sheets.filter(s => s.rows.length).length < 2)) {
+      const first = sheets.find(s => s.rows.length);
+      if (!first) return json({ error: "El Excel está vacío." }, 422);
+      return json({ kind: "table", rows: first.rows.map(r => r.map(c => (c == null ? "" : String(c)))) });
+    }
     const { preview, payload } = analyzeWorkbook(sheets, Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : 18);
     const relational = preview.sheets.filter((s) => s.role !== "ignorada").length;
     if (!preview.counts.documents && !preview.counts.clients && !preview.counts.products) {

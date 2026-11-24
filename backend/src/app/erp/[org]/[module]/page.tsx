@@ -214,7 +214,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     ]);
     const failed = balances.error || promos.error || coupons.error;
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{points ? "FIDELIZACIÓN" : "PRECIOS"} / {c.organization.name}</p><LiveRefresh org={org} tables={livePayments} /></div><h1>{title}</h1>
-      <p>{points ? "Cada cobro a un cliente identificado le suma puntos; aquí ves quién tiene más y registras sus canjes." : "Descuentos y cupones que el punto de venta del móvil aplica solo en sus fechas."}</p></section>
+      <p>{points ? "Cada cobro a un cliente identificado le suma puntos; aquí ves quién tiene más y registras sus canjes." : "Descuentos y cupones que la venta rápida (web y móvil) aplica sola en sus fechas."}</p></section>
       {failed ? <div className="fv-empty" role="alert"><h2>No pudimos cargar esta sección</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <LoyaltyBoard org={org} view={points ? "puntos" : "promociones"} currency={c.organization.currency || "PEN"} today={limaDate(new Date())}
             rate={settings.data ? Number((settings.data as { loyalty_rate: number | string }).loyalty_rate) || null : null}

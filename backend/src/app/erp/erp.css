@@ -718,3 +718,24 @@
 .fv-neg { color: #e0457b; }
 .fv-note-box { font-size: 13.5px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, #6fb7ff 12%, transparent); margin: 8px 0; }
 .fv-file { cursor: pointer; }
+
+/* ── v3.10 · Importación completa ── */
+.fv-import-steps { list-style: none; counter-reset: st; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; padding: 0; margin: 6px 0 16px; }
+.fv-import-steps li { counter-increment: st; display: grid; gap: 4px; padding: 12px 14px 12px 50px; position: relative; border-radius: 16px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); }
+.fv-import-steps li::before { content: counter(st); position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; color: #fff; background: linear-gradient(135deg, #8b7bff, #6a5ae0); }
+.fv-import-steps span { color: var(--erp-muted); font-size: 13px; }
+.fv-import-job { display: grid; gap: 8px; margin-top: 16px; padding: 16px; border-radius: 18px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); }
+.fv-import-job .fv-bar { height: 10px; }
+.fv-import-job .fv-bar i { transition: width .4s ease; }
+.fv-import-history li { align-items: center; gap: 12px; }
+.fv-import-history li > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.fv-import-history small { color: var(--erp-muted); }
+
+/* ── v3.10 · Promociones y cupones en la venta rápida ── */
+.fv-pos-price s, .fv-pos-lines small s { opacity: .55; font-weight: 500; margin-right: 2px; }
+.fv-pos-promo { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 11px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #e0457b, #c2407e); vertical-align: middle; }
+.fv-pos-lines .fv-pos-promo { margin: 4px 0 0; }
+.fv-pos-coupon { margin: 10px 0 2px; }
+.fv-pos-coupon-form { display: flex; gap: 8px; }
+.fv-pos-coupon-form input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .06em; }
+.fv-pos-sums .is-saving { color: #0e8c74; font-weight: 700; }

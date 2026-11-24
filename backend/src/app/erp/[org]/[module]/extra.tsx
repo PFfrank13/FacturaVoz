@@ -4,7 +4,8 @@ import type { workspaceContext } from "@/lib/erp/context";
 import { money } from "@/lib/schemas";
 import { limaDate } from "@/lib/erp/receipts";
 import { byCategory, expenseCategories, type ExpenseRow } from "@/lib/erp/expenses";
-import type { PosProduct } from "@/lib/erp/pos";
+import type { PosProduct, PosPromo } from "@/lib/erp/pos";
+import { hasFeature } from "@/lib/erp/access";
 import PosBoard from "@/components/erp/PosBoard";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import { ExpenseForm, MarkAlertsRead, RestoreButton, VerifyAudit } from "@/components/erp/OwnerBoards";
@@ -29,22 +30,27 @@ export async function renderExtra(id: string, c: Ctx, org: string, title: string
   const name = c.organization.name;
 
   if (id === "vender") {
-    const [prods, codes, fiscal] = await Promise.all([
-      c.db.from("products").select("id,name,unit_price,unit,stock,barcode,icbper,category,image_path").eq("org_id", org).eq("active", true).neq("unit", "ZZ").order("name").limit(5000),
+    const pricing = hasFeature(c.license, "precios");
+    const [prods, codes, fiscal, promoRes] = await Promise.all([
+      c.db.from("products").select("id,name,unit_price,unit,stock,barcode,icbper,category,image_path,wholesale_price,wholesale_min_qty").eq("org_id", org).eq("active", true).neq("unit", "ZZ").order("name").limit(5000),
       c.db.from("product_barcodes").select("code,product_id").eq("org_id", org).limit(20000),
       c.db.from("fiscal_companies").select("org_id").eq("org_id", org).maybeSingle(),
+      pricing ? c.db.from("promotions").select("id,name,kind,value,product_ids,min_qty,starts_on,ends_on,active").eq("org_id", org).eq("active", true).limit(300) : Promise.resolve({ data: [] }),
     ]);
     if (prods.error) return <>{heading(`VENDER / ${name}`, title, "", org)}{failed("los productos")}</>;
-    type Raw = Omit<PosProduct, "image_url" | "unit_price" | "stock"> & { unit_price: number | string; stock: number | string | null; image_path: string | null };
+    type Raw = Omit<PosProduct, "image_url" | "unit_price" | "stock" | "wholesale_price" | "wholesale_min_qty"> & { unit_price: number | string; stock: number | string | null; image_path: string | null; wholesale_price: number | string | null; wholesale_min_qty: number | string | null };
     const rows = (prods.data ?? []) as Raw[];
     const paths = rows.map(r => r.image_path).filter((p): p is string => !!p).slice(0, 400);
     const signed = paths.length ? await c.db.storage.from("org-media").createSignedUrls(paths, 3600) : { data: [] };
     const urls = new Map((signed.data ?? []).map(s => [s.path, s.signedUrl] as const));
     const products: PosProduct[] = rows.map(r => ({ id: r.id, name: r.name, unit_price: Number(r.unit_price), unit: r.unit, stock: r.stock == null ? null : Number(r.stock),
-      barcode: r.barcode, icbper: !!r.icbper, category: r.category, image_url: r.image_path ? urls.get(r.image_path) ?? null : null }));
+      barcode: r.barcode, icbper: !!r.icbper, category: r.category, image_url: r.image_path ? urls.get(r.image_path) ?? null : null,
+      wholesale_price: r.wholesale_price == null ? null : Number(r.wholesale_price), wholesale_min_qty: r.wholesale_min_qty == null ? null : Number(r.wholesale_min_qty) }));
+    type RawPromo = Omit<PosPromo, "value" | "min_qty" | "product_ids"> & { value: number | string; min_qty: number | string | null; product_ids: string[] | null };
+    const promos: PosPromo[] = ((promoRes.data ?? []) as RawPromo[]).map(p => ({ ...p, value: Number(p.value), min_qty: p.min_qty == null ? null : Number(p.min_qty), product_ids: (p.product_ids ?? []).map(String) }));
     const extraCodes = Object.fromEntries(((codes.data ?? []) as { code: string; product_id: string }[]).map(x => [x.code, x.product_id]));
     return <>{heading(`VENDER / ${name}`, title, "Conecta tu lector de códigos USB y escanea: cada producto entra al carrito con su nombre y precio. También funciona con las etiquetas de la balanza.", org, liveSales)}
-      <PosBoard org={org} products={products} extraCodes={extraCodes} currency={cur} taxRate={Number(c.organization.default_tax_rate ?? 18)} canEmit={!!fiscal.data} />
+      <PosBoard org={org} products={products} extraCodes={extraCodes} currency={cur} taxRate={Number(c.organization.default_tax_rate ?? 18)} canEmit={!!fiscal.data} promos={promos} pricing={pricing} today={limaDate(new Date())} />
     </>;
   }
 

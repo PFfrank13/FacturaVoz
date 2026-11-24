@@ -1,6 +1,6 @@
 /** Quick sale on the web (same rules as the mobile POS): code lookup, scale labels, cart and change. Pure: tested. */
 
-export type PosProduct = { id: string; name: string; unit_price: number; unit: string; stock: number | null; barcode: string | null; icbper: boolean; category: string | null; image_url: string | null };
+export type PosProduct = { id: string; name: string; unit_price: number; unit: string; stock: number | null; barcode: string | null; icbper: boolean; category: string | null; image_url: string | null; wholesale_price?: number | null; wholesale_min_qty?: number | null };
 export type CartLine = { product_id: string; name: string; unit_price: number; quantity: number; unit: string; stock: number | null };
 
 export function ean13Check(twelve: string): number {
@@ -55,7 +55,7 @@ export function setQuantity(cart: CartLine[], productId: string, quantity: numbe
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Same totals as the mobile POS (computeTotals): prices without tax, tax per line rounded, total = both. */
-export function cartTotals(cart: CartLine[], taxRate: number): { subtotal: number; tax: number; total: number } {
+export function cartTotals(cart: { unit_price: number; quantity: number }[], taxRate: number): { subtotal: number; tax: number; total: number } {
   const subtotal = r2(cart.reduce((s, l) => s + r2(l.unit_price * l.quantity), 0));
   const tax = r2(cart.reduce((s, l) => s + r2(r2(l.unit_price * l.quantity) * taxRate / 100), 0));
   return { subtotal, tax, total: r2(subtotal + tax) };
@@ -92,4 +92,61 @@ export function searchProducts(q: string, products: PosProduct[], limit = 60): P
     const hay = norm(`${p.name} ${p.category ?? ""} ${p.barcode ?? ""}`);
     return words.every(w => hay.includes(w));
   }).slice(0, limit);
+}
+
+// ── Precios por mayor, promociones y cupones (port of app/lib/logic/pricing.dart + pos.dart _lines) ──
+export type PosPromo = { id: string; name: string; kind: string; value: number; product_ids: string[]; min_qty: number | null; starts_on: string | null; ends_on: string | null; active: boolean };
+export type PosCoupon = { code: string; kind: string; value: number };
+export type Wholesale = Record<string, { price: number | null; min: number | null }>;
+export type PricedLine = { product_id: string; name: string; quantity: number; list_price: number; unit_price: number; reason: string };
+
+const liveOn = (p: PosPromo, today: string) => p.active && (!p.starts_on || p.starts_on <= today) && (!p.ends_on || p.ends_on >= today);
+
+/** Unit price (without tax) for a quantity, with the best discount in force. Never negative. */
+export function bestPrice(productId: string, listPrice: number, qty: number, promos: PosPromo[], today: string, wholesalePrice?: number | null, wholesaleMin?: number | null): { price: number; reason: string } {
+  let best = listPrice, reason = "";
+  if (wholesalePrice != null && wholesaleMin != null && qty >= wholesaleMin && wholesalePrice < best) { best = wholesalePrice; reason = "Precio por mayor"; }
+  for (const p of promos) {
+    if (!liveOn(p, today)) continue;
+    if (p.product_ids.length && !p.product_ids.includes(productId)) continue;
+    if (p.min_qty != null && qty < p.min_qty) continue;
+    let price: number;
+    if (p.kind === "porcentaje" || p.kind === "volumen") price = listPrice * (1 - Math.min(100, Math.max(0, p.value)) / 100);
+    else if (p.kind === "monto") price = listPrice - p.value;
+    else continue;
+    if (price < best) { best = price; reason = p.name; }
+  }
+  return { price: r2(best < 0 ? 0 : best), reason };
+}
+
+/** Coupon discount over a subtotal (never more than the subtotal). */
+export function couponDiscount(kind: string, value: number, subtotal: number): number {
+  const d = kind === "porcentaje" ? subtotal * Math.min(100, Math.max(0, value)) / 100 : value;
+  return r2(d > subtotal ? subtotal : d < 0 ? 0 : d);
+}
+
+/** Prices the cart like the mobile POS: best price per line, then the coupon spread over the unit prices. */
+export function priceCart(cart: { product_id: string; name: string; unit_price: number; quantity: number }[], promos: PosPromo[], today: string, wholesale: Wholesale = {}, coupon: PosCoupon | null = null): { lines: PricedLine[]; promoSaving: number; couponSaving: number } {
+  const lines: PricedLine[] = cart.map(l => {
+    const w = wholesale[l.product_id];
+    const b = bestPrice(l.product_id, l.unit_price, l.quantity, promos, today, w?.price, w?.min);
+    return { product_id: l.product_id, name: l.name, quantity: l.quantity, list_price: l.unit_price, unit_price: b.price, reason: b.reason };
+  });
+  const sub = (ls: PricedLine[]) => ls.reduce((s, l) => s + r2(l.unit_price * l.quantity), 0);
+  const listSub = lines.reduce((s, l) => s + r2(l.list_price * l.quantity), 0);
+  const before = sub(lines);
+  if (coupon && lines.length) {
+    const disc = couponDiscount(coupon.kind, coupon.value, before);
+    const f = before <= 0 ? 1 : (before - disc) / before;
+    for (const l of lines) l.unit_price = r2(l.unit_price * f);
+  }
+  return { lines, promoSaving: r2(listSub - before), couponSaving: r2(before - sub(lines)) };
+}
+
+/** Coupon checks without spending a use (the use is spent when the sale is charged). */
+export function couponProblemAt(c: { active: boolean; expires_on: string | null; max_uses: number | null; uses: number } | null, today: string): string | null {
+  if (!c || !c.active) return "Cupón no válido.";
+  if (c.expires_on && c.expires_on < today) return "Ese cupón ya venció.";
+  if (c.max_uses != null && c.uses >= c.max_uses) return "Ese cupón ya se usó todas las veces permitidas.";
+  return null;
 }

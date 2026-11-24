@@ -8,7 +8,8 @@ import { estimateTaxes, type Regime } from "@/lib/taxes";
 import { suggestMatches, type Receivable } from "@/lib/erp/bank";
 import NewInvoice from "@/components/NewInvoice";
 import LiveRefresh from "@/components/erp/LiveRefresh";
-import { BankImport, BankMatch, ImportBoard, InStoreToggle, RecurringActions, RecurringForm, RecurringRun, RegimePicker, StoreForm, SurveyToggle } from "@/components/erp/GrowthBoards";
+import ImportCenter, { UndoImport } from "@/components/erp/ImportCenter";
+import { BankImport, BankMatch, InStoreToggle, RecurringActions, RecurringForm, RecurringRun, RegimePicker, StoreForm, SurveyToggle } from "@/components/erp/GrowthBoards";
 
 type Ctx = Awaited<ReturnType<typeof workspaceContext>>;
 const addDay = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
@@ -191,12 +192,23 @@ export async function renderExtra2(id: string, c: Ctx, org: string, title: strin
   }
 
   if (id === "importar") {
-    const hist = await c.db.from("wb_imports").select("id,file_name,status,result,created_at,undone_at").eq("org_id", org).order("created_at", { ascending: false }).limit(20);
-    type H = { id: string; file_name: string; status: string; result: Record<string, unknown> | null; created_at: string; undone_at: string | null };
-    return <>{heading(`DATOS / ${name}`, title, "Trae clientes, productos y comprobantes de tu sistema anterior en minutos. Lo importado se puede deshacer desde el móvil.", org)}
-      <ImportBoard org={org} taxRate={Number(c.organization.default_tax_rate ?? 18)} />
-      {!hist.error && (hist.data ?? []).length > 0 && <section className="fv-create" style={{ padding: 18 }}><h3>Importaciones anteriores</h3>
-        <ul className="fv-lines">{((hist.data ?? []) as H[]).map(h => <li key={h.id}><span>{h.file_name} · {dateTime(h.created_at)}</span><span className={h.undone_at ? "fv-pill is-off" : h.status === "done" || h.status === "terminado" ? "fv-pill is-ok" : "fv-pill is-wait"}>{h.undone_at ? "Deshecha" : h.status}</span></li>)}</ul></section>}
+    const [wbs, jobs] = await Promise.all([
+      c.db.from("wb_imports").select("id,file_name,status,result,created_at,undone_at").eq("org_id", org).order("created_at", { ascending: false }).limit(20),
+      c.db.from("import_jobs").select("id,file_name,status,total,imported,skipped,created_at").eq("org_id", org).order("created_at", { ascending: false }).limit(20),
+    ]);
+    type W = { id: string; file_name: string; status: string; result: Record<string, unknown> | null; created_at: string; undone_at: string | null };
+    type J = { id: string; file_name: string; status: string; total: number; imported: number; skipped: number; created_at: string };
+    const jobLabel: Record<string, string> = { uploading: "Subiendo", queued: "En cola", processing: "Procesando", done: "Terminada", failed: "Falló", cancelled: "Cancelada" };
+    const n = (v: unknown) => Number(v ?? 0).toLocaleString("es-PE");
+    const rows = [
+      ...((wbs.data ?? []) as W[]).map(w => ({ at: w.created_at, el: <li key={`w${w.id}`}><span><strong>{w.file_name}</strong><small>{dateTime(w.created_at)} · {w.undone_at ? "deshecha" : w.status === "done" ? `${n(w.result?.documents)} comprobantes · ${n(w.result?.clients_created)} clientes nuevos` : "incompleta"}</small></span>
+        {w.undone_at ? <span className="fv-pill is-off">Deshecha</span> : c.access.is_admin ? <UndoImport org={org} job={w.id} /> : <span className="fv-pill is-ok">Importada</span>}</li> })),
+      ...((jobs.data ?? []) as J[]).map(j => ({ at: j.created_at, el: <li key={`j${j.id}`}><span><strong>{j.file_name}</strong><small>{dateTime(j.created_at)} · {n(j.imported)} de {n(j.total)} importados{j.skipped ? ` · ${n(j.skipped)} omitidos` : ""}</small></span>
+        <span className={j.status === "done" ? "fv-pill is-ok" : j.status === "failed" || j.status === "cancelled" ? "fv-pill is-off" : "fv-pill is-wait"}>{jobLabel[j.status] ?? j.status}</span></li> })),
+    ].sort((a, b) => b.at.localeCompare(a.at));
+    return <>{heading(`DATOS / ${name}`, title, "Trae tus comprobantes antiguos, clientes y productos desde SUNAT, Excel o tu sistema anterior. Lo importado desde un libro de Excel se puede deshacer.", org)}
+      <ImportCenter org={org} taxRate={Number(c.organization.default_tax_rate ?? 18)} />
+      {rows.length > 0 && <section className="fv-create" style={{ padding: 18 }}><h3>Importaciones anteriores</h3><ul className="fv-lines fv-import-history">{rows.map(r => r.el)}</ul></section>}
     </>;
   }
 

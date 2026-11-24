@@ -10,6 +10,7 @@ import { parseAmount } from "@/lib/erp/cash";
 import { expenseCategories } from "@/lib/erp/expenses";
 import { nextRun } from "@/lib/erp/bank";
 import { limaDate } from "@/lib/erp/receipts";
+import { couponProblemAt, priceCart, type PosCoupon, type PosPromo, type Wholesale } from "@/lib/erp/pos";
 import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
 import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
 import { lossProblem, type LotStatus } from "@/lib/erp/lots";
@@ -748,6 +749,7 @@ const posSchema = z.object({
   method: z.enum(["efectivo", "yape", "plin", "tarjeta", "transferencia"]),
   items: z.array(z.object({ product_id: uuid, quantity: z.number().positive().max(100_000) })).min(1).max(50),
   note: z.string().trim().max(120).optional(),
+  coupon: z.string().trim().max(40).optional(),
 });
 export type PosCheckoutResult = { ok: true; invoice_id: string; charged: number; reused: boolean } | { ok: false; message: string };
 
@@ -763,24 +765,64 @@ export async function posCheckout(org: string, input: z.input<typeof posSchema>)
   const entry = modules.find(m => m.id === "vender")!;
   if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tu plan o tu rol no permiten vender. Actualiza la página." };
   const ids = [...new Set(d.items.map(i => i.product_id))];
-  const { data: prods, error: pErr } = await c.db.from("products").select("id,name,unit_price,active").eq("org_id", org).in("id", ids);
+  const pricing = hasFeature(c.license, "precios");
+  const today = limaDate(new Date());
+  const [{ data: prods, error: pErr }, promos, coupon] = await Promise.all([
+    c.db.from("products").select("id,name,unit_price,active,wholesale_price,wholesale_min_qty").eq("org_id", org).in("id", ids),
+    pricing ? loadPosPromos(c.db, org) : Promise.resolve([] as PosPromo[]),
+    pricing && d.coupon ? checkCoupon(c.db, org, d.coupon, today) : Promise.resolve(null),
+  ]);
   if (pErr) return { ok: false, message: "No se pudieron leer los precios. Inténtalo otra vez." };
-  const byId = new Map(((prods ?? []) as { id: string; name: string; unit_price: number | string; active: boolean }[]).map(p => [p.id, p] as const));
-  const lines = [];
+  if (coupon && !coupon.ok) return { ok: false, message: coupon.message };
+  type P = { id: string; name: string; unit_price: number | string; active: boolean; wholesale_price: number | string | null; wholesale_min_qty: number | string | null };
+  const byId = new Map(((prods ?? []) as P[]).map(p => [p.id, p] as const));
+  const cart = [];
+  const wholesale: Wholesale = {};
   for (const i of d.items) {
     const p = byId.get(i.product_id);
     if (!p || !p.active) return { ok: false, message: "Un producto del carrito ya no está disponible. Quítalo y vuelve a cobrar." };
-    lines.push({ description: p.name, quantity: Math.round(i.quantity * 1000) / 1000, unit_price: Number(p.unit_price), product_id: p.id });
+    cart.push({ product_id: p.id, name: p.name, unit_price: Number(p.unit_price), quantity: Math.round(i.quantity * 1000) / 1000 });
+    wholesale[p.id] = { price: p.wholesale_price == null ? null : Number(p.wholesale_price), min: p.wholesale_min_qty == null ? null : Number(p.wholesale_min_qty) };
   }
+  // Same prices as the mobile POS (best of wholesale / promotions, then the coupon), computed here, never taken from the browser.
+  const priced = priceCart(cart, promos, today, wholesale, coupon?.ok ? coupon.coupon : null);
+  const lines = priced.lines.map(l => ({ description: l.reason ? `${l.name} (${l.reason})`.slice(0, 300) : l.name, quantity: l.quantity, unit_price: l.unit_price, product_id: l.product_id }));
+  const notes = [d.note, coupon?.ok ? `Cupón ${coupon.coupon.code}` : ""].filter(Boolean).join(" · ");
   const { data, error } = await c.db.rpc("fast_checkout_atomic", {
     p_org_id: org, p_request_id: d.request_id, p_items: lines,
     p_tax_rate: Number(c.organization.default_tax_rate ?? 18), p_currency: c.organization.currency || "PEN",
-    p_method: d.method, p_notes: d.note || null,
+    p_method: d.method, p_notes: notes || null,
   });
   const row = Array.isArray(data) ? data[0] as { invoice_id: string; charged: number | string; reused: boolean } | undefined : undefined;
   if (error || !row?.invoice_id) return { ok: false, message: dbMessage(error?.message, "No se pudo cobrar. Inténtalo de nuevo: no se duplicará.") };
+  // The coupon use is spent once the sale exists (a retried charge of the same sale does not spend it again).
+  if (coupon?.ok && !row.reused) await c.db.rpc("use_coupon", { p_org: org, p_code: coupon.coupon.code });
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, invoice_id: row.invoice_id, charged: Number(row.charged), reused: row.reused };
+}
+
+type Db = Awaited<ReturnType<typeof workspaceContext>>["db"];
+async function loadPosPromos(db: Db, org: string): Promise<PosPromo[]> {
+  const { data } = await db.from("promotions").select("id,name,kind,value,product_ids,min_qty,starts_on,ends_on,active").eq("org_id", org).eq("active", true).limit(300);
+  return ((data ?? []) as (Omit<PosPromo, "value" | "min_qty" | "product_ids"> & { value: number | string; min_qty: number | string | null; product_ids: string[] | null })[])
+    .map(p => ({ ...p, value: Number(p.value), min_qty: p.min_qty == null ? null : Number(p.min_qty), product_ids: (p.product_ids ?? []).map(String) }));
+}
+async function checkCoupon(db: Db, org: string, raw: string, today: string): Promise<{ ok: true; coupon: PosCoupon } | { ok: false; message: string }> {
+  const code = raw.trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{2,40}$/.test(code)) return { ok: false, message: "Cupón no válido." };
+  const { data } = await db.from("coupons").select("code,kind,value,active,expires_on,max_uses,uses").eq("org_id", org).eq("code", code).maybeSingle();
+  const c = data as { code: string; kind: string; value: number | string; active: boolean; expires_on: string | null; max_uses: number | null; uses: number | null } | null;
+  const problem = couponProblemAt(c ? { ...c, uses: Number(c.uses ?? 0) } : null, today);
+  if (problem || !c) return { ok: false, message: problem ?? "Cupón no válido." };
+  return { ok: true, coupon: { code: c.code, kind: c.kind, value: Number(c.value) } };
+}
+
+/** Checks a coupon for the web POS before charging (no use is spent here). */
+export async function posCoupon(org: string, code: string): Promise<{ ok: true; coupon: PosCoupon } | { ok: false; message: string }> {
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "vender")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector) || !hasFeature(c.license, "precios")) return { ok: false, message: "Tu plan no incluye cupones." };
+  return checkCoupon(c.db, org, String(code ?? ""), limaDate(new Date()));
 }
 
 /** RUC / DNI lookup for the receipt of a quick sale (same limits as everywhere). */
@@ -1013,4 +1055,16 @@ export async function ignoreBankLine(org: string, lineId: string): Promise<FormR
   if (error) return { ok: false, message: "No se pudo marcar." };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: "Movimiento marcado como no relacionado." };
+}
+
+/** Undoes a whole Excel import (same wb_import_undo as the mobile app; the database checks owner or admin). */
+export async function undoImport(org: string, job: string): Promise<FormResult> {
+  if (!uuid.safeParse(job).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "importar");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!ctx.c.access.is_admin) return { ok: false, message: "Solo el dueño o un administrador puede deshacer una importación." };
+  const { error } = await ctx.c.db.rpc("wb_import_undo", { p_job: job });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo deshacer la importación.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Importación deshecha: se quitó lo que había traído." };
 }

@@ -89,13 +89,23 @@ export function BankImport({ org }: { org: string }) {
   const router = useRouter();
   return <div className="fv-create" style={{ padding: 18 }}>
     <h3>Sube el extracto de tu banco</h3>
-    <p className="fv-caption">Descárgalo de tu banca por internet (BCP, Interbank, BBVA, Scotiabank…) como CSV y súbelo aquí. Detectamos fecha, detalle, monto y operación; lo repetido no se vuelve a cargar.</p>
-    <input type="file" accept=".csv,text/csv,.txt" disabled={busy} onChange={async e => {
+    <p className="fv-caption">Descárgalo de tu banca por internet (BCP, Interbank, BBVA, Scotiabank…) en Excel (.xlsx) o CSV y súbelo aquí. Detectamos fecha, detalle, monto y operación; lo repetido no se vuelve a cargar.</p>
+    <input type="file" accept=".xlsx,.xls,.csv,text/csv,.txt" disabled={busy} onChange={async e => {
       const f = e.target.files?.[0]; if (!f) return;
       setBusy(true); setM(null);
       try {
-        const text = await f.text();
-        const lines = parseBankTable(parseCsv(text));
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        let table: string[][];
+        if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+          // Excel (.xlsx): the server reads the first sheet; nothing is stored.
+          const { data } = await createClient().auth.getSession();
+          const res = await fetch("/api/import/workbook?mode=table", { method: "POST", headers: { "content-type": "application/octet-stream", ...(data.session ? { authorization: `Bearer ${data.session.access_token}` } : {}) }, body: bytes });
+          const j = await res.json().catch(() => ({}));
+          if (!res.ok) { setM({ ok: false, message: j.error ?? "No pude leer el Excel." }); return; }
+          table = j.rows as string[][];
+        } else if (bytes[0] === 0xd0 && bytes[1] === 0xcf) { setM({ ok: false, message: "Es un Excel antiguo (.xls). Ábrelo y guárdalo como .xlsx o .csv." }); return; }
+        else table = parseCsv(new TextDecoder().decode(bytes));
+        const lines = parseBankTable(table);
         if (!lines.length) { setM({ ok: false, message: "No encontré movimientos. Revisa que el archivo tenga columnas de fecha y monto (o abono/cargo)." }); return; }
         const r = await importBankLines(org, lines.map(l => ({ ...l, description: l.description.slice(0, 300), reference: l.reference.slice(0, 80), fingerprint: fingerprint(l) })), f.name);
         setM(r); if (r.ok) router.refresh();
@@ -111,63 +121,4 @@ export function BankMatch({ org, lineId, invoiceId, label }: { org: string; line
     {invoiceId && <ActionButton label={label} secondary={false} run={() => confirmBankMatch(org, lineId, invoiceId)} />}
     <ActionButton label="No es un cobro" run={() => ignoreBankLine(org, lineId)} />
   </span>;
-}
-
-// ── Importar desde Excel ──
-type Preview = { counts?: Record<string, number>; totals?: { net?: Record<string, number> }; sheets?: { name: string; role: string; rows: number }[]; warnings?: { message?: string }[] };
-type Analysis = { preview: Preview; payload: { clients?: unknown[]; products?: unknown[]; docs?: unknown[] }; file: string };
-const chunks = <T,>(l: T[], n: number) => Array.from({ length: Math.ceil(l.length / n) }, (_, i) => l.slice(i * n, i * n + n));
-
-export function ImportBoard({ org, taxRate }: { org: string; taxRate: number }) {
-  const [a, setA] = useState<Analysis | null>(null);
-  const [step, setStep] = useState("");
-  const [m, setM] = useState<FormResult | null>(null);
-  const router = useRouter();
-  async function analyze(f: File) {
-    setM(null); setA(null); setStep("Leyendo el archivo…");
-    try {
-      const { data } = await createClient().auth.getSession();
-      const res = await fetch(`/api/import/workbook?rate=${taxRate}`, { method: "POST", headers: { "content-type": "application/octet-stream", ...(data.session ? { authorization: `Bearer ${data.session.access_token}` } : {}) }, body: await f.arrayBuffer() });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) { setM({ ok: false, message: j.error ?? "No pude leer el Excel." }); return; }
-      setA({ preview: j.preview, payload: j.payload, file: f.name });
-    } catch { setM({ ok: false, message: "Sin conexión." }); }
-    finally { setStep(""); }
-  }
-  async function run() {
-    if (!a) return;
-    const db = createClient();
-    try {
-      setStep("Preparando…");
-      const counts = a.preview.counts ?? {};
-      const { data: job, error } = await db.rpc("wb_import_begin", { p_org: org, p_file: a.file.slice(0, 200), p_expected: { ...counts, net: a.preview.totals?.net ?? {} }, p_warnings: a.preview.warnings ?? [] });
-      if (error || !job) throw new Error(error?.message);
-      const clients = a.payload.clients ?? [], products = a.payload.products ?? [], docs = a.payload.docs ?? [];
-      let done = 0;
-      for (const c of chunks(clients, 1000)) { const r = await db.rpc("wb_import_clients", { p_job: job, p_rows: c }); if (r.error) throw new Error(r.error.message); done += c.length; setStep(`Clientes ${done}/${clients.length}`); }
-      done = 0;
-      for (const c of chunks(products, 500)) { const r = await db.rpc("wb_import_products", { p_job: job, p_rows: c }); if (r.error) throw new Error(r.error.message); done += c.length; setStep(`Productos ${done}/${products.length}`); }
-      done = 0;
-      for (const c of chunks(docs, 200)) { const r = await db.rpc("wb_import_docs", { p_job: job, p_docs: c }); if (r.error) throw new Error(r.error.message); done += c.length; setStep(`Comprobantes ${done}/${docs.length}`); }
-      const fin = await db.rpc("wb_import_finish", { p_job: job });
-      if (fin.error) throw new Error(fin.error.message);
-      setA(null); setM({ ok: true, message: "Importación terminada. Si algo salió mal, puedes deshacerla desde el móvil (Importar → Historial)." }); router.refresh();
-    } catch { setM({ ok: false, message: "La importación se detuvo. Revisa tu conexión y vuelve a intentarlo: lo ya importado no se duplica." }); }
-    finally { setStep(""); }
-  }
-  const c = a?.preview.counts ?? {};
-  return <div className="fv-create" style={{ padding: 18 }}>
-    <h3>Trae tu información desde Excel</h3>
-    <p className="fv-caption">Clientes, productos y comprobantes de tu sistema anterior (.xlsx, hasta 4 MB). Primero ves qué encontramos; nada se guarda hasta que confirmas.</p>
-    <input type="file" accept=".xlsx" disabled={!!step} onChange={e => { const f = e.target.files?.[0]; if (f) void analyze(f); e.target.value = ""; }} />
-    {a && <div className="fv-kpis" style={{ marginTop: 14 }}>
-      <div style={{ "--tone": "#3ee6b0" } as React.CSSProperties}><span>Clientes</span><strong>{c.clients ?? 0}</strong></div>
-      <div style={{ "--tone": "#6fb7ff" } as React.CSSProperties}><span>Productos</span><strong>{c.products ?? 0}</strong></div>
-      <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Comprobantes</span><strong>{c.documents ?? 0}</strong></div>
-    </div>}
-    {a?.preview.warnings?.slice(0, 5).map((w, i) => <p key={i} className="fv-note-box">{w.message}</p>)}
-    {a && <button className="fv-button" disabled={!!step} onClick={() => void run()}>Importar ahora</button>}
-    {step && <p className="fv-caption" aria-live="polite">{step}</p>}
-    <Msg m={m} />
-  </div>;
 }
