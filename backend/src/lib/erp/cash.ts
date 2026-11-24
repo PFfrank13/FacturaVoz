@@ -96,3 +96,16 @@ export function serviceSummary(moves: CashMove[]) {
   const r = (v: number) => Math.round(v * 100) / 100;
   return { count, inflow: r(inflow), outflow: r(outflow), net: r(inflow - outflow) };
 }
+
+/** Peruvian notes and coins for the count (BCRP denominations in circulation). */
+export const denominations = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1] as const;
+
+/** Total of a count by denomination (in cents to avoid float errors). */
+export function countTotal(qty: Record<string, number>): number {
+  return denominations.reduce((s, d) => s + Math.round(d * 100) * Math.max(0, Math.floor(qty[String(d)] ?? 0)), 0) / 100;
+}
+
+/** Short text of the count for the closing note: "200×1 · 50×3 · 1×7". */
+export function countText(qty: Record<string, number>): string {
+  return denominations.filter(d => (qty[String(d)] ?? 0) > 0).map(d => `${d >= 1 ? d : d.toFixed(2)}×${Math.floor(qty[String(d)])}`).join(" · ");
+}

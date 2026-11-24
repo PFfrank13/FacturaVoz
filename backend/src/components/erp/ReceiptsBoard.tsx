@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { getReceipt, shareReceipt, type ReceiptDetail, type ReceiptShare } from "@/app/erp/actions";
+import { emailReceipts, getReceipt, shareReceipt, type FormResult, type ReceiptDetail, type ReceiptShare } from "@/app/erp/actions";
 import { waPhone } from "@/lib/erp/clients";
 import {
   kindLabel, mailtoHref, matchesReceipt, parseRange, presetRange, receiptKind, shareMessage, receiptNumber, summarize, sunatLabel, sunatState, voidHint, voidWindow,
@@ -17,7 +17,7 @@ const stateTone: Record<SunatState, string> = {
 };
 
 /** Every receipt of the company, the same rows the mobile app issues. */
-export default function ReceiptsBoard({ org, rows, currency, range = null, capped = false }: { org: string; rows: ReceiptRow[]; currency: string; range?: { from: string; to: string } | null; capped?: boolean }) {
+export default function ReceiptsBoard({ org, rows, currency, range = null, capped = false, page = 1, search = "" }: { org: string; rows: ReceiptRow[]; currency: string; range?: { from: string; to: string } | null; capped?: boolean; page?: number; search?: string }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<ReceiptKind | "todos">("todos");
   const [sunat, setSunat] = useState<SunatState | "todos">("todos");
@@ -63,6 +63,13 @@ export default function ReceiptsBoard({ org, rows, currency, range = null, cappe
       })}
     </ul>
     {!visible.length && <div className="fv-empty"><h2>{q || kind !== "todos" || sunat !== "todos" || range ? "Sin coincidencias" : "Todavía no hay comprobantes"}</h2><p>Las boletas y facturas emitidas en el móvil o aquí aparecen en esta lista.</p></div>}
+    <nav className="fv-pagination" aria-label="Más comprobantes">
+      {page > 1 && <a className="fv-button secondary" href={pageHref(page - 1, range, search)}>‹ Más recientes</a>}
+      <span>Página {page}</span>
+      {capped && <a className="fv-button secondary" href={pageHref(page + 1, range, search)}>Más antiguos ›</a>}
+    </nav>
+    <SearchAll search={search} range={range} />
+    {visible.length > 0 && <SendList org={org} rows={visible} />}
     {open && <ReceiptSheet key={open.id} org={org} row={open} currency={currency} onClose={() => setOpenId(null)} />}
   </section>;
 }
@@ -165,6 +172,8 @@ function SendReceipt({ org, row }: { org: string; row: ReceiptRow }) {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<FormResult | null>(null);
   const prepare = async () => {
     setBusy(true);
     const s = await shareReceipt(org, row.id).catch(() => ({ ok: false, message: "No se pudo crear el enlace. Inténtalo de nuevo." }) as const);
@@ -189,8 +198,46 @@ function SendReceipt({ org, row }: { org: string; row: ReceiptRow }) {
     </div>
     <div className="fv-send-row">
       <label className="fv-search"><span>Correo</span><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@correo.com" /></label>
-      <a className="fv-button secondary" href={mailtoHref({ to: email, number: receiptNumber(row), business: share.business, body: message })}>Enviar por correo</a>
+      <button className="fv-button" disabled={sending || !email.trim()} onClick={async () => { setSending(true); const r = await emailReceipts(org, email, [row.id]).catch(() => ({ ok: false, message: "Sin conexión." })); setSent(r); setSending(false); }}>{sending ? "Enviando…" : "Enviar por correo"}</button>
+      <a className="fv-link" href={mailtoHref({ to: email, number: receiptNumber(row), business: share.business, body: message })}>o desde mi correo</a>
     </div>
+    {sent?.message && <p className={sent.ok ? "fv-ok" : "fv-error"} role={sent.ok ? "status" : "alert"}>{sent.message}</p>}
     <button className="fv-button secondary" onClick={copy}>{copied ? "Enlace copiado" : "Copiar enlace"}</button>
   </div>;
+}
+
+const pageHref = (p: number, range: { from: string; to: string } | null, search: string) => {
+  const q = new URLSearchParams();
+  if (p > 1) q.set("pagina", String(p));
+  if (range) { q.set("desde", range.from); q.set("hasta", range.to); }
+  if (search) q.set("buscar", search);
+  const t = q.toString();
+  return t ? `?${t}` : "?";
+};
+
+/** Searches the WHOLE history on the server (number, client name, DNI or RUC), not only the loaded page. */
+function SearchAll({ search, range }: { search: string; range: { from: string; to: string } | null }) {
+  return <form className="fv-inline-form fv-search-all" action="" method="get">
+    {range && <><input type="hidden" name="desde" value={range.from} /><input type="hidden" name="hasta" value={range.to} /></>}
+    <label className="fv-search"><span>Buscar en todo el historial</span><input name="buscar" defaultValue={search} maxLength={60} placeholder="Número, cliente, DNI o RUC" /></label>
+    <button className="fv-button secondary">Buscar</button>
+    {search && <a className="fv-link" href={pageHref(1, range, "")}>Quitar búsqueda</a>}
+  </form>;
+}
+
+/** Sends the receipts in the list (for example, a customer's whole history) to one e-mail. */
+function SendList({ org, rows }: { org: string; rows: ReceiptRow[] }) {
+  const [open, setOpen] = useState(false);
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [m, setM] = useState<FormResult | null>(null);
+  const list = rows.slice(0, 60);
+  if (!open) return <button className="fv-button secondary" onClick={() => setOpen(true)}>Enviar estos {list.length} comprobantes por correo</button>;
+  return <form className="fv-create fv-inline-form" style={{ padding: 14 }} onSubmit={async e => { e.preventDefault(); setBusy(true); const r = await emailReceipts(org, to, list.map(x => x.id)).catch(() => ({ ok: false, message: "Sin conexión." })); setM(r); setBusy(false); }}>
+    <p className="fv-caption">Ideal para mandarle a un cliente su historial: busca su nombre o RUC arriba y envía. Van con su enlace para ver y descargar cada uno ({list.length}{rows.length > 60 ? " de los primeros 60" : ""}).</p>
+    <label className="fv-search"><span>Correo del cliente</span><input type="email" required value={to} onChange={e => setTo(e.target.value)} /></label>
+    <button className="fv-button" disabled={busy}>{busy ? "Enviando…" : "Enviar"}</button>
+    <button type="button" className="fv-link" onClick={() => setOpen(false)}>Cancelar</button>
+    {m?.message && <p className={m.ok ? "fv-ok" : "fv-error"} role={m.ok ? "status" : "alert"}>{m.message}</p>}
+  </form>;
 }

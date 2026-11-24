@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
         source: "/:path((?!app(?:/|$)).*)",
         headers: [
           { key: "Content-Security-Policy", value: contentSecurityPolicy(false) },
-          { key: "Permissions-Policy", value: "microphone=(self), camera=(), geolocation=(), payment=()" },
+          { key: "Permissions-Policy", value: "microphone=(self), camera=(self), geolocation=(), payment=()" },
         ],
       },
       {

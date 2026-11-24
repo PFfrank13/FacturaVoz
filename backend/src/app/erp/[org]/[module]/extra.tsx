@@ -1,12 +1,14 @@
 import type React from "react";
-import Link from "next/link";
 import type { workspaceContext } from "@/lib/erp/context";
 import { money } from "@/lib/schemas";
 import { limaDate } from "@/lib/erp/receipts";
 import { byCategory, expenseCategories, type ExpenseRow } from "@/lib/erp/expenses";
 import type { PosProduct, PosPromo } from "@/lib/erp/pos";
 import { hasFeature } from "@/lib/erp/access";
-import PosBoard from "@/components/erp/PosBoard";
+import PosBoard, { type PayInfo } from "@/components/erp/PosBoard";
+import { FiadosBoard, NoticesBoard, type Debtor, type NoticeRow } from "@/components/erp/LedgerBoards";
+import { loadReceivables } from "./extra3";
+import { waPhone } from "@/lib/erp/clients";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import { ExpenseForm, MarkAlertsRead, RestoreButton, VerifyAudit } from "@/components/erp/OwnerBoards";
 
@@ -31,12 +33,19 @@ export async function renderExtra(id: string, c: Ctx, org: string, title: string
 
   if (id === "vender") {
     const pricing = hasFeature(c.license, "precios");
-    const [prods, codes, fiscal, promoRes] = await Promise.all([
+    const [prods, codes, fiscal, promoRes, paySet] = await Promise.all([
       c.db.from("products").select("id,name,unit_price,unit,stock,barcode,icbper,category,image_path,wholesale_price,wholesale_min_qty").eq("org_id", org).eq("active", true).neq("unit", "ZZ").order("name").limit(5000),
       c.db.from("product_barcodes").select("code,product_id").eq("org_id", org).limit(20000),
       c.db.from("fiscal_companies").select("org_id").eq("org_id", org).maybeSingle(),
       pricing ? c.db.from("promotions").select("id,name,kind,value,product_ids,min_qty,starts_on,ends_on,active").eq("org_id", org).eq("active", true).limit(300) : Promise.resolve({ data: [] }),
+      c.db.from("org_pay_settings").select("yape_phone,plin_phone,yape_qr_path,plin_qr_path,bank_name,bank_account,bank_cci,account_holder").eq("org_id", org).maybeSingle(),
     ]);
+    const ps = (paySet.data ?? null) as Record<string, string | null> | null;
+    const qrPaths = [ps?.yape_qr_path, ps?.plin_qr_path].filter((x): x is string => !!x);
+    const qrSigned = qrPaths.length ? await c.db.storage.from("org-media").createSignedUrls(qrPaths, 3600) : { data: [] };
+    const qrUrl = (path: string | null | undefined) => (path ? (qrSigned.data ?? []).find(x => x.path === path)?.signedUrl ?? null : null);
+    const pay: PayInfo | null = ps ? { yape: ps.yape_phone ?? "", plin: ps.plin_phone ?? "", yape_qr: qrUrl(ps.yape_qr_path), plin_qr: qrUrl(ps.plin_qr_path), bank_name: ps.bank_name ?? "",
+      bank_account: ps.bank_account ?? "", bank_cci: ps.bank_cci ?? "", holder: ps.account_holder ?? "" } : null;
     if (prods.error) return <>{heading(`VENDER / ${name}`, title, "", org)}{failed("los productos")}</>;
     type Raw = Omit<PosProduct, "image_url" | "unit_price" | "stock" | "wholesale_price" | "wholesale_min_qty"> & { unit_price: number | string; stock: number | string | null; image_path: string | null; wholesale_price: number | string | null; wholesale_min_qty: number | string | null };
     const rows = (prods.data ?? []) as Raw[];
@@ -50,59 +59,56 @@ export async function renderExtra(id: string, c: Ctx, org: string, title: string
     const promos: PosPromo[] = ((promoRes.data ?? []) as RawPromo[]).map(p => ({ ...p, value: Number(p.value), min_qty: p.min_qty == null ? null : Number(p.min_qty), product_ids: (p.product_ids ?? []).map(String) }));
     const extraCodes = Object.fromEntries(((codes.data ?? []) as { code: string; product_id: string }[]).map(x => [x.code, x.product_id]));
     return <>{heading(`VENDER / ${name}`, title, "Conecta tu lector de códigos USB y escanea: cada producto entra al carrito con su nombre y precio. También funciona con las etiquetas de la balanza.", org, liveSales)}
-      <PosBoard org={org} products={products} extraCodes={extraCodes} currency={cur} taxRate={Number(c.organization.default_tax_rate ?? 18)} canEmit={!!fiscal.data} promos={promos} pricing={pricing} today={limaDate(new Date())} />
+      <PosBoard org={org} products={products} extraCodes={extraCodes} currency={cur} taxRate={Number(c.organization.default_tax_rate ?? 18)} canEmit={!!fiscal.data} promos={promos} pricing={pricing} today={limaDate(new Date())} pay={pay} />
     </>;
   }
 
   if (id === "fiados") {
-    const res = await c.db.rpc("credit_balances", { p_org: org });
+    const [res, moves, cls] = await Promise.all([
+      c.db.rpc("credit_balances", { p_org: org }),
+      c.db.from("credit_ledger").select("id,client_id,kind,amount,description,created_at,method").eq("org_id", org).order("created_at", { ascending: false }).limit(3000),
+      c.db.from("clients").select("id,name").eq("org_id", org).order("name").limit(3000),
+    ]);
     type Bal = { client_id: string; client_name: string; phone: string | null; balance: number | string; last_move: string | null; oldest_due: string | null; credit_limit: number | string | null };
     const rows = ((res.data ?? []) as Bal[]).map(r => ({ ...r, balance: Number(r.balance), credit_limit: r.credit_limit == null ? null : Number(r.credit_limit) })).filter(r => r.balance > 0.004).sort((a, b) => b.balance - a.balance);
     const today = limaDate(new Date());
     const total = rows.reduce((s, r) => s + r.balance, 0);
     const late = rows.filter(r => r.oldest_due && r.oldest_due < today).length;
     const over = rows.filter(r => r.credit_limit != null && r.credit_limit > 0 && r.balance > r.credit_limit).length;
-    return <>{heading(`LIBRETA / ${name}`, title, "Quién te debe, cuánto y desde cuándo. Para anotar un fiado o un abono, abre al cliente en Clientes: se ve igual en el móvil.", org, liveFiados)}
+    type Mv = { id: string; client_id: string; kind: string; amount: number | string; description: string | null; created_at: string; method: string | null };
+    const byClient = new Map<string, Debtor["moves"]>();
+    for (const m of (moves.data ?? []) as Mv[]) byClient.set(m.client_id, [...(byClient.get(m.client_id) ?? []), { ...m, amount: Number(m.amount) }]);
+    const debtors: Debtor[] = rows.map(r => ({ client_id: r.client_id, name: r.client_name, phone: waPhone(r.phone), balance: r.balance, limit: r.credit_limit, oldest_due: r.oldest_due, moves: (byClient.get(r.client_id) ?? []).slice(0, 60) }));
+    return <>{heading(`LIBRETA / ${name}`, title, "Anota lo que fías y los abonos. Ve la cuenta de cada cliente y mándasela por WhatsApp. Es la misma libreta del móvil.", org, liveFiados)}
       {res.error ? failed("la libreta") : <>
         <div className="fv-kpis">
           <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Te deben</span><strong>{fmt(total)}</strong><small>{rows.length} {rows.length === 1 ? "cliente" : "clientes"}</small></div>
           <div style={{ "--tone": "#ff8aa8" } as React.CSSProperties}><span>Vencidos</span><strong>{late}</strong><small>con fecha de pago pasada</small></div>
           <div style={{ "--tone": "#a98bff" } as React.CSSProperties}><span>Pasaron su límite</span><strong>{over}</strong><small>según el crédito de cada uno</small></div>
         </div>
-        {!rows.length ? <div className="fv-empty"><h2>Nadie te debe</h2><p>Los fiados que anotes en el móvil o en Clientes aparecerán aquí.</p></div>
-          : <div className="fv-table-scroll fv-data"><table><thead><tr><th>Cliente</th><th>Debe</th><th>Límite</th><th>Paga desde</th><th>Último movimiento</th><th /></tr></thead><tbody>
-            {rows.map(r => <tr key={r.client_id}>
-              <td><strong>{r.client_name}</strong>{r.phone ? <><br /><small className="fv-muted">{r.phone}</small></> : null}</td>
-              <td><b>{fmt(r.balance)}</b></td>
-              <td>{r.credit_limit ? <span className={r.balance > r.credit_limit ? "fv-pill is-bad" : "fv-pill is-off"}>{fmt(r.credit_limit)}</span> : "—"}</td>
-              <td>{r.oldest_due ? <span className={r.oldest_due < today ? "fv-pill is-bad" : "fv-pill is-wait"}>{dateOnly(r.oldest_due)}</span> : "—"}</td>
-              <td>{r.last_move ? dateTime(r.last_move) : "—"}</td>
-              <td>{r.phone ? <a className="fv-link" href={`https://wa.me/51${r.phone.replace(/\D/g, "").slice(-9)}?text=${encodeURIComponent(`Hola ${r.client_name}, te recordamos tu saldo pendiente de ${fmt(r.balance)}. ¡Gracias!`)}`} target="_blank" rel="noopener noreferrer">Recordar por WhatsApp</a> : null}</td>
-            </tr>)}
-          </tbody></table></div>}
-        <p className="fv-caption"><Link className="fv-link" href={`/erp/${org}/clientes`}>Ir a Clientes para anotar fiados o abonos →</Link></p>
+        <FiadosBoard org={org} debtors={debtors} clients={(cls.data ?? []) as { id: string; name: string }[]} currency={cur} business={name} today={today} />
       </>}
     </>;
   }
 
   if (id === "avisos") {
-    const res = await c.db.from("payment_notices").select("id,app,amount,payer,operation_code,received_at,status,invoice_id").eq("org_id", org).order("received_at", { ascending: false }).limit(200);
-    type Notice = { id: string; app: string; amount: number | string | null; payer: string | null; operation_code: string | null; received_at: string; status: string; invoice_id: string | null };
-    const rows = (res.data ?? []) as Notice[];
+    const [res, rec] = await Promise.all([
+      c.db.from("payment_notices").select("id,app,amount,payer,operation_code,received_at,status,invoice:invoices(number)").eq("org_id", org).order("received_at", { ascending: false }).limit(500),
+      loadReceivables(c, org),
+    ]);
+    type Raw = { id: string; app: string; amount: number | string; payer: string | null; operation_code: string | null; received_at: string; status: string; invoice: unknown };
+    const rows: NoticeRow[] = ((res.data ?? []) as Raw[]).map(r => { const inv = (Array.isArray(r.invoice) ? r.invoice[0] : r.invoice) as { number: string } | null; return { ...r, amount: Number(r.amount), invoice: inv?.number ?? null }; });
     const today = limaDate(new Date());
-    const todays = rows.filter(r => limaDate(new Date(r.received_at)) === today);
-    const pending = rows.filter(r => r.status !== "matched" && r.status !== "conciliado" && !r.invoice_id).length;
-    return <>{heading(`COBROS / ${name}`, title, "Los avisos de Yape y Plin que lee el celular del negocio (o que pegas a mano). Así compruebas que el dinero llegó antes de entregar.", org, liveNotices)}
+    const todays = rows.filter(r => limaDate(new Date(r.received_at)) === today && r.status !== "descartado");
+    const pending = rows.filter(r => r.status === "nuevo").length;
+    return <>{heading(`COBROS / ${name}`, title, "Comprueba que el dinero llegó antes de entregar: pega el aviso de Yape, Plin o tu banco y regístralo. Aquí está el historial completo.", org, liveNotices)}
       {res.error ? failed("los avisos") : <>
         <div className="fv-kpis">
-          <div style={{ "--tone": "#a98bff" } as React.CSSProperties}><span>Recibido hoy</span><strong>{fmt(todays.reduce((s, r) => s + Number(r.amount ?? 0), 0))}</strong><small>{todays.length} avisos</small></div>
-          <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Sin venta asociada</span><strong>{pending}</strong><small>revísalos en el móvil</small></div>
+          <div style={{ "--tone": "#a98bff" } as React.CSSProperties}><span>Recibido hoy</span><strong>{fmt(todays.reduce((s, r) => s + r.amount, 0))}</strong><small>{todays.length} avisos</small></div>
+          <div style={{ "--tone": "#ffb35c" } as React.CSSProperties}><span>Sin asociar</span><strong>{pending}</strong><small>asígnalos a un comprobante o descártalos</small></div>
+          <div style={{ "--tone": "#3ee6b0" } as React.CSSProperties}><span>Este mes</span><strong>{fmt(rows.filter(r => r.received_at.slice(0, 7) === today.slice(0, 7) && r.status !== "descartado").reduce((s, r) => s + r.amount, 0))}</strong><small>por Yape, Plin y banco</small></div>
         </div>
-        {!rows.length ? <div className="fv-empty"><h2>Aún no hay avisos</h2><p>En el móvil, activa «Avisos automáticos de Yape/Plin» (Configuración → Cobros) y cada pago aparecerá aquí al instante.</p></div>
-          : <div className="fv-table-scroll fv-data"><table><thead><tr><th>Hora</th><th>App</th><th>De</th><th>Monto</th><th>Operación</th><th>Estado</th></tr></thead><tbody>
-            {rows.map(r => <tr key={r.id}><td>{dateTime(r.received_at)}</td><td>{r.app === "plin" ? "Plin" : r.app === "yape" ? "Yape" : r.app}</td><td>{r.payer ?? "—"}</td><td><b>{fmt(Number(r.amount ?? 0))}</b></td><td>{r.operation_code ?? "—"}</td>
-              <td>{r.invoice_id ? <span className="fv-pill is-ok">Con venta</span> : <span className="fv-pill is-wait">Sin asociar</span>}</td></tr>)}
-          </tbody></table></div>}
+        <NoticesBoard org={org} rows={rows} currency={cur} open={rec.rows.filter(r => r.currency === cur).map(r => ({ id: r.id, number: r.number, client: r.client, balance: r.balance }))} />
       </>}
     </>;
   }

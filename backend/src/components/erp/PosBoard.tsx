@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import CameraScan from "./CameraScan";
 import { posCheckout, posCoupon, posLookup } from "@/app/erp/actions";
 import { addToCart, bestPrice, cartTotals, changeFor, findByCode, priceCart, quickCash, searchProducts, setQuantity, shelfPrice, stockProblems, type CartLine, type PosCoupon, type PosProduct, type PosPromo, type Wholesale } from "@/lib/erp/pos";
 
@@ -9,11 +10,12 @@ const methods: { id: Method; label: string }[] = [
   { id: "efectivo", label: "Efectivo" }, { id: "yape", label: "Yape" }, { id: "plin", label: "Plin" }, { id: "tarjeta", label: "Tarjeta" }, { id: "transferencia", label: "Transferencia" },
 ];
 type Done = { invoice_id: string; charged: number; change: number | null; method: Method };
+export type PayInfo = { yape: string; plin: string; yape_qr: string | null; plin_qr: string | null; bank_name: string; bank_account: string; bank_cci: string; holder: string };
 type Emit = { kind: "03" | "01"; doc: string; name: string; address: string; busy: boolean; msg: string; result: string };
 
 /** Quick sale on the web: scan with the barcode gun (or search), cart, charge and, if wanted, boleta or factura. */
-export default function PosBoard({ org, products, extraCodes, currency, taxRate, canEmit, promos = [], pricing = false, today }: {
-  org: string; products: PosProduct[]; extraCodes: Record<string, string>; currency: string; taxRate: number; canEmit: boolean; promos?: PosPromo[]; pricing?: boolean; today: string;
+export default function PosBoard({ org, products, extraCodes, currency, taxRate, canEmit, promos = [], pricing = false, today, pay = null }: {
+  org: string; products: PosProduct[]; extraCodes: Record<string, string>; currency: string; taxRate: number; canEmit: boolean; promos?: PosPromo[]; pricing?: boolean; today: string; pay?: PayInfo | null;
 }) {
   const sym = currency === "USD" ? "US$" : "S/";
   const fmt = (n: number) => `${sym} ${n.toFixed(2)}`;
@@ -27,6 +29,8 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
   const [done, setDone] = useState<Done | null>(null);
   const [emit, setEmit] = useState<Emit | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
+  const [opCode, setOpCode] = useState("");
   const requestId = useRef<string>(crypto.randomUUID());
   const scan = useRef<HTMLInputElement>(null);
 
@@ -42,6 +46,8 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
   const pricedById = new Map(priced.lines.map(l => [l.product_id, l] as const));
   const totals = cartTotals(priced.lines, taxRate);
   const gross = (net: number) => Math.round(net * (1 + taxRate / 100) * 100) / 100;
+  /** What this line adds to the total: its value plus its own IGV, rounded like the receipt. */
+  const lineCharge = (net: number, qty: number) => { const v = Math.round(net * qty * 100) / 100; return Math.round((v + Math.round(v * taxRate) / 100) * 100) / 100; };
   const cash = Number(received.replace(",", "."));
   const change = method === "efectivo" && received ? changeFor(totals.total, cash) : null;
   const problems = stockProblems(cart);
@@ -54,13 +60,13 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
     setMsg(null);
   }
 
-  /** Enter in the scan box: an exact code (gun or typed) sells it; otherwise the only search result. */
-  function onEnter() {
-    const code = q.trim();
+  /** Enter in the scan box or a camera read: an exact code (gun, camera or typed) sells it; otherwise the only search result. */
+  function onEnter(fromCamera?: string) {
+    const code = (fromCamera ?? q).trim();
     if (!code) return;
     const hit = findByCode(code, products, extraCodes);
     if (hit) { add(hit.product, hit.quantity); setQ(""); return; }
-    if (list.length === 1) { add(list[0]); setQ(""); return; }
+    if (!fromCamera && list.length === 1) { add(list[0]); setQ(""); return; }
     if (/^\d{6,14}$/.test(code)) setMsg({ ok: false, text: `El código ${code} no está registrado. Agrégalo en Productos → Códigos de barras.` });
   }
 
@@ -68,9 +74,10 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
     if (busy || !cart.length) return;
     if (problems.length) { setMsg({ ok: false, text: `No hay stock suficiente: ${problems.join(" · ")}.` }); return; }
     if (method === "efectivo" && received && change === null) { setMsg({ ok: false, text: "Lo recibido no cubre el total." }); return; }
+    if (method !== "efectivo" && !verified) { setMsg({ ok: false, text: method === "tarjeta" ? "Confirma que el pago con tarjeta salió aprobado en tu POS." : "Revisa en tu app que el pago llegó (monto y nombre) y marca la casilla." }); return; }
     setBusy(true); setMsg(null);
     try {
-      const r = await posCheckout(org, { request_id: requestId.current, method, items: cart.map(l => ({ product_id: l.product_id, quantity: l.quantity })), coupon: coupon?.code });
+      const r = await posCheckout(org, { request_id: requestId.current, method, items: cart.map(l => ({ product_id: l.product_id, quantity: l.quantity })), coupon: coupon?.code, note: opCode.trim() ? `Operación ${opCode.trim()}`.slice(0, 120) : undefined });
       if (!r.ok) { setMsg({ ok: false, text: r.message }); return; }
       setDone({ invoice_id: r.invoice_id, charged: r.charged, change: method === "efectivo" && received ? changeFor(r.charged, cash) : null, method });
     } catch { setMsg({ ok: false, text: "Sin conexión. Vuelve a cobrar: la venta no se duplicará." }); }
@@ -80,7 +87,7 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
   function next() {
     requestId.current = crypto.randomUUID();
     setCart([]); setReceived(""); setMethod("efectivo"); setDone(null); setEmit(null); setMsg(null); setQ("");
-    setCoupon(null); setCouponOpen(false); setCouponCode(""); setCouponMsg("");
+    setCoupon(null); setCouponOpen(false); setCouponCode(""); setCouponMsg(""); setVerified(false); setOpCode("");
   }
 
   async function applyCoupon() {
@@ -154,6 +161,7 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
         <span aria-hidden="true">▍▌▍▎▌</span>
         <input ref={scan} value={q} onChange={e => { setQ(e.target.value); setMsg(null); }} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); onEnter(); } if (e.key === "Escape") setQ(""); }}
           placeholder="Escanea con la pistola o busca por nombre…" aria-label="Escanear código o buscar producto" autoComplete="off" />
+        <CameraScan onCode={code => onEnter(code)} />
       </div>
       {cats.length > 0 && <div className="fv-chips fv-pos-cats">
         <button className="fv-chip" aria-pressed={cat === null} onClick={() => setCat(null)}>Todo</button>
@@ -184,7 +192,7 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
             <input aria-label={`Cantidad de ${l.name}`} inputMode="decimal" value={l.quantity} onChange={e => { const v = Number(e.target.value.replace(",", ".")); if (Number.isFinite(v)) setCart(c => setQuantity(c, l.product_id, v)); }} />
             <button aria-label="Uno más" onClick={() => setCart(c => setQuantity(c, l.product_id, l.unit === "KGM" ? l.quantity + 0.1 : l.quantity + 1))}>+</button>
           </div>
-          <b>{fmt(Math.round(unit * l.quantity * 100) / 100)}</b>
+          <b>{fmt(lineCharge(pl ? pl.unit_price : l.unit_price, l.quantity))}</b>
         </li>; })}</ul>}
       {pricing && cart.length > 0 && <div className="fv-pos-coupon">
         {coupon ? <p><span className="fv-pill is-ok">Cupón {coupon.code}</span> <button className="fv-link" onClick={() => setCoupon(null)}>Quitar</button></p>
@@ -197,13 +205,14 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
       <div className="fv-pos-sums">
         {priced.promoSaving > 0.004 && <div className="is-saving"><span>Ahorro en promociones</span><span>−{fmt(gross(priced.promoSaving))}</span></div>}
         {priced.couponSaving > 0.004 && <div className="is-saving"><span>Cupón {coupon?.code}</span><span>−{fmt(gross(priced.couponSaving))}</span></div>}
-        <div><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
-        <div><span>IGV {taxRate}%</span><span>{fmt(totals.tax)}</span></div>
+        <div><span>Valor de venta</span><span>{fmt(totals.subtotal)}</span></div>
+        <div><span>IGV {taxRate}% (ya incluido)</span><span>{fmt(totals.tax)}</span></div>
         <div className="is-total"><span>Total</span><span>{fmt(totals.total)}</span></div>
       </div>
       <div className="fv-segment fv-pos-methods" role="group" aria-label="Medio de pago">
-        {methods.map(m => <button key={m.id} aria-pressed={method === m.id} onClick={() => setMethod(m.id)}>{m.label}</button>)}
+        {methods.map(m => <button key={m.id} aria-pressed={method === m.id} onClick={() => { setMethod(m.id); setVerified(false); }}>{m.label}</button>)}
       </div>
+      {method !== "efectivo" && cart.length > 0 && <PayPanel method={method} pay={pay} amount={fmt(totals.total)} verified={verified} setVerified={setVerified} opCode={opCode} setOpCode={setOpCode} />}
       {method === "efectivo" && cart.length > 0 && <div className="fv-pos-cash">
         <label className="fv-search"><span>Recibido</span><input inputMode="decimal" value={received} onChange={e => setReceived(e.target.value)} placeholder={totals.total.toFixed(2)} /></label>
         <div className="fv-chips">{quickCash(totals.total).map(v => <button key={v} className="fv-chip" onClick={() => setReceived(v.toFixed(2))}>{fmt(v)}</button>)}</div>
@@ -213,5 +222,24 @@ export default function PosBoard({ org, products, extraCodes, currency, taxRate,
       <button className="fv-button fv-pos-pay" disabled={!cart.length || busy} onClick={() => void charge()}>{busy ? "Cobrando…" : `Cobrar ${fmt(totals.total)}`}</button>
       {msg?.ok === false && cart.length > 0 && <p className="fv-error" role="alert">{msg.text}</p>}
     </aside>
+  </div>;
+}
+
+/** What the customer needs to pay by Yape, Plin, transfer or card, and the cashier's check before charging (same rule as the app). */
+function PayPanel({ method, pay, amount, verified, setVerified, opCode, setOpCode }: { method: Method; pay: PayInfo | null; amount: string; verified: boolean; setVerified: (v: boolean) => void; opCode: string; setOpCode: (v: string) => void }) {
+  const wallet = method === "yape" || method === "plin";
+  const phone = method === "yape" ? pay?.yape : method === "plin" ? pay?.plin : "";
+  const qr = method === "yape" ? pay?.yape_qr : method === "plin" ? pay?.plin_qr : null;
+  const missing = wallet ? !phone && !qr : method === "transferencia" ? !pay?.bank_account && !pay?.bank_cci : false;
+  return <div className={`fv-pay-panel is-${method}`}>
+    {wallet && <>
+      {qr ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={qr} alt={`QR de ${method === "yape" ? "Yape" : "Plin"}`} /> : null}
+      <p><b>{amount}</b> por {method === "yape" ? "Yape" : "Plin"}{phone ? <> al <b>{phone.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}</b></> : ""}{pay?.holder ? ` · a nombre de ${pay.holder}` : ""}</p>
+    </>}
+    {method === "transferencia" && <p><b>{amount}</b> por transferencia{pay?.bank_name ? ` a ${pay.bank_name}` : ""}<br />{pay?.bank_account && <>Cuenta: <b>{pay.bank_account}</b><br /></>}{pay?.bank_cci && <>CCI: <b>{pay.bank_cci}</b><br /></>}{pay?.holder && <>Titular: {pay.holder}</>}</p>}
+    {method === "tarjeta" && <p>Cobra <b>{amount}</b> en tu POS de tarjeta (Izipay, Niubiz, Culqi…).</p>}
+    {missing && <p className="fv-error">Aún no configuraste este medio de cobro. Agrégalo en Configuración → Medios de cobro.</p>}
+    <label className="fv-search"><span>N.º de operación (opcional)</span><input value={opCode} maxLength={40} onChange={e => setOpCode(e.target.value)} /></label>
+    <label className="fv-check"><input type="checkbox" checked={verified} onChange={e => setVerified(e.target.checked)} /> {method === "tarjeta" ? "El pago salió aprobado en el POS" : "Ya vi el pago en mi app: monto y nombre correctos"}</label>
   </div>;
 }

@@ -893,3 +893,58 @@
   .fv-qr-grid, .fv-qr-grid * { visibility: visible !important; }
   .fv-qr-grid { position: absolute; inset: 0; grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ── v3.12 · Cámara y cobro con QR en la venta rápida ── */
+.fv-pos-scan { gap: 8px; }
+.fv-cam-btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.fv-cam { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: rgba(8, 14, 26, .72); backdrop-filter: blur(6px); }
+.fv-cam-box { position: relative; width: min(520px, 100%); display: grid; gap: 12px; padding: 14px; border-radius: 24px; background: var(--erp-pane-strong); border: 1px solid var(--erp-rim); }
+.fv-cam-box video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 16px; background: #000; }
+.fv-cam-line { position: absolute; left: 12%; right: 12%; top: 38%; height: 2px; background: #ff4d6d; box-shadow: 0 0 12px #ff4d6d; animation: fv-cam 1.6s ease-in-out infinite alternate; }
+@keyframes fv-cam { from { transform: translateY(-40px); } to { transform: translateY(40px); } }
+@media (prefers-reduced-motion: reduce) { .fv-cam-line { animation: none; } }
+.fv-cam-box p { margin: 0; text-align: center; font-weight: 700; }
+.fv-pay-panel { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 14px; margin: 10px 0; border-radius: 18px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); }
+.fv-pay-panel.is-yape { border-color: #7b2fbe; background: color-mix(in srgb, #7b2fbe 8%, var(--erp-pane-strong)); }
+.fv-pay-panel.is-plin { border-color: #00b5c8; background: color-mix(in srgb, #00b5c8 8%, var(--erp-pane-strong)); }
+.fv-pay-panel img { width: 190px; height: 190px; object-fit: contain; border-radius: 14px; background: #fff; padding: 6px; }
+.fv-pay-panel p { margin: 0; line-height: 1.5; }
+.fv-pay-panel .fv-search, .fv-pay-panel .fv-check { width: 100%; text-align: left; }
+
+/* ── v3.12 · Caja con proceso, ficha de producto, avisos y comprobantes ── */
+.fv-steps { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0; margin: 0 0 14px; }
+.fv-steps li { display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 10px 12px; border-radius: 16px; border: 1px solid var(--erp-rim); background: var(--erp-pane); opacity: .7; }
+.fv-steps b { grid-row: span 2; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--erp-ink) 10%, transparent); font-weight: 800; }
+.fv-steps span { font-weight: 800; } .fv-steps small { color: var(--erp-muted); font-size: 12px; }
+.fv-steps li.is-now, .fv-steps li.is-next { opacity: 1; border-color: #c77417; }
+.fv-steps li.is-now b { background: #c77417; color: #fff; }
+.fv-steps li.is-done { opacity: 1; } .fv-steps li.is-done b { background: #0e8c74; color: #fff; }
+.fv-denoms { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 8px 0; }
+.fv-denoms label { display: grid; gap: 4px; padding: 8px 10px; border-radius: 14px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); }
+.fv-denoms label.is-bill { border-left: 4px solid #2f9e6e; } .fv-denoms label.is-coin { border-left: 4px solid #c9a227; }
+.fv-denoms span { font-weight: 800; font-size: 13px; } .fv-denoms input { width: 100%; font-size: 18px; font-weight: 700; }
+.fv-denoms small { color: var(--erp-muted); min-height: 1em; font-size: 12px; }
+.fv-denom-total { grid-column: 1 / -1; margin: 4px 0 0; font-size: 16px; }
+.fv-denom-wrap { flex-basis: 100%; }
+.fv-close-pro { display: grid; gap: 12px; }
+.fv-digital-check { border: 1px dashed var(--erp-rim); border-radius: 14px; padding: 10px 12px; display: grid; gap: 6px; }
+.fv-digital-check legend { font-weight: 800; font-size: 13px; padding: 0 4px; }
+.fv-report header, .fv-report-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fv-sign { margin-top: 18px; color: var(--erp-muted); font-size: 13px; }
+.fv-notice-preview { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px solid var(--erp-rim); }
+.fv-notice-preview b { font-size: 20px; }
+.fv-app-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: #fff; background: #4f6480; vertical-align: middle; }
+.fv-app-badge.a-yape { background: #7b2fbe; } .fv-app-badge.a-plin { background: #00a3b8; } .fv-app-badge.a-banco { background: #2f6fdc; }
+.fv-product-sheet { padding: 20px; display: grid; gap: 14px; max-width: 980px; }
+.fv-product-sheet header { display: flex; justify-content: space-between; align-items: center; }
+.fv-product-sheet fieldset { border: 1px solid var(--erp-rim); border-radius: 18px; padding: 14px; display: grid; gap: 10px; margin: 0; }
+.fv-product-sheet legend { font-weight: 800; padding: 0 6px; }
+.fv-input-row { display: flex; gap: 8px; align-items: center; } .fv-input-row input { flex: 1; min-width: 0; }
+.fv-margin-box { display: grid; gap: 4px; align-content: center; }
+.fv-search-all { margin: 10px 0; }
+@media (max-width: 760px) { .fv-steps { grid-template-columns: 1fr 1fr; } }
+@media print {
+  .fv-report, .fv-report * { visibility: visible !important; }
+  .fv-report { position: absolute; inset: 0; box-shadow: none; border: 0; background: #fff; color: #111; }
+  .fv-report .fv-actions { display: none; }
+}

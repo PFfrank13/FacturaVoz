@@ -26,6 +26,8 @@ const icons: Record<string, string> = {
   clientes360: "M12 21a9 9 0 1 1 9-9M12 12V3M12 12l6.4 6.4M15 21h6v-6",
   negocio: "M3 17l6-6 4 4 8-8M15 7h6v6",
   api: "M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16",
+  reponer: "M3 4h2l2.4 11.5a2 2 0 0 0 2 1.5h8.2a2 2 0 0 0 2-1.6L21 8H6.2M10 21h.01M18 21h.01M14 6V2m-2 2 2-2 2 2",
+  vencimientos: "M4 6h16v14H4zM4 10h16M8.5 3.5v4M15.5 3.5v4M9.5 14l5 4M14.5 14l-5 4",
   carta: "M6 3v8a2 2 0 0 0 4 0V3M8 11v10M16 3c-1.7 0-3 2-3 5s1.3 4 3 4v9",
   platos: "M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   placas: "M3 8h18v8H3zM6.5 12h2M10.5 12h3M15.5 12h2",
@@ -60,7 +62,7 @@ const icons: Record<string, string> = {
 /** Sections grouped the way a shopkeeper thinks about the day, each with its own color (same as the mobile menu). */
 const groups: { title: string; color: string; ids: string[] }[] = [
   { title: "Vender", color: "#0e8c74", ids: ["vender", "carta", "platos", "comprobantes", "cotizaciones", "cuaderno", "recurrentes", "tienda"] },
-  { title: "Mercadería", color: "#2f6fdc", ids: ["productos", "inventario", "compras", "sucursales"] },
+  { title: "Mercadería", color: "#2f6fdc", ids: ["productos", "inventario", "compras", "reponer", "vencimientos", "sucursales"] },
   { title: "Caja y cobros", color: "#c77417", ids: ["caja", "fiados", "cobranza", "cobros", "corte", "morosidad", "avisos", "credito", "conciliacion", "gastos", "escanear"] },
   { title: "Clientes y promociones", color: "#c2407e", ids: ["clientes", "clientes360", "promociones", "puntos", "encuestas"] },
   { title: "Servicios", color: "#0b8aa8", ids: ["trabajos", "agenda", "placas", "recordatorios", "paquetes", "historial", "margen_obra"] },

@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { escapeHtml, senderFor } from "@/lib/email";
 import { z } from "zod";
 import { workspaceContext } from "@/lib/erp/context";
 import { modules, moduleAllowed, can, hasFeature } from "@/lib/erp/access";
@@ -57,7 +59,12 @@ export async function createRecord(org: string, moduleId: string, _previous: For
 const uuid = z.uuid();
 const productEditSchema = z.object({
   name,
-  unit_price: z.coerce.number().min(0).max(10_000_000),
+  unit_price: z.coerce.number().min(0).max(10_000_000).optional(),
+  price_gross: z.coerce.number().min(0).max(12_000_000).optional(),
+  sku: z.string().trim().max(40).optional(), description: z.string().trim().max(400).optional(),
+  wholesale_gross: z.union([z.literal(""), z.coerce.number().min(0).max(12_000_000)]).optional(),
+  wholesale_min: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]).optional(),
+  in_store: z.enum(["on"]).optional(),
   category: z.string().trim().max(60),
   reorder_point: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]),
   unit_cost: z.union([z.literal(""), z.coerce.number().min(0).max(10_000_000)]).optional(),
@@ -80,9 +87,19 @@ export async function updateProduct(org: string, productId: string, _previous: F
   if ("error" in ctx) return { ok: false, message: ctx.error! };
   const parsed = productEditSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { ok: false, message: "Revisa el nombre, el precio y el stock mínimo." };
-  const { name: productName, unit_price, category, reorder_point, unit_cost, active, icbper } = parsed.data;
+  const { name: productName, category, reorder_point, unit_cost, active, icbper } = parsed.data;
+  // The web form sends the price WITH IGV (what the customer pays); the row keeps it without IGV for SUNAT.
+  const rate = Number(ctx.c.organization?.default_tax_rate ?? 18);
+  const toNet = (g: number) => Math.round((g / (1 + rate / 100)) * 100) / 100;
+  const unit_price = parsed.data.price_gross != null ? toNet(parsed.data.price_gross) : parsed.data.unit_price;
+  if (unit_price == null) return { ok: false, message: "Escribe el precio de venta." };
+  const w = parsed.data.wholesale_gross;
+  const extras = form.get("extras_shown") === "1" ? {
+    sku: parsed.data.sku || null, description: parsed.data.description || null, in_store: parsed.data.in_store === "on",
+    wholesale_price: w === "" || w == null ? null : toNet(w), wholesale_min_qty: w === "" || w == null ? null : (parsed.data.wholesale_min === "" ? null : parsed.data.wholesale_min ?? null),
+  } : {};
   const result = await ctx.c.db.from("products")
-    .update({ name: productName, unit_price, category: category || null, reorder_point: reorder_point === "" ? null : reorder_point, active: active === "on",
+    .update({ name: productName, unit_price, ...extras, category: category || null, reorder_point: reorder_point === "" ? null : reorder_point, active: active === "on",
       // Only touch the cost when the form sends it, so other editors never erase it.
       ...(unit_cost === undefined ? {} : { unit_cost: unit_cost === "" ? null : unit_cost }),
       // The bag checkbox is only rendered for unit products; its hidden marker says the form carried it.
@@ -1718,4 +1735,189 @@ export async function saveBooking(org: string, _previous: FormResult, form: Form
   if (error || !(data ?? []).length) return { ok: false, message: "No se pudo guardar. Crea primero tu dirección en Tienda en línea." };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: form.get("booking") === "on" ? "Reservas en línea activadas." : "Reservas en línea apagadas." };
+}
+
+// ── Avisos de Yape / Plin y libreta de fiados (same payment_notices / credit_ledger as the mobile app) ──
+const noticeSchema = z.object({ app: z.enum(["yape", "plin", "banco", "otro"]), amount: z.number().positive().max(10_000_000), payer: z.string().max(120), operation: z.string().max(40), raw: z.string().max(500) });
+
+/** Saves a pasted notice and, if an invoice is chosen, registers the payment on it (like «Registrar cobro» in the app). */
+export async function saveNotice(org: string, input: z.input<typeof noticeSchema>, invoiceId: string | null): Promise<FormResult> {
+  const parsed = noticeSchema.safeParse(input);
+  if (!parsed.success || (invoiceId && !uuid.safeParse(invoiceId).success)) return { ok: false, message: "El aviso no es válido." };
+  const ctx = await moduleContext(org, "avisos");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const d = parsed.data;
+  const { data: n, error } = await ctx.c.db.from("payment_notices").insert({ org_id: org, app: d.app, amount: Math.round(d.amount * 100) / 100, payer: d.payer.trim() || null,
+    operation_code: d.operation.trim() || null, raw_text: d.raw.trim() || null }).select("id").single();
+  if (error || !n) return { ok: false, message: /23505|duplicate/i.test(`${error?.code} ${error?.message}`) ? "Ese código de operación ya se registró antes." : "No se pudo guardar el aviso." };
+  if (invoiceId) {
+    const r = await applyNoticeTo(ctx.c, org, (n as { id: string }).id, invoiceId, d);
+    if (!r.ok) return r;
+  }
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: invoiceId ? "Cobro registrado con el aviso." : "Aviso guardado." };
+}
+
+async function applyNoticeTo(c: Awaited<ReturnType<typeof workspaceContext>>, org: string, noticeId: string, invoiceId: string, d: { app: string; amount: number; payer: string; operation: string }): Promise<FormResult> {
+  const { data: inv } = await c.db.from("invoices").select("id,amt_total,payments(amount)").eq("org_id", org).eq("id", invoiceId).maybeSingle();
+  const i = inv as { amt_total: number | string | null; payments: { amount: number | string }[] | null } | null;
+  if (!i) return { ok: false, message: "No encontramos ese comprobante." };
+  const balance = Math.round((Number(i.amt_total ?? 0) - (i.payments ?? []).reduce((s, p) => s + Number(p.amount), 0)) * 100) / 100;
+  if (balance <= 0.004) return { ok: false, message: "Ese comprobante ya está pagado." };
+  const { data: pay, error } = await c.db.from("payments").insert({ org_id: org, invoice_id: invoiceId, user_id: c.user.id, amount: Math.min(balance, Math.round(d.amount * 100) / 100), paid_on: limaDate(new Date()),
+    method: d.app === "banco" ? "transferencia" : d.app, note: [d.payer, d.operation ? `op. ${d.operation}` : ""].filter(Boolean).join(" · ").slice(0, 200) || null }).select("id").single();
+  if (error || !pay) return { ok: false, message: dbMessage(error?.message, "No se pudo registrar el cobro.") };
+  await c.db.from("payment_notices").update({ status: "aplicado", invoice_id: invoiceId, payment_id: (pay as { id: string }).id }).eq("org_id", org).eq("id", noticeId);
+  return { ok: true, message: "Cobro registrado." };
+}
+
+export async function resolveNotice(org: string, noticeId: string, invoiceId: string | null): Promise<FormResult> {
+  if (!uuid.safeParse(noticeId).success || (invoiceId && !uuid.safeParse(invoiceId).success)) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "avisos");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!invoiceId) {
+    const { error } = await ctx.c.db.from("payment_notices").update({ status: "descartado" }).eq("org_id", org).eq("id", noticeId);
+    if (error) return { ok: false, message: "No se pudo descartar." };
+  } else {
+    const { data } = await ctx.c.db.from("payment_notices").select("app,amount,payer,operation_code,status").eq("org_id", org).eq("id", noticeId).maybeSingle();
+    const n = data as { app: string; amount: number | string; payer: string | null; operation_code: string | null; status: string } | null;
+    if (!n || n.status === "aplicado") return { ok: false, message: "Ese aviso ya fue usado." };
+    const r = await applyNoticeTo(ctx.c, org, noticeId, invoiceId, { app: n.app, amount: Number(n.amount), payer: n.payer ?? "", operation: n.operation_code ?? "" });
+    if (!r.ok) return r;
+  }
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: invoiceId ? "Cobro registrado con el aviso." : "Aviso descartado." };
+}
+
+const fiadoSchema = z.object({
+  client_id: z.union([z.literal(""), uuid]).optional(), new_name: optional(120), new_phone: optional(20),
+  kind: z.enum(["cargo", "abono"]), amount: z.string().max(20), method: z.union([z.literal(""), z.enum(["efectivo", "yape", "plin", "transferencia", "tarjeta", "otro"])]).optional(),
+  description: optional(200), due_date: z.union([z.literal(""), z.iso.date()]).optional(),
+});
+
+/** «Anotar fiado» / «Registrar abono» from the Libreta (new client in the same step if needed). */
+export async function fiadoMove(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "fiados");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = fiadoSchema.safeParse(Object.fromEntries(form));
+  const amount = parsed.success ? parseAmount(parsed.data.amount) : null;
+  if (!parsed.success || amount == null || amount <= 0) return { ok: false, message: "Elige al cliente e indica un importe mayor que cero." };
+  const d = parsed.data;
+  let clientId = d.client_id || null;
+  if (!clientId) {
+    if (!d.new_name || d.new_name.trim().length < 2) return { ok: false, message: "Elige al cliente o escribe el nombre del nuevo." };
+    const phone = (d.new_phone ?? "").replace(/\D/g, "");
+    const { data: cl, error } = await ctx.c.db.from("clients").insert({ org_id: org, user_id: ctx.c.user.id, name: d.new_name.trim(), phone: phone || null }).select("id").single();
+    if (error || !cl) return { ok: false, message: dbMessage(error?.message, "No se pudo crear el cliente.") };
+    clientId = (cl as { id: string }).id;
+  }
+  const { error } = await ctx.c.db.from("credit_ledger").insert({ org_id: org, client_id: clientId, user_id: ctx.c.user.id, kind: d.kind, amount: Math.round(amount * 100) / 100,
+    method: d.kind === "abono" ? d.method || "efectivo" : null, description: d.description || null, due_date: d.kind === "cargo" && d.due_date ? d.due_date : null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo registrar. Revisa tus permisos.") };
+  let warn = "";
+  if (d.kind === "cargo") {
+    const { data: bal } = await ctx.c.db.rpc("credit_balances", { p_org: org });
+    const b = ((bal ?? []) as { client_id: string; balance: number | string; credit_limit: number | string | null }[]).find(x => x.client_id === clientId);
+    if (b?.credit_limit != null && Number(b.credit_limit) > 0 && Number(b.balance) > Number(b.credit_limit)) warn = ` Ojo: ya debe ${Number(b.balance).toFixed(2)} y su límite es ${Number(b.credit_limit).toFixed(2)}.`;
+  }
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: (d.kind === "abono" ? "Abono registrado: el saldo ya bajó (también en el móvil)." : "Fiado anotado en la libreta.") + warn };
+}
+
+// ── Ficha de producto completa (same products row and product_barcodes as the mobile app) ──
+const fullProductSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  unit: z.enum(["NIU", "KGM", "ZZ"]),
+  price_gross: z.string().max(20),
+  unit_cost: z.string().max(20).optional(),
+  category: optional(60), sku: optional(40), barcode: z.string().trim().regex(/^[0-9A-Za-z-]{0,40}$/).optional(), description: optional(400),
+  wholesale_gross: z.string().max(20).optional(), wholesale_min: z.string().max(12).optional(),
+  track: z.string().optional(), stock: z.string().max(14).optional(), reorder_point: z.string().max(14).optional(),
+  icbper: z.string().optional(), in_store: z.string().optional(), featured: z.string().optional(),
+});
+
+/** «Nuevo producto»: the price is typed WITH IGV (what the customer pays) and stored without IGV for SUNAT. */
+export async function createProduct(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "productos");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!can(ctx.c.access, "products_edit")) return { ok: false, message: "No tienes permiso para crear productos." };
+  const parsed = fullProductSchema.safeParse(Object.fromEntries(form));
+  const gross = parsed.success ? parseAmount(parsed.data.price_gross) : null;
+  if (!parsed.success || gross == null || gross < 0) return { ok: false, message: "Escribe el nombre y el precio de venta." };
+  const d = parsed.data;
+  const rate = Number(ctx.c.organization.default_tax_rate ?? 18);
+  const net = (g: number) => Math.round((g / (1 + rate / 100)) * 100) / 100;
+  const cost = d.unit_cost ? parseAmount(d.unit_cost) : null;
+  const wGross = d.wholesale_gross ? parseAmount(d.wholesale_gross) : null, wMin = d.wholesale_min ? parseAmount(d.wholesale_min) : null;
+  if (wGross != null && (wMin == null || wMin <= 0)) return { ok: false, message: "Indica desde cuántas unidades rige el precio por mayor." };
+  const track = d.track === "on" && d.unit !== "ZZ";
+  const stock = track ? parseAmount(d.stock || "0") ?? 0 : null, reorder = track && d.reorder_point ? parseAmount(d.reorder_point) : null;
+  const barcode = d.barcode?.trim() || null;
+  if (barcode) {
+    const [{ data: a }, { data: b }] = await Promise.all([
+      ctx.c.db.from("products").select("name").eq("org_id", org).eq("barcode", barcode).limit(1),
+      ctx.c.db.from("product_barcodes").select("product_id").eq("org_id", org).eq("code", barcode).limit(1),
+    ]);
+    if ((a ?? []).length || (b ?? []).length) return { ok: false, message: `El código ${barcode} ya pertenece a otro producto${(a ?? [])[0] ? ` (${(a as { name: string }[])[0].name})` : ""}.` };
+  }
+  const { data, error } = await ctx.c.db.from("products").insert({
+    org_id: org, user_id: ctx.c.user.id, name: d.name, unit: d.unit, unit_price: net(gross), unit_cost: cost, active: true,
+    category: d.category || null, sku: d.sku || null, barcode, description: d.description || null,
+    wholesale_price: wGross != null ? net(wGross) : null, wholesale_min_qty: wGross != null ? wMin : null,
+    stock, reorder_point: reorder, icbper: d.unit === "NIU" && d.icbper === "on", in_store: d.in_store === "on", featured: d.featured === "on",
+  }).select("id").single();
+  if (error || !data) return { ok: false, message: dbMessage(error?.message, "No se pudo crear el producto. Revisa que no exista ya.") };
+  const photo = await uploadImage(ctx.c.db, org, "productos", form.get("photo"));
+  if (photo && photo !== "bad") await ctx.c.db.from("products").update({ image_path: photo }).eq("org_id", org).eq("id", (data as { id: string }).id);
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: `«${d.name}» creado: ya se vende en la web y en el móvil a ${gross.toFixed(2)}${rate > 0 ? " con IGV" : ""}.${photo === "bad" ? " La foto no se subió (usa JPG, PNG o WEBP de hasta 2 MB)." : ""}` };
+}
+
+/**
+ * Sends one receipt or a customer's receipt history by e-mail: each one with its private link (PDF, XML and CDR, same
+ * `invoice_portal_link` the mobile app shares). The owner gets a blind copy; replies go to the owner.
+ */
+export async function emailReceipts(org: string, to: string, invoiceIds: string[]): Promise<FormResult> {
+  const ids = [...new Set(invoiceIds)].filter(i => uuid.safeParse(i).success).slice(0, 60);
+  const dest = String(to ?? "").trim().toLowerCase();
+  if (!ids.length) return { ok: false, message: "Elige al menos un comprobante." };
+  if (!z.email().safeParse(dest).success) return { ok: false, message: "Revisa el correo del cliente." };
+  const c = await workspaceContext(org);
+  const entry = modules.find(m => m.id === "comprobantes")!;
+  if (!moduleAllowed(entry, c.license, c.access, c.sector)) return { ok: false, message: "Tus permisos han cambiado. Actualiza la página." };
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { ok: false, message: "El envío por correo no está configurado en el servidor." };
+  const { data: allowed } = await c.db.rpc("consume_api_quota", { p_per_minute: 5, p_per_day: 100 });
+  if (allowed !== true) return { ok: false, message: "Demasiados envíos seguidos. Espera un minuto." };
+  const { data: invs } = await c.db.from("invoices").select("id,number,issue_date,currency,amt_total,doc_kind,fiscal:fiscal_documents(series,correlative)").eq("org_id", org).in("id", ids).order("issue_date", { ascending: false });
+  type I = { id: string; number: string; issue_date: string; currency: string; amt_total: number | string | null; doc_kind: string | null; fiscal: unknown };
+  const list = (invs ?? []) as I[];
+  if (!list.length) return { ok: false, message: "No encontramos esos comprobantes." };
+  const hdrs = await headers();
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.APP_URL ?? `https://${hdrs.get("host") ?? "factura-voz-two.vercel.app"}`).replace(/\/$/, "");
+  const rows: string[] = [];
+  for (const i of list) {
+    const link = await c.db.rpc("invoice_portal_link", { p_invoice: i.id });
+    const f = (Array.isArray(i.fiscal) ? i.fiscal[0] : i.fiscal) as { series: string; correlative: number } | null;
+    const num = f ? `${f.series}-${String(f.correlative).padStart(8, "0")}` : i.number;
+    const kind = i.doc_kind === "factura" ? "Factura" : i.doc_kind === "nota_credito" ? "Nota de crédito" : "Boleta";
+    const url = typeof link.data === "string" && /^[A-Za-z0-9_-]{20,80}$/.test(link.data) ? `${site}/comprobante/${link.data}` : null;
+    rows.push(`<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(kind)} ${escapeHtml(num)}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(i.issue_date.split("-").reverse().join("/"))}</td>`
+      + `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">${escapeHtml(i.currency === "USD" ? "US$" : "S/")} ${Number(i.amt_total ?? 0).toFixed(2)}</td>`
+      + `<td style="padding:8px;border-bottom:1px solid #e5e7eb">${url ? `<a href="${escapeHtml(url)}">Ver y descargar</a>` : ""}</td></tr>`);
+  }
+  const business = c.organization.name ?? "";
+  const owner = c.user.email && z.email().safeParse(c.user.email).success ? c.user.email : "";
+  const subject = list.length === 1 ? `Tu comprobante de ${business}` : `Tus ${list.length} comprobantes de ${business}`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#111827;max-width:640px"><p>Hola,</p><p>${escapeHtml(business)} te envía ${list.length === 1 ? "tu comprobante electrónico" : `el historial de tus ${list.length} comprobantes electrónicos`}. Con cada enlace puedes verlo, imprimirlo o descargar el PDF, el XML y la constancia de SUNAT (CDR).</p>`
+    + `<table style="border-collapse:collapse;width:100%;font-size:14px"><thead><tr><th align="left" style="padding:8px">Comprobante</th><th align="left" style="padding:8px">Fecha</th><th align="right" style="padding:8px">Total</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`
+    + `<p style="color:#6b7280;font-size:12px">Si tienes dudas, responde este correo y le llegará a ${escapeHtml(business)}.</p></div>`;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({ from: senderFor(business), to: [dest], ...(owner ? { reply_to: owner } : {}), ...(owner && owner.toLowerCase() !== dest ? { bcc: [owner] } : {}), subject, html }),
+    });
+    if (!res.ok) return { ok: false, message: "El servicio de correo no aceptó el envío. Inténtalo en unos minutos." };
+  } catch { return { ok: false, message: "No se pudo enviar el correo. Revisa tu conexión." }; }
+  return { ok: true, message: list.length === 1 ? `Comprobante enviado a ${dest}.` : `${list.length} comprobantes enviados a ${dest}.` };
 }

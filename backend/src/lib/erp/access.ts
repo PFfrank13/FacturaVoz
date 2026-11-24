@@ -40,6 +40,8 @@ export const modules: readonly Module[] = [
   { id: "cotizaciones", title: "Cotizaciones", feature: "cotizaciones", permission: "sell", table: "quotes", columns: "id,number,issue_date,status,currency", fields: [["number", "Número"], ["issue_date", "Fecha"], ["status", "Estado"], ["currency", "Moneda"]], order: "created_at" },
   { id: "caja", title: "Caja y cierre", feature: "caja", permission: "collect", sectors: ["bodega", "restaurante", "mayorista", "salon", "taller"] },
   { id: "compras", title: "Compras", feature: "stock", permission: "products_edit", sectors: ["bodega", "restaurante", "taller", "mayorista", "construccion"] },
+  { id: "vencimientos", title: "Vencimientos y mermas", feature: "stock", sectors: ["bodega", "restaurante", "mayorista"] },
+  { id: "reponer", title: "Reposición inteligente", feature: "stock", sectors: ["bodega", "restaurante", "taller", "mayorista", "construccion"] },
   { id: "promociones", title: "Precios y promociones", feature: "precios", permission: "products_edit" },
   { id: "puntos", title: "Puntos de clientes", feature: "fidelizacion", permission: "sell" },
   { id: "cobros", title: "Cobros", feature: "cobros", permission: "collect", table: "payments", columns: "id,amount,paid_on,method,note", fields: [["amount", "Importe registrado"], ["paid_on", "Fecha"], ["method", "Medio"], ["note", "Nota"]], order: "paid_on" },

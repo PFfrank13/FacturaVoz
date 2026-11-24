@@ -5,6 +5,7 @@ import { modules, moduleAllowed, featureLimit, can, hasFeature, visibleModules }
 import DataTable from "@/components/erp/DataTable";
 import CreateRecord from "@/components/erp/CreateRecord";
 import ProductBoard, { type ProductRow } from "@/components/erp/ProductBoard";
+import NewProductForm from "@/components/erp/ProductForm";
 import { ExpiryOverview } from "@/components/erp/LotsAndLosses";
 import InventoryCount from "@/components/erp/InventoryCount";
 import BulkPrices from "@/components/erp/BulkPrices";
@@ -43,10 +44,11 @@ import { renderExtra } from "./extra";
 import { renderExtra2 } from "./extra2";
 import { renderExtra3 } from "./extra3";
 import { renderExtra4 } from "./extra4";
+import { renderExtra5 } from "./extra5";
 import { money } from "@/lib/schemas";
 import { BrandingForm, BusinessForm, CancelInvite, InviteForm, MemberEditor, PaySettingsForm, SunatForm } from "@/components/erp/SettingsBoards";
 
-export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string; seg?: string; job?: string; q?: string; cliente?: string; dias?: string; mesas?: string }> }) {
+export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string; seg?: string; pagina?: string; buscar?: string; job?: string; q?: string; cliente?: string; dias?: string; mesas?: string }> }) {
   const { org, module: id } = await params;
   const c = await workspaceContext(org);
   const m = modules.find(m => m.id === id);
@@ -60,6 +62,8 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   if (extra3) return extra3;
   const extra4 = await renderExtra4(id, c, org, title, await searchParams);
   if (extra4) return extra4;
+  const extra5 = await renderExtra5(id, c, org, title, await searchParams);
+  if (extra5) return extra5;
   if (id === "reportes") {
     const search = await searchParams;
     const today = limaDate(new Date());
@@ -196,7 +200,15 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       .select("id,number,issue_date,status,currency,doc_kind,amt_total,voided_at,client:clients(name,tax_id),fiscal:fiscal_documents(doc_type,series,correlative,status,sunat_code,sunat_message,issued_at)")
       .eq("org_id", org);
     if (range) query = query.gte("issue_date", range.from).lte("issue_date", range.to);
-    const result = await query.order("issue_date", { ascending: false }).order("created_at", { ascending: false }).limit(300);
+    // Whole history: 300 per page, and the search runs on the server over every receipt (number, client, DNI/RUC).
+    const pageNo = Math.min(1000, Math.max(1, Number(search.pagina) || 1));
+    const buscar = (search.buscar ?? "").replace(/[%,()*]/g, " ").trim().slice(0, 60);
+    if (buscar) {
+      const cl = await c.db.from("clients").select("id").eq("org_id", org).or(`name.ilike.%${buscar}%,tax_id.ilike.%${buscar}%`).limit(200);
+      const ids = ((cl.data ?? []) as { id: string }[]).map(x => x.id);
+      query = query.or([`number.ilike.%${buscar}%`, ids.length ? `client_id.in.(${ids.join(",")})` : ""].filter(Boolean).join(","));
+    }
+    const result = await query.order("issue_date", { ascending: false }).order("created_at", { ascending: false }).range((pageNo - 1) * 300, pageNo * 300 - 1);
     const receipts: ReceiptRow[] = ((result.data ?? []) as unknown as (Omit<ReceiptRow, "client" | "fiscal"> & { client: unknown; fiscal: unknown })[]).map(r => ({
       ...r,
       client: (Array.isArray(r.client) ? r.client[0] : r.client) as ReceiptRow["client"] ?? null,
@@ -205,7 +217,7 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">FACTURACIÓN / {c.organization.name}</p><LiveRefresh org={org} tables={liveReceipts} /></div><h1>Comprobantes</h1><p>Boletas, facturas y notas emitidas en el móvil o aquí, con su estado en SUNAT, XML, CDR y versión imprimible.</p></section>
       <NewInvoice key={org} org={org} currency={c.organization.currency || "PEN"} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} notebookAllowed={hasFeature(c.license, "cuaderno_ia") && can(c.access, "sell")} />
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los comprobantes</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
-        : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} range={range} capped={receipts.length >= 300} />}
+        : <ReceiptsBoard org={org} rows={receipts} currency={c.organization.currency || "PEN"} range={range} capped={receipts.length >= 300} page={pageNo} search={buscar} />}
     </>;
   }
   if (id === "compras") {
@@ -324,6 +336,9 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       finance ? c.db.rpc("shift_report", { p_org: org, p_from: day, p_to: day }) : Promise.resolve({ data: null, error: null }),
       c.db.from("cash_shifts").select("opened_at,opening_float").eq("org_id", org).eq("user_id", c.user.id).is("closed_at", null).maybeSingle(),
     ]);
+    const history = finance ? await c.db.from("day_closings").select("day,counted_cash,expected_cash,difference,note").eq("org_id", org).order("day", { ascending: false }).limit(31) : { data: [] };
+    type Hist = { day: string; counted_cash: number | string; expected_cash: number | string; difference: number | string | null; note: string | null };
+    const hist = ((history.data ?? []) as Hist[]).map(h => ({ ...h, diff: Math.round((Number(h.counted_cash) - Number(h.expected_cash)) * 100) / 100 }));
     const num = (v: unknown) => (v == null ? null : Number(v));
     const shifts: ShiftRow[] | null = finance && !shiftRes.error ? ((shiftRes.data ?? []) as Record<string, unknown>[]).map(r => ({
       id: String(r.id), name: String(r.name ?? "Sin nombre"), opened_at: String(r.opened_at), closed_at: (r.closed_at as string | null) ?? null,
@@ -338,8 +353,12 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
       {summary.error || !summary.data ? <div className="fv-empty" role="alert"><h2>No pudimos cargar la caja</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
         : <CashBoard org={org} day={day} today={today} summary={summary.data as DaySummary}
             moves={cashMoves} cashiers={cashiers}
-            closing={(closing.data ?? null) as DayClosing | null} showExpected={finance} />}
+            closing={(closing.data ?? null) as DayClosing | null} showExpected={finance} business={c.organization.name ?? ""} />}
       {!summary.error && summary.data && !mineRes.error && <ShiftPanel org={org} mine={mine} shifts={shifts} currency={c.organization.currency || "PEN"} isToday={day === today} />}
+      {hist.length > 0 && <section className="fv-create fv-cash-card"><h3>Últimos cierres</h3>
+        <p className="fv-muted">En {hist.length} cierres: faltó {money(hist.filter(h => h.diff < -0.01).reduce((a, h) => a - h.diff, 0), c.organization.currency || "PEN")} y sobró {money(hist.filter(h => h.diff > 0.01).reduce((a, h) => a + h.diff, 0), c.organization.currency || "PEN")}. {hist.filter(h => Math.abs(h.diff) <= 0.01).length} cuadraron exacto.</p>
+        <ul className="fv-lines">{hist.map(h => <li key={h.day}><span><Link className="fv-link" href={`?dia=${h.day}`}>{h.day.slice(8, 10)}/{h.day.slice(5, 7)}</Link> · contado {money(Number(h.counted_cash), c.organization.currency || "PEN")}{h.note ? ` · ${h.note}` : ""}</span>
+          <span className={`fv-pill ${Math.abs(h.diff) <= 0.01 ? "is-ok" : "is-bad"}`}>{Math.abs(h.diff) <= 0.01 ? "Cuadró" : `${h.diff > 0 ? "Sobró" : "Faltó"} ${money(Math.abs(h.diff), c.organization.currency || "PEN")}`}</span></li>)}</ul></section>}
     </>;
   }
   if (id === "clientes") {
@@ -357,8 +376,8 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   }
   if (id === "productos" || id === "inventario") {
     // One catalog, shared with the mobile POS: same rows, photos and permissions.
-    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path,icbper")
-      .eq("org_id", org).order("name", { ascending: true }).order("id").limit(500);
+    const result = await c.db.from("products").select("id,name,unit_price,unit,active,category,stock,reorder_point,unit_cost,image_path,icbper,sku,barcode,description,wholesale_price,wholesale_min_qty,in_store")
+      .eq("org_id", org).order("name", { ascending: true }).order("id").limit(3000);
     const rows = (result.data ?? []) as Omit<ProductRow, "photo_url">[];
     const paths = rows.map(r => r.image_path).filter((p): p is string => !!p);
     const signed = paths.length ? await c.db.storage.from("org-media").createSignedUrls(paths, 3600) : { data: [] };
@@ -386,14 +405,14 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     });
     const salesTotal = sales.data ? Number((sales.data as { sales_total?: number | string }).sales_total ?? 0) : null;
     return <><section className="fv-heading"><div className="fv-heading-row"><p className="fv-eyebrow">{inventory ? "EXISTENCIAS" : "CATÁLOGO"} / {c.organization.name}</p><LiveRefresh org={org} tables={inventory ? liveInventory : liveProducts} /></div><h1>{title}</h1><p>{inventory ? "Stock, fechas de vencimiento y mermas con su motivo. Es el mismo inventario que vende el móvil." : "El mismo catálogo que vende el móvil. Lo que cambies aquí aparece allá al instante, y al revés."}</p></section>
-      {can(c.access, "products_edit") && id === "productos" && <CreateRecord org={org} moduleId={id} />}
+      {can(c.access, "products_edit") && <div className="fv-actions-row"><NewProductForm org={org} taxRate={Number(c.organization.default_tax_rate ?? 18)} categories={[...new Set(rows.map(r => r.category).filter((x): x is string => !!x))].sort()} /></div>}
       {can(c.access, "products_edit") && id === "productos" && <div className="fv-actions-row"><BulkPrices org={org} currency={c.organization.currency || "PEN"} taxRate={Number(c.organization.default_tax_rate ?? 18)}
         products={products.filter(p => p.active && p.unit !== "ZZ").map(p => ({ id: p.id, name: p.name, category: p.category, unit_price: Number(p.unit_price), unit_cost: p.unit_cost == null ? null : Number(p.unit_cost) }))} /></div>}
       {inventory && can(c.access, "products_edit") && <div className="fv-actions-row"><InventoryCount org={org} currency={c.organization.currency || "PEN"}
         products={products.filter(p => p.active && p.stock != null).map(p => ({ id: p.id, name: p.name, category: p.category, stock: Number(p.stock), unit: p.unit, unit_cost: p.unit_cost == null ? null : Number(p.unit_cost) }))} /></div>}
       {inventory && !lotRes.error && <ExpiryOverview org={org} lots={lots} losses={losses} currency={c.organization.currency || "PEN"} salesTotal={salesTotal} canEdit={can(c.access, "products_edit")} />}
       {result.error ? <div className="fv-empty" role="alert"><h2>No pudimos cargar los productos</h2><p>Pulsa Actualizar para reintentar. No se han modificado tus datos.</p></div>
-        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} canKardex={c.access.is_admin === true} canLots={inventory} />}
+        : <ProductBoard org={org} rows={products} currency={c.organization.currency || "PEN"} canEdit={can(c.access, "products_edit")} canKardex={c.access.is_admin === true} canLots={inventory} taxRate={Number(c.organization.default_tax_rate ?? 18)} />}
     </>;
   }
   const rawPage = Number((await searchParams).page ?? 1);
