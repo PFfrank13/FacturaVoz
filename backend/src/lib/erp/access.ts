@@ -28,7 +28,7 @@ export type Sector = keyof typeof sectors;
 export function sectorFor(value: string): Sector | null { return Object.hasOwn(sectors, value) ? value as Sector : null; }
 export type Module = { id: string; title: string; feature?: string; permission?: string; sectors?: readonly Sector[]; table?: string; columns?: string; fields?: readonly [string, string][]; order?: string };
 const jobSectors: Sector[] = ["servicios_tecnicos", "taller", "construccion"];
-const appointmentSectors: Sector[] = ["servicios_tecnicos", "salon", "consultorio", "taller", "educacion"];
+const appointmentSectors: Sector[] = ["servicios_tecnicos", "salon", "consultorio", "taller", "educacion", "restaurante"];
 export const modules: readonly Module[] = [
   { id: "vender", title: "Venta rápida", feature: "facturar", permission: "sell" },
   { id: "comprobantes", title: "Comprobantes", feature: "facturar", permission: "sell", table: "invoices", columns: "id,number,issue_date,status,currency", fields: [["number", "Número"], ["issue_date", "Fecha"], ["status", "Estado"], ["currency", "Moneda"]], order: "created_at" },
@@ -70,6 +70,15 @@ export const modules: readonly Module[] = [
   { id: "plan", title: "Mi plan", permission: "license" },
   { id: "configuracion", title: "Configuración", permission: "settings" },
   { id: "api", title: "API y webhooks", feature: "api_publica", permission: "team" },
+  { id: "carta", title: "Cocina y mesas", feature: "carta_qr", permission: "sell", sectors: ["restaurante"] },
+  { id: "platos", title: "Cuentas y costo por plato", feature: "carta_qr", sectors: ["restaurante"] },
+  { id: "placas", title: "Buscar por placa", feature: "trabajos", permission: "jobs", sectors: ["taller"] },
+  { id: "recordatorios", title: "Les toca volver", feature: "agenda", sectors: ["salon", "consultorio", "taller"] },
+  { id: "paquetes", title: "Paquetes y sesiones", feature: "agenda", sectors: ["salon", "consultorio", "educacion"] },
+  { id: "historial", title: "Historial privado", feature: "agenda", permission: "clients", sectors: ["consultorio"] },
+  { id: "corte", title: "Mensualidades y corte", feature: "recurrentes", permission: "collect", sectors: ["servicios_tecnicos"] },
+  { id: "morosidad", title: "Pensiones pendientes", feature: "recurrentes", permission: "collect", sectors: ["educacion"] },
+  { id: "margen_obra", title: "Margen por obra", feature: "trabajos", permission: "finance", sectors: ["construccion"] },
 ];
 export function moduleAllowed(m: Module, l: License, a: Access, sector: Sector | null): boolean {
   if (m.permission && !can(a, m.permission)) return false;

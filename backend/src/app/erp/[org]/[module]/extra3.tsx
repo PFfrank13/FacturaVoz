@@ -27,7 +27,7 @@ const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** Receivables with balance, client and last reminder (same rule as the mobile listReceivables). */
-async function loadReceivables(c: Ctx, org: string) {
+export async function loadReceivables(c: Ctx, org: string) {
   const res = await c.db.from("invoices")
     .select("id,number,issue_date,due_date,status,currency,doc_kind,voided_at,amt_total,client_id,client:clients(name,phone,email),fiscal:fiscal_documents(status),payments(amount)")
     .eq("org_id", org).eq("status", "sent").order("due_date", { ascending: true, nullsFirst: false }).limit(1000);

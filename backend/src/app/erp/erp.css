@@ -842,3 +842,54 @@
 .fv-role.r-vendedor { background: #2f6fdc; } .fv-role.r-finanzas { background: #c2407e; } .fv-role.r-tecnico { background: #c77417; }
 .fv-member-form { padding: 10px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px dashed var(--erp-rim); }
 @media (max-width: 640px) { .fv-three { grid-template-columns: 1fr; } }
+
+/* ── v3.11 · Módulos de otros rubros ── */
+.fv-stack { display: grid; gap: 16px; align-content: start; }
+.fv-status-select { padding: 8px 10px; border-radius: 12px; border: 1px solid var(--erp-rim); background: var(--erp-pane-strong); color: var(--erp-ink); font-weight: 700; }
+.fv-kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; margin: 14px 0; }
+.fv-kanban > section { display: grid; align-content: start; gap: 8px; padding: 12px; border-radius: 20px; background: var(--erp-pane); border: 1px solid var(--erp-rim); border-top: 4px solid var(--k, #8a8cab); min-height: 140px; }
+.fv-kanban h3 { display: flex; justify-content: space-between; font-size: 14px; margin: 0; }
+.fv-kanban h3 span { min-width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; color: #fff; background: var(--k, #8a8cab); font-size: 12px; }
+.fv-kanban ul, .fv-kanban-done { list-style: none; display: grid; gap: 8px; padding: 0; margin: 0; }
+.fv-kanban-done { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 10px; }
+.fv-kanban li a, .fv-kanban-done li a { display: grid; gap: 3px; padding: 11px 12px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px solid var(--erp-rim); color: inherit; text-decoration: none; box-shadow: var(--erp-shadow); }
+.fv-kanban li a:hover, .fv-kanban-done li a:hover { border-color: var(--erp-accent); }
+.fv-kanban small, .fv-kanban-done small { color: var(--erp-muted); }
+.fv-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.fv-gallery figure { margin: 0; display: grid; gap: 4px; }
+.fv-gallery img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; border: 1px solid var(--erp-rim); }
+.fv-gallery figcaption { font-size: 12px; color: var(--erp-muted); }
+.fv-agenda { display: grid; gap: 14px; margin: 14px 0; }
+.fv-agenda h3 { text-transform: capitalize; font-size: 15px; margin: 0 0 6px; }
+.fv-agenda ul { list-style: none; display: grid; gap: 8px; padding: 0; margin: 0; }
+.fv-agenda li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--erp-pane-strong); border: 1px solid var(--erp-rim); border-left: 4px solid var(--k, #8a8cab); }
+.fv-agenda li > b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.fv-agenda li > span:nth-child(2) { display: grid; gap: 2px; min-width: 0; } .fv-agenda small { color: var(--erp-muted); }
+.fv-plate { display: inline-block; padding: 4px 10px; border-radius: 8px; border: 2px solid var(--erp-ink); font-family: inherit; letter-spacing: .12em; font-size: 18px; background: #fff; color: #111827; width: fit-content; }
+.fv-span { grid-column: 1 / -1; }
+.fv-note { padding: 12px 14px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px solid var(--erp-rim); }
+.fv-note p { margin: 6px 0; white-space: pre-wrap; } .fv-note small { color: var(--erp-muted); }
+.fv-warn { color: #c77417; }
+.fv-kitchen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.fv-kitchen-col { display: grid; gap: 10px; align-content: start; padding: 12px; border-radius: 20px; background: var(--erp-pane); border: 1px solid var(--erp-rim); }
+.fv-kitchen-col h3 { margin: 0; font-size: 15px; }
+.fv-kitchen-col.k-nuevo { border-top: 4px solid #e0457b; } .fv-kitchen-col.k-preparando { border-top: 4px solid #c77417; } .fv-kitchen-col.k-listo { border-top: 4px solid #0e8c74; }
+.fv-ticket { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); }
+.fv-ticket header { display: grid; gap: 2px; } .fv-ticket header small { color: var(--erp-muted); }
+.fv-ticket ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.fv-ticket li small { display: block; color: #c77417; padding-left: 18px; }
+.fv-tables { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 0; margin-top: 12px; }
+.fv-tables li { display: grid; gap: 4px; padding: 16px; border-radius: 18px; background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #5b3a06; border: 1px solid #f0c27a; }
+.fv-take-order { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 12px; margin-top: 12px; }
+.fv-take-order .fv-lines li > span:first-child { display: grid; gap: 4px; flex: 1; }
+.fv-take-order .fv-lines input { width: 100%; }
+.fv-qr-tables { margin-top: 16px; }
+.fv-qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-top: 12px; }
+.fv-qr-grid figure { margin: 0; display: grid; justify-items: center; gap: 6px; padding: 12px; border-radius: 16px; background: #fff; color: #111827; border: 1px dashed #9aa6b6; break-inside: avoid; }
+.fv-qr-grid svg { width: 150px; height: 150px; } .fv-qr-grid figcaption { display: grid; text-align: center; }
+@media (max-width: 860px) { .fv-kitchen, .fv-take-order { grid-template-columns: 1fr; } .fv-agenda li { grid-template-columns: 56px 1fr; } .fv-agenda li > .fv-actions { grid-column: 1 / -1; } }
+@media print {
+  body * { visibility: hidden !important; }
+  .fv-qr-grid, .fv-qr-grid * { visibility: visible !important; }
+  .fv-qr-grid { position: absolute; inset: 0; grid-template-columns: repeat(3, 1fr); }
+}

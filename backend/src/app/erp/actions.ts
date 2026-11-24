@@ -10,6 +10,7 @@ import { parseAmount } from "@/lib/erp/cash";
 import { expenseCategories } from "@/lib/erp/expenses";
 import { nextRun } from "@/lib/erp/bank";
 import { limaDate } from "@/lib/erp/receipts";
+import { limaLocalToIso } from "@/lib/erp/rubros";
 import { couponProblemAt, priceCart, type PosCoupon, type PosPromo, type Wholesale } from "@/lib/erp/pos";
 import { purchaseProblem, toCents, type PurchaseLine } from "@/lib/erp/purchases";
 import { mergeKardex, type KardexEntry } from "@/lib/erp/kardex";
@@ -1410,4 +1411,311 @@ export async function setWebhook(org: string, id: string, action: "on" | "off" |
   if (error) return { ok: false, message: "No se pudo cambiar." };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: action === "delete" ? "Webhook eliminado." : action === "on" ? "Activado." : "Pausado." };
+}
+
+// ── Módulos de otros rubros (same tables, RPCs and RLS as the mobile app) ──
+/** First of the given modules the plan and role allow (jobs live in «Trabajos» and «Agenda»). */
+async function anyModule(org: string, ids: string[]) {
+  const c = await workspaceContext(org);
+  const ok = ids.some(id => { const e = modules.find(m => m.id === id); return !!e && moduleAllowed(e, c.license, c.access, c.sector); });
+  return ok ? { c, error: "" } as const : { c: null, error: "Tus permisos han cambiado. Actualiza la página." } as const;
+}
+const jobModules = ["trabajos", "agenda", "margen_obra", "placas"];
+
+const fullJobSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  client_id: z.union([z.literal(""), uuid]).optional(),
+  kind: z.enum(["visita", "instalacion", "servicio", "reparacion", "cita", "obra", "pedido", "clase", "otro"]),
+  status: z.string().trim().regex(/^[a-z_]{2,30}$/),
+  assigned_to: z.union([z.literal(""), uuid]).optional(),
+  scheduled_at: z.string().max(20).optional(),
+  duration_min: z.string().max(5).optional(),
+  address: optional(250), contact_phone: optional(20), notes: optional(2000), tech_note: optional(2000), amount: z.string().max(20).optional(),
+});
+
+/** Create or update a job / appointment (same `jobs` row as the mobile app; done_at is set by the database). */
+export async function saveJob(org: string, id: string | null, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (id && !uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = fullJobSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Escribe al menos el título." };
+  const d = parsed.data;
+  const at = d.scheduled_at ? limaLocalToIso(d.scheduled_at) : null;
+  if (d.scheduled_at && !at) return { ok: false, message: "Revisa la fecha y hora." };
+  const dur = d.duration_min ? Number(d.duration_min) : null;
+  const amount = d.amount ? parseAmount(d.amount) : null;
+  const row = { title: d.title, client_id: d.client_id || null, kind: d.kind, status: d.status, assigned_to: d.assigned_to || null, scheduled_at: at,
+    duration_min: dur && Number.isInteger(dur) && dur > 0 && dur <= 1440 ? dur : null, address: d.address || null, contact_phone: d.contact_phone || null,
+    notes: d.notes || null, tech_note: d.tech_note || null, amount: amount != null && amount >= 0 ? Math.round(amount * 100) / 100 : null };
+  const q = id ? ctx.c.db.from("jobs").update(row).eq("org_id", org).eq("id", id).select("id") : ctx.c.db.from("jobs").insert({ ...row, org_id: org }).select("id");
+  const { data, error } = await q;
+  if (error || !(data ?? []).length) return { ok: false, message: dbMessage(error?.message, "No se pudo guardar. Revisa tus permisos.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: id ? "Cambios guardados." : d.kind === "cita" ? "Cita agendada." : "Trabajo creado." };
+}
+
+export async function setJobStatus(org: string, id: string, status: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success || !/^[a-z_]{2,30}$/.test(status)) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("jobs").update({ status }).eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo cambiar el estado.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "" };
+}
+
+export async function deleteJob(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("jobs").delete().eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo borrar.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Borrado." };
+}
+
+const materialSchema = z.object({ product_id: z.union([z.literal(""), uuid]).optional(), description: optional(200), quantity: z.string().max(12), unit_price: z.string().max(20).optional() });
+export async function addJobMaterial(org: string, jobId: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(jobId).success) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = materialSchema.safeParse(Object.fromEntries(form));
+  const qty = parsed.success ? parseAmount(parsed.data.quantity) : null;
+  if (!parsed.success || qty == null || qty <= 0) return { ok: false, message: "Indica la cantidad." };
+  let description = parsed.data.description ?? "", price = parsed.data.unit_price ? parseAmount(parsed.data.unit_price) ?? 0 : 0;
+  if (parsed.data.product_id) {
+    const { data: p } = await ctx.c.db.from("products").select("name,unit_price").eq("org_id", org).eq("id", parsed.data.product_id).maybeSingle();
+    if (!p) return { ok: false, message: "Ese producto ya no existe." };
+    description = description || (p as { name: string }).name; if (!parsed.data.unit_price) price = Number((p as { unit_price: number | string }).unit_price);
+  }
+  if (!description.trim()) return { ok: false, message: "Elige un producto o escribe el material." };
+  const { error } = await ctx.c.db.from("job_materials").insert({ job_id: jobId, org_id: org, product_id: parsed.data.product_id || null, description: description.trim(), quantity: Math.round(qty * 100) / 100, unit_price: Math.round(price * 100) / 100 });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo agregar el material.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Material agregado." };
+}
+
+export async function jobAction(org: string, kind: "material_del" | "consume" | "milestone_del" | "milestone_invoice", id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const db = ctx.c.db;
+  if (kind === "material_del") { const { error } = await db.from("job_materials").delete().eq("org_id", org).eq("id", id); if (error) return { ok: false, message: "No se pudo quitar." }; }
+  else if (kind === "milestone_del") { const { error } = await db.from("job_milestones").delete().eq("org_id", org).eq("id", id); if (error) return { ok: false, message: "No se pudo quitar el hito." }; }
+  else if (kind === "consume") {
+    const { data, error } = await db.rpc("job_consume_materials", { p_job: id });
+    if (error) return { ok: false, message: dbMessage(error.message, "No se pudo descontar del inventario.") };
+    revalidatePath(`/erp/${org}`, "layout");
+    const n = Number(data ?? 0);
+    return { ok: true, message: n ? `${n} ${n === 1 ? "material descontado" : "materiales descontados"} del inventario.` : "No había materiales por descontar." };
+  } else {
+    if (!can(ctx.c.access, "sell")) return { ok: false, message: "Tu rol no permite facturar." };
+    const { error } = await db.rpc("milestone_invoice", { p_milestone: id });
+    if (error) return { ok: false, message: dbMessage(error.message, "No se pudo facturar el hito.") };
+    revalidatePath(`/erp/${org}`, "layout");
+    return { ok: true, message: "Hito facturado: el borrador está en Comprobantes." };
+  }
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Listo." };
+}
+
+export async function addMilestone(org: string, jobId: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(jobId).success) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const title = String(form.get("title") ?? "").trim().slice(0, 160), amount = parseAmount(String(form.get("amount") ?? "")), due = String(form.get("due_date") ?? "");
+  if (!title || amount == null || amount <= 0) return { ok: false, message: "Escribe el hito y su monto." };
+  const { error } = await ctx.c.db.from("job_milestones").insert({ job_id: jobId, org_id: org, title, amount: Math.round(amount * 100) / 100, due_date: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : null, position: Number(form.get("position") ?? 0) || 0 });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo agregar el hito.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Hito agregado." };
+}
+
+export async function addJobPhoto(org: string, jobId: string, clientId: string | null, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(jobId).success || (clientId && !uuid.safeParse(clientId).success)) return { ok: false, message: "No válido." };
+  const ctx = await anyModule(org, jobModules);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const path = await uploadImage(ctx.c.db, org, "trabajos", form.get("photo"));
+  if (!path) return { ok: false, message: "Elige una foto." };
+  if (path === "bad") return { ok: false, message: "La foto debe ser JPG, PNG o WEBP de hasta 2 MB." };
+  const kind = String(form.get("kind") ?? "foto");
+  const { error } = await ctx.c.db.from("media_files").insert({ org_id: org, job_id: jobId, client_id: clientId, path, kind: ["antes", "despues", "foto"].includes(kind) ? kind : "foto", caption: String(form.get("caption") ?? "").trim().slice(0, 200) || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar la foto.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Foto guardada." };
+}
+
+// Paquetes y sesiones
+export async function addPackage(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "paquetes");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = z.object({ client_id: uuid, name: z.string().trim().min(1).max(120), sessions: z.coerce.number().int().min(1).max(500), price: z.string().max(20).optional(), expires_on: z.union([z.literal(""), z.iso.date()]).optional() }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Elige el cliente, el nombre del paquete y cuántas sesiones." };
+  const d = parsed.data, price = d.price ? parseAmount(d.price) : null;
+  const { error } = await ctx.c.db.from("service_packages").insert({ org_id: org, client_id: d.client_id, name: d.name, sessions_total: d.sessions, price, expires_on: d.expires_on || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar el paquete.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Paquete guardado." };
+}
+export async function spendPackageSession(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "paquetes");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { data, error } = await ctx.c.db.rpc("use_package_session", { p_package: id });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo descontar la sesión.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  const left = Number(data ?? 0);
+  return { ok: true, message: left ? `Sesión usada. Le quedan ${left}.` : "Sesión usada. Ya no le quedan sesiones." };
+}
+
+// Les toca volver
+export async function addServiceReminder(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "recordatorios");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = z.object({ client_id: uuid, title: z.string().trim().min(1).max(120), days: z.coerce.number().int().min(1).max(730), note: optional(300) }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { ok: false, message: "Elige el cliente, qué le toca y en cuántos días." };
+  const d = parsed.data;
+  const due = new Date(`${limaDate(new Date())}T12:00:00Z`); due.setUTCDate(due.getUTCDate() + d.days);
+  const { error } = await ctx.c.db.from("service_reminders").insert({ org_id: org, client_id: d.client_id, due_on: due.toISOString().slice(0, 10), title: d.title, note: d.note || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar el recordatorio.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Recordatorio guardado." };
+}
+export async function doneServiceReminder(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "recordatorios");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("service_reminders").update({ done_at: new Date().toISOString() }).eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: "No se pudo marcar." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Hecho." };
+}
+
+/** Merges keys into clients.extra (cut-off / pension notices, service state, health consent). */
+async function mergeClientExtra(db: Awaited<ReturnType<typeof workspaceContext>>["db"], org: string, clientId: string, patch: Record<string, unknown>, drop: string[] = []) {
+  const { data } = await db.from("clients").select("extra").eq("org_id", org).eq("id", clientId).maybeSingle();
+  if (!data) return "No encontramos ese cliente.";
+  const extra = { ...(((data as { extra: Record<string, unknown> | null }).extra) ?? {}), ...patch };
+  for (const k of drop) delete extra[k];
+  const { error } = await db.from("clients").update({ extra }).eq("org_id", org).eq("id", clientId);
+  return error ? "No se pudo guardar." : null;
+}
+
+// Historial privado (consultorio)
+export async function recordConsent(org: string, clientId: string): Promise<FormResult> {
+  if (!uuid.safeParse(clientId).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "historial");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const err = await mergeClientExtra(ctx.c.db, org, clientId, { consentimiento_salud: limaDate(new Date()) });
+  if (err) return { ok: false, message: err };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Consentimiento registrado." };
+}
+export async function addPrivateNote(org: string, clientId: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(clientId).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "historial");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const body = String(form.get("body") ?? "").trim();
+  if (!body || body.length > 5000) return { ok: false, message: "Escribe la nota (máximo 5000 caracteres)." };
+  const { error } = await ctx.c.db.from("private_notes").insert({ org_id: org, client_id: clientId, body });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar la nota.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Nota guardada." };
+}
+export async function deletePrivateNote(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "historial");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("private_notes").delete().eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: "No se pudo borrar." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Nota borrada." };
+}
+
+// Placas (taller)
+export async function registerVehicle(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "placas");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = z.object({ client_id: uuid, plate: z.string().max(12), name: optional(80), model: optional(80) }).safeParse(Object.fromEntries(form));
+  const plate = parsed.success ? parsed.data.plate.toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
+  if (!parsed.success || plate.length < 5) return { ok: false, message: "Elige el cliente y escribe la placa (mínimo 5 caracteres)." };
+  const { error } = await ctx.c.db.from("client_assets").insert({ org_id: org, client_id: parsed.data.client_id, name: parsed.data.name || "Vehículo", model: parsed.data.model || null, serial: plate });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo registrar el vehículo.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: `Vehículo ${plate} registrado.` };
+}
+
+// Mensualidades y corte / pensiones pendientes
+export async function clientNotice(org: string, moduleId: "corte" | "morosidad", clientId: string, action: "aviso" | "cortado" | "activo"): Promise<FormResult> {
+  if (!uuid.safeParse(clientId).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, moduleId);
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const today = limaDate(new Date());
+  if (action === "cortado") {
+    const { data } = await ctx.c.db.from("clients").select("extra").eq("org_id", org).eq("id", clientId).maybeSingle();
+    const a = (data as { extra: Record<string, unknown> | null } | null)?.extra?.aviso_corte_fecha;
+    if (typeof a !== "string" || a.slice(0, 10) >= today) return { ok: false, message: "Primero envía el aviso previo; el corte se habilita desde el día siguiente." };
+  }
+  const err = action === "aviso"
+    ? await mergeClientExtra(ctx.c.db, org, clientId, { [moduleId === "corte" ? "aviso_corte_fecha" : "aviso_pension_fecha"]: today })
+    : await mergeClientExtra(ctx.c.db, org, clientId, { servicio: action, servicio_fecha: today }, action === "activo" ? ["aviso_corte_fecha"] : []);
+  if (err) return { ok: false, message: err };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: action === "aviso" ? "Aviso registrado." : action === "cortado" ? "Registrado: servicio cortado." : "Registrado: servicio reconectado." };
+}
+
+// Margen por obra
+export async function setExpenseJob(org: string, expenseId: string, jobId: string | null): Promise<FormResult> {
+  if (!uuid.safeParse(expenseId).success || (jobId && !uuid.safeParse(jobId).success)) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "margen_obra");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("expenses").update({ job_id: jobId }).eq("org_id", org).eq("id", expenseId);
+  if (error) return { ok: false, message: "No se pudo asignar el gasto." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: jobId ? "Gasto asignado a la obra." : "Gasto quitado de la obra." };
+}
+
+// Cocina y mesas (restaurante)
+export async function setKitchenStatus(org: string, id: string, status: "preparando" | "listo" | "entregado"): Promise<FormResult> {
+  if (!uuid.safeParse(id).success || !["preparando", "listo", "entregado"].includes(status)) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "carta");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("quotes").update({ kitchen_status: status }).eq("org_id", org).eq("id", id);
+  if (error) return { ok: false, message: "No se pudo cambiar." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "" };
+}
+
+const kitchenSchema = z.object({ request_id: uuid, table: z.string().trim().max(12), items: z.array(z.object({ product_id: uuid, quantity: z.number().positive().max(1000), note: z.string().trim().max(200).optional() })).min(1).max(50) });
+export async function createKitchenOrder(org: string, input: z.input<typeof kitchenSchema>): Promise<FormResult & { number?: string }> {
+  const parsed = kitchenSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Agrega al menos un plato." };
+  const ctx = await moduleContext(org, "carta");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const d = parsed.data;
+  const { data: prods } = await ctx.c.db.from("products").select("id,name,unit_price").eq("org_id", org).in("id", [...new Set(d.items.map(i => i.product_id))]);
+  const byId = new Map(((prods ?? []) as { id: string; name: string; unit_price: number | string }[]).map(p => [p.id, p] as const));
+  if (d.items.some(i => !byId.has(i.product_id))) return { ok: false, message: "Un plato ya no está disponible." };
+  const { data, error } = await ctx.c.db.rpc("create_pos_kitchen_order", {
+    p_org: org, p_request_id: d.request_id, p_table: d.table || null, p_tax_rate: Number(ctx.c.organization.default_tax_rate ?? 18), p_currency: ctx.c.organization.currency || "PEN",
+    p_items: d.items.map(i => { const p = byId.get(i.product_id)!; return { description: p.name, quantity: i.quantity, unit_price: Number(p.unit_price), note: i.note || null, product_id: p.id }; }),
+  });
+  const row = Array.isArray(data) ? data[0] as { quote_id: string; quote_number: string } | undefined : undefined;
+  if (error || !row?.quote_id) return { ok: false, message: dbMessage(error?.message, "No se pudo enviar el pedido a cocina.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: `Pedido ${row.quote_number} enviado a cocina.`, number: row.quote_number };
+}
+
+/** «Reservas en línea» settings on org_store (same fields the public /reservar page reads). */
+export async function saveBooking(org: string, _previous: FormResult, form: FormData): Promise<FormResult> {
+  const ctx = await moduleContext(org, "agenda");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!can(ctx.c.access, "settings")) return { ok: false, message: "Solo el dueño o un administrador cambia las reservas." };
+  const services = [...new Set(String(form.get("services") ?? "").split(/\r?\n/).map(s => s.trim().slice(0, 80)).filter(Boolean))].slice(0, 30);
+  const hours = String(form.get("hours") ?? "").trim().slice(0, 200);
+  const { data, error } = await ctx.c.db.from("org_store").update({ booking: form.get("booking") === "on", booking_services: services, booking_hours: hours || null, updated_at: new Date().toISOString() }).eq("org_id", org).select("org_id");
+  if (error || !(data ?? []).length) return { ok: false, message: "No se pudo guardar. Crea primero tu dirección en Tienda en línea." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: form.get("booking") === "on" ? "Reservas en línea activadas." : "Reservas en línea apagadas." };
 }
