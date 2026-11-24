@@ -41,9 +41,10 @@ const liveInventory = ["products", "product_lots", "stock_losses"] as const;
 import NewInvoice from "@/components/NewInvoice";
 import { renderExtra } from "./extra";
 import { renderExtra2 } from "./extra2";
+import { renderExtra3 } from "./extra3";
 import { money } from "@/lib/schemas";
 
-export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string }> }) {
+export default async function ModulePage({ params, searchParams }: { params: Promise<{ org: string; module: string }>; searchParams: Promise<{ page?: string; from?: string; to?: string; dia?: string; desde?: string; hasta?: string; mes?: string; seg?: string }> }) {
   const { org, module: id } = await params;
   const c = await workspaceContext(org);
   const m = modules.find(m => m.id === id);
@@ -53,6 +54,8 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
   if (extra) return extra;
   const extra2 = await renderExtra2(id, c, org, title, (await searchParams).mes);
   if (extra2) return extra2;
+  const extra3 = await renderExtra3(id, c, org, title, await searchParams);
+  if (extra3) return extra3;
   if (id === "reportes") {
     const search = await searchParams;
     const today = limaDate(new Date());

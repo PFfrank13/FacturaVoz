@@ -2,13 +2,14 @@ import type React from "react";
 import Link from "next/link";
 import type { workspaceContext } from "@/lib/erp/context";
 import { can, hasFeature } from "@/lib/erp/access";
-import { money } from "@/lib/schemas";
+import { money, totals } from "@/lib/schemas";
 import { limaDate } from "@/lib/erp/receipts";
 import { estimateTaxes, type Regime } from "@/lib/taxes";
 import { suggestMatches, type Receivable } from "@/lib/erp/bank";
 import NewInvoice from "@/components/NewInvoice";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import ImportCenter, { UndoImport } from "@/components/erp/ImportCenter";
+import QuotesBoard, { type QuoteRow } from "@/components/erp/QuotesBoard";
 import { BankImport, BankMatch, InStoreToggle, RecurringActions, RecurringForm, RecurringRun, RegimePicker, StoreForm, SurveyToggle } from "@/components/erp/GrowthBoards";
 
 type Ctx = Awaited<ReturnType<typeof workspaceContext>>;
@@ -22,6 +23,7 @@ const tone = (t: string) => ({ "--tone": t }) as React.CSSProperties;
 const liveRec = ["recurring_invoices"] as const;
 const liveBank = ["bank_lines", "payments"] as const;
 const liveSurveys = ["surveys"] as const;
+const liveQuotes = ["quotes"] as const;
 
 /** Web modules added in v3.9 (same tables and rules as the mobile app). Returns null for any other module. */
 export async function renderExtra2(id: string, c: Ctx, org: string, title: string, mes?: string) {
@@ -209,6 +211,23 @@ export async function renderExtra2(id: string, c: Ctx, org: string, title: strin
     return <>{heading(`DATOS / ${name}`, title, "Trae tus comprobantes antiguos, clientes y productos desde SUNAT, Excel o tu sistema anterior. Lo importado desde un libro de Excel se puede deshacer.", org)}
       <ImportCenter org={org} taxRate={Number(c.organization.default_tax_rate ?? 18)} />
       {rows.length > 0 && <section className="fv-create" style={{ padding: 18 }}><h3>Importaciones anteriores</h3><ul className="fv-lines fv-import-history">{rows.map(r => r.el)}</ul></section>}
+    </>;
+  }
+
+  if (id === "cotizaciones") {
+    const res = await c.db.from("quotes").select("id,number,status,issue_date,valid_until,currency,tax_rate,public_token,invoice_id,responder_name,response_note,responded_at,source,contact_phone,client:clients(name),items:quote_items(quantity,unit_price)")
+      .eq("org_id", org).order("created_at", { ascending: false }).limit(300);
+    type Raw = { id: string; number: string; status: string; issue_date: string; valid_until: string | null; currency: string; tax_rate: number | string; public_token: string | null; invoice_id: string | null;
+      responder_name: string | null; response_note: string | null; responded_at: string | null; source: string | null; contact_phone: string | null; client: { name: string } | { name: string }[] | null; items: { quantity: number | string; unit_price: number | string }[] | null };
+    const rows: QuoteRow[] = ((res.data ?? []) as unknown as Raw[]).map(q => {
+      const cl = Array.isArray(q.client) ? q.client[0] : q.client;
+      const items = (q.items ?? []).map(i => ({ description: "x", quantity: Number(i.quantity), unit_price: Number(i.unit_price) }));
+      return { id: q.id, number: q.number, status: q.status, issue_date: q.issue_date, valid_until: q.valid_until, currency: q.currency || cur, total: totals(items, Number(q.tax_rate ?? 0)).total,
+        client: cl?.name ?? "", token: q.public_token, invoice_id: q.invoice_id, responder: q.responder_name, response_note: q.response_note, responded_at: q.responded_at, from_store: q.source === "store", contact_phone: q.contact_phone };
+    });
+    return <>{heading(`VENDER / ${name}`, title, "Cotiza en segundos, mándale el enlace a tu cliente y entérate al instante si la acepta. Con un clic la conviertes en venta.", org, liveQuotes)}
+      <NewInvoice key={`q-${org}`} org={org} currency={cur} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} mode="quote" />
+      {res.error ? failed("las cotizaciones") : <QuotesBoard org={org} rows={rows} today={today} canSell={can(c.access, "sell")} />}
     </>;
   }
 

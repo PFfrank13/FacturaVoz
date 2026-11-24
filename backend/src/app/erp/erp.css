@@ -739,3 +739,75 @@
 .fv-pos-coupon-form { display: flex; gap: 8px; }
 .fv-pos-coupon-form input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .06em; }
 .fv-pos-sums .is-saving { color: #0e8c74; font-weight: 700; }
+
+/* ── v3.10 · Cotizaciones ── */
+.fv-quotes { list-style: none; display: grid; gap: 12px; padding: 0; }
+.fv-quote { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: start; padding: 16px 18px; border-radius: 20px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); }
+.fv-quote-main { display: grid; gap: 4px; min-width: 0; }
+.fv-quote-main small { color: var(--erp-muted); }
+.fv-quote-main .fv-pill { margin-left: 6px; }
+.fv-quote-total { font-size: 20px; font-variant-numeric: tabular-nums; }
+.fv-quote > .fv-actions, .fv-quote > p { grid-column: 1 / -1; }
+.fv-quote .fv-actions { flex-wrap: wrap; gap: 8px; }
+.fv-inline-form { display: inline-flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+@media (max-width: 640px) { .fv-quote { grid-template-columns: 1fr; } }
+
+/* ── v3.10 · Cobranza, crédito, clientes 360 y ganancia real ── */
+.fv-collect, .fv-credit { list-style: none; display: grid; gap: 10px; padding: 0; }
+.fv-collect > li, .fv-credit > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; padding: 14px 16px; border-radius: 18px;
+  background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); }
+.fv-collect > li.is-late { border-left: 4px solid #e0457b; }
+.fv-collect > li > .fv-actions { grid-column: 1 / -1; flex-wrap: wrap; gap: 8px; }
+.fv-collect-main { display: grid; gap: 3px; min-width: 0; }
+.fv-collect-main small, .fv-credit small { color: var(--erp-muted); }
+.fv-collect-amount { text-align: right; display: grid; font-variant-numeric: tabular-nums; }
+.fv-collect-amount b { font-size: 19px; }
+.fv-collect-amount small { color: var(--erp-muted); }
+.fv-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-weight: 900; font-size: 12px; color: #fff; background: #8a97ab; vertical-align: middle; }
+.fv-grade.g-a { background: #0e8c74; } .fv-grade.g-b { background: #2f6fdc; } .fv-grade.g-c { background: #c77417; } .fv-grade.g-d { background: #e0457b; }
+.fv-seg { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: #fff; background: #8a97ab; margin-right: 4px; }
+.fv-seg.s-vip { background: linear-gradient(135deg, #ffd36e, #d99a1c); } .fv-seg.s-loyal { background: #0e8c74; } .fv-seg.s-atRisk { background: #c77417; }
+.fv-seg.s-lost { background: #e0457b; } .fv-seg.s-newcomer { background: #2f6fdc; }
+.fv-credit > li > div { display: grid; gap: 5px; min-width: 0; }
+.fv-credit > li.is-over { border-left: 4px solid #e0457b; } .fv-credit > li.is-near { border-left: 4px solid #c77417; }
+.fv-credit > li.is-over .fv-bar i { background: linear-gradient(90deg, #e0457b, #ff7aa5); } .fv-credit > li.is-near .fv-bar i { background: linear-gradient(90deg, #c77417, #ffb35c); }
+.fv-claims li { align-items: center; gap: 12px; flex-wrap: wrap; }
+.fv-claims li > span:first-child { display: grid; gap: 2px; }
+.fv-pay-form { padding: 10px; border-radius: 14px; background: var(--erp-pane-strong); border: 1px dashed var(--erp-rim); }
+.fv-pay-form .fv-ok, .fv-pay-form .fv-error { flex-basis: 100%; }
+.fv-month-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 520px; margin: 0 0 14px; }
+.fv-month-nav strong { font-size: 18px; text-transform: capitalize; }
+.fv-profit-hero { display: grid; gap: 4px; padding: 22px 24px; border-radius: 24px; color: #fff; background: linear-gradient(135deg, #0e8c74, #2fb59a 60%, #6fd3bd); box-shadow: 0 18px 40px -22px #0e8c74; }
+.fv-profit-hero.is-loss { background: linear-gradient(135deg, #b8325f, #e0457b 60%, #ff8db0); box-shadow: 0 18px 40px -22px #e0457b; }
+.fv-profit-hero span { font-weight: 700; opacity: .9; } .fv-profit-hero strong { font-size: clamp(30px, 5vw, 44px); letter-spacing: -.02em; font-variant-numeric: tabular-nums; } .fv-profit-hero small { opacity: .9; }
+.fv-up { color: #0e8c74; font-style: normal; font-weight: 700; } .fv-down { color: #e0457b; font-style: normal; font-weight: 700; }
+.fv-dual { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; align-items: end; height: 170px; margin-top: 8px; }
+.fv-dual > div { display: grid; grid-template-rows: 1fr auto; height: 100%; gap: 6px; text-align: center; }
+.fv-dual-bars { display: flex; gap: 4px; align-items: flex-end; justify-content: center; height: 100%; }
+.fv-dual-bars i { width: 40%; max-width: 22px; min-height: 2px; border-radius: 6px 6px 2px 2px; }
+.fv-dual i.is-sales, .fv-legend i.is-sales { background: linear-gradient(180deg, #3ee6b0, #0e8c74); }
+.fv-dual i.is-exp, .fv-legend i.is-exp { background: linear-gradient(180deg, #ffd36e, #c77417); }
+.fv-dual small { color: var(--erp-muted); text-transform: capitalize; }
+.fv-legend { display: flex; gap: 8px; align-items: center; color: var(--erp-muted); font-size: 13px; }
+.fv-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; }
+.fv-forecast { list-style: none; display: grid; gap: 6px; padding: 0; }
+.fv-forecast li { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 8px; padding: 9px 12px; border-radius: 12px; background: var(--erp-pane-strong); font-variant-numeric: tabular-nums; }
+.fv-forecast li.is-bad { background: color-mix(in srgb, #e0457b 12%, transparent); }
+.fv-forecast b { text-align: right; }
+@media (max-width: 640px) { .fv-collect > li, .fv-credit > li { grid-template-columns: 1fr; } .fv-collect-amount { text-align: left; } .fv-forecast li { grid-template-columns: 1fr 1fr; } }
+
+/* ── v3.10 · PIN del dueño y Tareas del Copiloto ── */
+.fv-pin-form { max-width: 620px; padding: 20px; }
+.fv-agent-ask { display: grid; gap: 12px; padding: 18px; }
+.fv-agent-ask textarea { width: 100%; resize: vertical; min-height: 64px; font: inherit; }
+.fv-agent-tasks { list-style: none; display: grid; gap: 12px; padding: 0; }
+.fv-agent-tasks > li { display: grid; gap: 8px; padding: 16px 18px; border-radius: 20px; background: linear-gradient(135deg, var(--erp-pane-strong), var(--erp-pane)); border: 1px solid var(--erp-rim); box-shadow: var(--erp-shadow); }
+.fv-agent-tasks header { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.fv-agent-tasks > li > small { color: var(--erp-muted); font-style: italic; }
+.fv-agent-step { border-top: 1px solid var(--erp-rim); padding-top: 10px; }
+.fv-agent-step h4 { margin: 0 0 6px; font-size: 14px; }
+.fv-agent-step ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.fv-agent-step .fv-lines { padding-left: 0; }
+.fv-agent-step .fv-lines li > span { display: grid; gap: 2px; min-width: 0; }
+.fv-agent-step .fv-lines small { color: var(--erp-muted); }

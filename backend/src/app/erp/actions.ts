@@ -849,6 +849,9 @@ const expenseSchema = z.object({
   total: z.string().max(20),
   supplier_name: optional(160),
   doc_number: optional(40),
+  supplier_tax_id: z.string().trim().regex(/^(\d{8}|\d{11})?$/).optional(),
+  tax: z.string().max(20).optional(),
+  source: z.enum(["manual", "scan"]).optional(),
 });
 
 /** A business expense, in the same table the mobile app uses. */
@@ -859,10 +862,13 @@ export async function addExpense(org: string, _previous: FormResult, form: FormD
   const total = parsed.success ? parseAmount(parsed.data.total) : null;
   if (!parsed.success || total == null || total <= 0) return { ok: false, message: "Indica la fecha y un importe mayor que cero." };
   const d = parsed.data;
+  // IGV of the purchase (fiscal credit), only when it was read from a factura or typed; never more than the total.
+  const rawTax = d.tax ? parseAmount(d.tax) : 0;
+  const tax = rawTax != null && rawTax > 0 && rawTax < total ? Math.round(rawTax * 100) / 100 : 0;
   const { error } = await ctx.c.db.from("expenses").insert({
     org_id: org, user_id: ctx.c.user.id, spent_on: d.spent_on, category: d.category in expenseCategories ? d.category : "otros",
-    description: d.description || "Gasto", total: Math.round(total * 100) / 100, tax: 0, currency: ctx.c.organization.currency || "PEN", source: "manual",
-    supplier_name: d.supplier_name || null, doc_number: d.doc_number || null,
+    description: d.description || "Gasto", total: Math.round(total * 100) / 100, tax, currency: ctx.c.organization.currency || "PEN", source: d.source ?? "manual",
+    supplier_name: d.supplier_name || null, doc_number: d.doc_number || null, ...(d.supplier_tax_id ? { supplier_tax_id: d.supplier_tax_id } : {}),
   });
   if (error) return { ok: false, message: "No se pudo guardar el gasto. Revisa tus permisos." };
   revalidatePath(`/erp/${org}`, "layout");
@@ -1067,4 +1073,140 @@ export async function undoImport(org: string, job: string): Promise<FormResult> 
   if (error) return { ok: false, message: dbMessage(error.message, "No se pudo deshacer la importación.") };
   revalidatePath(`/erp/${org}`, "layout");
   return { ok: true, message: "Importación deshecha: se quitó lo que había traído." };
+}
+
+// ── Cotizaciones (same create_quote / convert_quote as the mobile app) ──
+const quoteSchema = z.object({
+  client_name: z.string().trim().max(120),
+  client_tax_id: z.string().trim().max(15).optional(),
+  tax_rate: z.number().min(0).max(100),
+  notes: z.string().trim().max(500).optional(),
+  valid_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  items: z.array(z.object({ description: z.string().trim().min(1).max(200), quantity: z.number().positive().max(1_000_000), unit_price: z.number().min(0).max(10_000_000) })).min(1).max(50),
+});
+export type QuoteResult = { ok: true; id: string; number: string; token: string | null } | { ok: false; message: string };
+
+export async function createQuote(org: string, input: z.input<typeof quoteSchema>): Promise<QuoteResult> {
+  const parsed = quoteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Revisa los artículos: cada uno necesita descripción, cantidad y precio." };
+  const ctx = await moduleContext(org, "cotizaciones");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const d = parsed.data;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const { data, error } = await ctx.c.db.rpc("create_quote", {
+    p_org: org, p_client_name: d.client_name || "Cliente varios", p_client_tax_id: d.client_tax_id || null, p_tax_rate: r2(d.tax_rate),
+    p_currency: ctx.c.organization.currency || "PEN", p_notes: d.notes || null, p_transcript: null,
+    p_items: d.items.map(i => ({ description: i.description, quantity: r2(i.quantity), unit_price: r2(i.unit_price) })), p_valid_until: d.valid_until ?? null,
+  });
+  const row = Array.isArray(data) ? data[0] as { quote_id: string; quote_number?: string } | undefined : undefined;
+  if (error || !row?.quote_id) return { ok: false, message: dbMessage(error?.message, "No se pudo crear la cotización.") };
+  const { data: q } = await ctx.c.db.from("quotes").select("number,public_token").eq("id", row.quote_id).maybeSingle();
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, id: row.quote_id, number: (q as { number: string } | null)?.number ?? row.quote_number ?? "", token: (q as { public_token: string | null } | null)?.public_token ?? null };
+}
+
+export async function setQuoteStatus(org: string, id: string, status: "sent" | "accepted" | "rejected"): Promise<FormResult> {
+  if (!uuid.safeParse(id).success || !["sent", "accepted", "rejected"].includes(status)) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cotizaciones");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  let q = ctx.c.db.from("quotes").update({ status }).eq("org_id", org).eq("id", id);
+  if (status === "sent") q = q.eq("status", "draft");
+  const { error } = await q;
+  if (error) return { ok: false, message: "No se pudo cambiar el estado." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: status === "accepted" ? "Marcada como aceptada." : status === "rejected" ? "Marcada como rechazada." : "" };
+}
+
+export async function convertQuote(org: string, id: string, dueDate: string | null): Promise<FormResult & { invoice_id?: string }> {
+  if (!uuid.safeParse(id).success || (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate))) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cotizaciones");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!can(ctx.c.access, "sell")) return { ok: false, message: "Tu rol no permite facturar." };
+  const { data, error } = await ctx.c.db.rpc("convert_quote", { p_quote: id, p_due_date: dueDate || null });
+  if (error || !data) return { ok: false, message: dbMessage(error?.message, "No se pudo convertir la cotización.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Convertida en venta: el borrador ya está en Comprobantes, listo para emitir.", invoice_id: String(data) };
+}
+
+export async function deleteQuote(org: string, id: string): Promise<FormResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cotizaciones");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { data, error } = await ctx.c.db.from("quotes").delete().eq("org_id", org).eq("id", id).in("status", ["draft", "rejected"]).select("id");
+  if (error || !(data ?? []).length) return { ok: false, message: "Solo se borran cotizaciones en borrador o rechazadas." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "Cotización eliminada." };
+}
+
+// ── Cobranza y crédito (same tables and RPCs as the mobile «Cobranza» and «Crédito por cliente») ──
+/** Public pay link of an invoice (/pagar/<token>) for the WhatsApp reminder. */
+export async function payLink(org: string, invoiceId: string): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
+  if (!uuid.safeParse(invoiceId).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cobranza");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { data, error } = await ctx.c.db.rpc("invoice_pay_link", { p_invoice: invoiceId });
+  if (error || typeof data !== "string" || !/^[A-Za-z0-9_-]{16,120}$/.test(data)) return { ok: false, message: "No se pudo crear el enlace de pago." };
+  return { ok: true, path: `/pagar/${data}` };
+}
+
+export async function logReminder(org: string, invoiceId: string, stage: number): Promise<FormResult> {
+  if (!uuid.safeParse(invoiceId).success || !Number.isInteger(stage) || Math.abs(stage) > 3650) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cobranza");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  await ctx.c.db.from("reminder_log").upsert({ org_id: org, invoice_id: invoiceId, stage, channel: "whatsapp" }, { onConflict: "invoice_id,stage,channel", ignoreDuplicates: true });
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: "" };
+}
+
+/** «Ya pagué» reported by the customer: confirm (registers the payment) or reject. */
+export async function resolveClaim(org: string, claimId: string, accept: boolean): Promise<FormResult> {
+  if (!uuid.safeParse(claimId).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cobranza");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.rpc("resolve_payment_claim", { p_claim: claimId, p_accept: accept });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo resolver el aviso de pago.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: accept ? "Pago confirmado y registrado." : "Aviso rechazado." };
+}
+
+const paySchema = z.object({ amount: z.string().max(20), method: z.enum(["efectivo", "yape", "plin", "tarjeta", "transferencia"]), paid_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), note: optional(120) });
+/** A payment (or partial payment) against an invoice. */
+export async function registerPayment(org: string, invoiceId: string, balance: number, _previous: FormResult, form: FormData): Promise<FormResult> {
+  if (!uuid.safeParse(invoiceId).success) return { ok: false, message: "No válido." };
+  const ctx = await moduleContext(org, "cobranza");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const parsed = paySchema.safeParse(Object.fromEntries(form));
+  const amount = parsed.success ? parseAmount(parsed.data.amount) : null;
+  if (!parsed.success || amount == null || amount <= 0) return { ok: false, message: "Indica un importe mayor que cero." };
+  if (amount > balance + 0.009) return { ok: false, message: `El importe supera el saldo (${balance.toFixed(2)}).` };
+  if (parsed.data.paid_on > limaDate(new Date())) return { ok: false, message: "La fecha no puede ser futura." };
+  const { error } = await ctx.c.db.from("payments").insert({ org_id: org, invoice_id: invoiceId, user_id: ctx.c.user.id, amount: Math.round(amount * 100) / 100, paid_on: parsed.data.paid_on, method: parsed.data.method, note: parsed.data.note || null });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo registrar el cobro. Revisa tus permisos.") };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: amount >= balance - 0.009 ? "Cobro registrado: comprobante pagado." : "Abono registrado." };
+}
+
+export async function setCreditLimit(org: string, clientId: string, limit: number | null): Promise<FormResult> {
+  if (!uuid.safeParse(clientId).success || (limit != null && (!Number.isFinite(limit) || limit < 0 || limit > 100_000_000))) return { ok: false, message: "Límite no válido." };
+  const ctx = await moduleContext(org, "credito");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  const { error } = await ctx.c.db.from("clients").update({ credit_limit: limit && limit > 0 ? Math.round(limit * 100) / 100 : null }).eq("org_id", org).eq("id", clientId);
+  if (error) return { ok: false, message: "No se pudo guardar el límite." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: limit && limit > 0 ? "Límite guardado." : "Límite quitado." };
+}
+
+/** Owner PIN (asked to void or delete payments): same set_admin_pin with the current PIN as the mobile app. */
+export async function setOwnerPin(org: string, pin: string | null, current: string | null): Promise<FormResult> {
+  if (pin != null && !/^\d{4,8}$/.test(pin)) return { ok: false, message: "El PIN debe tener de 4 a 8 dígitos." };
+  if (current != null && !/^\d{4,8}$/.test(current)) return { ok: false, message: "El PIN actual no es correcto." };
+  const ctx = await moduleContext(org, "pin");
+  if (!ctx.c) return { ok: false, message: ctx.error };
+  if (!ctx.c.access.is_admin) return { ok: false, message: "Solo el dueño o un administrador." };
+  const { data, error } = await ctx.c.db.rpc("set_admin_pin", { p_org: org, p_pin: pin, p_current: current });
+  if (error) return { ok: false, message: dbMessage(error.message, "No se pudo guardar el PIN.") };
+  const r = (data ?? {}) as { ok?: boolean; error?: string };
+  if (!r.ok) return { ok: false, message: r.error ?? "No se pudo guardar el PIN." };
+  revalidatePath(`/erp/${org}`, "layout");
+  return { ok: true, message: pin ? "PIN del dueño guardado." : "PIN del dueño desactivado." };
 }
