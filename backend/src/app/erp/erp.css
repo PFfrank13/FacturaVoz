@@ -478,66 +478,6 @@
 @media (max-width: 1100px) { .fv-kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .fv-kpis-4 { grid-template-columns: 1fr; } }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Tema profesional (24/11/2026): fondo neutro, paneles sólidos, UN acento de marca y
-   color solo para estados (rojo = problema, ámbar = atención, verde = bien). Va al final para
-   imponerse sobre los estilos anteriores sin quitar ninguna función.
-   ───────────────────────────────────────────────────────────────────────────── */
-.fv-workspace {
-  --erp-bg: #f5f6f8; --erp-ink: #111827; --erp-muted: #5b6472; --erp-line: #e4e7ec;
-  --erp-pane: #ffffff; --erp-pane-strong: #ffffff; --erp-rim: #e4e7ec;
-  --erp-accent: #0b7a64; --erp-accent-ink: #ffffff; --erp-glow: rgba(11, 122, 100, .18);
-  --erp-a1: transparent; --erp-a2: transparent; --erp-a3: transparent; --erp-a4: transparent;
-  --erp-shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
-  --erp-ok: #0b7a64; --erp-warn: #b45309; --erp-bad: #b42318;
-}
-@media (prefers-color-scheme: dark) {
-  .fv-workspace {
-    --erp-bg: #0d1117; --erp-ink: #e6edf3; --erp-muted: #9aa4b2; --erp-line: #262c36;
-    --erp-pane: #161b22; --erp-pane-strong: #161b22; --erp-rim: #262c36;
-    --erp-accent: #34d399; --erp-accent-ink: #052e22; --erp-glow: rgba(52, 211, 153, .18);
-    --erp-shadow: 0 1px 2px rgba(0, 0, 0, .4);
-    --erp-ok: #34d399; --erp-warn: #f59e0b; --erp-bad: #f87171;
-  }
-}
-.fv-workspace::before { display: none; }
-.fv-rail, .fv-topbar, .fv-pulse > a, .fv-next, .fv-table-scroll, .fv-details, .fv-empty, .fv-product, .fv-sheet, .fv-create,
-.fv-board-tools, .fv-home-card, .fv-expiry, .fv-reorder-card, .fv-branches li {
-  background: var(--erp-pane) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
-  border: 1px solid var(--erp-rim) !important; box-shadow: var(--erp-shadow) !important;
-}
-/* KPIs: tarjetas blancas con una línea de acento, sin halos de colores. */
-.fv-kpis > div { --tone: var(--erp-accent) !important; background: var(--erp-pane) !important; border: 1px solid var(--erp-rim) !important; box-shadow: var(--erp-shadow) !important; }
-.fv-kpis > div::before { background: none !important; border-top: 3px solid var(--erp-accent); opacity: .9; }
-.fv-pulse > a { --tone: var(--erp-accent) !important; }
-.fv-pulse > a::before { background: none !important; }
-.fv-pulse > a:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16, 24, 40, .1) !important; }
-.fv-studio b { background: none !important; color: var(--erp-accent) !important; -webkit-background-clip: initial; background-clip: initial; }
-.fv-doc-badge, .fv-doc-badge.is-boleta, .fv-doc-badge.is-nota_credito { background: var(--erp-accent) !important; box-shadow: none !important; }
-.fv-doc-badge.is-nota_credito { background: var(--erp-warn) !important; }
-.fv-avatar { background: color-mix(in srgb, var(--erp-accent) 12%, var(--erp-pane)) !important; color: var(--erp-accent) !important; border-color: var(--erp-rim) !important; }
-.fv-shares i::after { background: var(--erp-accent) !important; }
-.fv-rhythm-bars span { background: color-mix(in srgb, var(--erp-accent) 22%, var(--erp-line)) !important; box-shadow: none !important; }
-.fv-rhythm-bars span.is-peak, .fv-rhythm-bars span.is-now { background: var(--erp-accent) !important; }
-.fv-ledger .is-in, .fv-top li:first-child::before, .fv-pay-day header span { color: var(--erp-ok) !important; }
-.fv-ledger .is-out, .fv-ledger .is-warn, .fv-branches .is-out { color: var(--erp-warn) !important; }
-.fv-todo li::before, .fv-lots li.is-semana::before { background: var(--erp-warn) !important; }
-.fv-todo li.is-bad::before, .fv-lots li.is-vencido::before { background: var(--erp-bad) !important; box-shadow: none !important; }
-.fv-lots li::before { background: color-mix(in srgb, var(--erp-accent) 60%, var(--erp-line)); }
-.fv-link:hover, .fv-mic .fv-button span { color: var(--erp-bad) !important; }
-.fv-rail nav a[aria-current="page"] { background: color-mix(in srgb, var(--erp-accent) 10%, var(--erp-pane)) !important; box-shadow: inset 3px 0 0 var(--erp-accent) !important; }
-.fv-rail nav a[aria-current="page"]::before { display: none; }
-.fv-rail nav a:hover { background: color-mix(in srgb, var(--erp-ink) 5%, transparent) !important; transform: none !important; }
-.fv-button { box-shadow: none !important; }
-.fv-button:hover { filter: brightness(1.06); transform: none !important; }
-.fv-pill.is-ok { color: var(--erp-ok) !important; background: color-mix(in srgb, var(--erp-ok) 10%, var(--erp-pane)) !important; }
-.fv-pill.is-wait { color: var(--erp-warn) !important; background: color-mix(in srgb, var(--erp-warn) 10%, var(--erp-pane)) !important; }
-.fv-pill.is-bad { color: var(--erp-bad) !important; background: color-mix(in srgb, var(--erp-bad) 10%, var(--erp-pane)) !important; }
-.fv-pill.is-off { color: var(--erp-muted) !important; background: color-mix(in srgb, var(--erp-ink) 5%, var(--erp-pane)) !important; }
-.fv-ok { color: var(--erp-ok) !important; } .fv-error { color: var(--erp-bad) !important; }
-.fv-heading h1 { letter-spacing: -.02em; }
-.fv-eyebrow { color: var(--erp-muted) !important; letter-spacing: .08em; }
-
 /* Conteo de inventario */
 .fv-actions-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-bottom: 14px; }
 .fv-count { max-width: 720px; }
@@ -547,10 +487,50 @@
 .fv-count-list li small { color: var(--erp-muted); }
 .fv-count-list input { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--erp-rim); background: var(--erp-pane); color: var(--erp-ink); font: inherit; text-align: right; font-variant-numeric: tabular-nums; }
 .fv-count-list input:focus { outline: none; border-color: var(--erp-accent); box-shadow: 0 0 0 3px var(--erp-glow); }
-.fv-count-list input.is-invalid { border-color: var(--erp-bad, #b42318); }
+.fv-count-list input.is-invalid { border-color: #ff6b6b; }
 .fv-count-list em { font-style: normal; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
-.fv-count-list em.is-out { color: var(--erp-bad, #b42318); } .fv-count-list em.is-in { color: var(--erp-ok, #0b7a64); }
+.fv-count-list em.is-out { color: #ff6b6b; } .fv-count-list em.is-in { color: #3ee6b0; }
 .fv-count-foot { display: grid; gap: 8px; }
 .fv-chips { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
 .fv-chip { border: 1px solid var(--erp-rim); background: var(--erp-pane); color: var(--erp-ink); border-radius: 99px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .fv-chip[aria-pressed="true"] { border-color: var(--erp-accent); color: var(--erp-accent); background: color-mix(in srgb, var(--erp-accent) 8%, var(--erp-pane)); }
+
+/* Carga de un módulo: respuesta inmediata al hacer clic */
+.fv-module-loading { display: grid; gap: 18px; padding-top: 8px; }
+.fv-module-loading-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.fv-module-loading-cards span { height: 96px; border-radius: 22px; background: linear-gradient(90deg, var(--erp-pane), var(--erp-pane-strong), var(--erp-pane)); background-size: 200% 100%; animation: fv-shimmer 1.2s linear infinite; border: 1px solid var(--erp-rim); }
+@keyframes fv-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .fv-module-loading-cards span { animation: none; } }
+@media (max-width: 720px) { .fv-module-loading-cards { grid-template-columns: 1fr; } }
+
+/* ── Pulido de diseño (misma paleta aurora y vidrio): menú con íconos y grupos, barra superior con persona ── */
+.fv-rail nav a { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.fv-rail-icon { width: 20px; height: 20px; flex: none; opacity: .78; transition: opacity .25s var(--erp-ease), transform .35s var(--erp-ease); }
+.fv-rail nav a:hover .fv-rail-icon { opacity: 1; transform: scale(1.08); }
+.fv-rail nav a[aria-current="page"] .fv-rail-icon { opacity: 1; color: var(--erp-accent); filter: drop-shadow(0 0 6px var(--erp-glow)); }
+.fv-rail nav a span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fv-rail-group { display: flex; flex-direction: column; gap: 3px; margin-top: 12px; }
+.fv-rail-title { font-size: 10.5px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--erp-muted); opacity: .75; padding: 4px 12px 2px; }
+.fv-user { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fv-user > b { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 14px; font-weight: 800; color: var(--erp-accent-ink);
+  background: linear-gradient(135deg, var(--erp-accent), color-mix(in srgb, var(--erp-accent) 55%, #3d8bff)); box-shadow: 0 6px 16px -8px var(--erp-glow); }
+.fv-user > span { display: grid; min-width: 0; line-height: 1.25; }
+.fv-user strong { color: var(--erp-ink); font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fv-user small { font-size: 12px; color: var(--erp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tipografía de títulos más firme y tarjetas que responden al cursor */
+.fv-heading h1 { font-size: clamp(30px, 3.4vw, 44px); font-weight: 800; letter-spacing: -1.4px; line-height: 1.08; }
+.fv-kpis > div { transition: transform .3s var(--erp-ease), box-shadow .3s var(--erp-ease); }
+.fv-kpis > div:hover { transform: translateY(-3px); box-shadow: var(--erp-shadow), 0 18px 36px -20px var(--tone); }
+.fv-kpis strong { letter-spacing: -1px; }
+.fv-button { transition: transform .2s var(--erp-ease), box-shadow .25s var(--erp-ease), filter .2s; }
+.fv-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 22px -12px var(--erp-glow); }
+.fv-button:active:not(:disabled) { transform: translateY(0) scale(.98); }
+.fv-button:focus-visible, .fv-rail nav a:focus-visible, .fv-link:focus-visible { outline: 2px solid var(--erp-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .fv-kpis > div, .fv-button, .fv-rail-icon { transition: none; } .fv-kpis > div:hover, .fv-button:hover { transform: none; } }
+@media (max-width: 720px) {
+  .fv-rail-group { flex-direction: row; margin-top: 0; }
+  .fv-rail-title { display: none; }
+  .fv-rail nav a { flex-direction: column; gap: 4px; padding: 8px 10px; font-size: 11.5px; min-width: 72px; text-align: center; }
+  .fv-rail nav a span { white-space: nowrap; }
+  .fv-user small { display: none; }
+}

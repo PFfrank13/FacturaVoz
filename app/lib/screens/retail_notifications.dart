@@ -347,12 +347,18 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
                     Expanded(
                       child: Semantics(
                         header: true,
-                        child: Text(
-                          h.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
+                        // Se achica en vez de cortarse: «Venta rápida» entra entera junto a la isla.
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            h.title,
+                            maxLines: 1,
+                            softWrap: false,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.3,
+                            ),
                           ),
                         ),
                       ),

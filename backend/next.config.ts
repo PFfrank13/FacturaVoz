@@ -33,6 +33,9 @@ function contentSecurityPolicy(flutter: boolean) {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Volver a una sección ya abierta es instantáneo durante 30 s (el contenido en vivo se refresca solo con
+  // LiveRefresh y cada acción llama a router.refresh / revalidatePath, así que no se ven datos viejos).
+  experimental: { staleTimes: { dynamic: 30, static: 180 } },
   async rewrites() {
     return [{ source: "/app", destination: "/app/index.html" }];
   },

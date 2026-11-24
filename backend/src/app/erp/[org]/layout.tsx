@@ -15,11 +15,15 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       <Link className="fv-wordmark" href="/">Factura<span>Voz</span><i aria-hidden="true">▂▅▃▇</i></Link>
       <p className="fv-eyebrow">{c.sector ? sectors[c.sector].name : "TU EMPRESA"}</p>
       <strong className="fv-org-name">{c.organization.name}</strong>
-      <RailNav links={[{ href: `/erp/${org}`, label: "Inicio" }, ...visibleModules(c.license, c.access, c.sector).map(m => ({ href: `/erp/${org}/${m.id}`, label: m.id === "clientes" && c.sector === "consultorio" ? "Pacientes" : m.id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title }))]} />
+      <RailNav links={[{ id: "inicio", href: `/erp/${org}`, label: "Inicio" }, ...visibleModules(c.license, c.access, c.sector).map(m => ({ id: m.id, href: `/erp/${org}/${m.id}`, label: m.id === "clientes" && c.sector === "consultorio" ? "Pacientes" : m.id === "clientes" && c.sector === "educacion" ? "Alumnos y contactos" : m.title }))]} />
       <Link className="fv-switch" href="/">⇄ Cambiar empresa</Link>
     </aside>
     <div className="fv-workarea">
-      <header className="fv-topbar"><span>{c.access.display_name || c.user.email}</span><RefreshAccess org={org} /></header>
+      <header className="fv-topbar">
+        <span className="fv-user"><b aria-hidden="true">{(c.access.display_name || c.user.email || "?").trim().slice(0, 1).toUpperCase()}</b>
+          <span><strong>{c.access.display_name || c.user.email}</strong><small>{c.access.role === "owner" ? "Dueño" : c.access.role === "admin" ? "Administrador" : c.access.role === "finanzas" ? "Finanzas" : c.access.role === "tecnico" ? "Técnico" : "Cajero"} · {c.organization.name}</small></span></span>
+        <RefreshAccess org={org} />
+      </header>
       <main id="workspace-content" className="fv-content">{children}</main>
     </div>
   </div>;

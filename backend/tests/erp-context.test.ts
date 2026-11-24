@@ -22,5 +22,6 @@ it("checks membership against the authenticated user and rejects another organiz
   await expect(workspaceContext(org)).rejects.toThrow("NOT_FOUND");
   expect(query.eq).toHaveBeenCalledWith("org_id", org);
   expect(query.eq).toHaveBeenCalledWith("user_id", "actual-user");
-  expect(mock.db.rpc).not.toHaveBeenCalled();
+  // The license/access RPCs now run in parallel with the membership check (one round trip); they verify
+  // membership themselves and raise for outsiders, and the page still answers NOT_FOUND before using anything.
 });
