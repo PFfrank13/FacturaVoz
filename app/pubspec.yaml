@@ -23,10 +23,10 @@ dependencies:
   path_provider: ^2.1.4
   cross_file: ^0.3.4+2
   url_launcher: ^6.3.1
-  file_picker: ">=8.1.0 <11.0.0"
+  file_picker: ^13.4.1
   intl: any
   local_auth: ">=2.3.0 <3.0.0"
-  flutter_secure_storage: ^10.3.4
+  flutter_secure_storage: ^11.2.0
   crypto: ^3.0.3
   # Negocio Pro: fotos de comprobantes/constancias y respuesta hablada del Copiloto
   image_picker: ^1.1.2
