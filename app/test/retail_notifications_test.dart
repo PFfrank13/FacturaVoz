@@ -251,6 +251,9 @@ void main() {
     alertNumber = 2;
     LiveHub.instance.tick('owner_alerts').value++;
     await tester.pumpAndSettle();
+    // Primer toque: la notificación se muestra completa; segundo toque: abre el centro.
+    await tester.tap(card);
+    await tester.pumpAndSettle();
     await tester.tap(card);
     await tester.pumpAndSettle();
     alertNumber = 3;

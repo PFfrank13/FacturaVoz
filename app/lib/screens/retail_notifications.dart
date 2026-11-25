@@ -1,4 +1,6 @@
 import 'package:dynamic_notification_island/dynamic_notification_island.dart';
+import '../ui/copilot_island.dart';
+import 'assistant.dart' show openCopilot;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -288,16 +290,30 @@ class _RetailNotificationToolbarState extends State<_RetailNotificationToolbar>
     // On phones the island lives in the status strip, centered over the
     // camera, like the system one. Without a strip it sits in the toolbar.
     final strip = statusBarIslandGeometry(MediaQuery.of(context));
+    // Pro y Empresa (plan con Copiloto): sin avisos pendientes, la isla se abre en el Copiloto para conversar.
+    // Básico: la isla es solo para notificaciones (al tocarla se ve la notificación completa).
+    final canCopilot = Access.instance.has('copiloto');
     Widget island(Size size, IslandPlacement placement) =>
         DynamicNotificationIsland(
           notice: notice,
           announcement: _announcement == 0 ? null : _announcement,
           compactLabel: notice == null
               ? 'Actividad'
-              : 'Vista previa de notificaciones',
+              : 'Ver la notificación completa',
           compactSize: size,
           placement: placement,
           onOpen: _openCenter,
+          idleIcon: canCopilot ? Icons.auto_awesome_rounded : null,
+          idleLabel: 'Hablar con el Copiloto',
+          idleBuilder: canCopilot
+              ? (overlayContext, close) => CopilotIslandPanel(
+                    onClose: close,
+                    onOpenFull: (ask) {
+                      close();
+                      if (mounted) openCopilot(context, ask: ask);
+                    },
+                  )
+              : null,
         );
 
     return AppBar(

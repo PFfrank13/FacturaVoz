@@ -179,4 +179,49 @@ void main() {
     expect(opened, 1);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a touch opens the complete notice and it stays until closed', (tester) async {
+    const long = DynamicIslandNotice(
+      id: 'largo',
+      title: 'Stock bajo',
+      message: 'Arroz, aceite, azúcar, leche, fideos, atún y galletas están por debajo de su mínimo. Haz tu pedido hoy para no quedarte sin mercadería el fin de semana.',
+    );
+    await tester.pumpWidget(frame(current: long, duration: const Duration(seconds: 2)));
+    await tester.tap(pill);
+    await tester.pumpAndSettle();
+    expect(panel, findsOneWidget);
+    expect(find.textContaining('fin de semana'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(panel, findsOneWidget, reason: 'opened by a touch: no auto retreat');
+    final size = tester.getSize(panel);
+    expect(size.height, inInclusiveRange(84, 160));
+  });
+
+  testWidgets('with no notice, a touch pours the island into the idle content', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: DynamicNotificationIsland(
+            notice: null,
+            onOpen: () {},
+            idleIcon: Icons.auto_awesome_rounded,
+            idleLabel: 'Copiloto',
+            idleBuilder: (context, close) => Row(children: [
+              const Expanded(child: Text('Hola, soy tu copiloto')),
+              TextButton(onPressed: close, child: const Text('Cerrar')),
+            ]),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(pill);
+    await tester.pumpAndSettle();
+    expect(find.text('Hola, soy tu copiloto'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 10));
+    expect(find.text('Hola, soy tu copiloto'), findsOneWidget, reason: 'stays open');
+    await tester.tap(find.text('Cerrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hola, soy tu copiloto'), findsNothing);
+  });
 }

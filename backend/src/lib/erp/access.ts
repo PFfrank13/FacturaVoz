@@ -54,7 +54,7 @@ export const modules: readonly Module[] = [
   { id: "clientes360", title: "Análisis de clientes", feature: "clientes", permission: "finance" },
   { id: "negocio", title: "Ganancia real", feature: "reportes", permission: "finance" },
   { id: "escanear", title: "Escanear comprobante", permission: "finance" },
-  { id: "pin", title: "PIN del dueño", feature: "antifraude", permission: "team" },
+  { id: "pin", title: "PIN del dueño", permission: "team" },
   { id: "agente", title: "Tareas del Copiloto", feature: "copiloto_agente", permission: "settings" },
   { id: "alertas", title: "Alertas del dueño", feature: "antifraude", permission: "team" },
   { id: "bitacora", title: "Bitácora", feature: "antifraude", permission: "team" },

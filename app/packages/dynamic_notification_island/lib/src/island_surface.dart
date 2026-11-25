@@ -25,10 +25,14 @@ class _CompactIsland extends StatelessWidget {
     required this.pulse,
     required this.bare,
     required this.elevated,
+    this.idleIcon,
+    this.idleAccent,
   });
 
   final double height;
   final DynamicIslandNotice? notice;
+  final IconData? idleIcon;
+  final Color? idleAccent;
   final Animation<double> pulse;
 
   /// Plain black, exactly like the hardware island at rest.
@@ -37,7 +41,11 @@ class _CompactIsland extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = notice == null ? null : _bright(notice!.accent);
+    final accent = notice != null
+        ? _bright(notice!.accent)
+        : idleIcon != null && idleAccent != null
+            ? _bright(idleAccent!)
+            : null;
     final glyph = height * .6;
     final inset = (height - glyph) / 2;
     return DecoratedBox(
@@ -65,7 +73,7 @@ class _CompactIsland extends StatelessWidget {
             _Glyph(
               size: glyph,
               accent: accent,
-              icon: notice?.icon,
+              icon: notice?.icon ?? idleIcon,
               pulse: pulse,
             ),
             const Spacer(),
@@ -401,10 +409,16 @@ class _ExpandedIsland extends StatelessWidget {
     required this.notice,
     required this.onOpen,
     required this.onClose,
+    required this.onExpand,
+    this.full = false,
   });
 
   final DynamicIslandNotice notice;
-  final VoidCallback onOpen, onClose;
+  final VoidCallback onOpen, onClose, onExpand;
+
+  /// Complete notice (opened by a touch): the whole text, scrollable within
+  /// Apple's expanded height (84–160 pt), and the action below it.
+  final bool full;
 
   @override
   Widget build(BuildContext context) {
@@ -417,10 +431,12 @@ class _ExpandedIsland extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          onTap: onOpen,
+          onTap: full ? onOpen : onExpand,
           borderRadius: BorderRadius.circular(_bodyRadius),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 8, 16),
+          child: ConstrainedBox(
+           constraints: const BoxConstraints(minHeight: 84, maxHeight: 160),
+           child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 8, full ? 12 : 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -473,7 +489,7 @@ class _ExpandedIsland extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             notice.title,
-                            maxLines: 2,
+                            maxLines: full ? 3 : 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white,
@@ -512,7 +528,30 @@ class _ExpandedIsland extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Padding(
+                if (full) ...[
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 52, right: 8),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          notice.message,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xffdbe3ee),
+                            height: 1.32,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _ActionPill(label: notice.actionLabel, accent: accent, onTap: onOpen),
+                    ),
+                  ),
+                ] else Padding(
                   padding: const EdgeInsets.only(left: 52, right: 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -553,9 +592,56 @@ class _ExpandedIsland extends StatelessWidget {
                 ),
               ],
             ),
+           ),
           ),
         ),
       ),
     );
   }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({required this.label, required this.accent, required this.onTap});
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: accent,
+        shape: const StadiumBorder(),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xff07121c),
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+        ),
+      );
+}
+
+/// Frame for the idle content: Apple's expanded height range (84–160 pt) and
+/// margins concentric with the island's corners.
+class _IdleBody extends StatelessWidget {
+  const _IdleBody({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        type: MaterialType.transparency,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 84, maxHeight: 160),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            child: child,
+          ),
+        ),
+      );
 }

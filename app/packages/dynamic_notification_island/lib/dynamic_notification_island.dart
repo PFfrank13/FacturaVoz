@@ -72,6 +72,10 @@ class DynamicNotificationIsland extends StatefulWidget {
     this.compactSize = const Size(126, 34),
     this.placement = IslandPlacement.toolbar,
     this.activityExtent = 32,
+    this.idleBuilder,
+    this.idleIcon,
+    this.idleAccent = const Color(0xffb69cff),
+    this.idleLabel = 'Abrir',
   });
 
   final DynamicIslandNotice? notice;
@@ -85,6 +89,16 @@ class DynamicNotificationIsland extends StatefulWidget {
   final Size compactSize;
   final IslandPlacement placement;
   final double activityExtent;
+
+  /// Optional content the island pours into when it is tapped with no pending
+  /// notice (like a Live Activity of a running app: a player, a timer or an
+  /// assistant). It stays open until it is closed or swiped up.
+  final Widget Function(BuildContext context, VoidCallback close)? idleBuilder;
+
+  /// Leading glyph of the resting pill while [idleBuilder] is available.
+  final IconData? idleIcon;
+  final Color idleAccent;
+  final String idleLabel;
 
   @override
   State<DynamicNotificationIsland> createState() =>
@@ -124,6 +138,13 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   bool _announcedInitial = false;
   Size _size = Size.zero;
 
+  /// The idle content (e.g. the assistant) is open instead of a notice.
+  bool _idle = false;
+
+  /// The notice was opened by the person: show it complete and keep it open.
+  bool _full = false;
+  static const _idleId = '\u0000idle';
+
   bool get _inStrip => widget.placement == IslandPlacement.statusBar;
 
   @override
@@ -157,7 +178,10 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   @override
   void didUpdateWidget(covariant DynamicNotificationIsland oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.notice == null || widget.notice?.id != oldWidget.notice?.id) {
+    // A notice that disappears (or is replaced) closes its card at once; the
+    // idle content belongs to the app and is not affected by notice changes.
+    if (!_idle &&
+        (widget.notice == null || widget.notice?.id != oldWidget.notice?.id)) {
       _dropImmediately();
     }
     if (widget.notice != null &&
@@ -204,6 +228,8 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   void _settledClosed() {
     _visibleId = null;
     _dragDy = 0;
+    _idle = false;
+    _full = false;
     _hidePortal();
   }
 
@@ -226,16 +252,28 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   void _scheduleDismiss() {
     _timer?.cancel();
     final lifetime = widget.duration;
-    if (_accessible || lifetime == null || !_portal.isShowing) return;
+    if (_accessible || _idle || _full || lifetime == null || !_portal.isShowing) {
+      return;
+    }
     const revealDelay = Duration(milliseconds: 420);
     _timer = Timer(lifetime + (_reduced ? Duration.zero : revealDelay), _close);
   }
 
-  void _show() {
+  /// [manual] is a touch on the island: the notice opens complete and stays
+  /// until closed. Automatic announcements show a short preview that retreats.
+  void _show({bool manual = false}) {
     if (widget.notice == null) {
-      widget.onOpen();
+      if (manual && widget.idleBuilder != null) {
+        _openIdle();
+      } else {
+        widget.onOpen();
+      }
       return;
     }
+    // Never interrupt the idle content (a conversation) with an announcement.
+    if (!manual && _idle && _portal.isShowing) return;
+    _idle = false;
+    _full = manual;
     _dragDy = 0;
     _visibleId = widget.notice!.id;
     if (!_portal.isShowing) setState(_portal.show);
@@ -247,12 +285,30 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
     _scheduleDismiss();
   }
 
+  void _openIdle() {
+    _timer?.cancel();
+    _dragDy = 0;
+    _idle = true;
+    _full = false;
+    _visibleId = _idleId;
+    if (!_portal.isShowing) setState(_portal.show);
+    if (!_reduced) HapticFeedback.lightImpact();
+    _springTo(1);
+  }
+
+  void _showFull() {
+    _timer?.cancel();
+    setState(() => _full = true);
+  }
+
   void _dropImmediately() {
     _timer?.cancel();
     _motion.stop();
     _target = 0;
     _dragDy = 0;
     _visibleId = null;
+    _idle = false;
+    _full = false;
     _motion.value = 0;
     _hidePortal();
   }
@@ -318,7 +374,8 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
   Widget build(BuildContext context) {
     final notice = widget.notice;
     final rest = widget.compactSize;
-    final active = !_inStrip || notice != null;
+    final idleReady = notice == null && widget.idleBuilder != null;
+    final active = !_inStrip || notice != null || idleReady;
     final size = _size = Size(
       rest.width + (_inStrip && active ? widget.activityExtent * 2 : 0),
       rest.height,
@@ -342,9 +399,9 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
           ),
           child: Semantics(
             button: true,
-            label: widget.compactLabel,
+            label: idleReady ? widget.idleLabel : widget.compactLabel,
             child: Tooltip(
-              message: widget.compactLabel,
+              message: idleReady ? widget.idleLabel : widget.compactLabel,
               excludeFromSemantics: true,
               child: Material(
                 type: MaterialType.transparency,
@@ -353,7 +410,8 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
                   customBorder: const StadiumBorder(),
                   splashColor: Colors.white.withValues(alpha: .08),
                   highlightColor: Colors.white.withValues(alpha: .05),
-                  onTap: () => _portal.isShowing ? _close() : _show(),
+                  onTap: () =>
+                      _portal.isShowing ? _close() : _show(manual: true),
                   // The expanded surface replaces the pill while it is shown,
                   // so there is always exactly one island on screen.
                   child: Opacity(
@@ -361,6 +419,8 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
                     child: _CompactIsland(
                       height: size.height,
                       notice: notice,
+                      idleIcon: idleReady ? widget.idleIcon : null,
+                      idleAccent: widget.idleAccent,
                       pulse: _pulse,
                       bare: _inStrip && !active,
                       elevated: !_inStrip,
@@ -377,7 +437,8 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
 
   Widget _overlay(BuildContext context) {
     final notice = widget.notice;
-    if (notice == null || _visibleId != notice.id) {
+    final idle = _idle && _visibleId == _idleId && widget.idleBuilder != null;
+    if (!idle && (notice == null || _visibleId != notice.id)) {
       return const SizedBox.shrink();
     }
     // Leave the rest of the overlay transparent to touch. The follower tracks
@@ -398,12 +459,12 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
           ancestor: overlay,
         );
         final safe = MediaQuery.paddingOf(context);
-        const margin = 10.0;
+        const margin = 11.0;
         final usable = math.max(
           0.0,
           bounds.maxWidth - safe.left - safe.right - margin * 2,
         );
-        final width = math.min(412.0, usable);
+        final width = math.min(408.0, usable);
         if (width < 100) return const SizedBox.shrink();
         final left = (center.dx - width / 2)
             .clamp(
@@ -415,11 +476,15 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
             )
             .toDouble();
         final shift = left + width / 2 - center.dx;
-        final content = _ExpandedIsland(
-          notice: notice,
-          onOpen: _open,
-          onClose: _close,
-        );
+        final Widget content = idle
+            ? _IdleBody(child: widget.idleBuilder!(context, _close))
+            : _ExpandedIsland(
+                notice: notice!,
+                full: _full,
+                onOpen: _open,
+                onClose: _close,
+                onExpand: _showFull,
+              );
         return Stack(
           children: [
             Positioned(
@@ -451,7 +516,7 @@ class _DynamicNotificationIslandState extends State<DynamicNotificationIsland>
                         compact: _size,
                         expandedWidth: width,
                         shift: shift,
-                        accent: notice.accent,
+                        accent: idle ? widget.idleAccent : notice!.accent,
                         child: IgnorePointer(
                           ignoring: reveal < .5,
                           child: ExcludeSemantics(
