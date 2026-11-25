@@ -140,7 +140,7 @@ const rubros = <RubroSpec>[
     home: ['pos', 'fiados', 'reponer', 'caja'],
     areas: [
       RubroArea('Tu bodega', ['pos', 'facturar', 'fiados', 'reponer', 'productos', 'compras', 'vencimientos', 'caja']),
-      RubroArea('Vender más', ['tienda', 'puntos', 'precios', 'cupones', 'cotizaciones', 'cuaderno', 'avisos', 'credito', 'clientes360']),
+      RubroArea('Vender más', ['tienda', 'puntos', 'precios', 'cupones', 'cotizaciones', 'cuaderno', 'avisos', 'credito', 'clientes360', 'recurrentes', 'encuestas']),
       _moneyArea,
       _businessArea,
       _settingsArea,

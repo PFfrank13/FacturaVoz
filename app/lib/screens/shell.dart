@@ -437,7 +437,6 @@ class _MainShellState extends State<MainShell> {
     }
 
     const homeColor = Color(0xFF0E8C74);
-    const settingsColor = Color(0xFF4F6480);
     return FvGlassSurface(
       radius: 24,
       blur: 18,
@@ -502,13 +501,7 @@ class _MainShellState extends State<MainShell> {
                 selected: e.isTab && e.tab == _tab,
                 onTap: () => open(e)),
           ],
-          if (tabs.contains('settings')) ...[
-            const SizedBox(height: 14),
-            Divider(height: 1, indent: 22, endIndent: 22, color: cs.outlineVariant.withValues(alpha: .6)),
-            const SizedBox(height: 8),
-            tile(icon: Icons.settings_rounded, label: 'Configuración', color: settingsColor, selected: _tab == 'settings',
-              onTap: () => open(const MenuEntry('ajustes', tab: 'settings'))),
-          ],
+          // «Configuración» es una categoría más del menú (ajustes, equipo, plan y API), igual que en la web.
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 12, 20, 28),
             child: Text('Solo ves lo que incluye tu plan $plan y lo que tu rol permite.',

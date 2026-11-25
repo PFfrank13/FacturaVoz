@@ -2,6 +2,7 @@
 import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { menuGroups } from "@/lib/erp/menu";
 
 /** Stroke icons (24 px grid) for each workspace section: recognizable at a glance, same weight everywhere. */
 const icons: Record<string, string> = {
@@ -60,16 +61,7 @@ const icons: Record<string, string> = {
 };
 
 /** Sections grouped the way a shopkeeper thinks about the day, each with its own color (same as the mobile menu). */
-const groups: { title: string; color: string; ids: string[] }[] = [
-  { title: "Vender", color: "#0e8c74", ids: ["vender", "carta", "platos", "comprobantes", "cotizaciones", "cuaderno", "recurrentes", "tienda"] },
-  { title: "Mercadería", color: "#2f6fdc", ids: ["productos", "inventario", "compras", "reponer", "vencimientos", "sucursales"] },
-  { title: "Caja y cobros", color: "#c77417", ids: ["caja", "fiados", "cobranza", "cobros", "corte", "morosidad", "avisos", "credito", "conciliacion", "gastos", "escanear"] },
-  { title: "Clientes y promociones", color: "#c2407e", ids: ["clientes", "clientes360", "promociones", "puntos", "encuestas"] },
-  { title: "Servicios", color: "#0b8aa8", ids: ["trabajos", "agenda", "placas", "recordatorios", "paquetes", "historial", "margen_obra"] },
-  { title: "Mi negocio", color: "#6a5ae0", ids: ["negocio", "reportes", "impuestos", "comisiones", "agente", "importar"] },
-  { title: "Control del dueño", color: "#8a4b2f", ids: ["alertas", "bitacora", "pin", "papelera"] },
-  { title: "Configuración", color: "#4f6480", ids: ["equipo", "plan", "configuracion", "api"] },
-];
+const groups = menuGroups;
 
 export const RailIcon = ({ id }: { id: string }) => <svg className="fv-rail-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
   <path d={icons[id] ?? icons.productos} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />

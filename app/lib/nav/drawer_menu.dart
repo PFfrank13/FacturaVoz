@@ -24,8 +24,11 @@ const bodegaMenu = <MenuSectionSpec>[
       ['clientes', 'clientes360', 'precios', 'cupones', 'puntos', 'encuestas']),
   MenuSectionSpec('Mi negocio', Color(0xFF6A5AE0), Icons.insights_rounded,
       ['reportes', 'negocio', 'impuestos', 'comisiones', 'agente', 'importar']),
-  MenuSectionSpec('Control del dueño', Color(0xFF4F6480), Icons.shield_rounded,
+  MenuSectionSpec('Control del dueño', Color(0xFF8A4B2F), Icons.shield_rounded,
       ['alertas', 'bitacora', 'pin', 'papelera']),
+  // Igual que la web: los ajustes del negocio, el equipo, el plan y las conexiones (API, plan Empresa).
+  MenuSectionSpec('Configuración', Color(0xFF4F6480), Icons.settings_rounded,
+      ['ajustes', 'equipo', 'plan', 'api']),
 ];
 
 /// Funciones que ya son una pestaña del shell: se abren como pestaña (no como pantalla aparte) para no duplicar.
@@ -38,6 +41,7 @@ const featureTab = <String, String>{
   'caja': 'cash',
   'clientes': 'clients',
   'reportes': 'reportes',
+  'ajustes': 'settings',
 };
 
 /// Un ítem del menú: una pestaña del shell o una función del catálogo.
