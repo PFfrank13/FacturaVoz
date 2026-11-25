@@ -35,6 +35,11 @@ import 'taxes.dart';
 /// Abre el Copiloto: pregunta por tu negocio o da una orden, por voz o por texto.
 /// Con [ask] la pregunta se envía sola al abrir (p. ej. "plan de rescate de caja").
 Future<void> openCopilot(BuildContext context, {String? ask}) {
+  // Solo si el plan contratado en Solvex Hub incluye el Copiloto. Si no, se explica cómo obtenerlo (nunca se abre).
+  if (!Access.instance.has('copiloto')) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El Copiloto con IA no está incluido en tu plan.')));
+    return Future.value();
+  }
   final nav = Navigator.of(context);
   Haptics.soft();
   return showModalBottomSheet<void>(

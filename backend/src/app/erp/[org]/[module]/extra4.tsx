@@ -6,7 +6,7 @@ import { money } from "@/lib/schemas";
 import { limaDate } from "@/lib/erp/receipts";
 import { clientKey } from "@/lib/erp/insights";
 import { waPhone } from "@/lib/erp/clients";
-import { can } from "@/lib/erp/access";
+import { can, hasFeature } from "@/lib/erp/access";
 import LiveRefresh from "@/components/erp/LiveRefresh";
 import { isoToLimaLocal, jobKinds, jobStatuses, normPlate, noticeText, canCut, obraSignal, statusOf, type JobStatus } from "@/lib/erp/rubros";
 import { loadReceivables } from "./extra3";
@@ -320,7 +320,7 @@ export async function renderExtra4(id: string, c: Ctx, org: string, title: strin
     return <>{heading(`RESTAURANTE / ${name}`, title, "Pedidos de las mesas (QR), de la tienda y los que tomes aquí, en vivo. Pásalos de Nuevos a Preparando y a Listos.", org, liveKitchen)}
       {res.error ? failed("las comandas") : <KitchenBoard org={org} orders={orders} products={((prods.data ?? []) as { id: string; name: string; unit_price: number | string }[]).map(p => ({ id: p.id, name: p.name, price: n(p.unit_price) }))} />}
       <section className="fv-create fv-cash-card fv-qr-tables"><h3>QR para las mesas</h3>
-        {!slug ? <p className="fv-muted">Primero crea tu carta en <Link className="fv-link" href={`/erp/${org}/tienda`}>Tienda en línea</Link>: cada QR abre tu carta con el número de mesa y el pedido llega aquí.</p> : <>
+        {!slug ? <p className="fv-muted">Primero crea tu carta en Tienda en línea{hasFeature(c.license, "tienda") ? <> (<Link className="fv-link" href={`/erp/${org}/tienda`}>abrir</Link>)</> : ""}: cada QR abre tu carta con el número de mesa y el pedido llega aquí.</p> : <>
           <form className="fv-inline-form"><label className="fv-search"><span>¿Cuántas mesas?</span><input name="mesas" type="number" min={1} max={60} defaultValue={mesas || 10} /></label><button className="fv-button secondary">Generar QR</button>
             {qrs.length > 0 && <PrintButton />}</form>
           {qrs.length > 0 && <div className="fv-qr-grid">{qrs.map((svg, i) => <figure key={i}><span dangerouslySetInnerHTML={{ __html: svg }} /><figcaption><b>MESA {i + 1}</b><small>Escanea, mira la carta y pide</small></figcaption></figure>)}</div>}

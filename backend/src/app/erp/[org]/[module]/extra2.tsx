@@ -227,7 +227,7 @@ export async function renderExtra2(id: string, c: Ctx, org: string, title: strin
     });
     return <>{heading(`VENDER / ${name}`, title, "Cotiza en segundos, mándale el enlace a tu cliente y entérate al instante si la acepta. Con un clic la conviertes en venta.", org, liveQuotes)}
       <NewInvoice key={`q-${org}`} org={org} currency={cur} defaultTaxRate={Number(c.organization.default_tax_rate ?? 18)} voiceAllowed={hasFeature(c.license, "voz")} mode="quote" />
-      {res.error ? failed("las cotizaciones") : <QuotesBoard org={org} rows={rows} today={today} canSell={can(c.access, "sell")} />}
+      {res.error ? failed("las cotizaciones") : <QuotesBoard org={org} rows={rows} today={today} canSell={can(c.access, "sell")} store={hasFeature(c.license, "tienda")} />}
     </>;
   }
 

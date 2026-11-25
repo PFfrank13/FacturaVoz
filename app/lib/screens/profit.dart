@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../finance.dart';
@@ -304,10 +305,9 @@ class _ProfitScreenState extends State<ProfitScreen> with LiveReload<ProfitScree
                 // se partían en dos renglones en pantallas angostas).
                 child: Row(children: [
                   Expanded(child: _mini(context, Icons.add_rounded, 'Gasto', _addExpense)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _mini(context, Icons.document_scanner_rounded, 'Escanear', _scan)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _mini(context, Icons.auto_awesome_rounded, 'Preguntar', () => openCopilot(context))),
+                  // Escanear (lectura con IA) y Preguntar (Copiloto) solo si el plan los incluye.
+                  if (Access.instance.has('cuaderno_ia')) ...[const SizedBox(width: 8), Expanded(child: _mini(context, Icons.document_scanner_rounded, 'Escanear', _scan))],
+                  if (Access.instance.has('copiloto')) ...[const SizedBox(width: 8), Expanded(child: _mini(context, Icons.auto_awesome_rounded, 'Preguntar', () => openCopilot(context)))],
                 ]),
               ),
               const SizedBox(height: 20),
@@ -514,8 +514,8 @@ class _ProfitScreenState extends State<ProfitScreen> with LiveReload<ProfitScree
                 const SizedBox(width: 8),
                 Expanded(child: Text(f.warning!, style: t.textTheme.bodySmall?.copyWith(color: Brand.bad, fontWeight: FontWeight.w600))),
               ]),
-              const SizedBox(height: 10),
-              FilledButton.icon(
+              if (Access.instance.has('copiloto')) const SizedBox(height: 10),
+              if (Access.instance.has('copiloto')) FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: Brand.bad, minimumSize: const Size(64, 44)),
                 onPressed: () => openCopilot(context, ask: 'Mi caja se va a poner negativa. Dame un plan de rescate de 3 pasos con nombres y montos.'),
                 icon: const Icon(Icons.auto_awesome_rounded),

@@ -195,7 +195,7 @@ class _TaxesScreenState extends State<TaxesScreen> with LiveReload<TaxesScreen> 
                     ]),
                   ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
+                if (Access.instance.has('copiloto')) OutlinedButton.icon(
                   onPressed: () => openCopilot(context, ask: 'Explícame en palabras simples cuánto debo pagar a SUNAT este mes y cuánto me queda.'),
                   icon: const Icon(Icons.auto_awesome_rounded),
                   label: const Text('Pregúntale al copiloto'),

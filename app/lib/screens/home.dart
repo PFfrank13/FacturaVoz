@@ -384,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (Access.instance.can('sell')) QuickAction(icon: Icons.mic_rounded, label: 'Facturar', colors: const [Color(0xFFFFA77F), Color(0xFFFF7E9A)], onTap: _newInvoice),
                       if (Access.instance.can('sell') && Access.instance.has('cotizaciones'))
                         QuickAction(icon: Icons.request_quote_rounded, label: 'Cotizar', colors: const [Color(0xFF8E7CF2), Color(0xFF6A62E2)], onTap: _quickQuote),
-                      if (Access.instance.can('finance'))
+                      if (Access.instance.can('finance') && Access.instance.has('cuaderno_ia'))
                         QuickAction(icon: Icons.document_scanner_rounded, label: 'Escanear', colors: const [Color(0xFF5BC0EB), Color(0xFF3A86FF)], onTap: () => _push(const ScanScreen())),
                       if (Access.instance.can('finance')) QuickAction(icon: Icons.shopping_bag_rounded, label: 'Gasto', colors: const [Color(0xFFFFC56E), Color(0xFFFF9F43)], onTap: _quickExpense),
                       if (Access.instance.has('tienda'))

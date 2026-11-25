@@ -141,7 +141,7 @@ class _BusinessSetupScreenState extends State<BusinessSetupScreen> {
       for (final (i, (icon, text)) in const [
         (Icons.mic_rounded, 'Factura hablando: "boleta para Rosa, 2 kilos de arroz a 4 soles"'),
         (Icons.people_alt_rounded, 'Cada cliente con su ficha: deuda, historial, fotos y WhatsApp'),
-        (Icons.auto_awesome_rounded, 'Un copiloto que te avisa a quién cobrar y cuánto guardar para SUNAT'),
+        (Icons.savings_rounded, 'Te muestra a quién cobrar y cuánto guardar para SUNAT'),
       ].indexed)
         Reveal(
           index: 3 + i,

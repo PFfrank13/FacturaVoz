@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../access.dart';
 import '../app_state.dart';
 import '../errors.dart';
 import '../models.dart';
@@ -288,7 +289,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> with LiveReload<Expense
     final now = DateTime.now();
     final isCurrent = _year == now.year && _month == now.month;
     return RetailResponsiveFrame(maxWidth: 1100, child: Scaffold(
-      appBar: AppBar(title: const Text('Gastos'), actions: [IconButton(onPressed: _scan, icon: const Icon(Icons.document_scanner_rounded), tooltip: 'Escanear comprobante')]),
+      appBar: AppBar(title: const Text('Gastos'), actions: [if (Access.instance.has('cuaderno_ia')) IconButton(onPressed: _scan, icon: const Icon(Icons.document_scanner_rounded), tooltip: 'Escanear comprobante')]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: const Text('Gasto')),
       body: RefreshIndicator(
         onRefresh: _load,
