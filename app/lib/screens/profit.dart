@@ -305,8 +305,9 @@ class _ProfitScreenState extends State<ProfitScreen> with LiveReload<ProfitScree
                 // se partían en dos renglones en pantallas angostas).
                 child: Row(children: [
                   Expanded(child: _mini(context, Icons.add_rounded, 'Gasto', _addExpense)),
-                  // Escanear (lectura con IA) y Preguntar (Copiloto) solo si el plan los incluye.
-                  if (Access.instance.has('cuaderno_ia')) ...[const SizedBox(width: 8), Expanded(child: _mini(context, Icons.document_scanner_rounded, 'Escanear', _scan))],
+                  // Escanear va en todos los planes; Preguntar (Copiloto) solo si el plan lo incluye.
+                  const SizedBox(width: 8),
+                  Expanded(child: _mini(context, Icons.document_scanner_rounded, 'Escanear', _scan)),
                   if (Access.instance.has('copiloto')) ...[const SizedBox(width: 8), Expanded(child: _mini(context, Icons.auto_awesome_rounded, 'Preguntar', () => openCopilot(context)))],
                 ]),
               ),

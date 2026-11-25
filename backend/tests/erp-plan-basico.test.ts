@@ -14,10 +14,10 @@ describe("el menú de la web solo muestra lo que el plan incluye", () => {
   it("dueño de bodega con plan Básico", () => {
     const ids = visibleModules(basico, owner, "bodega").map(m => m.id).sort();
     expect(ids).toEqual([
-      "caja", "clientes", "clientes360", "cobranza", "cobros", "compras", "comprobantes", "configuracion", "cotizaciones", "credito", "equipo", "fiados", "avisos",
+      "caja", "clientes", "clientes360", "cobranza", "cobros", "compras", "comprobantes", "configuracion", "cotizaciones", "credito", "equipo", "escanear", "fiados", "avisos",
       "gastos", "importar", "impuestos", "inventario", "negocio", "papelera", "plan", "productos", "reponer", "reportes", "vencimientos", "vender",
     ].sort());
-    for (const premium of ["agente", "escanear", "pin", "alertas", "bitacora", "promociones", "puntos", "tienda", "cuaderno", "recurrentes", "conciliacion", "encuestas", "comisiones", "api", "sucursales"])
+    for (const premium of ["agente", "pin", "alertas", "bitacora", "promociones", "puntos", "tienda", "cuaderno", "recurrentes", "conciliacion", "encuestas", "comisiones", "api", "sucursales"])
       expect(ids).not.toContain(premium);
   });
 });
